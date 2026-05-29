@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATEC Mobility | 통합 관제 포털</title>
+<script>
+(function(){
+  try{
+    var m=sessionStorage.getItem('atec_ui_mode');
+    if(m==='mobile') document.documentElement.classList.add('force-mobile');
+    if(m==='web') document.documentElement.classList.add('force-web');
+  }catch(e){}
+})();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+:root { --atec-wine:#7A0B3C; --atec-magenta:#C2185B; --atec-pink:#D81B60; --atec-rose:#EC407A; }
+body { font-family:'Pretendard', sans-serif; }
+.chip{ display:inline-flex; align-items:center; border-radius:9999px; padding:1px 8px; font-size:11px; font-weight:600; }
+.launch-card{ transition:transform .15s, box-shadow .15s; }
+.launch-card:hover{ transform:translateY(-4px); box-shadow:0 18px 40px -16px rgba(122,11,60,.45); }
+.mode-card.selected{ border-color:var(--atec-magenta); background:linear-gradient(135deg,#fff,#fce4ec); box-shadow:0 4px 12px -4px rgba(194,24,91,.3); }
+.mode-card.selected .text-slate-700{ color:var(--atec-wine); }
+/* === 모바일 (자동/강제) === */
+@media (max-width:767px){
+  html:not(.force-web){ font-size:14px; }
+  html:not(.force-web) header > div{ padding:10px 14px !important; gap:6px !important; }
+  html:not(.force-web) #user-badge{ width:100%; padding:6px 10px !important; gap:5px !important; }
+  html:not(.force-web) #user-badge button{ font-size:10px !important; padding:3px 7px !important; }
+  html:not(.force-web) .max-w-\[1280px\]{ padding-left:14px !important; padding-right:14px !important; }
+  html:not(.force-web) #auth-overlay > div{ padding:22px 20px !important; max-width:100% !important; }
+  html:not(.force-web) .launch-card{ padding:18px !important; }
+  html:not(.force-web) .grid.md\:grid-cols-2{ grid-template-columns:1fr !important; gap:12px !important; }
+  html:not(.force-web) .grid.grid-cols-2{ gap:8px !important; }
+}
+html.force-mobile{ font-size:14px; }
+html.force-mobile header > div{ padding:10px 14px !important; gap:6px !important; }
+html.force-mobile #user-badge{ width:100%; padding:6px 10px !important; gap:5px !important; }
+html.force-mobile #user-badge button{ font-size:10px !important; padding:3px 7px !important; }
+html.force-mobile .max-w-\[1280px\]{ padding-left:14px !important; padding-right:14px !important; }
+html.force-mobile #auth-overlay > div{ padding:22px 20px !important; max-width:100% !important; }
+html.force-mobile .launch-card{ padding:18px !important; }
+html.force-mobile .grid.md\:grid-cols-2{ grid-template-columns:1fr !important; gap:12px !important; }
+html.force-mobile .grid.grid-cols-2{ gap:8px !important; }
+/* 웹 모드 강제 */
+html.force-web body{ min-width:1100px; }
+/* === 사용자 배지 버튼 (항상 표시, 좁으면 줄바꿈) === */
+.ub-btn{ display:inline-flex; align-items:center; white-space:nowrap; }
+@media (max-width:767px){
+  html:not(.force-web) #user-badge{ flex-wrap:wrap; }
+  html:not(.force-web) .ub-btn{ font-size:10px !important; padding:4px 8px !important; }
+}
+html.force-mobile #user-badge{ flex-wrap:wrap; }
+html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important; }
+</style>
+</head>
+<body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 500px at 80% -120px, #fdeef4, transparent), #fbf7f9;">
+
+<!-- ===================== AUTH OVERLAY ===================== -->
+<div id="auth-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:linear-gradient(135deg, #6A0A35, #7A0B3C 55%, #A8124F);">
+  <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px);background-size:28px 28px;"></div>
+  <div class="absolute -right-32 -top-40 w-[28rem] h-[28rem] rounded-full" style="background:radial-gradient(circle, rgba(236,64,122,.45), transparent 70%)"></div>
+  <div class="absolute -left-32 -bottom-40 w-[28rem] h-[28rem] rounded-full" style="background:radial-gradient(circle, rgba(122,11,60,.5), transparent 70%)"></div>
+
+  <div class="auth-shell relative w-full max-w-[920px] grid lg:grid-cols-[1.05fr_0.95fr] rounded-2xl overflow-hidden shadow-2xl" style="min-height:0;">
+    <!-- LEFT: BRAND PANEL (desktop only) -->
+    <div class="auth-brand hidden lg:flex flex-col justify-between p-9 text-white relative" style="background:linear-gradient(160deg,#6A0A35 0%,#7A0B3C 50%,#A8124F 100%);">
+      <div class="absolute inset-0 opacity-[0.08]" style="background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px);background-size:32px 32px;"></div>
+      <div class="relative">
+        <div class="flex items-center gap-2.5 mb-1">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <div class="text-xl font-extrabold tracking-tight leading-none">ATEC <span class="text-pink-200">Mobility</span></div>
+            <div class="text-[11px] text-pink-100/80 mt-1">통합 관제 포털</div>
+          </div>
+        </div>
+      </div>
+      <div class="relative">
+        <h2 class="text-[25px] font-extrabold leading-snug tracking-tight">장애를 데이터로<br>먼저 잡습니다</h2>
+        <p class="text-[12.5px] text-pink-100/85 mt-2.5 leading-relaxed max-w-xs">버스 단말기와 철도 키오스크 장애를 한 곳에서 관리합니다.</p>
+
+        <!-- 이번 달 기준 라벨 -->
+        <div class="inline-flex items-center gap-1.5 mt-4 mb-1 bg-white/12 border border-white/20 rounded-full px-3 py-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2" stroke="#fff" stroke-width="1.8"/><path d="M4 9h16M8 3v4M16 3v4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span id="brand-period" class="text-[11px] font-bold text-white">이번 달 기준</span>
+        </div>
+
+        <!-- 두 시스템 카드 -->
+        <div class="grid grid-cols-2 gap-2.5 mt-2">
+          <!-- 버스 (핑크) -->
+          <div class="rounded-xl p-3" style="background:rgba(194,24,91,.22);border:1px solid rgba(244,114,182,.35)">
+            <div class="flex items-center gap-1.5 mb-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#fbcfe8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="text-[11.5px] font-bold text-pink-100">버스 단말기</span>
+            </div>
+            <div class="flex items-baseline gap-1"><span id="brand-bus-cnt" class="text-[19px] font-extrabold leading-none">—</span><span class="text-[10px] text-pink-100/70">건</span></div>
+            <div id="brand-bus-sub" class="text-[10px] text-pink-100/60 mt-0.5">이번 달 접수</div>
+          </div>
+          <!-- 철도 (블루) -->
+          <div class="rounded-xl p-3" style="background:rgba(99,102,241,.22);border:1px solid rgba(165,180,252,.4)">
+            <div class="flex items-center gap-1.5 mb-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#c7d2fe" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#c7d2fe" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <span class="text-[11.5px] font-bold text-indigo-100">철도 키오스크</span>
+            </div>
+            <div class="flex items-baseline gap-1"><span id="brand-rail-cnt" class="text-[19px] font-extrabold leading-none">—</span><span class="text-[10px] text-indigo-100/70">건</span></div>
+            <div id="brand-rail-sub" class="text-[10px] text-indigo-100/60 mt-0.5">이번 달 접수</div>
+          </div>
+        </div>
+      </div>
+      <div class="relative text-[10.5px] text-pink-100/55">데이터는 브라우저·클라우드에서 안전하게 처리됩니다</div>
+    </div>
+
+    <!-- RIGHT: FORM CARD -->
+    <div class="relative bg-white p-6 sm:p-9 flex flex-col justify-center">
+    <div class="text-center mb-5 lg:hidden">
+      <div class="inline-flex items-center gap-2 mb-1">
+        <span class="text-xl font-extrabold text-[#7A0B3C]">ATEC <span class="text-[#C2185B]">Mobility</span></span>
+      </div>
+      <div class="text-[12px] text-slate-500">통합 관제 포털</div>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="login-form">
+      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">로그인</div>
+      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
+      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')doLogin()">
+      <!-- 모드 선택: 모바일 / 웹 -->
+      <div class="mb-3">
+        <div class="text-[11px] font-bold text-slate-500 mb-1.5">화면 모드 선택 <span class="text-[#C2185B]">*</span></div>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg px-3 py-2 text-center transition" data-mode="web">
+            <input type="radio" name="ui-mode" value="web" class="hidden" onchange="selectMode('web')">
+            <div class="text-[18px]">🖥</div>
+            <div class="text-[11px] font-bold text-slate-700 mt-0.5">웹</div>
+            <div class="text-[10px] text-slate-400">PC·태블릿</div>
+          </label>
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg px-3 py-2 text-center transition" data-mode="mobile">
+            <input type="radio" name="ui-mode" value="mobile" class="hidden" onchange="selectMode('mobile')">
+            <div class="text-[18px]">📱</div>
+            <div class="text-[11px] font-bold text-slate-700 mt-0.5">모바일</div>
+            <div class="text-[10px] text-slate-400">휴대폰</div>
+          </label>
+        </div>
+      </div>
+      <button onclick="doLogin()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">로그인</button>
+      <div id="li-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
+      <div class="flex items-center justify-between mt-2">
+        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#C2185B] hover:underline">비밀번호 찾기</button>
+        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#C2185B] font-bold hover:underline">회원가입</button></div>
+      </div>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="signup-form" class="hidden">
+      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">회원가입</div>
+      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
+      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
+      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
+      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]">
+      <button onclick="doSignup()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">가입하기</button>
+      <div id="su-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
+      <div class="text-[11px] text-slate-400 text-center mt-1">가입 즉시 사용할 수 있습니다.</div>
+      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인</button></div>
+    </div>
+
+    <!-- PASSWORD RESET REQUEST FORM -->
+    <div id="reset-form" class="hidden">
+      <div class="text-sm font-extrabold text-[#7A0B3C] mb-1">비밀번호 찾기</div>
+      <p class="text-[11px] text-slate-500 mb-3">가입한 이메일로 <b>재설정 요청</b>을 보냅니다. 관리자가 임시 비밀번호를 발급하면 로그인 후 변경할 수 있습니다.</p>
+      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')requestReset()">
+      <button onclick="requestReset()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">재설정 요청 보내기</button>
+      <div id="rs-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인으로 돌아가기</button></div>
+    </div>
+
+    <div id="first-admin-note" class="hidden text-[11px] text-center text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 mt-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PORTAL (after login) ===================== -->
+<div id="app-root" class="hidden">
+<header class="relative overflow-hidden text-white" style="background:linear-gradient(110deg, var(--atec-wine) 0%, var(--atec-magenta) 55%, var(--atec-pink) 130%);">
+  <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(255,255,255,.25) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.25) 1px,transparent 1px);background-size:26px 26px;"></div>
+  <div class="absolute -right-16 -top-20 w-80 h-80 rounded-full" style="background:radial-gradient(circle, rgba(236,64,122,.45), transparent 70%)"></div>
+  <div class="relative max-w-[1280px] mx-auto px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
+    <div class="flex items-center gap-2">
+      <span class="text-lg sm:text-xl font-extrabold tracking-tight">ATEC <span class="font-semibold text-pink-200">Mobility</span></span>
+      <span class="inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5">통합 관제 포털</span>
+    </div>
+    <div id="user-badge" class="flex items-center flex-wrap gap-1.5 sm:gap-2 bg-white/12 border border-white/20 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs"></div>
+  </div>
+</header>
+
+<div class="max-w-[1280px] mx-auto px-4 sm:px-5 py-6 sm:py-8">
+  <h1 class="text-lg font-extrabold text-[#7A0B3C] mb-1">시스템 선택</h1>
+  <p class="text-[13px] text-slate-500 mb-6">사용할 관제 시스템을 선택하세요.</p>
+
+  <div id="launcher-grid" class="grid md:grid-cols-3 gap-5">
+    <!-- 단말기 시스템 -->
+    <a href="terminal.html" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 7h8M8 11h8M8 15h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-base font-extrabold text-[#7A0B3C]">단말기 장애 현장처리 판정 시스템</div>
+      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">차량번호 검색으로 과거 이력·재불량 위험·권장 조치를 확인하고, 선제 점검 대상과 이벤트 로그를 분석합니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#C2185B]">들어가기
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- 센터배정 시스템 -->
+    <a href="center.html" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0891B2,#26A69A)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="white" stroke-width="1.8"/></svg>
+      </div>
+      <div class="text-base font-extrabold text-[#0E7490]">센터 배정 최적화 관제 시스템</div>
+      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">운수사 위치·장애접수를 지도에 표시하고, 변경 전/후 센터 배정을 비교해 최적 배정을 검토합니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0891B2]">들어가기
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- 철도 키오스크 장애 관리 시스템 (권한 필요) -->
+    <a href="rail.html" id="launch-rail" data-perm="rail" class="launch-card block bg-white border border-indigo-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#3730A3,#6366F1)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-base font-extrabold text-[#3730A3]">철도 키오스크 장애 관리 시스템</div>
+      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#6366F1]">들어가기
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+  </div>
+
+  <!-- ADMIN: USER MANAGEMENT (admin only) -->
+  <div id="admin-section" class="mt-8" data-admin style="display:none">
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+      <h2 class="text-sm font-extrabold text-[#7A0B3C]">사용자 관리</h2>
+      <p class="text-[12px] text-slate-500 mt-1">가입 신청 승인/거부, 권한 변경, 비밀번호 재설정, 계정 삭제를 관리합니다.</p>
+      <div class="text-[11px] text-slate-500 mt-2 bg-rose-50/60 border border-rose-100 rounded-lg px-3 py-2 leading-relaxed">
+        💡 <b class="text-[#C2185B]">관리자 권한 부여 방법</b>: 아래 사용자 목록에서 일반 사용자 오른쪽의 <b>'관리자로'</b> 버튼을 누르면 그 사람이 관리자가 됩니다. 다시 <b>'일반으로'</b>를 누르면 해제됩니다.
+        (고정 관리자 <b>ysukim@atecmobility.com</b> 계정은 보호되어 변경·삭제할 수 없습니다.)
+      </div>
+      <div class="text-[11px] text-slate-500 mt-2 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed">
+        🚆 <b class="text-[#3730A3]">철도 시스템 권한</b>: 신규 가입자는 <b>버스 단말기 + 센터 배정</b>만 사용할 수 있습니다. 사용자 목록의 <b>"🚆 부여"</b> 버튼을 누르면 그 사용자에게 <b>철도 키오스크 시스템</b> 접근 권한이 부여됩니다. <b>"🚆 허용 ✓"</b>를 다시 누르면 권한이 회수됩니다. 관리자는 자동으로 모든 권한을 보유합니다.
+      </div>
+    </div>
+    <div id="admin-pending" class="mb-4"></div>
+    <div id="admin-resets" class="mb-4"></div>
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+      <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-3">전체 사용자</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-[12px]">
+          <thead><tr class="text-slate-400 border-b border-rose-100 text-left">
+            <th class="py-1.5 pr-2 font-semibold">이메일</th><th class="py-1.5 pr-2 font-semibold">이름</th>
+            <th class="py-1.5 pr-2 font-semibold">권한</th><th class="py-1.5 pr-2 font-semibold">상태</th>
+            <th class="py-1.5 pr-2 font-semibold">철도</th>
+            <th class="py-1.5 pr-2 font-semibold">가입일</th>
+            <th class="py-1.5 pr-2 font-semibold cursor-pointer select-none hover:text-[#C2185B]" onclick="toggleRecentSort()" title="클릭 시 최근 접속순 상위 5명만 표시"><span id="recent-th">최근 접속일 ⇅</span></th>
+            <th class="py-1.5 pr-2 font-semibold text-right">관리</th>
+          </tr></thead>
+          <tbody id="admin-users"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-[11px] text-slate-400 mt-10 pb-4">
+    ATEC Mobility · 통합 관제 포털 · 계정·데이터는 브라우저 내에서만 처리됩니다
+  </footer>
+</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let ME = null;
+
+/* ====== 고정 관리자 설정 (이 이메일만 관리자) ====== */
+const ADMIN_EMAIL='ysukim@atecmobility.com';
+const ADMIN_NAME='관리자';
+const ADMIN_PWHASH='7ba1cbd8435a7d0da85e4185b8c65932268ff9b6634d08c36bd687b523a201b9'; // SHA-256 of the admin password
+
+/* ============ IndexedDB (계정 공유: atec_maint / users) ============ */
+const DB_NAME='atec_maint', DB_VER=2;
+let _db=null;
+function openDB(){
+  return new Promise((res,rej)=>{
+    if(_db) return res(_db);
+    const rq=indexedDB.open(DB_NAME,DB_VER);
+    rq.onupgradeneeded=e=>{ const db=e.target.result;
+      if(!db.objectStoreNames.contains('recRecords')) db.createObjectStore('recRecords',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('evDays')) db.createObjectStore('evDays',{keyPath:'day'});
+      if(!db.objectStoreNames.contains('meta')) db.createObjectStore('meta',{keyPath:'k'});
+      if(!db.objectStoreNames.contains('users')) db.createObjectStore('users',{keyPath:'username'});
+    };
+    rq.onsuccess=e=>{ _db=e.target.result; res(_db); };
+    rq.onerror=e=>rej(e.target.error);
+  });
+}
+function idbBulkPut(store,items){ return openDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); const os=tx.objectStore(store); items.forEach(it=>os.put(it)); tx.oncomplete=()=>res(items.length); tx.onerror=e=>rej(e.target.error); })); }
+function idbGetAll(store){ return openDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(store,'readonly'); const rq=tx.objectStore(store).getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e.target.error); })); }
+function idbDelete(store,key){ return openDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete=()=>res(); tx.onerror=e=>rej(e.target.error); })); }
+function idbAvailable(){ try{ return typeof indexedDB!=='undefined'; }catch(e){ return false; } }
+function nowStamp(){ const d=new Date(); const p=n=>('0'+n).slice(-2); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+
+/* ============ CLOUD (Supabase) — 계정 동기화 ============ */
+const SB_URL='https://eiyksjcqntenmetmhmij.supabase.co';
+const SB_KEY='sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
+const SB_USERS='shared_users';
+const SB_DATA='shared_data';
+function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, extra||{}); }
+function cloudAvailable(){ return !!(SB_URL && SB_KEY && SB_URL.indexOf('http')===0); }
+// 브랜드 요약(가벼움) 읽기: shared_data 의 'brand_summary' 키
+async function loadBrandSummary(){
+  // 기본 폴백값(요약이 아직 없을 때) — 누적값 표시
+  const now=new Date();
+  setBrandFallback();
+  if(!cloudAvailable()) return;
+  try{
+    const url=`${SB_URL}/rest/v1/${SB_DATA}?key=eq.brand_summary&select=payload`;
+    const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) return;
+    const rows=await r.json(); if(!rows||!rows[0]||!rows[0].payload) return;
+    const s=JSON.parse(rows[0].payload);
+    applyBrandSummary(s);
+  }catch(e){ console.warn('brand summary load skip', e); }
+}
+function setBrandFallback(){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const now=new Date();
+  set('brand-period', `${now.getFullYear()}년 ${now.getMonth()+1}월 기준`);
+  // 아직 요약 게시 전: 누적 기준 안내
+  const bus=document.getElementById('brand-bus-cnt'), rail=document.getElementById('brand-rail-cnt');
+  if(bus && bus.textContent==='—'){ set('brand-bus-cnt','12,532'); set('brand-bus-sub','누적 접수 (월별 집계 대기)'); }
+  if(rail && rail.textContent==='—'){ set('brand-rail-cnt','2,765'); set('brand-rail-sub','누적 접수 (월별 집계 대기)'); }
+}
+function applyBrandSummary(s){
+  s=s||{};
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el && v!=null) el.textContent=v; };
+  const now=new Date(); const mon=(now.getMonth()+1);
+  set('brand-period', `${now.getFullYear()}년 ${mon}월 기준`);
+  if(s.bus){ set('brand-bus-cnt', (s.bus.month||0).toLocaleString('ko-KR')); set('brand-bus-sub', `이번 달 · 누적 ${(s.bus.total||0).toLocaleString('ko-KR')}건`); }
+  if(s.rail){ set('brand-rail-cnt', (s.rail.month||0).toLocaleString('ko-KR')); set('brand-rail-sub', `이번 달 · 누적 ${(s.rail.total||0).toLocaleString('ko-KR')}건`); }
+}
+// 클라우드의 모든 계정 가져오기
+async function cloudUsersGetAll(){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?select=username,data`;
+  const r=await fetch(url,{headers:sbHeaders()});
+  if(!r.ok) throw new Error('users get '+r.status);
+  const rows=await r.json();
+  return rows.map(row=>{ try{ return Object.assign({username:row.username}, JSON.parse(row.data)); }catch(e){ return {username:row.username}; } });
+}
+// 계정 저장(upsert)
+async function cloudUserPut(user){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?on_conflict=username`;
+  const {username, ...rest}=user;
+  const body=[{username, data:JSON.stringify(rest), updated_at:new Date().toISOString()}];
+  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error('user put '+r.status+' '+t); }
+  return true;
+}
+// 계정 삭제
+async function cloudUserDelete(username){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?username=eq.${encodeURIComponent(username)}`;
+  const r=await fetch(url,{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});
+  if(!r.ok){ const t=await r.text(); throw new Error('user delete '+r.status+' '+t); }
+  return true;
+}
+
+/* ============ AUTH ============ */
+async function sha256(s){
+  try{ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+  catch(e){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return 'x'+(h>>>0).toString(16); }
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function normEmail(e){ return (e||'').trim().toLowerCase(); }
+async function getUsers(){
+  if(cloudAvailable()){ try{ return await cloudUsersGetAll(); }catch(e){ console.warn('cloud users failed, fallback to local', e); } }
+  if(!idbAvailable()) return [];
+  try{ return await idbGetAll('users'); }catch(e){ return []; }
+}
+async function getUser(u){ const all=await getUsers(); return all.find(x=>x.username===normEmail(u)); }
+/* 계정 저장/삭제: 클라우드 우선, 실패 시 로컬 */
+async function userPut(user){
+  if(cloudAvailable()){ try{ await cloudUserPut(user); return; }catch(e){ console.warn('cloud user put failed', e); throw e; } }
+  if(idbAvailable()) await userPut(user);
+}
+async function userDelete(username){
+  if(cloudAvailable()){ try{ await cloudUserDelete(username); return; }catch(e){ console.warn('cloud user delete failed', e); throw e; } }
+  if(idbAvailable()) await idbDelete('users',username);
+}
+function showAuth(which){
+  $('#auth-overlay').classList.remove('hidden');
+  $('#app-root').classList.add('hidden');
+  $('#login-form').classList.toggle('hidden', which!=='login');
+  $('#signup-form').classList.toggle('hidden', which!=='signup');
+  $('#reset-form').classList.toggle('hidden', which!=='reset');
+  applyBrandSummary({}); // 라벨 먼저 채우고
+  loadBrandSummary();    // 클라우드 요약 비동기 로드
+}
+/* 화면 모드(웹/모바일) 선택 */
+let UI_MODE='';
+function selectMode(m){
+  UI_MODE=m;
+  document.querySelectorAll('.mode-card').forEach(c=>{
+    c.classList.toggle('selected', c.dataset.mode===m);
+  });
+}
+function getUIMode(){
+  // 우선 사용자가 선택한 값, 없으면 sessionStorage(이전 선택), 없으면 화면 폭으로 추정
+  if(UI_MODE) return UI_MODE;
+  let m=null; try{ m=sessionStorage.getItem('atec_ui_mode'); }catch(e){}
+  if(m) return m;
+  return (window.innerWidth<=767)?'mobile':'web';
+}
+function applyUIMode(mode){
+  document.documentElement.classList.toggle('force-mobile', mode==='mobile');
+  try{ sessionStorage.setItem('atec_ui_mode', mode); }catch(e){}
+}
+async function checkFirstRun(){
+  // 고정 관리자만 관리자입니다. 안내 문구 표시 안 함.
+  $('#first-admin-note').classList.add('hidden');
+}
+/* 고정 관리자 계정을 자동 등록(없으면 생성). 비밀번호 해시는 고정값으로 항상 보정 */
+async function ensureAdminAccount(){
+  if(!idbAvailable() && !cloudAvailable()) return;
+  try{
+    const u=await getUser(ADMIN_EMAIL);
+    if(!u){
+      await userPut({ username:ADMIN_EMAIL, name:ADMIN_NAME, pwhash:ADMIN_PWHASH,
+        role:'admin', status:'approved', created:nowStamp(), resetReq:false, tempPw:false, fixedAdmin:true });
+    } else {
+      // 항상 관리자/승인 상태 유지 (권한 강등·삭제 방지)
+      let changed=false;
+      if(u.role!=='admin'){ u.role='admin'; changed=true; }
+      if(u.status!=='approved'){ u.status='approved'; changed=true; }
+      if(!u.fixedAdmin){ u.fixedAdmin=true; changed=true; }
+      if(changed) await userPut(u);
+    }
+  }catch(e){}
+}
+async function doSignup(){
+  const u=normEmail($('#su-user').value), name=($('#su-name').value||'').trim(), pw=$('#su-pw').value||'', pw2=$('#su-pw2').value||'';
+  const msg=$('#su-msg'); const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
+  if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
+  if(u===ADMIN_EMAIL) return set('이 이메일은 사용할 수 없습니다.');
+  if(!name) return set('이름을 입력하세요.');
+  if(pw.length<6) return set('비밀번호는 6자 이상이어야 합니다.');
+  if(pw!==pw2) return set('비밀번호가 일치하지 않습니다.');
+  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 계정 저장을 지원하지 않습니다.');
+  if(await getUser(u)) return set('이미 가입된 이메일입니다.');
+  await userPut({ username:u, name, pwhash:await sha256(pw), role:'user', status:'approved', perms:[], created:nowStamp(), resetReq:false, tempPw:false });
+  set('가입 완료! 잠시 후 로그인 화면으로 이동합니다.', true);
+  setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; $('#li-pw').focus(); }, 1500);
+}
+async function doLogin(){
+  const u=normEmail($('#li-user').value), pw=$('#li-pw').value||'';
+  const msg=$('#li-msg'); const set=t=>{ msg.textContent=t; msg.style.color='#B91C1C'; };
+  if(!u||!pw) return set('이메일과 비밀번호를 입력하세요.');
+  if(!UI_MODE) return set('화면 모드(웹/모바일)를 선택하세요.');
+  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 로그인 저장을 지원하지 않습니다.');
+  const user=await getUser(u);
+  if(!user || user.pwhash!==await sha256(pw)) return set('이메일 또는 비밀번호가 올바르지 않습니다.');
+  if(user.status==='pending') return set('아직 관리자 승인 대기 중인 계정입니다.');
+  if(user.status==='rejected') return set('승인이 거부된 계정입니다. 관리자에게 문의하세요.');
+  ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:user.perms||[]};
+  user.lastLogin=nowStamp();           // 최근 접속일자 기록
+  if(user.resetReq){ user.resetReq=false; }
+  await userPut(user);
+  applyUIMode(UI_MODE);  // 선택한 모드 적용·저장
+  saveSession();
+  enterApp();
+  if(user.tempPw){ setTimeout(()=>promptChangePw(true), 300); }
+}
+async function requestReset(){
+  const u=normEmail($('#rs-user').value); const msg=$('#rs-msg'); const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
+  if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
+  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 계정 기능을 지원하지 않습니다.');
+  const user=await getUser(u);
+  if(user){ user.resetReq=true; user.resetReqAt=nowStamp(); await userPut(user); }
+  set('재설정 요청이 접수되었습니다. 관리자가 임시 비밀번호를 발급해 드립니다.', true);
+  setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; }, 1800);
+}
+async function promptChangePw(forced){
+  const cur = forced? null : prompt('현재 비밀번호를 입력하세요.');
+  if(!forced && cur===null) return;
+  const np = prompt(forced? '임시 비밀번호로 로그인하셨습니다.\n새 비밀번호를 입력하세요 (6자 이상).' : '새 비밀번호를 입력하세요 (6자 이상).');
+  if(np===null) return;
+  if((np||'').length<6){ alert('비밀번호는 6자 이상이어야 합니다.'); return; }
+  const user=await getUser(ME.username); if(!user) return;
+  if(!forced && user.pwhash!==await sha256(cur)){ alert('현재 비밀번호가 올바르지 않습니다.'); return; }
+  user.pwhash=await sha256(np); user.tempPw=false; user.resetReq=false;
+  await userPut(user);
+  alert('비밀번호가 변경되었습니다.');
+}
+/* 세션: sessionStorage에 저장 → 같은 탭에서 시스템 이동 시 유지, 브라우저/탭 닫으면 자동 로그아웃 */
+function saveSession(){ try{ sessionStorage.setItem('atec_session', JSON.stringify(ME)); }catch(e){} }
+function logout(){
+  ME=null;
+  try{ sessionStorage.removeItem('atec_session'); }catch(e){}
+  $('#li-user').value=''; $('#li-pw').value=''; $('#li-msg').textContent='';
+  showAuth('login'); checkFirstRun();
+}
+function isAdmin(){ return ME && ME.role==='admin'; }
+function hasPerm(p){ if(!ME) return false; if(ME.role==='admin') return true; return Array.isArray(ME.perms) && ME.perms.includes(p); }
+function applyPermVisibility(){
+  document.querySelectorAll('[data-perm]').forEach(el=>{
+    const p = el.getAttribute('data-perm');
+    el.style.display = hasPerm(p) ? '' : 'none';
+  });
+  // 시스템 카드가 2개만 보이면 가운데 정렬, 3개 모두 보이면 3컬럼
+  const grid = document.getElementById('launcher-grid');
+  if(grid){
+    const visible = Array.from(grid.children).filter(c => c.style.display !== 'none').length;
+    grid.classList.remove('md:grid-cols-3','md:grid-cols-2');
+    grid.classList.add(visible >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2');
+  }
+}
+function renderUserBadge(){
+  const b=$('#user-badge'); if(!b) return;
+  const roleChip = isAdmin()? '<span class="bg-amber-400 text-amber-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ml-1">관리자</span>' : '<span class="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-bold ml-1">일반</span>';
+  b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="shrink-0"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span class="font-bold truncate max-w-[120px]">${ME?ME.name:''}</span>${roleChip}
+    <button onclick="showHelp()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition" title="사용법 도움말">❓ 도움말</button>
+    <button onclick="promptChangePw(false)" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🔑 비밀번호</button>
+    <button onclick="logout()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🚪 로그아웃</button>`;
+}
+function applyRoleVisibility(){ document.querySelectorAll('[data-admin]').forEach(el=>{ el.style.display = isAdmin()? '' : 'none'; }); applyPermVisibility(); }
+
+/* ============ HELP (사용법 도움말) ============ */
+function helpContentPortal(){
+  return `
+    <div class="space-y-3">
+      <div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">📌 처음 사용하시나요?</div>
+        <p>1) 회원가입 → 2) 즉시 로그인 가능 (관리자 승인 불필요)</p>
+        <p class="text-slate-500 text-[11px] mt-1">관리자(ysukim)는 자동 등록되어 즉시 로그인할 수 있습니다.</p>
+      </div>
+
+      <div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🖥📱 화면 모드</div>
+        <p>로그인할 때 <b>웹</b> 또는 <b>모바일</b> 중 하나를 반드시 선택합니다.</p>
+        <ul class="list-disc pl-5 mt-1 text-[12px]">
+          <li><b>웹 모드</b>: PC·태블릿 등 큰 화면 (정보 한눈에)</li>
+          <li><b>모바일 모드</b>: 휴대폰 폭에 맞춰 화면 정리</li>
+        </ul>
+        <p class="text-slate-500 text-[11px] mt-1">화면 폭에 맞춰 한쪽이 미리 선택되어 있고, 바꿔서 선택할 수 있습니다.</p>
+      </div>
+
+      <div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🏠 포털 두 시스템</div>
+        <ul class="list-disc pl-5 text-[12px]">
+          <li><b>📟 단말기 시스템</b>: 장애접수 분석, 선제 점검 대상, 차량 검색, 이벤트 분석</li>
+          <li><b>🗺 센터 배정 시스템</b>: 운수사를 4개 센터에 배정하고 지도에서 비교</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🔒 보안</div>
+        <ul class="list-disc pl-5 text-[12px]">
+          <li>브라우저 창을 닫으면 자동 로그아웃됩니다.</li>
+          <li>같은 탭에서 시스템 간 이동(포털↔단말기↔센터)은 로그인 유지됩니다.</li>
+          <li>비밀번호는 암호화(해시)되어 저장됩니다.</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">☁ 데이터 공유</div>
+        <p>관리자가 클라우드에 데이터를 게시하면 모든 사용자가 같은 데이터를 보게 됩니다.</p>
+        <p class="text-slate-500 text-[11px] mt-1">계정 정보도 클라우드에 저장되어 어느 기기에서든 같은 계정으로 로그인됩니다.</p>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-900">
+        💡 <b>각 시스템 안에도 도움말 버튼</b>이 있습니다. 단말기 시스템에 들어가면 그 시스템의 자세한 사용법(대시보드·선제점검·차량검색 등)을 확인할 수 있습니다.
+      </div>
+    </div>`;
+}
+function showHelp(){
+  const body=$('#help-body'); if(!body) return;
+  body.innerHTML=helpContentPortal();
+  $('#help-modal').classList.remove('hidden');
+}
+function closeHelp(){ $('#help-modal').classList.add('hidden'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeHelp(); });
+
+function enterApp(){
+  $('#auth-overlay').classList.add('hidden');
+  $('#app-root').classList.remove('hidden');
+  renderUserBadge();
+  applyRoleVisibility();
+  if(isAdmin()) renderAdmin();
+}
+
+/* ============ ADMIN ============ */
+async function renderAdmin(){
+  if(!isAdmin()) return;
+  const users=await getUsers();
+  const pending=users.filter(u=>u.status==='pending');
+  const pbox=$('#admin-pending');
+  if(pending.length){
+    pbox.innerHTML=`<div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <div class="text-xs font-extrabold text-amber-800 mb-2">⏳ 승인 대기 (${pending.length}명)</div>
+      <div class="space-y-2">${pending.map(u=>`
+        <div class="flex items-center gap-2 bg-white rounded-lg border border-amber-100 px-3 py-2">
+          <div class="flex-1"><b class="text-slate-800">${u.name}</b> <span class="text-slate-400 text-[11px]">${u.username}</span> <span class="text-[10px] text-slate-400">· 신청 ${u.created||''}</span></div>
+          <button onclick="approveUser('${u.username}')" class="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md px-2.5 py-1 transition">승인</button>
+          <button onclick="rejectUser('${u.username}')" class="text-[11px] font-bold text-red-600 border border-red-200 hover:bg-red-50 rounded-md px-2.5 py-1 transition">거부</button>
+        </div>`).join('')}</div>
+    </div>`;
+  } else pbox.innerHTML='';
+  const resetReqs=users.filter(u=>u.resetReq);
+  const rbox=$('#admin-resets');
+  if(resetReqs.length){
+    rbox.innerHTML=`<div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+      <div class="text-xs font-extrabold text-[#B91C1C] mb-2">🔑 비밀번호 재설정 요청 (${resetReqs.length}건)</div>
+      <div class="space-y-2">${resetReqs.map(u=>`
+        <div class="flex items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
+          <div class="flex-1"><b class="text-slate-800">${u.name}</b> <span class="text-slate-400 text-[11px]">${u.username}</span> <span class="text-[10px] text-slate-400">· 요청 ${u.resetReqAt||''}</span></div>
+          <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#C2185B] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
+          <button onclick="dismissReset('${u.username}')" class="text-[11px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-2.5 py-1 transition">요청 무시</button>
+        </div>`).join('')}</div>
+    </div>`;
+  } else rbox.innerHTML='';
+  const statusChip=s=>({approved:'<span class="chip" style="background:#dcfce7;color:#16A34A">승인됨</span>',pending:'<span class="chip" style="background:#fef9c3;color:#a16207">대기</span>',rejected:'<span class="chip" style="background:#fee2e2;color:#B91C1C">거부됨</span>'}[s]||s);
+  let list = users.slice();
+  if(RECENT_SORT){
+    // 최근 접속순 정렬 후 상위 5명만
+    list = list.filter(u=>u.lastLogin).sort((a,b)=>(b.lastLogin||'').localeCompare(a.lastLogin||''));
+    const noLogin = users.filter(u=>!u.lastLogin);
+    list = list.slice(0,5);
+    $('#recent-th').innerHTML = '최근 접속일 ▼ <span class="text-[10px] text-[#C2185B]">(상위 5)</span>';
+  } else {
+    list = list.sort((a,b)=>(a.created||'').localeCompare(b.created||''));
+    $('#recent-th').innerHTML = '최근 접속일 ⇅';
+  }
+  $('#admin-users').innerHTML = list.map((u,i)=>{
+    const me = ME && u.username===ME.username;
+    const roleBtn = u.role==='admin'
+      ? `<button onclick="setRole('${u.username}','user')" ${me?'disabled':''} class="text-[11px] border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
+      : `<button onclick="setRole('${u.username}','admin')" class="text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-0.5 hover:bg-amber-50">관리자로</button>`;
+    const rankBadge = RECENT_SORT ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#C2185B] text-white text-[10px] font-bold mr-1">${i+1}</span>` : '';
+    // 철도 권한: 관리자는 자동 부여, 일반은 perms 배열에 'rail' 포함 여부
+    const isAdminRow = u.role==='admin';
+    const hasRail = isAdminRow || (Array.isArray(u.perms) && u.perms.includes('rail'));
+    const railCell = isAdminRow
+      ? '<span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">자동</span>'
+      : (hasRail
+          ? `<button onclick="toggleRailPerm('${u.username}',false)" class="text-[11px] border border-indigo-300 bg-indigo-50 text-indigo-700 rounded px-2 py-0.5 hover:bg-indigo-100 font-bold" title="클릭하면 권한 회수">🚆 허용 ✓</button>`
+          : `<button onclick="toggleRailPerm('${u.username}',true)" class="text-[11px] border border-slate-200 text-slate-500 rounded px-2 py-0.5 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300" title="클릭하면 철도 시스템 권한 부여">🚆 부여</button>`);
+    return `<tr class="border-b border-rose-50">
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#C2185B]">${rankBadge}${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
+      <td class="py-1.5 pr-2 text-slate-700">${u.name}</td>
+      <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#fef3c7;color:#b45309;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
+      <td class="py-1.5 pr-2">${statusChip(u.status)}</td>
+      <td class="py-1.5 pr-2">${railCell}</td>
+      <td class="py-1.5 pr-2 text-slate-400 text-[11px]">${u.created||'-'}</td>
+      <td class="py-1.5 pr-2 text-[11px] ${u.lastLogin?'text-[#3730A3] font-semibold':'text-slate-300'}">${u.lastLogin?'🕒 '+u.lastLogin:'미접속'}</td>
+      <td class="py-1.5 pr-2 text-right whitespace-nowrap">
+        ${u.status==='pending'?`<button onclick="approveUser('${u.username}')" class="text-[11px] font-bold text-emerald-700 mr-1">승인</button>`:''}
+        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#C2185B] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
+        ${roleBtn}
+        <button onclick="deleteUser('${u.username}')" ${me?'disabled':''} class="text-[11px] text-red-600 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 ml-1 disabled:opacity-40">삭제</button>
+      </td>
+    </tr>`;
+  }).join('') + (RECENT_SORT ? `<tr><td colspan="8" class="py-2 text-center text-[11px] text-slate-400">최근 접속순 상위 ${list.length}명 표시 중 · <button onclick="toggleRecentSort()" class="text-[#C2185B] font-semibold underline">전체 보기</button></td></tr>` : '');
+}
+let RECENT_SORT=false;
+function toggleRecentSort(){ RECENT_SORT=!RECENT_SORT; renderAdmin(); }
+async function approveUser(u){ const x=await getUser(u); if(!x)return; x.status='approved'; await userPut(x); renderAdmin(); }
+async function rejectUser(u){ if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 변경할 수 없습니다.'); return; } const x=await getUser(u); if(!x)return; x.status='rejected'; await userPut(x); renderAdmin(); }
+function genTempPw(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<8;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+async function issueTempPw(u){
+  const x=await getUser(u); if(!x) return;
+  const temp=genTempPw(); x.pwhash=await sha256(temp); x.tempPw=true; x.resetReq=false;
+  await userPut(x); renderAdmin();
+  alert(`'${x.name}'(${x.username}) 님의 임시 비밀번호가 발급되었습니다.\n\n임시 비밀번호:  ${temp}\n\n이 비밀번호를 해당 사용자에게 전달하세요. 사용자는 로그인하면 즉시 새 비밀번호로 변경하게 됩니다.`);
+}
+async function dismissReset(u){ const x=await getUser(u); if(!x)return; x.resetReq=false; await userPut(x); renderAdmin(); }
+async function toggleRailPerm(u, grant){
+  const x = await getUser(u); if(!x) return;
+  if(x.role==='admin'){ alert('관리자는 자동으로 모든 시스템 권한을 보유합니다.'); return; }
+  x.perms = Array.isArray(x.perms) ? x.perms.slice() : [];
+  const i = x.perms.indexOf('rail');
+  if(grant && i<0) x.perms.push('rail');
+  if(!grant && i>=0) x.perms.splice(i,1);
+  await userPut(x);
+  // 본인이 본인 권한 변경한 경우 즉시 ME 반영
+  if(ME && u===ME.username){ ME.perms = x.perms.slice(); saveSession(); applyPermVisibility(); }
+  renderAdmin();
+}
+async function setRole(u,role){
+  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정의 권한은 변경할 수 없습니다.'); return; }
+  const x=await getUser(u); if(!x)return;
+  x.role=role; await userPut(x); renderAdmin(); renderUserBadge();
+}
+async function deleteUser(u){
+  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 삭제할 수 없습니다.'); return; }
+  if(ME&&u===ME.username){ alert('본인 계정은 삭제할 수 없습니다.'); return; }
+  if(!confirm(`'${u}' 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+  await userDelete(u); renderAdmin();
+}
+
+/* ============ INIT ============ */
+async function initAuth(){
+  // 저장된 화면 모드 적용 + 폼에 미리 선택
+  try{
+    const saved=sessionStorage.getItem('atec_ui_mode');
+    const guess = saved || ((window.innerWidth<=767)?'mobile':'web');
+    selectMode(guess);
+    applyUIMode(guess);
+  }catch(e){}
+  await ensureAdminAccount(); // 고정 관리자 자동 등록
+  let sess=null; try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
+  if(sess && sess.username){
+    const user=await getUser(sess.username);
+    if(user && user.status==='approved'){ ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:user.perms||[]}; enterApp(); return; }
+  }
+  await checkFirstRun();
+  showAuth('login');
+}
+initAuth();
+</script>
+<!-- ============ HELP MODAL ============ -->
+<div id="help-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,.65)">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-[760px] w-full max-h-[90vh] flex flex-col">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#7A0B3C,#C2185B);color:#fff;border-radius:1rem 1rem 0 0">
+      <div class="font-extrabold text-base">❓ 사용법 도움말</div>
+      <button onclick="closeHelp()" class="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center text-sm">✕</button>
+    </div>
+    <div class="overflow-y-auto px-5 py-4 text-[13px] text-slate-700 leading-relaxed" id="help-body"></div>
+    <div class="px-5 py-2.5 border-t border-rose-100 flex justify-between items-center text-[11px] text-slate-400">
+      <span>ATEC Mobility 통합 관제 포털</span>
+      <a href="ATEC_사용자매뉴얼.docx" download class="text-[#C2185B] font-bold hover:underline">📄 전체 매뉴얼(.docx) 다운로드</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
