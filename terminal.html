@@ -421,6 +421,71 @@ html.force-mobile select, html.force-mobile textarea{ font-size:16px !important;
 html.force-mobile .searchbar{ padding:13px 14px !important; border-radius:14px !important; }
 html.force-mobile .searchbar input{ font-size:16px !important; }
 html.force-mobile button{ min-height:40px; }
+
+/* ============================================================
+   ✨ TOSS-STYLE THEME — 전면 리스킨 (미니멀·정렬·단일 포인트 컬러)
+   마크업 변경 없이 CSS로 색·카드·버튼·입력·헤더를 재정의.
+   ============================================================ */
+:root{
+  --atec-wine:#1B64DA; --atec-magenta:#3182F6; --atec-pink:#4593FC; --atec-rose:#8AB4F8;
+  --t-brand:#3182F6; --t-brand-d:#1B56C0;
+  --t-ink:#191F28; --t-sub:#4E5968; --t-mute:#8B95A1;
+  --t-line:#E8EBF0; --t-soft:#F4F6F8; --t-card:#FFFFFF;
+  --t-danger:#F04452; --t-warn:#E8890C; --t-ok:#12B886;
+}
+html, body{ background:#F2F4F6 !important; color:var(--t-ink); }
+#auth-overlay{ background:linear-gradient(160deg,#1B64DA,#3182F6 60%,#4593FC) !important; }
+#cloud-loader{ background:#F2F4F6 !important; }
+
+/* ── 브랜드 색 일괄 치환 ── */
+.text-\[\#7A0B3C\]{ color:var(--t-ink) !important; }
+.text-\[\#C2185B\],.text-\[\#D81B60\],.text-\[\#EC407A\],.text-\[\#A8124F\]{ color:var(--t-brand) !important; }
+.bg-\[\#C2185B\]{ background-color:var(--t-brand) !important; }
+.border-\[\#C2185B\]{ border-color:var(--t-brand) !important; }
+.hover\:bg-\[\#a01049\]:hover,.hover\:bg-\[\#5d0828\]:hover{ background-color:var(--t-brand-d) !important; }
+.hover\:text-\[\#C2185B\]:hover{ color:var(--t-brand) !important; }
+.hover\:border-\[\#C2185B\]:hover{ border-color:var(--t-brand) !important; }
+.focus\:border-\[\#C2185B\]:focus{ border-color:var(--t-brand) !important; box-shadow:0 0 0 3px rgba(49,130,246,.12); }
+.text-\[\#B91C1C\]{ color:var(--t-danger) !important; }
+.text-\[\#16A34A\]{ color:var(--t-ok) !important; }
+.text-\[\#0E7490\],.text-\[\#0891B2\]{ color:#0B9CB5 !important; }
+.bg-\[\#0891B2\]{ background-color:#0EA5C4 !important; }
+
+/* ── rose(핑크) → 뉴트럴 그레이 ── */
+.bg-rose-50,.bg-rose-100,.bg-rose-50\/60,.bg-rose-50\/40{ background-color:var(--t-soft) !important; }
+.border-rose-50,.border-rose-100,.border-rose-200,.border-rose-300{ border-color:var(--t-line) !important; }
+.hover\:bg-rose-50:hover,.hover\:bg-rose-100:hover{ background-color:var(--t-soft) !important; }
+.divide-rose-50>*+*{ border-color:var(--t-line) !important; }
+.from-rose-50,.to-yellow-50,.from-cyan-50,.to-sky-50,.from-amber-50,.to-amber-50,.bg-gradient-to-br{ background-image:none !important; }
+
+/* ── 텍스트 그레이 토스화 ── */
+.text-slate-400{ color:var(--t-mute) !important; }
+.text-slate-500,.text-slate-600{ color:var(--t-sub) !important; }
+.text-slate-700,.text-slate-800{ color:var(--t-ink) !important; }
+
+/* ── 카드/패널: 깔끔한 라운드·옅은 보더·미세 그림자 ── */
+.rounded-lg{ border-radius:12px !important; }
+.rounded-xl{ border-radius:16px !important; }
+.rounded-2xl{ border-radius:20px !important; }
+.shadow-sm,.shadow-md,.shadow-lg,.shadow-2xl,.shadow-card{ box-shadow:0 1px 3px rgba(17,24,39,.05),0 1px 2px rgba(17,24,39,.03) !important; }
+.bg-white.border,.panel,.kpi{ border-color:var(--t-line) !important; background:#fff !important; }
+.panel,.kpi{ border:1px solid var(--t-line) !important; border-radius:16px !important; }
+
+/* ── 버튼·칩 ── */
+button{ border-radius:12px; }
+.chip{ border-radius:9999px; font-weight:600; }
+
+/* ── 입력 ── */
+input,select,textarea{ border-color:var(--t-line) !important; border-radius:11px; }
+.searchbar{ border-color:var(--t-line) !important; border-radius:16px !important; box-shadow:0 1px 3px rgba(17,24,39,.04) !important; }
+
+/* ── 탭: 액티브는 블루 알약 ── */
+.tab-btn{ color:var(--t-sub) !important; border-radius:11px; }
+.tab-btn.active{ background:var(--t-brand) !important; color:#fff !important; }
+.tab-btn.active *{ color:#fff !important; }
+
+/* ── 헤더 라벨/배지 가독성 유지 ── */
+header .bg-white\/15,header .bg-white\/12,header .bg-white\/25{ background:rgba(255,255,255,.16) !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #fdeef4, transparent), #fbf7f9;">
@@ -643,22 +708,8 @@ html.force-mobile button{ min-height:40px; }
     <!-- KPI cards -->
     <div id="stat-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
 
-    <div class="panel mb-5">
-      <div class="panel-head"><span class="panel-dot"></span>자주 발생하는 장애<span class="panel-sub">상위 10</span></div>
-      <div id="top-err" class="px-1"></div>
-    </div>
-
-    <div class="grid lg:grid-cols-2 gap-5 mb-5">
-      <div class="panel">
-        <div class="panel-head"><span class="panel-dot" style="background:#B91C1C"></span>재불량 주의 조치<span class="panel-sub">30일 내 재접수율</span></div>
-        <p class="text-[11px] text-slate-500 mb-3 px-1">아래 조치 후에는 같은 차량의 재접수가 잦습니다. 조치 시 원인 재확인을 권장합니다.</p>
-        <div id="repeat-risk" class="px-1"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><span class="panel-dot"></span>재불량 다발 차량<span class="panel-sub">접수 횟수 상위</span></div>
-        <div id="top-veh" class="flex flex-wrap gap-2 px-1"></div>
-      </div>
-    </div>
+    <!-- (삭제됨) 자주 발생하는 장애·재불량 주의 조치·재불량 다발 차량 — 렌더 안전용 숨김 placeholder -->
+    <div style="display:none"><div id="top-err"></div><div id="repeat-risk"></div><div id="top-veh"></div></div>
   </section>
 
   <!-- PREEMPTIVE CHECK -->
