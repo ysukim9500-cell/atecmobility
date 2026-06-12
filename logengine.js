@@ -374,4 +374,131 @@ async function aiLogAnalysis(vnum, vid){
     out.innerHTML='<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12.5px] text-slate-700 leading-relaxed"><div class="text-[11px] font-bold text-blue-700 mb-1">🤖 AI 종합 분석</div>'+html+'</div>';
   }catch(e){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 분석 오류: '+logEsc(e.message||e)+'</span>'; }
 }
+
+/* =========================================================
+   단말기(S/N) 조회 — 개체 이력 추적 (탭: 단말기 조회)
+   데이터원: log_diagnoses (백업 분석 후 저장된 진단·처리 기록)
+   ========================================================= */
+function snChip(label,val,color){ return '<span class="inline-flex items-center gap-1 text-[11px] font-semibold rounded-md px-2 py-1" style="background:'+color+'18;color:'+color+'">'+logEsc(label)+' <b>'+logEsc(val)+'</b></span>'; }
+
+async function snFetchRows(col, op, val, limit){
+  try{
+    const url=SB_URL+'/rest/v1/log_diagnoses?'+col+'='+op+'.'+val+'&order=analyzed_at.desc,created_at.desc&limit='+(limit||500);
+    const r=await fetch(url,{headers:logSbHeaders()});
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+async function snSearch(){
+  const box=document.getElementById('sn-result'); if(!box) return;
+  const qel=document.getElementById('sn-q'); const q=((qel&&qel.value)||'').trim();
+  if(q.length<2){ box.innerHTML='<span class="text-[12px] text-rose-600">S/N을 2자 이상 입력하세요 (뒤 4자리 권장).</span>'; return; }
+  box.innerHTML='<span class="text-[12px] text-slate-500">조회 중…</span>';
+  const rows=await snFetchRows('terminal_sn','ilike','*'+encodeURIComponent(q)+'*',500);
+  if(rows===null){ box.innerHTML='<span class="text-[12px] text-rose-600">조회 실패(테이블 미생성일 수 있음).</span>'; return; }
+  if(!rows.length){ box.innerHTML='<div class="text-[12px] text-slate-500">\''+logEsc(q)+'\' 와 일치하는 단말기 기록이 없습니다.<br>※ 백업 분석 후 <b>진단·처리 저장</b>을 한 단말기만 조회됩니다.</div>'; return; }
+  const bySn={}; for(let i=0;i<rows.length;i++){ const s=rows[i].terminal_sn||'(미상)'; (bySn[s]=bySn[s]||[]).push(rows[i]); }
+  const sns=Object.keys(bySn);
+  if(sns.length>1){
+    let h='<div class="text-[12px] text-slate-500 mb-2">'+sns.length+'개 단말기가 일치합니다. 선택하세요.</div><div class="flex flex-col gap-1.5">';
+    for(let i=0;i<sns.length;i++){ const s=sns[i]; h+='<button onclick="snPick(\''+(''+s).replace(/\x27/g,"\\\x27")+'\')" class="text-left text-[12.5px] border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition"><b>'+logEsc(s)+'</b> <span class="text-slate-400">('+logModelOf(s)+')</span> · 진단 '+bySn[s].length+'건</button>'; }
+    h+='</div>'; box.innerHTML=h; return;
+  }
+  box.innerHTML=snCardHtml(sns[0], bySn[sns[0]]);
+}
+
+async function snPick(sn){
+  const box=document.getElementById('sn-result'); if(!box) return;
+  box.innerHTML='<span class="text-[12px] text-slate-500">불러오는 중…</span>';
+  const rows=await snFetchRows('terminal_sn','eq',encodeURIComponent(sn),200);
+  if(!rows||!rows.length){ box.innerHTML='<span class="text-[12px] text-slate-500">기록 없음.</span>'; return; }
+  box.innerHTML=snCardHtml(sn, rows);
+  const tab=document.getElementById('sn'); if(tab && tab.scrollIntoView){ try{ tab.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
+}
+
+function snCardHtml(sn, rows){
+  const asc=rows.slice().sort(function(a,b){ const ka=(a.analyzed_at||a.created_at||''),kb=(b.analyzed_at||b.created_at||''); return ka<kb?-1:ka>kb?1:0; });
+  const model=logModelOf(sn);
+  // 장착 차량 변천(이설)
+  const vehSeq=[];
+  for(let i=0;i<asc.length;i++){ const v=asc[i].vehicle_no||'(미상)'; const dt=(asc[i].analyzed_at||'').slice(0,10);
+    if(!vehSeq.length || vehSeq[vehSeq.length-1].v!==v) vehSeq.push({v:v,from:dt}); }
+  const distinctVeh={}; for(let i=0;i<asc.length;i++) distinctVeh[asc[i].vehicle_no||'(미상)']=1;
+  const nVeh=Object.keys(distinctVeh).length;
+  // 재불량(같은 장애 그룹 반복) + 최초 등장 인덱스
+  const firstIdx={}; for(let i=0;i<asc.length;i++){ const g=asc[i].primary_group||asc[i].error_type||''; if(g && !(g in firstIdx)) firstIdx[g]=i; }
+  let recur=0; const cseen={}; for(let i=0;i<asc.length;i++){ const g=asc[i].primary_group||asc[i].error_type||''; if(!g) continue; if(cseen[g]) recur++; cseen[g]=1; }
+  const lastDate=(rows[0].analyzed_at||rows[0].created_at||'').slice(0,10);
+  const actCnt={}; for(let i=0;i<asc.length;i++){ const a=asc[i].action_type||''; if(a) actCnt[a]=(actCnt[a]||0)+1; }
+  const acts=Object.keys(actCnt).sort(function(a,b){return actCnt[b]-actCnt[a];});
+
+  let h='<div class="border border-rose-100 rounded-xl p-4" style="background:#fff7fa">';
+  h+='<div class="flex items-center gap-2 flex-wrap mb-1"><span class="text-xl font-extrabold text-[#7A0B3C]">S/N '+logEsc(sn)+'</span><span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#7C3AED">'+model+'</span>';
+  if(recur>0) h+='<span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#B91C1C">재불량 '+recur+'회</span>';
+  if(nVeh>1) h+='<span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#0891B2">이설 '+(nVeh-1)+'회</span>';
+  h+='</div>';
+  h+='<div class="flex gap-1.5 flex-wrap mb-3">'+snChip('누적 진단',rows.length+'건','#C2185B')+snChip('장착 차량',nVeh+'대','#7A0B3C')+snChip('마지막 진단',lastDate||'-','#64748b')+'</div>';
+  if(vehSeq.length){
+    h+='<div class="text-[12px] font-bold text-slate-600 mb-1">📍 장착 차량 변천</div><div class="flex items-center gap-1 flex-wrap mb-3 text-[11.5px]">';
+    for(let i=0;i<vehSeq.length;i++){ if(i>0) h+='<span class="text-slate-300">→</span>'; h+='<span class="bg-white border border-slate-200 rounded-md px-2 py-1"><b>'+logEsc(vehSeq[i].v)+'</b> <span class="text-slate-400">'+(vehSeq[i].from?vehSeq[i].from.slice(2):'')+'</span></span>'; }
+    h+='</div>';
+  }
+  if(acts.length){ h+='<div class="text-[12px] font-bold text-slate-600 mb-1">🔧 처리유형</div><div class="flex gap-1.5 flex-wrap mb-3">'; for(let i=0;i<acts.length;i++){ h+=snChip(acts[i],actCnt[acts[i]]+'회','#16A34A'); } h+='</div>'; }
+  h+='<div class="text-[12px] font-bold text-slate-600 mb-1">🕑 진단·처리 타임라인</div><div class="flex flex-col gap-1">';
+  for(let i=asc.length-1;i>=0;i--){ const x=asc[i]; const g=x.primary_group||x.error_type||''; const isRecur=(g && firstIdx[g]<i);
+    h+='<div class="flex items-start gap-2 text-[11.5px] bg-white border border-slate-100 rounded-md px-2 py-1.5">'
+      +'<span class="text-slate-400 shrink-0 w-14">'+logEsc((x.analyzed_at||'').slice(2))+'</span>'
+      +'<div class="flex-1 min-w-0"><span class="text-slate-700">'+logEsc(g||'-')+'</span>'
+      +(x.action_type?' <span class="text-slate-400">→ '+logEsc(x.action_type)+'</span>':'')
+      +' <span class="text-slate-400">('+logEsc(x.vehicle_no||'')+')</span>'
+      +(isRecur?' <span class="text-[10px] font-bold text-white rounded px-1" style="background:#B91C1C">재발</span>':'')
+      +'</div></div>';
+  }
+  h+='</div>';
+  if(recur>0) h+='<div class="mt-3 text-[11.5px] text-rose-700 bg-rose-100 rounded-lg px-3 py-2">⚠ 같은 장애가 '+recur+'회 재발했습니다. 수리 미흡 또는 <b>단말기 개체 불량</b> 가능성 — 교체 검토를 권장합니다.</div>';
+  h+='</div>';
+  return h;
+}
+
+async function loadBadTerminals(){
+  const box=document.getElementById('sn-rank'); if(!box) return;
+  box.innerHTML='<span class="text-[12px] text-slate-400">불량 단말기 집계 중…</span>';
+  let rows=null;
+  try{ const url=SB_URL+'/rest/v1/log_diagnoses?select=terminal_sn,vehicle_no,primary_group,error_type,action_type,analyzed_at,created_at&order=created_at.desc&limit=3000'; const r=await fetch(url,{headers:logSbHeaders()}); if(r.ok) rows=await r.json(); }catch(e){}
+  if(rows===null){ box.innerHTML=''; return; }
+  if(!rows.length){ box.innerHTML='<div class="bg-white border border-rose-100 rounded-xl p-6 text-center text-[12.5px] text-slate-400">저장된 단말기 진단 기록이 아직 없습니다.<br>백업 분석 후 <b>진단·처리 저장</b>을 하면 여기에 누적됩니다.</div>'; return; }
+  const bySn={};
+  for(let i=0;i<rows.length;i++){ const s=rows[i].terminal_sn; if(!s) continue; (bySn[s]=bySn[s]||[]).push(rows[i]); }
+  const list=[];
+  for(const s in bySn){
+    const arr=bySn[s].slice().sort(function(a,b){ const ka=(a.analyzed_at||a.created_at||''),kb=(b.analyzed_at||b.created_at||''); return ka<kb?-1:ka>kb?1:0; });
+    const veh={}; const seen={}; let recur=0;
+    for(let i=0;i<arr.length;i++){ veh[arr[i].vehicle_no||'?']=1; const g=arr[i].primary_group||arr[i].error_type||''; if(g){ if(seen[g]) recur++; seen[g]=1; } }
+    const nVeh=Object.keys(veh).length;
+    const score=recur*40 + (nVeh-1)*15 + arr.length*5;
+    list.push({sn:s, n:arr.length, recur:recur, nVeh:nVeh, score:score, model:logModelOf(s), last:(arr[arr.length-1].analyzed_at||'').slice(0,10)});
+  }
+  list.sort(function(a,b){ return b.score-a.score || b.recur-a.recur; });
+  const top=[]; for(let i=0;i<list.length;i++){ if(list[i].recur>0||list[i].n>=2) top.push(list[i]); if(top.length>=15) break; }
+  if(!top.length){ box.innerHTML='<div class="bg-white border border-rose-100 rounded-xl p-5 text-center text-[12.5px] text-slate-400">아직 재불량(반복) 단말기가 없습니다. 👍</div>'; return; }
+  let h='<div class="flex items-center gap-2 mb-2 pl-1"><h3 class="text-[13px] font-extrabold text-[#7A0B3C]">🔧 교체 검토 권장 단말기</h3><span class="text-[11px] text-slate-400">재불량·이설·진단 빈도 종합 상위</span></div>';
+  h+='<div class="flex flex-col gap-1.5">';
+  for(let i=0;i<top.length;i++){ const t=top[i]; const col=t.recur>=3?'#B91C1C':t.recur>=1?'#D81B60':'#64748b';
+    h+='<button onclick="snPick(\''+(''+t.sn).replace(/\x27/g,"\\\x27")+'\')" class="text-left bg-white border border-rose-100 rounded-lg px-3 py-2 hover:bg-rose-50 transition flex items-center gap-2">'
+      +'<span class="text-[12px] font-extrabold text-slate-400 w-5">'+(i+1)+'</span>'
+      +'<div class="flex-1 min-w-0"><div class="text-[13px] font-bold text-slate-800">S/N '+logEsc(t.sn)+' <span class="text-[10px] font-bold text-white rounded px-1" style="background:#7C3AED">'+t.model+'</span></div>'
+      +'<div class="text-[11px] text-slate-500">진단 '+t.n+'건 · 장착 '+t.nVeh+'대'+(t.last?' · 최근 '+t.last:'')+'</div></div>'
+      +'<span class="text-[11px] font-bold text-white rounded-md px-2 py-1 shrink-0" style="background:'+col+'">재불량 '+t.recur+'</span>'
+      +'</button>';
+  }
+  h+='</div>';
+  box.innerHTML=h;
+}
+
+function initSnTab(){
+  const box=document.getElementById('sn-result'); if(box) box.innerHTML='';
+  const qel=document.getElementById('sn-q'); if(qel) qel.value='';
+  loadBadTerminals();
+}
 /* logengine.js — end */

@@ -573,6 +573,10 @@ html.force-mobile button{ min-height:40px; }
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span class="tab-full">차량 검색</span><span class="tab-short">차량검색</span>
     </button>
+    <button data-tab="sn" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+      <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="6" y="6" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="tab-full">단말기 조회</span><span class="tab-short">단말기</span>
+    </button>
     <button data-tab="events" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 13h4l2 5 4-12 2 7h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-full">이벤트 분석</span><span class="tab-short">이벤트</span>
@@ -681,6 +685,23 @@ html.force-mobile button{ min-height:40px; }
 
   <!-- VEHICLE RESULT -->
   <section id="result" class="hidden"></section>
+
+  <!-- 단말기(S/N) 조회 -->
+  <section id="sn" class="hidden">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">단말기(S/N) 조회 · 개체 이력 추적</h2>
+    </div>
+    <p class="text-[12px] text-slate-500 mb-3 pl-3 max-w-2xl">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+      <div class="flex gap-2">
+        <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 입력 — 뒤 4자리만 쳐도 됩니다 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
+          class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#C2185B]">
+        <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">조회</button>
+      </div>
+      <div id="sn-result" class="mt-3"></div>
+    </div>
+    <div id="sn-rank"></div>
+  </section>
 
   <!-- EVENT ANALYSIS -->
   <section id="events" class="hidden">
@@ -1257,9 +1278,10 @@ function setTab(t){
   if(t==='admin' && !isAdmin()) t='dash';
   CURTAB=t;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
-  ['dash','preempt','result','events','admin','ai'].forEach(id=>$('#'+id).classList.add('hidden'));
+  ['dash','preempt','result','events','admin','ai','sn'].forEach(id=>$('#'+id).classList.add('hidden'));
   if(t==='dash'){ $('#dash').classList.remove('hidden'); }
   else if(t==='preempt'){ $('#preempt').classList.remove('hidden'); renderPreempt(); }
+  else if(t==='sn'){ $('#sn').classList.remove('hidden'); if(typeof initSnTab==='function') initSnTab(); }
   else if(t==='events'){ $('#events').classList.remove('hidden'); renderEvents(); }
   else if(t==='ai'){ $('#ai').classList.remove('hidden'); initAI(); }
   else if(t==='admin'){ $('#admin').classList.remove('hidden'); renderAdmin(); }
@@ -2423,11 +2445,6 @@ function renderVehicle(vnum, veh){
           </div>
           <div class="text-xs text-slate-500 mt-1">${veh.op} · 차량ID ${veh.vid||'-'} · ${last.center||''}</div>
           <div class="text-xs text-slate-500">${last.route||''}</div>
-          <button onclick="askAIAboutVehicle('${vnum.replace(/'/g,"\\'")}')" title="이 차량을 AI가 분석합니다"
-            class="inline-flex items-center justify-center gap-2 text-[15px] font-extrabold text-white rounded-xl px-5 py-3 mt-3 transition shadow-md hover:brightness-110 active:scale-95"
-            style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">
-            🤖 이 차량 AI 분석하기 <span style="font-size:15px">›</span>
-          </button>
         </div>
         <div class="vstat-row flex gap-2 flex-wrap">
           ${miniStat('총 접수', items.length+'건','#C2185B')}
