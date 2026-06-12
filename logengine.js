@@ -254,6 +254,10 @@ async function saveLogDiagnosis(vnum, vid){
     if(!r.ok){ const t=await r.text(); throw new Error('저장 실패 '+r.status+' '+t.slice(0,120)); }
     set('저장됐습니다. 이력에 누적됩니다.', true);
     loadLogHistory(vnum);
+    // 백업 점검 완료 → 즉시 선제점검 대상에서 제외
+    try{ if(typeof INSPECTED_BK!=='undefined' && INSPECTED_BK.add) INSPECTED_BK.add(vnum); }catch(e){}
+    try{ if(typeof updatePreemptBadge==='function') updatePreemptBadge(); }catch(e){}
+    try{ if(typeof renderPreempt==='function' && typeof CURTAB!=='undefined' && CURTAB==='preempt') renderPreempt(); }catch(e){}
   }catch(e){ set(''+(e.message||e)); }
 }
 

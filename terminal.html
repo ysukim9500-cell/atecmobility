@@ -113,17 +113,21 @@ html.force-mobile .max-w-\[1600px\]{ padding-left:12px !important; padding-right
 
 /* === 타일 (channel/center/term) — 모바일 컴팩트 === */
 @media (max-width:767px){
-  html:not(.force-web) .ctile{ padding:10px 12px !important; border-radius:12px !important; border-width:1px !important; }
-  html:not(.force-web) .ctile .ct-name{ font-size:12px !important; font-weight:700 !important; margin:0 !important; }
-  html:not(.force-web) .ctile .ct-num{ font-size:22px !important; line-height:1 !important; margin-top:5px !important; }
-  html:not(.force-web) .ctile .ct-share{ font-size:10px !important; margin-top:2px !important; }
-  html:not(.force-web) .ctile .ct-bar{ height:4px !important; margin-top:7px !important; }
+  html:not(.force-web) #channel-tiles{ grid-template-columns:repeat(3,1fr) !important; gap:7px !important; }
+  html:not(.force-web) #center-tiles{ gap:7px !important; }
+  html:not(.force-web) .ctile{ padding:8px 9px !important; border-radius:12px !important; border-width:1px !important; }
+  html:not(.force-web) .ctile .ct-name{ font-size:11px !important; font-weight:700 !important; margin:0 !important; }
+  html:not(.force-web) .ctile .ct-num{ font-size:15px !important; line-height:1.05 !important; margin-top:2px !important; }
+  html:not(.force-web) .ctile .ct-share{ font-size:9px !important; margin-top:1px !important; }
+  html:not(.force-web) .ctile .ct-bar{ display:none !important; }
 }
-html.force-mobile .ctile{ padding:10px 12px !important; border-radius:12px !important; border-width:1px !important; }
-html.force-mobile .ctile .ct-name{ font-size:12px !important; font-weight:700 !important; margin:0 !important; }
-html.force-mobile .ctile .ct-num{ font-size:22px !important; line-height:1 !important; margin-top:5px !important; }
-html.force-mobile .ctile .ct-share{ font-size:10px !important; margin-top:2px !important; }
-html.force-mobile .ctile .ct-bar{ height:4px !important; margin-top:7px !important; }
+html.force-mobile #channel-tiles{ grid-template-columns:repeat(3,1fr) !important; gap:7px !important; }
+html.force-mobile #center-tiles{ gap:7px !important; }
+html.force-mobile .ctile{ padding:8px 9px !important; border-radius:12px !important; border-width:1px !important; }
+html.force-mobile .ctile .ct-name{ font-size:11px !important; font-weight:700 !important; margin:0 !important; }
+html.force-mobile .ctile .ct-num{ font-size:15px !important; line-height:1.05 !important; margin-top:2px !important; }
+html.force-mobile .ctile .ct-share{ font-size:9px !important; margin-top:1px !important; }
+html.force-mobile .ctile .ct-bar{ display:none !important; }
 
 /* === 섹션 제목 === */
 @media (max-width:767px){
@@ -133,17 +137,19 @@ html.force-mobile .sec-title{ font-size:13px !important; margin-bottom:8px !impo
 
 /* === KPI 카드 === */
 @media (max-width:767px){
-  html:not(.force-web) .kpi{ padding:13px 14px !important; border-radius:14px !important; }
-  html:not(.force-web) .kpi .kpi-val{ font-size:24px !important; }
-  html:not(.force-web) .kpi .kpi-label{ font-size:11px !important; }
-  html:not(.force-web) .kpi .kpi-sub{ font-size:10px !important; }
-  html:not(.force-web) .kpi .kpi-ico{ width:48px !important; height:48px !important; opacity:.05 !important; right:-2px !important; bottom:-4px !important; }
+  html:not(.force-web) #stat-cards{ gap:8px !important; margin-bottom:14px !important; }
+  html:not(.force-web) .kpi{ padding:9px 11px !important; border-radius:12px !important; }
+  html:not(.force-web) .kpi .kpi-val{ font-size:18px !important; }
+  html:not(.force-web) .kpi .kpi-label{ font-size:10px !important; }
+  html:not(.force-web) .kpi .kpi-sub{ font-size:9px !important; }
+  html:not(.force-web) .kpi .kpi-ico{ width:36px !important; height:36px !important; opacity:.05 !important; right:-2px !important; bottom:-4px !important; }
 }
-html.force-mobile .kpi{ padding:13px 14px !important; border-radius:14px !important; }
-html.force-mobile .kpi .kpi-val{ font-size:24px !important; }
-html.force-mobile .kpi .kpi-label{ font-size:11px !important; }
-html.force-mobile .kpi .kpi-sub{ font-size:10px !important; }
-html.force-mobile .kpi .kpi-ico{ width:48px !important; height:48px !important; opacity:.05 !important; right:-2px !important; bottom:-4px !important; }
+html.force-mobile #stat-cards{ gap:8px !important; margin-bottom:14px !important; }
+html.force-mobile .kpi{ padding:9px 11px !important; border-radius:12px !important; }
+html.force-mobile .kpi .kpi-val{ font-size:18px !important; }
+html.force-mobile .kpi .kpi-label{ font-size:10px !important; }
+html.force-mobile .kpi .kpi-sub{ font-size:9px !important; }
+html.force-mobile .kpi .kpi-ico{ width:36px !important; height:36px !important; opacity:.05 !important; right:-2px !important; bottom:-4px !important; }
 
 /* === 패널 / 차트 === */
 @media (max-width:767px){
@@ -641,7 +647,7 @@ html.force-mobile button{ min-height:40px; }
     </div>
 
     <!-- KPI cards -->
-    <div id="stat-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+    <div id="stat-cards" class="grid grid-cols-3 md:grid-cols-3 gap-4 mb-6"></div>
 
     <!-- (삭제됨) 자주 발생하는 장애·재불량 주의 조치·재불량 다발 차량 — 렌더 안전용 숨김 placeholder -->
     <div style="display:none"><div id="top-err"></div><div id="repeat-risk"></div><div id="top-veh"></div></div>
@@ -653,7 +659,7 @@ html.force-mobile button{ min-height:40px; }
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#C2185B]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 3일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
+          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#C2185B]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
         </div>
         <div id="preempt-summary" class="flex gap-2 flex-wrap"></div>
       </div>
@@ -1222,6 +1228,30 @@ async function saveExcluded(){
   try{ await idbBulkPut('meta',[{k:'excludedPreempt', v:[...EXCLUDED]}]); }catch(e){}
 }
 
+/* 백업 점검 완료 차량 — log_diagnoses에 기록이 있으면 선제점검에서 자동 제외 */
+let INSPECTED_BK = new Set();
+const INSPECT_EXCLUDE_DAYS = 30;   // 백업 점검 후 N일간 선제점검 제외
+async function loadInspectedBackups(){
+  try{
+    if(typeof SB_URL==='undefined' || typeof SB_KEY==='undefined') return;
+    const url = SB_URL+'/rest/v1/log_diagnoses?select=vehicle_no,analyzed_at,created_at&order=created_at.desc&limit=2000';
+    const r = await fetch(url,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(!r.ok) return;                       // 테이블 미생성 등 — 조용히 통과
+    const rows = await r.json();
+    const refMs = (KB && KB.meta && KB.meta.ref_date) ? new Date(KB.meta.ref_date+'T23:59:59').getTime() : Date.now();
+    const set = new Set();
+    for(const x of rows){
+      if(!x || !x.vehicle_no) continue;
+      const raw = (x.analyzed_at||x.created_at||'').replace(' ','T');
+      const t = new Date(raw).getTime();
+      if(isNaN(t)){ set.add(x.vehicle_no); continue; }
+      const days = Math.floor((refMs - t)/864e5);
+      if(days <= INSPECT_EXCLUDE_DAYS) set.add(x.vehicle_no);   // 최근 점검분만 제외
+    }
+    INSPECTED_BK = set;
+  }catch(e){}
+}
+
 /* ============ TABS ============ */
 function setTab(t){
   if(t==='admin' && !isAdmin()) t='dash';
@@ -1391,6 +1421,7 @@ function afterLoad(usedStore){
   initPreemptControls();
   initEventControls();
   updatePreemptBadge();
+  loadInspectedBackups().then(()=>{ updatePreemptBadge(); if(CURTAB==='preempt') renderPreempt(); });   // 백업 점검 차량 제외 반영
   $('#ref-date').textContent = (KB.meta.ref_date||KB.meta.period||'-');
   renderStorageStatus(usedStore);
   renderUpdated();
@@ -1475,7 +1506,7 @@ function updatePreemptBadge(){
   try{
     const all=computePreempt(GF.ch||'');
     const gfHas = gfActive() ? (v=>vehMatches(v)) : (()=>true);
-    const n=capPerCenter(all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v)), 10).length;
+    const n=capPreempt(all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v)), 10).length;
     b.textContent=n;
   }catch(e){ b.textContent=(KB.preempt||[]).length; }
 }
@@ -1681,7 +1712,6 @@ function renderDash(){
     ['총 접수', num(recordsN), '#C2185B', subTxt, ICONS.rec],
     ['해당 차량', num(vehN), '#7A0B3C', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
     ['장애 유형', num(errEntries.length), '#D81B60', '분류된 오류 종류', ICONS.err],
-    ['평균 재접수율', view.repeatRate+'%', '#EC407A', active?'필터 기준 30일내 재접수':'30일 내 재접수 비율', ICONS.rate],
   ];
   $('#stat-cards').innerHTML = cards.map(c=>`
     <div class="kpi">
@@ -1800,10 +1830,10 @@ async function loadExcReasons(){ if(!idbAvailable())return; try{ const rows=awai
 /* 선택한 접수구분(채널)만으로 선제점검 점수를 재산정 */
 /* ============ 통합 선제점검 점수 산정 ============
    기준: 장애접수 이력 + 당일 이벤트(핵심) 종합. 위험도순.
-   - 최근 3일 내 처리(접수)된 차량은 제외 (이미 조치됨)
+   - 최근 7일 내 처리(접수)된 차량은 제외 (이미 조치됨)
    - ch 지정 시 해당 접수구분만으로 장애접수 점수 산정
 */
-const RECENT_HANDLED_DAYS = 3;
+const RECENT_HANDLED_DAYS = 7;   // 최근 처리(접수)된 차량 제외 기간 — 전산등록 후 클라우드 업로드 재등장 방지
 function computePreempt(ch){
   const REF = KB.meta.ref_date ? new Date(KB.meta.ref_date+'T23:59:59') : new Date();
   const tm = GF.term||'';
@@ -1816,6 +1846,7 @@ function computePreempt(ch){
   }
   const out=[];
   for(const v in KB.vehicles){
+    if(INSPECTED_BK.has(v)) continue;                 // 백업 점검 완료 차량은 선제점검 제외
     const allItems=KB.vehicles[v].items;
     let items = ch ? allItems.filter(it=>it.recv===ch) : allItems;
     if(tm){ const hasTerm = allItems.some(it=>it.term===tm); if(!hasTerm) continue; items = items.filter(it=>it.term===tm); }   // 선택 기종 차량만
@@ -1823,7 +1854,7 @@ function computePreempt(ch){
     if(!items.length && !coreEv) continue;            // 접수도 없고 이벤트도 없으면 제외
     const last = items.length? items[items.length-1] : null;
     const lastAll = allItems[allItems.length-1];      // 전체 기준 최신 접수(처리시점 판단용)
-    // 최근 3일 내 처리(접수)된 차량은 제외
+    // 최근 7일 내 처리(접수)된 차량은 제외
     if(lastAll){ const lad=new Date(lastAll.date.replace(' ','T')); const dsAll=Math.floor((REF-lad)/864e5); if(dsAll<=RECENT_HANDLED_DAYS) continue; }
     const days_since = last? Math.floor((REF-new Date(last.date.replace(' ','T')))/864e5) : 999;
     const recent30 = items.filter(it=>Math.floor((REF-new Date(it.date.replace(' ','T')))/864e5)<=30).length;
@@ -1855,6 +1886,11 @@ function capPerCenter(sortedList, n){
   const cnt={}; const res=[];
   for(const p of sortedList){ const c=p.center||'미상'; cnt[c]=cnt[c]||0; if(cnt[c]<n){ res.push(p); cnt[c]++; } }
   return res;
+}
+/* 대시보드에서 센터를 선택했으면 그 센터 상위 n대만(평탄), 아니면 센터별 상위 n대 */
+function capPreempt(sortedList, n){
+  if(GF.center) return sortedList.slice(0, n);
+  return capPerCenter(sortedList, n);
 }
 /* ============ 트러블슈팅 매뉴얼 사전 ============
    B700/B710/B800 매뉴얼에서 발췌한 핵심 조치 절차.
@@ -2056,7 +2092,7 @@ function renderPreempt(){
     if(PF_LEVEL==='low') return p.sc>=30&&p.sc<50;
     return true;
   });
-  if(!showExcluded) list = capPerCenter(list, TOP_N);   // 센터별 상위 10대
+  if(!showExcluded) list = capPreempt(list, TOP_N);   // 센터 선택 시 그 센터 상위 10대, 아니면 센터별 상위 10대
 
   // summary (active = non-excluded, honoring GF)
   const active=all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v));
