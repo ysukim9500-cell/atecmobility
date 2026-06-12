@@ -329,7 +329,14 @@ async function fetchDiag(col,val){
 }
 async function aiLogAnalysis(vnum, vid){
   const out=document.getElementById('logbk-ai'); if(!out) return;
-  if(typeof getAIKey!=='function' || !getAIKey()){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 공용 키가 설정되지 않았습니다(관리자에게 등록 요청).</span>'; return; }
+  // 공용 키 확보: 메모리 캐시에 없으면(=AI 탭 미방문) 클라우드에서 직접 로드
+  let aikey = (typeof getAIKey==='function') ? getAIKey() : '';
+  if(!aikey && typeof fetchPublicAIKey==='function'){
+    out.innerHTML='<span class="text-[12px] text-slate-500">🔑 AI 공용 키 확인 중…</span>';
+    try{ aikey = await fetchPublicAIKey(); }catch(e){ aikey=''; }
+    if(aikey){ if(typeof setAIKey==='function') setAIKey(aikey); else { try{ AI_KEY_CACHE=aikey; }catch(e){} } }
+  }
+  if(!aikey){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 공용 키가 설정되지 않았습니다(관리자에게 등록 요청).</span>'; return; }
   out.innerHTML='<span class="text-[12px] text-slate-500">🤖 로그·이력·S/N 종합 분석 중…</span>';
   try{
     const d=window.__lastDiag||{};
@@ -356,7 +363,7 @@ async function aiLogAnalysis(vnum, vid){
       +(hasEv?'당일 이벤트가 제공되었으니 보조로 활용하세요.':'당일 이벤트는 제공되지 않았습니다 — 이벤트 관련 추정/언급은 하지 마세요.')+'\n'
       +'한국어로 짧고 명확하게:\n**종합 진단**(1~2문장)\n**재불량/수리 미흡 여부**(S/N·과거 이력 근거. 조치 후 같은 장애 재발 시 수리 미흡 의심 명시)\n**권장 조치**(구체 1~3개, 과거 효과없던 조치 지양)\n마지막 줄: ⚠ AI 추정 — 최종 판단은 기사님 확인 후';
     const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent',{
-      method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':getAIKey()},
+      method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aikey},
       body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:ctx}]}],generationConfig:{maxOutputTokens:1024,temperature:0.4,thinkingConfig:{thinkingBudget:0}}})});
     const data=await res.json();
     if(!res.ok){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 호출 실패('+res.status+'). 잠시 후 재시도.</span>'; return; }
