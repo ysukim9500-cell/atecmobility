@@ -35,7 +35,7 @@ const LOG_GUIDE={
  "승하차3통신":{t:"승하차 3번(하차2) 단말기 통신 단절",steps:["하차2 단말기 커넥터 체결 확인","하차2 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 하차2 단말기 → 통합단말기 순 교체"],parts:["하차2 케이블","하차2 단말기","통합단말기"]},
  "승하차통신":{t:"승하차 단말기 통신 단절",steps:["해당 승하차 단말기 커넥터 체결 확인","케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 단말기 → 통합단말기 순 교체"],parts:["승하차 케이블","승하차 단말기","통합단말기"]},
  "표출기통신":{t:"표출기(운전자 화면) 통신 불안정",steps:["표출기↔통합단말기 케이블 접점·삽입 점검","표출기 재부팅","지속 시 표출단말기 교체"],parts:["표출기 케이블","표출단말기"]},
- "모뎀BMS통신":{t:"외장 LTE 모뎀 / BMS 통신 실패",steps:["외장모뎀 전원 LED(ST1/ST2/Pow/LTE) 확인","커넥터 흔들어 접촉·USIM 점검","외장모뎀 교체 → LTE 케이블 → 통합단말기 순","⚠ B600/B700/B710 외장모뎀 혼용 금지"],parts:["외장 LTE 모뎀","LTE 케이블","통합단말기"]},
+ "모뎀BMS통신":{t:"외장 LTE 모뎀 / BMS 통신 실패",steps:["외장모뎀 전원 LED(ST1/ST2/Pow/LTE) 확인","커넥터 흔들어 접촉·USIM 점검","외장모뎀 교체 → LTE 케이블 → 통합단말기 순","⚠ B700/B710/B800 외장모뎀 혼용 금지"],parts:["외장 LTE 모뎀","LTE 케이블","통합단말기"]},
  "카드SAM":{t:"카드 인식 / PSAM(SAM) 오류",steps:["PSAM 세척·소켓 접촉 상태 확인","재인식 후에도 지속 시 승하차 단말기 교체(1:1 권장)"],parts:["PSAM","승하차 단말기"]},
  "GPS위치":{t:"GPS / 측위 이상",steps:["GPS 안테나 체결·시야(하늘) 확보 확인","안테나 케이블 흔들어 접촉 점검","안테나 교체 → 통합단말기 순"],parts:["GPS 안테나","통합단말기"]},
  "센터통신":{t:"센터 / 클라우드 통신 불량",steps:["외장모뎀 신호·안테나 점검","수집/단말 센터 IP 설정 확인(재설치 메뉴)"],parts:["외장모뎀","안테나"]},
@@ -73,6 +73,23 @@ function parseSetTermInfo(text){
   if(!pos && toks[1]) pos=toks[1];
   if(toks.length<2) return null;
   return { vehicleId:vehicleId, pos:pos, posLabel:seunghaPosLabel(pos), bizId:bizId };
+}
+
+/* ===== 차량 일치 검증 =====
+   백업의 차량ID 끝 6자리 = 번호판 숫자(서울74사3021 → 743021).
+   조회한 번호판(vnum)과 백업 차량ID(vehicleId)를 대조. */
+function verifyVehicle(vnum, vehicleId){
+  var pd=(''+(vnum||'')).replace(/\D/g,'');     // 번호판 숫자 (예: 743021)
+  var vid=(''+(vehicleId||'')).replace(/\D/g,''); // 백업 차량ID
+  if(!pd || !vid || pd.length<4) return {checked:false};   // 확인 불가
+  var match = (vid.length>=pd.length && vid.slice(-pd.length)===pd) || vid.indexOf(pd)>=0;
+  return {checked:true, match:match, plateDigits:pd, vehicleId:vid};
+}
+function vehicleMatchBanner(vnum, vehicleId){
+  var v=verifyVehicle(vnum, vehicleId);
+  if(!v.checked) return '';
+  if(v.match) return '<div class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 mb-2">✅ <b>차량 일치 확인</b> — 조회 차량('+logEsc(vnum)+')과 백업 차량ID('+logEsc(vehicleId)+')가 일치합니다.</div>';
+  return '<div class="text-[12px] font-bold text-[#B91C1C] bg-rose-50 border-2 border-rose-300 rounded-lg px-3 py-2 mb-2">⚠ <b>차량 불일치 주의</b> — 조회한 차량은 <b>'+logEsc(vnum)+'</b>인데 이 백업의 차량ID는 <b>'+logEsc(vehicleId)+'</b>(끝 '+logEsc(v.vehicleId.slice(-6))+')로 <b>다른 차량</b>일 수 있습니다. 백업 파일을 다시 확인하세요.</div>';
 }
 
 /* ===== 파서 ===== */
@@ -396,6 +413,7 @@ function analyzeIntegratedData(r, vnum){
     dg.findings.some(function(f){ return (f.group==='모뎀BMS통신'||f.group==='센터통신'||f.group==='GW통신') && f.core; }) ||
     (integSeungha && integSeungha.failedUnits.length>=2);
   const id=parseSetTermInfo(r.setTerm||''); const vehicleId=id?id.vehicleId:'';
+  dg.vehicleId=vehicleId;   // 차량 일치 검증용
   if(vehicleId){ if(!window.__integByVeh) window.__integByVeh={};
     const uf={}; if(integSeungha) integSeungha.failedUnits.forEach(function(u){ uf[u]=true; });
     window.__integByVeh[vehicleId]={selfBad:!!selfBad, unitFail:integSeungha?integSeungha.failedUnits:[], unitMap:uf, vnum:vnum}; }
@@ -464,7 +482,8 @@ function renderSeungha(self, iso, vnum, vid, targetId, extraFindings){
   const histId=targetId+'-snhist';
   var hasPos=!!self.posLabel;
   var unit=self.posLabel||'승하차';
-  var head='<div class="flex items-center gap-2 mb-2 flex-wrap">'
+  var head=vehicleMatchBanner(vnum, self.vehicleId)
+    +'<div class="flex items-center gap-2 mb-2 flex-wrap">'
     +'<span class="chip bg-slate-100 text-slate-600">'+logEsc(self.sn?'S/N '+self.sn:'승하차')+'</span>'
     +'<span class="chip" style="background:#ede9fe;color:#6D28D9;font-weight:700">'+logEsc(hasPos?unit+' 승하차 단말기':'승하차 단말기')+'</span>'
     +(self.vehicleId?'<span class="chip bg-slate-100 text-slate-500">차량ID '+logEsc(self.vehicleId)+'</span>':'')
@@ -599,7 +618,7 @@ function renderModuleLinks(moduleDiag){
 
 function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, moduleDiag){
   const box=document.getElementById('logbk-result');
-  const head='<div class="flex items-center gap-2 mb-2 flex-wrap"><span class="chip bg-slate-100 text-slate-600">'+logEsc(dg.model)+(dg.sn&&dg.sn!=='단말기'?' · S/N '+logEsc(dg.sn):'')+'</span></div>';
+  const head=vehicleMatchBanner(vnum, dg.vehicleId)+'<div class="flex items-center gap-2 mb-2 flex-wrap"><span class="chip bg-slate-100 text-slate-600">'+logEsc(dg.model)+(dg.sn&&dg.sn!=='단말기'?' · S/N '+logEsc(dg.sn):'')+'</span></div>';
   const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad)+renderModuleLinks(moduleDiag);
   if(!dg.findings.length && !extra){
     box.innerHTML=head+'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 통신 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">로그상 승하차·표출기·모뎀 등 통신 이상이 잡히지 않았습니다(정상 범위).</div></div>'
@@ -844,17 +863,22 @@ async function aiLogAnalysis(vnum, vid){
     const sys='당신은 ATEC 버스 단말기 장애 분석 전문가입니다. 아래 데이터를 근거로 종합 분석하세요.\n'
       +'주요 근거(우선): 1)현재 로그 진단 2)이 차량 과거 로그 이력 3)동일 단말기(S/N) 이력.\n'
       +(hasEv?'당일 이벤트가 제공되었으니 보조로 활용하세요.':'당일 이벤트는 제공되지 않았습니다 — 이벤트 관련 추정/언급은 하지 마세요.')+'\n'
-      +'한국어로 짧고 명확하게:\n**종합 진단**(1~2문장)\n**재불량/수리 미흡 여부**(S/N·과거 이력 근거. 조치 후 같은 장애 재발 시 수리 미흡 의심 명시)\n**권장 조치**(구체 1~3개, 과거 효과없던 조치 지양)\n마지막 줄: (주의) AI 추정 — 최종 판단은 기사님 확인 후';
+      +'한국어로 짧고 명확하게:\n**종합 진단**(1~2문장)\n**재불량/수리 미흡 여부**(S/N·과거 이력 근거. 조치 후 같은 장애 재발 시 수리 미흡 의심 명시)\n**권장 조치**(구체 1~3개, 과거 효과없던 조치 지양).\n면책 문구는 쓰지 마세요(시스템이 자동으로 붙입니다).';
     const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent',{
       method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aikey},
-      body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:ctx}]}],generationConfig:{maxOutputTokens:1024,temperature:0.4,thinkingConfig:{thinkingBudget:0}}})});
+      body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:ctx}]}],generationConfig:{maxOutputTokens:1536,temperature:0.4,thinkingConfig:{thinkingBudget:0}}})});
     const data=await res.json();
     if(!res.ok){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 호출 실패('+res.status+'). 잠시 후 재시도.</span>'; return; }
     const cand=(data.candidates||[])[0];
     let ans=(cand&&cand.content&&cand.content.parts)?cand.content.parts.map(function(p){return p.text||'';}).join(''):'';
+    const truncated=(cand&&cand.finishReason==='MAX_TOKENS');
     if(!ans) ans='(빈 응답)';
+    // AI가 혹시 넣은 말미 면책문구(또는 잘린 조각) 제거 → 면책은 코드에서 고정 추가(절대 안 잘림)
+    ans=ans.replace(/\n*\s*[⚠※]?\s*\(?주의\)?\s*[:\-—]*\s*AI[\s\S]*$/,'').replace(/\n*\s*[⚠※][\s\S]*기사님[\s\S]*$/,'').trim();
     const html=logEsc(ans).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
-    out.innerHTML='<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12.5px] text-slate-700 leading-relaxed"><div class="text-[11px] font-bold text-blue-700 mb-1">🤖 AI 종합 분석</div>'+html+'</div>';
+    const trunc=truncated?'<div class="text-[10px] text-slate-400 mt-1">(응답이 길어 일부 생략 — 핵심만 표시)</div>':'';
+    const footer='<div class="text-[11px] font-semibold text-amber-700 mt-2 pt-2" style="border-top:1px dashed #c7d2fe">⚠ AI 추정입니다 — 최종 판단은 기사님이 현장 확인 후 결정하세요.</div>';
+    out.innerHTML='<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12.5px] text-slate-700 leading-relaxed"><div class="text-[11px] font-bold text-blue-700 mb-1">🤖 AI 종합 분석</div>'+html+trunc+footer+'</div>';
   }catch(e){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 분석 오류: '+logEsc(e.message||e)+'</span>'; }
 }
 
