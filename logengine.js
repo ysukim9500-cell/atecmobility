@@ -178,6 +178,40 @@ function analyzeGps(prevpass, counts){
     firstRec:times.length?bpFmt(times[0]):'', invalid:invalid, hasTaco:hasTaco, level:level };
 }
 
+/* ===== 통합 모듈연결 진단 (.evl) =====
+   표출기(HMI)·DTG(타코)·BMS 연결 끊김을 직접증거로 집계 → 격리를 전 모듈로 확장 */
+var MODULE_GUIDE={
+  "표출기": {label:'표출기(운전자 단말기)', steps:['표출기↔통합 케이블 접점·삽입 점검','표출기 재부팅','지속 시 표출단말기 교체'], parts:['표출기 케이블','표출단말기']},
+  "DTG":   {label:'DTG(타코미터)',         steps:['DTG 커넥터 재연결·체결 확인','DTG 케이블 교체 TEST','지속 시 타코메타 점검'], parts:['DTG 케이블','타코메타']},
+  "BMS":   {label:'BMS↔센터(모뎀)',        steps:['외장 LTE 모뎀 LED·USIM 점검','모뎀 케이블 체결','지속 시 통합단말기 BMS B/D 점검'], parts:['외장 LTE 모뎀','통합단말기']}
+};
+function moduleGroupOf(mod){
+  if(/^a2h_|^h2g_/.test(mod)) return '표출기';   // AFC↔HMI / HMI↔GW = 표출기 경로
+  if(mod==='dtg') return 'DTG';
+  if(mod==='b2t_mqtt') return 'BMS';
+  return '';
+}
+function analyzeModuleLinks(evlList){
+  if(!evlList || !evlList.length) return null;
+  var g={};
+  for(var i=0;i<evlList.length;i++){
+    var grp=moduleGroupOf(evlList[i].mod); if(!grp) continue;
+    var t=evlList[i].text;
+    var disc=(t.match(/DISCONNECT/g)||[]).length;
+    var conn=(t.match(/CONNECTED/g)||[]).length;
+    if(!g[grp]) g[grp]={disconnect:0, connected:0};
+    g[grp].disconnect+=disc; g[grp].connected+=conn;
+  }
+  var findings=[];
+  for(var k in g){
+    var d=g[k].disconnect;
+    if(d>=3){ findings.push({group:k, disconnect:d, connected:g[k].connected, core:d>=10}); }
+  }
+  if(!findings.length) return null;
+  findings.sort(function(a,b){ return b.disconnect-a.disconnect; });
+  return findings;
+}
+
 /* =========================================================
    승하차 고장 격리 (통합 / 승하차 / 케이블)
    - 통합단말기 백업: 유닛별(승차/하차1/하차2) 통신실패 + 통합 자체 건강
@@ -204,45 +238,80 @@ function analyzeIntegratedSeungha(counts){
   if(!any && !generic) return null;
   return { units:units, generic:generic, failedUnits:Object.keys(units) };
 }
+/* 승하차 debug에서 통합(C2V) 연결 직접증거 추출
+   - on_connected / ": connected" = 통합에 실제 연결됨
+   - ": send" = 통합으로 데이터 송신(활발한 통신)
+   - try_conn = 연결 시도 횟수
+   → 본체 살아있음 + 링크 정상 여부를 추정이 아닌 로그로 확인 */
+function analyzeSeunghaLink(debugTexts){
+  if(!debugTexts || !debugTexts.length) return null;
+  var connected=0, send=0, tryConn=0, onConn=0;
+  for(var i=0;i<debugTexts.length;i++){
+    var t=debugTexts[i];
+    connected += (t.match(/\] : connected/g)||[]).length;
+    send      += (t.match(/\] : send/g)||[]).length;
+    tryConn   += (t.match(/try_conn/g)||[]).length;
+    onConn    += (t.match(/on_connected/g)||[]).length;
+  }
+  var everConnected = (connected>0 || onConn>0);
+  var sentData = send>0;
+  // 상태: active(연결+송신) / tryingNoConn(시도만, 통합 도달X) / booted(돌긴함)
+  var state = (everConnected && sentData) ? 'active' : (tryConn>0 ? 'tryingNoConn' : 'booted');
+  return { connected:connected, send:send, tryConn:tryConn, onConn:onConn,
+    everConnected:everConnected, sentData:sentData, reconnects:onConn, state:state };
+}
 /* 승하차 단말기 백업 자체 진단 */
-function analyzeSeunghaSelf(setTerm, counts, activity, sn){
+function analyzeSeunghaSelf(setTerm, counts, activity, sn, debugTexts){
   var id=parseSetTermInfo(setTerm||'');
   var selfLoss=0; ["5202","5203","5205"].forEach(function(c){ if(counts[c]) selfLoss+=counts[c]; });
   var alive=!!activity;                       // 거래/이벤트 데이터 = 가동 흔적
+  var link=analyzeSeunghaLink(debugTexts);    // 통합 연결 직접증거(있으면)
+  if(link && (link.everConnected||link.sentData||link.tryConn>0)) alive=true; // debug가 더 확실
   return { sn:sn, id:id, posLabel:id?id.posLabel:'', vehicleId:id?id.vehicleId:'',
-    selfLoss:selfLoss, alive:alive };
+    selfLoss:selfLoss, alive:alive, link:link };
 }
-/* 고장 격리 판정 — 승하차 백업 기준(+선택적으로 통합 교차정보) */
+/* 고장 격리 판정 — 승하차 백업 기준(+통합 교차정보 +debug 연결 직접증거) */
 function isolateFromSeungha(self, integ){
-  // integ: 같은 차량 통합 진단 요약 {selfBad:bool, unitFail:bool} 또는 null
   var unit=self.posLabel||'승하차';
   var reasons=[], steps=[], verdict, color, conf;
-  var integSelfBad = integ && integ.selfBad;     // 통합 자체 이상(부팅/전원/BMS/다수유닛)
-  var integUnitFail = integ && integ.unitFail;   // 통합이 이 유닛 통신실패를 기록
+  var integSelfBad = integ && integ.selfBad;
+  var integUnitFail = integ && integ.unitFail;
+  var link=self.link;                            // {state:'active'|'tryingNoConn'|'booted', sentData, everConnected, reconnects, tryConn}
 
   if(integSelfBad){
     verdict='통합단말기'; color='#B91C1C'; conf='높음';
     reasons.push('통합단말기 백업에서 자체 이상(부팅/전원/BMS 또는 다수 유닛 동시 실패)이 확인됨');
-    if(self.alive) reasons.push('승하차('+unit+')는 자체 가동 흔적이 있어 본체 정상 가능성');
+    if(link && link.state==='active') reasons.push('승하차('+unit+')는 통합과 실제 연결·송신 기록이 있어 본체 정상(직접증거)');
+    else if(self.alive) reasons.push('승하차('+unit+')는 자체 가동 흔적이 있어 본체 정상 가능성');
     steps=['통합단말기 우선 점검·교체 검토','통합 교체 후 '+unit+' 통신 회복 확인'];
+  } else if(link && link.state==='tryingNoConn'){
+    // debug 직접증거: 연결 시도만 있고 통합 도달 실패 → 단선/포트
+    verdict='케이블 단선 / 통합 포트'; color='#B45309'; conf='높음';
+    reasons.push(unit+' 승하차는 부팅·연결시도('+link.tryConn+'회)는 하지만 통합 연결 성공 기록이 0 → 통합에 도달조차 못함(직접증거)');
+    reasons.push('승하차 본체는 동작 중이므로 본체 불량 가능성 낮음 → 단선/커넥터 또는 통합 포트');
+    steps=[unit+' 통신 케이블 단선·커넥터 탈락 확인 → 임시 가설 교체 TEST','통합단말기 해당 포트 → 예비포트(sp) 이동','그래도 연결 안 되면 통합 포트/본체 점검'];
   } else if(!self.alive){
     verdict='승하차 단말기'; color='#C2185B'; conf='높음';
-    reasons.push(unit+' 승하차 백업에 가동 흔적(거래/이벤트)이 없음 → 단말기 무응답/미부팅');
+    reasons.push(unit+' 승하차 백업에 가동 흔적(거래/연결/이벤트)이 없음 → 단말기 무응답/미부팅(직접증거)');
     steps=[unit+' 승하차 단말기 전원·커넥터 확인','전원 정상인데 무응답이면 '+unit+' 승하차 단말기 교체'];
   } else if(self.selfLoss>0){
-    // 승하차는 살아있고 스스로 통신끊김을 기록 → 링크(케이블/포트) 의심
-    verdict='케이블/커넥터'; color='#B45309'; conf=integUnitFail?'높음':'중간';
-    reasons.push(unit+' 승하차는 정상 가동 중인데 통신끊김을 '+self.selfLoss+'회 자체 기록 → 본체는 살아있음');
-    if(integUnitFail) reasons.push('통합도 동일 '+unit+' 통신실패를 기록 → 양쪽 정상, 사이 연결이 문제');
-    else reasons.push('통합 백업까지 함께 보면 더 정확 (통합도 정상이면 케이블 확정)');
-    steps=[unit+' 통신 케이블 임시 가설로 교체 TEST','통합단말기 해당 포트 → 예비포트(sp) 이동 점검','회복되면 케이블/커넥터 확정, 안되면 통합 포트/본체'];
+    // 살아있고(연결·송신) + 끊김기록 → 간헐 접촉불량
+    var intermittent = link && link.state==='active';
+    verdict='케이블/커넥터'+(intermittent?'(간헐 접촉불량)':''); color='#B45309';
+    conf = (intermittent||integUnitFail)?'높음':'중간';
+    if(intermittent) reasons.push(unit+' 승하차는 통합과 연결·데이터송신('+link.send+'회) 기록이 있는데 통신끊김도 '+self.selfLoss+'회 반복'+(link.reconnects?'·재연결 '+link.reconnects+'회':'')+' → 붙었다 끊겼다 하는 간헐 접촉불량(직접증거)');
+    else reasons.push(unit+' 승하차는 정상 가동 중인데 통신끊김을 '+self.selfLoss+'회 자체 기록 → 본체는 살아있음');
+    if(integUnitFail) reasons.push('통합도 동일 '+unit+' 통신실패를 기록 → 양쪽 본체 정상, 사이 연결이 문제');
+    else if(!integ) reasons.push('통합 백업까지 함께 보면 더 정확');
+    steps=[unit+' 통신 케이블 커넥터 재체결 → 임시 가설 교체 TEST','통합단말기 해당 포트 → 예비포트(sp) 이동 점검','회복되면 케이블/커넥터 확정, 안되면 통합 포트/본체'];
   } else {
     verdict='정상'; color='#16A34A'; conf='-';
     reasons.push(unit+' 승하차 자체 통신끊김 기록 없음(정상 범위)');
+    if(link && link.state==='active') reasons.push('통합과 연결·송신 정상 확인');
     steps=['추가 조치 불필요 — 필요 시 통합 백업도 확인'];
   }
-  return { unit:unit, vehicleId:self.vehicleId, verdict:verdict, color:color, conf:conf, reasons:reasons, steps:steps,
-    needIntegrated: !integ && verdict!=='승하차 단말기' };
+  return { unit:unit, vehicleId:self.vehicleId, verdict:verdict, color:color, conf:conf, reasons:reasons, steps:steps, link:link,
+    needIntegrated: !integ && verdict.indexOf('통합')<0 && verdict!=='승하차 단말기' };
 }
 
 /* ===== 경로 판별 ===== */
@@ -257,11 +326,18 @@ function isSeunghaActivityPath(p){ return /(^|\/)trans\/drive_backup\/[^/]+/i.te
 function isSdrLogPath(p){ if(/\/backup\//i.test(p)) return false; return /(^|\/)logs\/term\/[^/]*_sdr\.log$/i.test(p) || /(^|\/)[0-9]{8}_sdr\.log$/i.test(p); }
 /* GPS 위치기록 prevpass(작은 바이너리) */
 function isPrevpassPath(p){ return /(^|\/)gps\/prevpass_data_[0-9]+\.log$/i.test(p) || /(^|\/)prevpass_data_[0-9]+\.log$/i.test(p); }
+/* 승하차 bus debug(통합 연결 직접증거용) — 승하차 백업일 때만 읽음 */
+function isSeunghaDebugPath(p){ if(/\/backup\//i.test(p)) return false; return /(^|\/)bus\/logs\/debug\/log_[0-9]+\.dmp$/i.test(p); }
+/* 통합 모듈연결 로그 .evl (표출기HMI·DTG·BMS mqtt) — logs/backup/ 안에 있음 */
+function isModuleEvlPath(p){ return /(^|\/)logs\/backup\/[0-9]+_(a2h_[a-z]+_recv|h2g_[a-z]+_recv|dtg|b2t_mqtt)\.evl$/i.test(p); }
+function moduleEvlName(p){ var m=(''+p).match(/([0-9]+)_(a2h_[a-z]+_recv|h2g_[a-z]+_recv|dtg|b2t_mqtt)\.evl$/i); return m?m[2].toLowerCase():''; }
 
 /* 폴더(여러 파일) 직접 분석 — 큰 debug 파일은 읽지 않아 가볍다 */
 async function readBackupFromFiles(fileList){
-  const files=Array.prototype.slice.call(fileList); let sn=''; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTerm=''; let activity=false;
+  const files=Array.prototype.slice.call(fileList); let sn=''; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTerm=''; let activity=false; const debugTexts=[]; let dbgBytes=0; const evlList=[]; let evlBytes=0;
   for(let i=0;i<files.length;i++){ if(sn) break; sn=snFromPath(files[i].webkitRelativePath||files[i].name); }
+  const wantDebug=isSeunghaSn(sn);   // 승하차 백업일 때만 debug 읽기(통합은 성능 위해 생략)
+  const wantEvl=!isSeunghaSn(sn);    // 통합 백업일 때 모듈연결 .evl 읽기
   for(let i=0;i<files.length;i++){
     const f=files[i]; const p=f.webkitRelativePath||f.name;
     try{
@@ -270,25 +346,31 @@ async function readBackupFromFiles(fileList){
       else if(isSetTermInfoPath(p)){ if(!setTerm) setTerm=await f.text(); }
       else if(isSdrLogPath(p)){ sdrTexts.push(await f.text()); }
       else if(isPrevpassPath(p)){ prevpass.push(new Uint8Array(await f.arrayBuffer())); }
+      else if(wantEvl && evlBytes<3000000 && isModuleEvlPath(p)){ const t=await f.text(); evlList.push({mod:moduleEvlName(p),text:t}); evlBytes+=t.length; }
+      else if(wantDebug && dbgBytes<8000000 && isSeunghaDebugPath(p)){ const t=await f.text(); debugTexts.push(t); dbgBytes+=t.length; if(isSeunghaActivityPath(p)) activity=true; }
       else if(isSeunghaActivityPath(p)){ activity=true; }
     }catch(e){}
   }
-  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity};
+  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList};
 }
 /* zip 분석 */
 async function readBackupFromZip(file){
-  const zip=await JSZip.loadAsync(file); let sn=''; const imp=[],asc=[],sdr=[],pvp=[]; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTermE=null; let activity=false;
+  const zip=await JSZip.loadAsync(file); let sn=''; const imp=[],asc=[],sdr=[],pvp=[],dbg=[],evl=[]; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTermE=null; let activity=false; const debugTexts=[]; const evlList=[];
   zip.forEach(function(p,e){ if(e.dir) return; if(!sn) sn=snFromPath(p);
     if(isImportantPath(p)) imp.push(e); else if(isAsciiEventPath(p)){ asc.push(e); if(isSeunghaActivityPath(p)) activity=true; }
     else if(isSetTermInfoPath(p)){ if(!setTermE) setTermE=e; }
     else if(isSdrLogPath(p)) sdr.push(e); else if(isPrevpassPath(p)) pvp.push(e);
+    else if(isModuleEvlPath(p)) evl.push({e:e,mod:moduleEvlName(p)});
+    else if(isSeunghaDebugPath(p)) dbg.push(e);
     else if(isSeunghaActivityPath(p)) activity=true; });
   for(let i=0;i<imp.length;i++){ const u8=await imp[i].async('uint8array'); const c=parseImportantEvt(u8); for(const k in c) counts[k]=(counts[k]||0)+c[k]; }
   for(let i=0;i<asc.length;i++){ const t=await asc[i].async('string'); const c=parseAsciiEvt(t); for(const k in c) counts[k]=(counts[k]||0)+c[k]; }
   for(let i=0;i<sdr.length;i++){ try{ sdrTexts.push(await sdr[i].async('string')); }catch(e){} }
   for(let i=0;i<pvp.length;i++){ try{ prevpass.push(await pvp[i].async('uint8array')); }catch(e){} }
+  if(!isSeunghaSn(sn)){ let eb=0; for(let i=0;i<evl.length && eb<3000000;i++){ try{ const t=await evl[i].e.async('string'); evlList.push({mod:evl[i].mod,text:t}); eb+=t.length; }catch(e){} } }
+  if(isSeunghaSn(sn)){ let dbgBytes=0; for(let i=0;i<dbg.length && dbgBytes<8000000;i++){ try{ const t=await dbg[i].async('string'); debugTexts.push(t); dbgBytes+=t.length; }catch(e){} } }
   let setTerm=''; if(setTermE){ try{ setTerm=await setTermE.async('string'); }catch(e){} }
-  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity};
+  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList};
 }
 
 /* 메인: 폴더 또는 zip 어느 쪽이든 분석 */
@@ -309,6 +391,7 @@ function analyzeIntegratedData(r, vnum){
   const bootDiag=analyzeBootPower(r.sdrTexts||[]);
   const gpsDiag=analyzeGps(r.prevpass||[], r.counts);
   const integSeungha=analyzeIntegratedSeungha(r.counts);
+  const moduleDiag=analyzeModuleLinks(r.evlList||[]);
   const selfBad=(bootDiag&&bootDiag.level==='core') ||
     dg.findings.some(function(f){ return (f.group==='모뎀BMS통신'||f.group==='센터통신'||f.group==='GW통신') && f.core; }) ||
     (integSeungha && integSeungha.failedUnits.length>=2);
@@ -316,7 +399,7 @@ function analyzeIntegratedData(r, vnum){
   if(vehicleId){ if(!window.__integByVeh) window.__integByVeh={};
     const uf={}; if(integSeungha) integSeungha.failedUnits.forEach(function(u){ uf[u]=true; });
     window.__integByVeh[vehicleId]={selfBad:!!selfBad, unitFail:integSeungha?integSeungha.failedUnits:[], unitMap:uf, vnum:vnum}; }
-  return {sn:sn,dg:dg,bootDiag:bootDiag,gpsDiag:gpsDiag,integSeungha:integSeungha,selfBad:!!selfBad,vehicleId:vehicleId};
+  return {sn:sn,dg:dg,bootDiag:bootDiag,gpsDiag:gpsDiag,integSeungha:integSeungha,moduleDiag:moduleDiag,selfBad:!!selfBad,vehicleId:vehicleId};
 }
 
 /* 메인: 통합(슬롯1)·승하차(슬롯2)를 각각/동시 분석 */
@@ -338,7 +421,7 @@ async function analyzeLogBackup(vnum, vid){
     let integInfo = integR ? analyzeIntegratedData(integR, vnum) : null;
 
     if(seunghaR){
-      const self=analyzeSeunghaSelf(seunghaR.setTerm, seunghaR.counts, seunghaR.activity, seunghaR.sn);
+      const self=analyzeSeunghaSelf(seunghaR.setTerm, seunghaR.counts, seunghaR.activity, seunghaR.sn, seunghaR.debugTexts||[]);
       let integSummary=null;
       if(integInfo && (!self.vehicleId || !integInfo.vehicleId || integInfo.vehicleId===self.vehicleId)){
         integSummary={selfBad:integInfo.selfBad, unitFail:integInfo.integSeungha?integInfo.integSeungha.failedUnits:[]};
@@ -346,13 +429,18 @@ async function analyzeLogBackup(vnum, vid){
         integSummary=window.__integByVeh[self.vehicleId];
       }
       const iso=isolateFromSeungha(self, integSummary);
+      // 승하차 자체 카드/SAM 등 비통신 진단 (이벤트코드 재사용)
+      const dgS=diagnoseCounts(self.sn, seunghaR.counts);
+      const COMM_GROUPS={'승하차통신':1,'승하차1통신':1,'승하차2통신':1,'승하차3통신':1,'GW통신':1,'센터통신':1,'기타통신':1,'모뎀BMS통신':1,'표출기통신':1};
+      const seunghaExtra=dgS.findings.filter(function(f){ return !COMM_GROUPS[f.group]; });
+      self.extra=seunghaExtra;
       window.__lastDiag={vnum:vnum,vid:vid,sn:self.sn,model:logModelOf(self.sn),seungha:self,iso:iso,findings:[],analyzedAt:new Date().toISOString().slice(0,10)};
       if(integInfo){
         // 동시 분석: 통합 진단(logbk-result) + 승하차 격리(logbk-iso, 후순위라 저장카드 소유)
-        renderDiag(integInfo.dg, vnum, vid, integInfo.bootDiag, integInfo.gpsDiag, integInfo.integSeungha, integInfo.selfBad);
-        renderSeungha(self, iso, vnum, vid, 'logbk-iso');
+        renderDiag(integInfo.dg, vnum, vid, integInfo.bootDiag, integInfo.gpsDiag, integInfo.integSeungha, integInfo.selfBad, integInfo.moduleDiag);
+        renderSeungha(self, iso, vnum, vid, 'logbk-iso', seunghaExtra);
       } else {
-        renderSeungha(self, iso, vnum, vid, 'logbk-result');
+        renderSeungha(self, iso, vnum, vid, 'logbk-result', seunghaExtra);
         if(isoBox) isoBox.innerHTML='';
       }
       return;
@@ -361,7 +449,7 @@ async function analyzeLogBackup(vnum, vid){
     // 통합만
     if(integInfo){
       window.__lastDiag={vnum:vnum,vid:vid,sn:integInfo.dg.sn,model:integInfo.dg.model,findings:integInfo.dg.findings,bootDiag:integInfo.bootDiag,gpsDiag:integInfo.gpsDiag,integSeungha:integInfo.integSeungha,selfBad:integInfo.selfBad,analyzedAt:new Date().toISOString().slice(0,10)};
-      renderDiag(integInfo.dg, vnum, vid, integInfo.bootDiag, integInfo.gpsDiag, integInfo.integSeungha, integInfo.selfBad);
+      renderDiag(integInfo.dg, vnum, vid, integInfo.bootDiag, integInfo.gpsDiag, integInfo.integSeungha, integInfo.selfBad, integInfo.moduleDiag);
       if(isoBox) isoBox.innerHTML='';
     }
   }catch(err){
@@ -370,18 +458,27 @@ async function analyzeLogBackup(vnum, vid){
 }
 
 /* ===== 승하차 단말기 백업 결과 렌더 (현장용 직관 카드) ===== */
-function renderSeungha(self, iso, vnum, vid, targetId){
+function renderSeungha(self, iso, vnum, vid, targetId, extraFindings){
   targetId=targetId||'logbk-result';
   const box=document.getElementById(targetId); if(!box) return;
   const histId=targetId+'-snhist';
+  var hasPos=!!self.posLabel;
   var unit=self.posLabel||'승하차';
   var head='<div class="flex items-center gap-2 mb-2 flex-wrap">'
     +'<span class="chip bg-slate-100 text-slate-600">'+logEsc(self.sn?'S/N '+self.sn:'승하차')+'</span>'
-    +'<span class="chip" style="background:#ede9fe;color:#6D28D9;font-weight:700">'+logEsc(unit)+' 승하차 단말기</span>'
-    +(self.vehicleId?'<span class="chip bg-slate-100 text-slate-500">차량ID '+logEsc(self.vehicleId)+'</span>':'')+'</div>';
+    +'<span class="chip" style="background:#ede9fe;color:#6D28D9;font-weight:700">'+logEsc(hasPos?unit+' 승하차 단말기':'승하차 단말기')+'</span>'
+    +(self.vehicleId?'<span class="chip bg-slate-100 text-slate-500">차량ID '+logEsc(self.vehicleId)+'</span>':'')
+    +(hasPos?'':'<span class="chip bg-amber-50 text-amber-700">⚠ 위치 미상 (set_term_info 없음)</span>')+'</div>'
+    +(hasPos?'':'<div class="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1 mb-2">식별파일이 없어 승차/하차1/하차2 위치는 확인 불가하지만, 아래 원인 판정은 유효합니다.</div>');
+  var linkChip='';
+  if(self.link){
+    if(self.link.state==='active') linkChip='<span class="chip bg-emerald-50 text-emerald-700">🔗 통합 연결·송신 확인('+self.link.send+'회'+(self.link.reconnects?'·재연결 '+self.link.reconnects:'')+')</span>';
+    else if(self.link.state==='tryingNoConn') linkChip='<span class="chip bg-rose-50 text-rose-700">🔗 연결 시도만('+self.link.tryConn+'회)·통합 도달 실패</span>';
+    else linkChip='<span class="chip bg-slate-50 text-slate-500">🔗 연결기록 미확인</span>';
+  }
   var status='<div class="flex gap-1.5 flex-wrap mb-2 text-[11px]">'
     +'<span class="chip '+(self.alive?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700')+'">'+(self.alive?'🟢 가동 흔적 있음(살아있음)':'🔴 가동 흔적 없음(무응답)')+'</span>'
-    +'<span class="chip '+(self.selfLoss?'bg-amber-50 text-amber-700':'bg-slate-50 text-slate-500')+'">자체 통신끊김 '+self.selfLoss+'회</span></div>';
+    +'<span class="chip '+(self.selfLoss?'bg-amber-50 text-amber-700':'bg-slate-50 text-slate-500')+'">자체 통신끊김 '+self.selfLoss+'회</span>'+linkChip+'</div>';
   var conf = iso.conf&&iso.conf!=='-' ? ' <span class="text-[11px] font-medium opacity-80">· 신뢰도 '+logEsc(iso.conf)+'</span>' : '';
   var reasons=iso.reasons.map(function(r){return '<li>'+logEsc(r)+'</li>';}).join('');
   var steps=iso.steps.map(function(s){return '<li>'+logEsc(s)+'</li>';}).join('');
@@ -397,7 +494,22 @@ function renderSeungha(self, iso, vnum, vid, targetId){
     ? '<div class="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-2">💡 이 차량의 <b>통합단말기 백업</b>도 같은 화면에서 분석하면 <b>통합 문제까지 확정</b>됩니다(통합 이상 시 통합으로 자동 판정).</div>'
     : '';
   var grp = self.posLabel==='승차'?'승하차1통신':self.posLabel==='하차1'?'승하차2통신':self.posLabel==='하차2'?'승하차3통신':'승하차통신';
-  box.innerHTML=head+status+verdictCard+prompt+'<div id="'+histId+'" class="mt-3"></div>';
+  // 카드/SAM 등 비통신 추가 진단
+  var extraHtml='';
+  if(extraFindings && extraFindings.length){
+    var rows='';
+    for(var i=0;i<extraFindings.length;i++){
+      var f=extraFindings[i]; var G=logGuide(f.group); var core=f.core;
+      var ev=f.codes.slice(0,4).map(function(c){ var e=LOG_CODES[c[0]]||['','','','']; return '<li><b>'+c[0]+'</b> '+logEsc(e[0])+' — '+c[1]+'회</li>'; }).join('');
+      var steps=G.steps.map(function(s){return '<li>'+logEsc(s)+'</li>';}).join('');
+      rows+='<div class="border border-rose-100 rounded-lg p-2.5 mb-1.5 '+(core?'bg-rose-50/40':'bg-amber-50/30')+'">'
+        +'<div class="text-[12.5px] font-bold '+(core?'text-[#B91C1C]':'text-[#B45309]')+'">'+(core?'🔴':'🟡')+' '+logEsc(G.t)+' <span class="text-[10px] font-normal text-slate-400">총 '+f.n+'회</span></div>'
+        +'<ul class="text-[11px] text-slate-600 list-disc pl-5 mt-1 space-y-0.5">'+ev+'</ul>'
+        +'<div class="text-[11px] text-slate-500 mt-1 font-semibold">점검:</div><ol class="text-[11.5px] text-slate-700 list-decimal pl-5 space-y-0.5">'+steps+'</ol></div>';
+    }
+    extraHtml='<div class="mt-3"><div class="text-[12px] font-extrabold text-[#7A0B3C] mb-1">🔌 승하차 자체 추가 진단 (카드·SAM·기타)</div>'+rows+'</div>';
+  }
+  box.innerHTML=head+status+verdictCard+prompt+extraHtml+'<div id="'+histId+'" class="mt-3"></div>';
   showActionCard(vnum, vid, {group:grp});
   if(self.sn) loadSnHistory(self.sn,histId);
 }
@@ -467,10 +579,28 @@ function renderIntegratedSeungha(integSeungha, selfBad){
     +'</div>';
 }
 
-function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad){
+/* 모듈 연결 진단 (.evl) — 표출기/DTG/BMS 끊김 격리 카드 */
+function renderModuleLinks(moduleDiag){
+  if(!moduleDiag || !moduleDiag.length) return '';
+  var h='';
+  for(var i=0;i<moduleDiag.length;i++){
+    var f=moduleDiag[i]; var G=MODULE_GUIDE[f.group]||{label:f.group,steps:['연결 점검'],parts:[]};
+    var core=f.core; var lamp=core?'🔴':'🟡', sev=core?'핵심':'주의';
+    var steps=G.steps.map(function(s){return '<li>'+logEsc(s)+'</li>';}).join('');
+    var parts=(G.parts&&G.parts.length)?('<div class="text-[11px] text-slate-500 mt-1.5">점검 부품: '+G.parts.map(function(p){return '<span class="chip bg-rose-50 text-[#B91C1C] border border-rose-200" style="font-size:11px">'+logEsc(p)+'</span>';}).join(' ')+'</div>'):'';
+    h+='<div class="border border-rose-100 rounded-lg p-3 mb-2 '+(core?'bg-rose-50/40':'bg-amber-50/40')+'">'
+      +'<div class="text-[13px] font-extrabold '+(core?'text-[#B91C1C]':'text-[#B45309]')+'">'+lamp+' ['+sev+'] '+logEsc(G.label)+' 연결 끊김</div>'
+      +'<div class="text-[11px] text-slate-600 mt-1 bg-white/70 rounded px-2 py-1.5">🔎 <b>판단 근거</b>: 모듈연결 로그(.evl)에서 <b>연결 끊김 '+f.disconnect+'회</b>'+(f.connected?' / 재연결 '+f.connected+'회':'')+' (직접증거)</div>'
+      +'<div class="text-[11px] text-slate-500 mt-2 font-semibold">✅ 점검 순서</div>'
+      +'<ol class="text-[12px] text-slate-700 list-decimal pl-5 mt-0.5 space-y-0.5">'+steps+'</ol>'+parts+'</div>';
+  }
+  return h;
+}
+
+function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, moduleDiag){
   const box=document.getElementById('logbk-result');
   const head='<div class="flex items-center gap-2 mb-2 flex-wrap"><span class="chip bg-slate-100 text-slate-600">'+logEsc(dg.model)+(dg.sn&&dg.sn!=='단말기'?' · S/N '+logEsc(dg.sn):'')+'</span></div>';
-  const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad);
+  const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad)+renderModuleLinks(moduleDiag);
   if(!dg.findings.length && !extra){
     box.innerHTML=head+'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 통신 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">로그상 승하차·표출기·모뎀 등 통신 이상이 잡히지 않았습니다(정상 범위).</div></div>'
       +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="w-full text-[12px] font-bold text-white rounded-lg py-2 mt-2 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">🤖 로그+이력+S/N 종합 AI 분석</button>'
