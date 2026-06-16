@@ -14,6 +14,8 @@
   body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
   .fg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .qact{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .qact .btn{ flex:1 1 auto; }
   @media(max-width:600px){
     .wrap{ padding:0 12px 50px; }
     .fg3{ grid-template-columns:1fr; }
@@ -22,6 +24,8 @@
     .chk-row{ flex-wrap:wrap; align-items:flex-start; }
     .chk-row .seg{ width:100%; justify-content:flex-start; margin-top:7px; flex-wrap:wrap; }
     .seg button{ flex:1; min-width:64px; }
+    .qact{ display:grid; grid-template-columns:1fr 1fr; }
+    .qact .btn-main{ grid-column:1 / -1; }
   }
   .topbar{ background:linear-gradient(120deg,#0b4a3a,#0e7a5f 45%,#10b981); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -162,10 +166,10 @@
         <div><label class="lbl">판정</label><select id="q-pass" class="inp"><option value="">전체</option><option value="true">합격</option><option value="false">불합격</option></select></div>
         <div><label class="lbl">차량번호 검색</label><input id="q-vehicle" class="inp" placeholder="번호 일부 (선택)"></div>
       </div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
+      <div class="qact">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
-        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 다운로드 (ZIP)</button>
-        <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
+        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 (ZIP)</button>
+        <button class="btn btn-out" onclick="exportCsv()">CSV</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
       </div>

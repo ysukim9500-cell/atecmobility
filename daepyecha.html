@@ -15,13 +15,16 @@
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
   .fg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .fg2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .qact{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .qact .btn{ flex:1 1 auto; }
   @media(max-width:600px){
     .wrap{ padding:0 12px 50px; }
     .fg3{ grid-template-columns:1fr; }
     .fg2{ grid-template-columns:1fr; }
     .card{ padding:16px; }
-    table.mat{ min-width:480px; }
     .tab{ font-size:13px; padding:9px; }
+    .qact{ display:grid; grid-template-columns:1fr 1fr; }
+    .qact .btn-main{ grid-column:1 / -1; }
   }
   .topbar{ background:linear-gradient(120deg,#5e0a2e,#7A0B3C 45%,#C2185B); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -47,10 +50,19 @@
   .btn-out{ background:#fff; border:1.5px solid #C2185B; color:#C2185B; }
   .btn-soft{ background:#f7e7ef; color:#7A0B3C; }
   .btn-soft:hover{ background:#f1d6e3; }
-  table.mat{ width:100%; border-collapse:separate; border-spacing:0; }
-  table.mat th{ background:#7A0B3C; color:#fff; font-size:11.5px; font-weight:700; padding:8px 8px; text-align:left; }
-  table.mat th:first-child{ border-top-left-radius:9px; } table.mat th:last-child{ border-top-right-radius:9px; }
-  table.mat td{ border-bottom:1px solid #f0e0e8; padding:4px; }
+  /* 자재 항목 카드 */
+  .mat-item{ border:1px solid #eedbe6; border-radius:12px; padding:11px 12px; margin-bottom:9px; background:#fffafc; }
+  .mi-top{ display:flex; align-items:center; gap:9px; }
+  .mi-no{ font-weight:800; color:#b0367a; font-size:13px; min-width:20px; text-align:center; }
+  .mi-top .r-name{ flex:1; min-width:0; }
+  .mi-del{ background:none; border:none; color:#c98; cursor:pointer; font-weight:700; font-size:17px; line-height:1; padding:2px 6px; flex-shrink:0; }
+  .mi-grid{ display:grid; grid-template-columns:84px 1.3fr 1fr; gap:8px; margin-top:9px; }
+  .mi-lbl{ font-size:10.5px; font-weight:700; color:#a4587d; display:block; margin-bottom:3px; }
+  .mi-grid .inp{ padding:7px 9px; }
+  @media(max-width:600px){
+    .mi-grid{ grid-template-columns:84px 1fr; }
+    .mi-grid > div:nth-child(3){ grid-column:1 / -1; }
+  }
   .sig-pad{ border:1.5px dashed #d09cb4; border-radius:11px; background:linear-gradient(#fff,#fdf7fa); touch-action:none; width:100%; height:118px; }
   .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#f7e7ef; color:#9a3768; }
   .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #f3e3eb; }
@@ -133,16 +145,8 @@
           <button class="btn btn-soft" style="padding:7px 12px;font-size:12px;color:#b91c1c;background:#fdeaea" onclick="clearRows()">비우기</button>
         </div>
       </div>
-      <p id="mat-hint" class="text-[11.5px]" style="color:#a98">기종을 먼저 선택하면 해당 기종의 품명이 드롭다운에 채워집니다. "기타"는 직접 입력할 수 있어요.</p>
-      <div style="overflow-x:auto">
-        <table class="mat">
-          <thead><tr>
-            <th style="width:38px">No</th><th>품명</th><th style="width:74px">수량</th>
-            <th style="width:150px">S/N</th><th>비고</th><th style="width:34px"></th>
-          </tr></thead>
-          <tbody id="mat-body"></tbody>
-        </table>
-      </div>
+      <p id="mat-hint" class="text-[11.5px]" style="color:#a98;margin-bottom:10px">기종을 먼저 선택하면 해당 기종의 품명이 드롭다운에 채워집니다. "기타"는 직접 입력할 수 있어요.</p>
+      <div id="mat-body"></div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -186,10 +190,10 @@
         <div><label class="lbl">기종</label><select id="q-model" class="inp"></select></div>
         <div><label class="lbl">차량번호 검색</label><input id="q-vehicle" class="inp" placeholder="번호 일부 (선택)"></div>
       </div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
+      <div class="qact">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
-        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 다운로드 (ZIP)</button>
-        <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
+        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 (ZIP)</button>
+        <button class="btn btn-out" onclick="exportCsv()">CSV</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
       </div>
@@ -242,18 +246,22 @@ function optionTags(sel){
   return html;
 }
 function rowHtml(){
-  return '<tr>'+
-    '<td class="rno" style="text-align:center;color:#b08;font-weight:700;font-size:12px"></td>'+
-    '<td><select class="inp r-name" style="padding:7px 9px" onchange="onPick(this)">'+optionTags()+'</select>'+
-      '<input class="inp r-cname" style="padding:7px 9px;margin-top:4px;display:none" placeholder="품명 직접 입력"></td>'+
-    '<td><input class="inp r-qty" type="number" min="0" value="1" style="padding:7px 8px;text-align:center"></td>'+
-    '<td><input class="inp r-sn" placeholder="S/N" style="padding:7px 9px"></td>'+
-    '<td><input class="inp r-note" style="padding:7px 9px"></td>'+
-    '<td style="text-align:center"><button onclick="this.closest(\'tr\').remove();renumber()" style="color:#c98;background:none;border:none;cursor:pointer;font-weight:700">✕</button></td>'+
-  '</tr>';
+  return '<div class="mat-item">'+
+    '<div class="mi-top">'+
+      '<span class="mi-no"></span>'+
+      '<select class="inp r-name" onchange="onPick(this)">'+optionTags()+'</select>'+
+      '<button class="mi-del" onclick="this.closest(\'.mat-item\').remove();renumber()" title="삭제">✕</button>'+
+    '</div>'+
+    '<input class="inp r-cname" style="display:none;margin-top:8px" placeholder="품명 직접 입력">'+
+    '<div class="mi-grid">'+
+      '<div><span class="mi-lbl">수량</span><input class="inp r-qty" type="number" min="0" value="1" style="text-align:center"></div>'+
+      '<div><span class="mi-lbl">S/N</span><input class="inp r-sn" placeholder="S/N"></div>'+
+      '<div><span class="mi-lbl">비고</span><input class="inp r-note"></div>'+
+    '</div>'+
+  '</div>';
 }
 function onPick(sel){
-  var cn = sel.closest('tr').querySelector('.r-cname');
+  var cn = sel.closest('.mat-item').querySelector('.r-cname');
   cn.style.display = (sel.value===CUSTOM) ? 'block':'none';
   if(sel.value===CUSTOM) cn.focus();
 }
@@ -264,31 +272,30 @@ function loadAllItems(){
   clearRows();
   curItems().forEach(function(it){
     el('mat-body').insertAdjacentHTML('beforeend', rowHtml());
-    var tr = el('mat-body').lastElementChild;
-    tr.querySelector('.r-name').value = it;
+    el('mat-body').lastElementChild.querySelector('.r-name').value = it;
   });
   renumber();
 }
 function onModel(){
-  el('mat-body').querySelectorAll('tr').forEach(function(tr){
-    var s=tr.querySelector('.r-name'), v=s.value;
+  el('mat-body').querySelectorAll('.mat-item').forEach(function(it){
+    var s=it.querySelector('.r-name'), v=s.value;
     s.innerHTML=optionTags(v);
     if(s.value!==v){ s.value=''; }
   });
   el('mat-hint').textContent = el('f-model').value ? ('선택 기종: '+el('f-model').value+' — 품명 드롭다운이 갱신되었습니다.') : '기종을 먼저 선택하세요.';
 }
 function renumber(){
-  var rows=el('mat-body').querySelectorAll('tr');
-  rows.forEach(function(tr,i){ tr.querySelector('.rno').textContent=(i+1); });
-  el('mat-count').textContent=rows.length+'개';
+  var items=el('mat-body').querySelectorAll('.mat-item');
+  items.forEach(function(it,i){ it.querySelector('.mi-no').textContent=(i+1); });
+  el('mat-count').textContent=items.length+'개';
 }
 function collectItems(){
   var out=[];
-  el('mat-body').querySelectorAll('tr').forEach(function(tr){
-    var sel=tr.querySelector('.r-name').value;
-    var name = sel===CUSTOM ? tr.querySelector('.r-cname').value.trim() : sel;
+  el('mat-body').querySelectorAll('.mat-item').forEach(function(it){
+    var sel=it.querySelector('.r-name').value;
+    var name = sel===CUSTOM ? it.querySelector('.r-cname').value.trim() : sel;
     if(!name) return;
-    out.push({ name:name, qty:Number(tr.querySelector('.r-qty').value||0), sn:tr.querySelector('.r-sn').value.trim(), note:tr.querySelector('.r-note').value.trim() });
+    out.push({ name:name, qty:Number(it.querySelector('.r-qty').value||0), sn:it.querySelector('.r-sn').value.trim(), note:it.querySelector('.r-note').value.trim() });
   });
   return out;
 }
