@@ -727,8 +727,8 @@ async function saveLogDiagnosis(vnum, vid){
     try{
       const r=await fetch(SB_URL+'/rest/v1/log_diagnoses',{method:'POST',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify([srow])});
       if(!r.ok){ const t=await r.text(); throw new Error('저장 실패 '+r.status+' '+t.slice(0,120)); }
-      set('저장됐습니다. 이력에 누적됩니다.', true); loadLogHistory(vnum);
-    }catch(e){ set(''+(e.message||e)); }
+      set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true); loadLogHistory(vnum);
+    }catch(e){ set(''+(e.message||e)); logToast('저장 실패: '+(e.message||e), false); }
     return;
   }
   const faults=d.findings.map(function(f){ return {group:f.group, n:f.n, core:f.core, codes:f.codes.slice(0,5)}; });
@@ -745,7 +745,7 @@ async function saveLogDiagnosis(vnum, vid){
   try{
     const r=await fetch(SB_URL+'/rest/v1/log_diagnoses',{method:'POST',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify([row])});
     if(!r.ok){ const t=await r.text(); throw new Error('저장 실패 '+r.status+' '+t.slice(0,120)); }
-    set('저장됐습니다. 이력에 누적됩니다.', true);
+    set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true);
     loadLogHistory(vnum);
     // 백업 점검 완료 → 즉시 선제점검 대상에서 제외
     try{ if(typeof INSPECTED_BK!=='undefined' && INSPECTED_BK.add) INSPECTED_BK.add(vnum); }catch(e){}
@@ -776,19 +776,78 @@ async function loadLogHistory(vnum){
       if(recurred) recurByAction[act].repeat++;
     }
     const actStats=Object.keys(recurByAction).map(function(a){ const s=recurByAction[a]; return logEsc(a)+': 재발 '+s.repeat+'/'+s.total; });
-    let tl='';
+    let tl=''; window.__logHist={}; const vnE=(''+vnum).replace(/'/g,"\\'"); const canDel=(typeof isAdmin==='function'&&isAdmin());
     for(let i=0;i<rows.length;i++){
       const x=rows[i]; const G=logGuide(x.primary_group||''); const core=(x.faults||[]).some(function(f){ return f.core; });
+      if(x.id!=null) window.__logHist[x.id]={error_type:x.error_type||'',action_type:x.action_type||'',notes:x.notes||''};
+      const btns=(x.id!=null)?('<div class="flex gap-1 shrink-0 ml-1">'
+        +'<button onclick="editLogDiag('+x.id+',\''+vnE+'\')" class="text-[10px] text-[#C2185B] border border-rose-200 rounded px-1.5 py-0.5 hover:bg-rose-50">수정</button>'
+        +(canDel?'<button onclick="deleteLogDiag('+x.id+',\''+vnE+'\')" class="text-[10px] text-red-600 border border-red-200 rounded px-1.5 py-0.5 hover:bg-red-50">삭제</button>':'')
+        +'</div>'):'';
       tl+='<div class="flex items-start gap-2 py-1.5 border-b border-rose-50 last:border-0">'
         +'<span class="text-[10px] text-slate-400 shrink-0 w-16">'+logEsc((''+(x.analyzed_at||'')).slice(2))+'</span>'
         +'<div class="flex-1 min-w-0">'
         +'<div class="text-[12px] font-semibold '+(core?'text-[#B91C1C]':'text-slate-700')+'">'+(core?'🔴':'🟡')+' '+logEsc(x.error_type||G.t||x.primary_group)+'</div>'
         +'<div class="text-[11px] text-slate-500">조치: '+logEsc(x.action_type||'-')+(x.notes?' · '+logEsc(x.notes):'')+'</div>'
-        +'</div></div>';
+        +'</div>'+btns+'</div>';
     }
     const statBox=actStats.length?('<div class="bg-rose-50/60 border border-rose-100 rounded-lg px-3 py-2 mb-2 text-[11px] text-slate-600"><b class="text-[#C2185B]">조치별 재불량</b> — '+actStats.join(' · ')+'<div class="text-[10px] text-slate-400 mt-0.5">재발이 적은 조치가 효과적입니다.</div></div>'):'';
     box.innerHTML=statBox+'<div>'+tl+'</div>';
   }catch(e){ box.innerHTML='<span class="text-[12px] text-slate-400">이력 오류: '+logEsc(e.message||e)+'</span>'; }
+}
+
+/* ===== 저장/수정/삭제 완료 토스트 팝업 ===== */
+function logToast(msg, ok){
+  var t=document.getElementById('logbk-toast');
+  if(!t){ t=document.createElement('div'); t.id='logbk-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(10px);z-index:10000;padding:13px 24px;border-radius:11px;font-size:14px;font-weight:700;color:#fff;box-shadow:0 10px 30px -8px rgba(0,0,0,.45);opacity:0;transition:opacity .22s,transform .22s;pointer-events:none;max-width:90vw;text-align:center;';
+    document.body.appendChild(t); }
+  t.style.background = (ok===false) ? '#B91C1C' : '#16A34A';
+  t.textContent=(ok===false?'⚠ ':'✅ ')+msg;
+  t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t.__tmr); t.__tmr=setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; }, 2300);
+}
+
+/* ===== 진단·처리 이력 수정 (모달) ===== */
+function editLogDiag(id, vnum){
+  var cur=(window.__logHist&&window.__logHist[id])||{error_type:'',action_type:'',notes:''};
+  function opts(arr,sel){ var h='<option value="">(선택)</option>'; for(var i=0;i<arr.length;i++){ h+='<option'+(arr[i]===sel?' selected':'')+'>'+logEsc(arr[i])+'</option>'; } return h; }
+  var ets=(typeof ERROR_TYPES!=='undefined')?ERROR_TYPES:[]; var ats=(typeof ACTION_TYPES!=='undefined')?ACTION_TYPES:[];
+  var m=document.getElementById('logbk-edit-modal');
+  if(!m){ m=document.createElement('div'); m.id='logbk-edit-modal'; m.style.cssText='position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.6);padding:16px;'; document.body.appendChild(m); }
+  var ss='width:100%;margin:3px 0 10px;padding:8px;border:1px solid #f1b9cf;border-radius:8px;font-size:13px;';
+  m.innerHTML='<div style="background:#fff;border-radius:14px;max-width:460px;width:100%;padding:18px 18px 16px;box-shadow:0 20px 50px -10px rgba(0,0,0,.5)">'
+    +'<div style="font-size:15px;font-weight:800;color:#7A0B3C;margin-bottom:12px">진단·처리 이력 수정</div>'
+    +'<div style="font-size:12px;font-weight:700;color:#64748b">오류유형</div><select id="eld-err" style="'+ss+'">'+opts(ets,cur.error_type)+'</select>'
+    +'<div style="font-size:12px;font-weight:700;color:#64748b">처리유형</div><select id="eld-act" style="'+ss+'">'+opts(ats,cur.action_type)+'</select>'
+    +'<div style="font-size:12px;font-weight:700;color:#64748b">메모</div><textarea id="eld-note" rows="2" style="'+ss+'">'+logEsc(cur.notes||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">'
+    +'<button onclick="closeEditLogDiag()" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:13px;font-weight:700;color:#475569;cursor:pointer">취소</button>'
+    +'<button onclick="submitEditLogDiag('+id+',\''+(''+vnum).replace(/'/g,"\\'")+'\')" style="padding:8px 18px;border:0;border-radius:8px;background:#C2185B;color:#fff;font-size:13px;font-weight:700;cursor:pointer">저장</button>'
+    +'</div></div>';
+  m.style.display='flex';
+}
+function closeEditLogDiag(){ var m=document.getElementById('logbk-edit-modal'); if(m) m.style.display='none'; }
+async function submitEditLogDiag(id, vnum){
+  var err=(document.getElementById('eld-err')||{}).value||'';
+  var act=(document.getElementById('eld-act')||{}).value||'';
+  var note=(document.getElementById('eld-note')||{}).value||'';
+  if(!act){ logToast('처리유형을 선택하세요.', false); return; }
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/log_diagnoses?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify({error_type:err,action_type:act,notes:note})});
+    if(!r.ok){ var t=await r.text(); throw new Error(r.status+' '+t.slice(0,140)); }
+    closeEditLogDiag(); logToast('수정되었습니다.', true); loadLogHistory(vnum);
+  }catch(e){ logToast('수정 실패: '+(e.message||e), false); }
+}
+/* ===== 진단·처리 이력 삭제 (관리자만) ===== */
+async function deleteLogDiag(id, vnum){
+  if(typeof isAdmin==='function' && !isAdmin()){ logToast('삭제는 관리자만 가능합니다.', false); return; }
+  if(!confirm('이 진단·처리 이력을 삭제할까요? 되돌릴 수 없습니다.')) return;
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/log_diagnoses?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:logSbHeaders({'Prefer':'return=minimal'})});
+    if(!r.ok){ var t=await r.text(); throw new Error(r.status+' '+t.slice(0,140)); }
+    logToast('삭제되었습니다.', true); loadLogHistory(vnum);
+  }catch(e){ logToast('삭제 실패: '+(e.message||e), false); }
 }
 
 /* ===== 단말기 S/N 과거 이력 (수리 미흡 재발 확인) ===== */
