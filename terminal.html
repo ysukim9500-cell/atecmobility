@@ -105,6 +105,26 @@ html.force-mobile #user-badge{ width:100%; justify-content:flex-start; padding:6
 html.force-mobile #user-badge button{ font-size:10px !important; padding:3px 7px !important; }
 html.force-mobile #kb-status{ width:100%; padding:8px 12px !important; min-width:0 !important; }
 
+/* === 헤더/지식베이스 컴팩트화 (모바일: 절반 이상 축소) === */
+html.force-mobile header.atec-header > div.relative{ padding-top:8px !important; padding-bottom:8px !important; gap:5px !important; }
+html.force-mobile header.atec-header h1{ font-size:14.5px !important; margin-top:2px !important; }
+html.force-mobile header.atec-header h1 svg{ width:15px !important; height:15px !important; }
+html.force-mobile #kb-status{ padding:5px 10px !important; }
+html.force-mobile #kb-status > div:first-child{ display:none !important; }
+html.force-mobile #kb-meta{ font-size:10.5px !important; line-height:1.35 !important; font-weight:600 !important; }
+html.force-mobile #user-badge{ padding:4px 8px !important; gap:4px !important; }
+html.force-mobile #user-badge button{ font-size:9.5px !important; padding:2px 6px !important; }
+@media (max-width:767px){
+  html:not(.force-web) header.atec-header > div.relative{ padding-top:8px !important; padding-bottom:8px !important; gap:5px !important; }
+  html:not(.force-web) header.atec-header h1{ font-size:14.5px !important; margin-top:2px !important; }
+  html:not(.force-web) header.atec-header h1 svg{ width:15px !important; height:15px !important; }
+  html:not(.force-web) #kb-status{ padding:5px 10px !important; }
+  html:not(.force-web) #kb-status > div:first-child{ display:none !important; }
+  html:not(.force-web) #kb-meta{ font-size:10.5px !important; line-height:1.35 !important; font-weight:600 !important; }
+  html:not(.force-web) #user-badge{ padding:4px 8px !important; gap:4px !important; }
+  html:not(.force-web) #user-badge button{ font-size:9.5px !important; padding:2px 6px !important; }
+}
+
 /* === 본문 컨테이너 === */
 @media (max-width:767px){
   html:not(.force-web) .max-w-\[1600px\]{ padding-left:12px !important; padding-right:12px !important; padding-top:12px !important; padding-bottom:12px !important; }
@@ -2001,6 +2021,7 @@ function lookupManual(p){
 
 /* 차량별 맞춤 권장: 당일 이벤트 + 과거 접수 + 처리 메모 + 매뉴얼 절차 종합 */
 function buildSmartReco(p){
+  return '';   // 맞춤 권장·매뉴얼 절차 비표시 (선제점검·차량검색 공통)
   const vinfo = KB.vehicles[p.v];
   if(!vinfo) return '';
   const items = vinfo.items;
