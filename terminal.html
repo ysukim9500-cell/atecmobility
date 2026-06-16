@@ -2364,6 +2364,21 @@ async function loadDepotEta(plate, route, boxId){
     const d=await r.json();
     if(!d.ok){ box.innerHTML=`<span class="text-rose-600 text-[12px]">조회 실패: ${escHtml(d.error||('HTTP '+r.status))}</span>`; return; }
     if(!d.running){
+      if(d.front){
+        const f=d.front;
+        const fEta=(f.etaMin!=null)?`앞차 종점까지 약 ${f.etaMin}분`:(f.running?'앞차 운행 중':'앞차도 위치 미확인');
+        box.innerHTML=`<div class="text-[13px] leading-relaxed">
+          <b class="text-amber-700">📡 이 차량 GPS 미수신 — 앞차 기준 안내</b>
+          <div class="mt-1 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            <b class="text-[#B45309]">앞차 ${escHtml(f.tail||f.plate||'')}</b>
+            <span class="text-[12px] text-slate-600">· ${escHtml(fEta)}</span>
+            ${f.gap?`<span class="text-[11px] text-slate-400"> · 앞차와 ${f.gap}구간 차이</span>`:''}
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1">🚌 ${escHtml(d.route||'')}${d.garage?' · 🅿️ '+escHtml(d.garage):''}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">※ 앞차 정보는 오늘 새벽 운행순서 기준 추정입니다. 단말기 GPS 점검 권장.</div>
+        </div>`;
+        return;
+      }
       box.innerHTML=`<div class="text-[13px]"><b class="text-emerald-700">🅿️ 차고지 입고 추정 — 점검 가능</b>
         <div class="text-[11px] text-slate-500 mt-0.5">${escHtml(d.message||'현재 운행 중이 아닙니다.')}</div></div>`;
       return;
