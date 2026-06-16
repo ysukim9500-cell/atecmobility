@@ -142,6 +142,31 @@
       });
   }
 
+  // HTML 노드 → A4 1장에 '꽉 맞춰(contain)' 넣기 — 항목 많아도 한 장 보장
+  function nodeToPdfFit(node) {
+    return html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+      .then(function (canvas) {
+        var jsPDF = (global.jspdf && global.jspdf.jsPDF) || global.jsPDF;
+        var pdf = new jsPDF('p', 'mm', 'a4');
+        var pw = 210, ph = 297, margin = 7;
+        var maxW = pw - margin * 2, maxH = ph - margin * 2;
+        var iw = maxW, ih = canvas.height * iw / canvas.width;
+        if (ih > maxH) { ih = maxH; iw = canvas.width * ih / canvas.height; }
+        var x = (pw - iw) / 2, y = margin;
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, iw, ih);
+        return pdf.output('blob');
+      });
+  }
+
+  // CSV 다운로드 (엑셀 한글 BOM 포함)
+  function downloadCsv(name, header, rows) {
+    var esc = function (s) { s = String(s == null ? '' : s); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    var lines = [header.map(esc).join(',')].concat(rows.map(function (r) { return r.map(esc).join(','); }));
+    var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+
   function toast(msg, ok) {
     var t = document.getElementById('fc-toast');
     if (!t) { t = document.createElement('div'); t.id = 'fc-toast';
@@ -166,9 +191,11 @@
     cloudAvailable: cloudAvailable, isAdmin: isAdmin, myEmail: myEmail, me: me,
     restInsert: restInsert, restSelect: restSelect, restDelete: restDelete,
     uploadPdf: uploadPdf, removePdf: removePdf, signedUrl: signedUrl,
-    SignaturePad: SignaturePad, nodeToPdf: nodeToPdf,
+    SignaturePad: SignaturePad, nodeToPdf: nodeToPdf, nodeToPdfFit: nodeToPdfFit,
+    downloadCsv: downloadCsv,
     toast: toast, todayStr: todayStr, stampSlug: stampSlug, ascii: ascii, rand4: rand4,
     CENTERS: ['강남', '강서', '강북', '강동'],
-    MODELS: ['B700', 'B710', 'B800']
+    MODELS: ['B700', 'B710', 'B800'],
+    FORM_MODELS: ['서울 B800', '서울 B700', '서울 B710', '공항 B620']
   };
 })(window);

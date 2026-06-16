@@ -8,201 +8,260 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-  :root{ --atec-wine:#7A0B3C; --atec-magenta:#C2185B; }
-  body{ background:#fdf2f6; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
-  .card{ background:#fff; border:1px solid #f3d3e0; border-radius:16px; box-shadow:0 8px 24px -16px rgba(122,11,60,.3); }
-  .lbl{ font-size:12px; font-weight:700; color:#7A0B3C; margin-bottom:3px; display:block; }
-  .inp{ width:100%; border:1px solid #e7cdd9; border-radius:9px; padding:8px 10px; font-size:14px; background:#fff; }
-  .inp:focus{ outline:none; border-color:#C2185B; box-shadow:0 0 0 3px rgba(194,24,91,.12); }
-  .btn{ border-radius:10px; font-weight:800; font-size:14px; padding:10px 16px; cursor:pointer; }
-  .btn-main{ background:linear-gradient(135deg,#7A0B3C,#C2185B); color:#fff; }
-  .btn-out{ background:#fff; border:1.5px solid #C2185B; color:#C2185B; }
-  .sig-pad{ border:1px dashed #c98aa8; border-radius:10px; background:#fff; touch-action:none; width:100%; height:120px; }
-  .grp-ttl{ font-size:12.5px; font-weight:800; color:#7A0B3C; background:#fbeaf1; border-radius:8px; padding:6px 10px; margin:12px 0 6px; }
-  .chk-row{ display:flex; align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid #f6e3ec; }
-  .chk-row .seg{ display:flex; gap:4px; }
-  .seg button{ font-size:11px; font-weight:700; border-radius:7px; padding:4px 9px; border:1px solid #e2c7d4; background:#fff; color:#94849b; cursor:pointer; }
-  .seg button.ok.on{ background:#15803d; color:#fff; border-color:#15803d; }
-  .seg button.na.on{ background:#94a3b8; color:#fff; border-color:#94a3b8; }
-  .seg button.no.on{ background:#dc2626; color:#fff; border-color:#dc2626; }
-  #print-area{ position:fixed; left:-9999px; top:0; width:780px; background:#fff; padding:34px 38px; color:#1f2733; font-size:13px; }
-  #print-area h2{ text-align:center; font-size:22px; font-weight:800; letter-spacing:4px; margin:0 0 4px; }
-  #print-area .pa-sub{ text-align:center; color:#666; font-size:12px; margin-bottom:16px; }
-  #print-area table{ width:100%; border-collapse:collapse; }
-  #print-area .meta td{ border:1px solid #999; padding:7px 9px; font-size:13px; }
-  #print-area .meta .k{ background:#f3e6ec; font-weight:700; width:110px; }
-  #print-area .ck th, #print-area .ck td{ border:1px solid #999; padding:5px 8px; font-size:12px; }
-  #print-area .ck th{ background:#7A0B3C; color:#fff; }
-  #print-area .grp td{ background:#f3e6ec; font-weight:700; }
-  #print-area .sign-box{ border:1px solid #999; border-radius:6px; padding:10px 12px; margin-top:18px; width:50%; }
-  #print-area .sign-img{ height:60px; }
+  :root{ --wine:#7A0B3C; --mag:#C2185B; --ink:#1f2733; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
+  .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
+  .topbar{ background:linear-gradient(120deg,#0b4a3a,#0e7a5f 45%,#10b981); color:#fff; }
+  .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .brand{ display:flex; align-items:center; gap:11px; }
+  .brand .logo{ width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,.16); display:grid; place-items:center; }
+  .brand h1{ font-size:17px; font-weight:800; margin:0; }
+  .brand p{ font-size:11.5px; margin:2px 0 0; color:#c8f1e3; }
+  .back{ color:#fff; font-size:12.5px; font-weight:700; text-decoration:none; opacity:.92; }
+  .tabs{ display:flex; gap:4px; background:#fff; border:1px solid #d4ece2; border-radius:13px; padding:5px; margin:20px 0 18px; box-shadow:0 8px 22px -16px rgba(6,95,70,.35); }
+  .tab{ flex:1; text-align:center; padding:10px; border-radius:9px; font-weight:800; font-size:14px; color:#6f9588; cursor:pointer; border:none; background:none; }
+  .tab.on{ background:linear-gradient(135deg,#047857,#10b981); color:#fff; box-shadow:0 6px 14px -6px rgba(16,185,129,.5); }
+  .card{ background:#fff; border:1px solid #e2dce6; border-radius:16px; box-shadow:0 10px 30px -22px rgba(6,95,70,.32); padding:22px; }
+  .sec-ttl{ font-size:12.5px; font-weight:800; color:#065f46; display:flex; align-items:center; gap:7px; margin:0 0 12px; }
+  .sec-ttl::before{ content:""; width:4px; height:15px; border-radius:3px; background:linear-gradient(#047857,#10b981); }
+  .lbl{ font-size:11.5px; font-weight:700; color:#5b7a6f; margin-bottom:4px; display:block; }
+  .inp{ width:100%; border:1px solid #cfe3da; border-radius:10px; padding:9px 11px; font-size:14px; background:#fff; }
+  .inp:focus{ outline:none; border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.13); }
+  select.inp{ appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; padding-right:30px; }
+  .btn{ border-radius:11px; font-weight:800; font-size:13.5px; padding:10px 16px; cursor:pointer; border:none; }
+  .btn-main{ background:linear-gradient(135deg,#047857,#10b981); color:#fff; box-shadow:0 8px 18px -8px rgba(16,185,129,.55); }
+  .btn-main:disabled{ opacity:.55; }
+  .btn-out{ background:#fff; border:1.5px solid #10b981; color:#047857; }
+  .btn-soft{ background:#e6f6ef; color:#047857; }
+  .grp-ttl{ font-size:12px; font-weight:800; color:#065f46; background:#e9f7f1; border-radius:9px; padding:7px 11px; margin:14px 0 4px; }
+  .chk-row{ display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px solid #eef6f2; }
+  .seg{ display:flex; gap:4px; }
+  .seg button{ font-size:11px; font-weight:700; border-radius:8px; padding:5px 10px; border:1px solid #d6e4dd; background:#fff; color:#8aa79b; cursor:pointer; }
+  .seg .ok.on{ background:#15803d; color:#fff; border-color:#15803d; }
+  .seg .na.on{ background:#94a3b8; color:#fff; border-color:#94a3b8; }
+  .seg .no.on{ background:#dc2626; color:#fff; border-color:#dc2626; }
+  .sig-pad{ border:1.5px dashed #93cbb6; border-radius:11px; background:linear-gradient(#fff,#f5fbf8); touch-action:none; width:100%; height:118px; }
+  .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#e6f6ef; color:#3a8a6c; }
+  .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #eef6f2; }
+  .hide{ display:none !important; }
+  #print-area{ position:fixed; left:-99999px; top:0; width:794px; background:#fff; padding:30px 34px; color:#15202b; font-family:'Noto Sans KR',sans-serif; }
+  #pa-head{ display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2.5px solid #047857; padding-bottom:10px; }
+  #pa-head .t{ font-size:24px; font-weight:800; letter-spacing:5px; color:#111; }
+  #pa-head .s{ font-size:11px; color:#047857; font-weight:700; margin-top:3px; }
+  #pa-head .co{ text-align:right; font-size:10.5px; color:#666; line-height:1.5; }
+  #pa-head .co b{ color:#047857; font-size:13px; }
+  .pa-meta{ width:100%; border-collapse:collapse; margin:12px 0 8px; }
+  .pa-meta td{ border:1px solid #b9b9b9; padding:6px 9px; font-size:12px; }
+  .pa-meta .k{ background:#e7f4ee; font-weight:700; width:92px; color:#0b4a3a; }
+  .pa-cols{ display:flex; gap:16px; align-items:flex-start; }
+  .pa-cols > div{ flex:1; }
+  table.pa-ck{ width:100%; border-collapse:collapse; margin-bottom:6px; }
+  table.pa-ck th{ background:#047857; color:#fff; font-size:10.5px; padding:4px 6px; text-align:left; }
+  table.pa-ck .g td{ background:#e7f4ee; font-weight:700; color:#0b4a3a; font-size:10.5px; }
+  table.pa-ck td{ border:1px solid #d0d0d0; padding:3px 6px; font-size:10.5px; }
+  .verdict{ font-size:14px; font-weight:800; margin-top:10px; }
+  .pa-sign{ border:1px solid #b9b9b9; border-radius:7px; padding:9px 12px; margin-top:14px; width:55%; }
+  .pa-sign img{ height:54px; margin-top:4px; }
+  .pa-foot{ text-align:right; font-size:9px; color:#9a9a9a; margin-top:10px; }
 </style>
 </head>
 <body>
-<div class="max-w-3xl mx-auto px-4 py-6">
-  <div class="flex items-center justify-between mb-5">
-    <div class="flex items-center gap-3">
-      <a href="index.html" class="text-[#C2185B] text-sm font-bold hover:underline">← 포털</a>
-      <h1 class="text-lg font-extrabold text-[#7A0B3C]">설치 완료 체크리스트</h1>
-    </div>
-    <span id="user-badge" class="text-[11px] text-slate-500"></span>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">
+    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="#fff" stroke-width="1.7"/><path d="M8 8l1.4 1.4L11.6 7M8 14l1.4 1.4L11.6 13M14.5 8.5h2.5M14.5 14.5h2.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h1>설치 완료 체크리스트</h1><p>ATEC Mobility · 단말기 설치 점검표</p></div>
+  </div>
+  <a href="index.html" class="back">← 포털</a>
+</div></div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab on" id="tab-write" onclick="showTab('write')">서식 작성</button>
+    <button class="tab" id="tab-browse" onclick="showTab('browse')">조회 · 다운로드</button>
   </div>
 
-  <div class="card p-5 mb-5">
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-2">
-      <div><label class="lbl">작성일</label><input id="f-date" class="inp" type="date"></div>
-      <div><label class="lbl">센터</label><select id="f-center" class="inp"></select></div>
-      <div><label class="lbl">운수사</label><input id="f-operator" class="inp" placeholder="예) 다모아"></div>
-      <div><label class="lbl">차량번호</label><input id="f-vehicle" class="inp" placeholder="예) 서울70사1234"></div>
-      <div><label class="lbl">단말기 기종</label><select id="f-model" class="inp" onchange="renderChecklist()"></select></div>
-      <div><label class="lbl">단말기 S/N</label><input id="f-sn" class="inp" placeholder="설치 단말기 S/N"></div>
-    </div>
-
-    <div id="chk-host"></div>
-
-    <div class="mt-4"><label class="lbl">특이사항 / 메모</label><textarea id="f-memo" class="inp" rows="2"></textarea></div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 items-end">
-      <div>
-        <label class="lbl">설치자</label>
-        <input id="f-installer" class="inp" placeholder="설치자 이름">
-      </div>
-      <div class="text-right">
-        <span class="lbl inline-block mr-2">종합 판정</span>
-        <span id="verdict" class="inline-block px-3 py-1.5 rounded-lg text-[13px] font-extrabold bg-slate-100 text-slate-500">—</span>
+  <!-- ===== 작성 ===== -->
+  <div id="pane-write">
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-ttl">기본 정보</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div><label class="lbl">작성일</label><input id="f-date" class="inp" type="date"></div>
+        <div><label class="lbl">센터</label><select id="f-center" class="inp"></select></div>
+        <div><label class="lbl">운수사</label><input id="f-operator" class="inp" placeholder="예) 다모아자동차"></div>
+        <div><label class="lbl">차량번호</label><input id="f-vehicle" class="inp" placeholder="예) 서울74사1234"></div>
+        <div><label class="lbl">단말기 기종</label><select id="f-model" class="inp" onchange="renderChecklist()"></select></div>
+        <div><label class="lbl">단말기 S/N</label><input id="f-sn" class="inp" placeholder="설치 단말기 S/N"></div>
       </div>
     </div>
-    <div class="mt-3">
-      <div class="flex items-center justify-between mb-1">
-        <label class="lbl mb-0">설치자 서명</label>
-        <button class="text-[11px] text-slate-400 hover:text-[#C2185B]" onclick="SIG.installer.clear()">서명 지우기</button>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="sec-ttl" style="margin:0">점검 항목</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-soft" style="padding:6px 11px;font-size:11.5px" onclick="setAll('ok')">전체 정상</button>
+          <button class="btn btn-soft" style="padding:6px 11px;font-size:11.5px" onclick="setAll('na')">전체 해당없음</button>
+        </div>
       </div>
-      <canvas id="sig-installer" class="sig-pad" width="600" height="240"></canvas>
+      <div id="chk-host"></div>
     </div>
 
-    <div class="flex flex-wrap gap-2 mt-5">
-      <button class="btn btn-out" onclick="downloadPdf()">PDF 다운로드</button>
-      <button class="btn btn-main" id="save-btn" onclick="saveCloud()">체크리스트 저장 (60일 보관)</button>
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-ttl">판정 · 서명</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin-bottom:12px">
+        <div><label class="lbl">설치자</label><input id="f-installer" class="inp" placeholder="설치자 이름"></div>
+        <div style="text-align:right"><div class="lbl">종합 판정</div><span id="verdict" class="pill" style="font-size:13px;padding:5px 12px">—</span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <label class="lbl" style="margin:0">설치자 서명</label>
+        <button class="text-[11px]" style="color:#0a7;background:none;border:none;cursor:pointer" onclick="SIG.installer.clear()">지우기</button>
+      </div>
+      <canvas id="sig-installer" class="sig-pad" width="640" height="236"></canvas>
+      <div style="margin-top:12px"><label class="lbl">특이사항 / 메모</label><textarea id="f-memo" class="inp" rows="2"></textarea></div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+        <button class="btn btn-out" onclick="downloadPdf()">PDF 미리보기 · 다운로드</button>
+        <button class="btn btn-main" id="save-btn" onclick="saveCloud()">체크리스트 저장 (60일 보관)</button>
+      </div>
+      <p class="text-[11px]" style="color:#0a7;margin-top:8px">PDF는 항목이 많아도 <b>A4 한 장</b>에 정렬되어 출력됩니다.</p>
     </div>
-    <p class="text-[11px] text-slate-400 mt-2">저장 시 PDF가 클라우드에 60일간 보관 후 자동 삭제됩니다.</p>
   </div>
 
-  <div class="card p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-extrabold text-[#7A0B3C]">최근 체크리스트 (최대 60일)</h2>
-      <button class="text-[12px] text-[#C2185B] font-bold" onclick="loadList()">새로고침</button>
+  <!-- ===== 조회 ===== -->
+  <div id="pane-browse" class="hide">
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-ttl">조회 조건</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div><label class="lbl">시작일</label><input id="q-from" class="inp" type="date"></div>
+        <div><label class="lbl">종료일</label><input id="q-to" class="inp" type="date"></div>
+        <div><label class="lbl">센터</label><select id="q-center" class="inp"></select></div>
+        <div><label class="lbl">기종</label><select id="q-model" class="inp"></select></div>
+        <div><label class="lbl">판정</label><select id="q-pass" class="inp"><option value="">전체</option><option value="true">합격</option><option value="false">불합격</option></select></div>
+        <div><label class="lbl">차량번호 검색</label><input id="q-vehicle" class="inp" placeholder="번호 일부 (선택)"></div>
+      </div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn btn-main" onclick="runQuery()">조회</button>
+        <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
+        <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
+        <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
+      </div>
     </div>
-    <div id="list-box" class="text-[13px] text-slate-500">불러오는 중…</div>
+    <div class="card">
+      <div class="sec-ttl" style="margin-bottom:8px">조회 결과 <span class="pill" id="q-count">0건</span></div>
+      <div id="q-results" style="font-size:13px;color:#5b7a6f">조회 버튼을 눌러 결과를 확인하세요.</div>
+    </div>
   </div>
 </div>
+
 <div id="print-area"></div>
 
 <script src="form-common.js"></script>
 <script>
-var SIG = {};
+var SIG={}, STATE={};
 function el(id){ return document.getElementById(id); }
-function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-/* 기종별 점검표 (현장에서 수정 가능 · 표준안) */
-var BASE = {
-  '전원·기본': ['전원 인가 / 전원 LED 정상','입력 전압 정상(24V)','부팅 정상(에러 없이 기동)','펌웨어 최신 버전'],
-  '통신': ['센터 통신 연결(온라인)','LTE/모뎀 신호 정상','데이터 송수신 확인'],
-  'GPS': ['GPS 위치 수신 정상'],
-  '카드·정산': ['교통카드 결제 테스트 정상','PSAM 인식 정상','정산 데이터 전송 확인'],
-  '승하차 단말기': ['승차 단말기 통신·결제 정상','하차1 단말기 통신·결제 정상','하차2 단말기 통신·결제 정상','승하차 케이블 체결 상태'],
-  '표출·운행': ['표출기 노선·정류장 표출 정상','DTG 운행기록 연동'],
-  '설치 마감': ['차량번호/노선 설정 일치','거치·브라켓 고정 상태','케이블 정리·보호 상태']
-};
-var MODEL_EXTRA = {
-  'B700': {},
-  'B710': { '승하차 단말기': ['승차 단말기 통신·결제 정상','하차1 단말기 통신·결제 정상','하차2 단말기 통신·결제 정상','승하차 케이블 체결 상태','승하차 위치(승차/하차1/하차2) 설정 확인'] },
-  'B800': {}
-};
-
-function modelTemplate(model){
-  var t = JSON.parse(JSON.stringify(BASE));
-  var ex = MODEL_EXTRA[model] || {};
-  Object.keys(ex).forEach(function(g){ t[g] = ex[g]; });
-  return t;
+function showTab(t){
+  el('pane-write').classList.toggle('hide', t!=='write');
+  el('pane-browse').classList.toggle('hide', t!=='browse');
+  el('tab-write').classList.toggle('on', t==='write');
+  el('tab-browse').classList.toggle('on', t==='browse');
+  if(t==='browse' && !window.__queried){ window.__queried=true; quickRange(30); }
 }
 
-var STATE = {}; // key -> 'ok'|'na'|'no'
+/* 기종별 점검표 (서울 B800/B700/B710 · 공항 B620) */
+function template(model){
+  var T={
+    '전원·기동':['전원 인가 / 전원 LED 정상','입력 전압 정상','부팅 정상(에러 없음)','펌웨어 버전 확인'],
+    '통신':['센터 통신 연결(온라인)','LTE/모뎀 신호 정상','데이터 송수신 확인'],
+    '측위(GPS)':['GPS 위치 수신 정상'],
+    '단말 기능':['교통카드 결제 테스트 정상','PSAM 인식 정상','정산 데이터 전송 확인'],
+    '승하차 단말기':['승차 단말기 결제·통신 정상','하차1 단말기 결제·통신 정상','하차2 단말기 결제·통신 정상','승하차 케이블 체결 상태'],
+    '표출·운행':['표출기 노선·정류장 표출 정상','DTG 운행기록 연동'],
+    '설치 마감':['차량번호/노선 설정 일치','거치·브라켓 고정 상태','케이블 정리·보호 상태','외관·라벨 확인']
+  };
+  if(model==='서울 B700'){
+    T={'전원·기동':T['전원·기동'],'통신':T['통신'],'측위(GPS)':T['측위(GPS)'],'단말 기능':T['단말 기능'],
+       'C-ITS / V2X':['V2X 전원 정상','C-ITS 표출기 동작','C-ITS LTE모뎀 통신','C-ITS GPS 안테나 수신'],
+       '승하차 단말기':T['승하차 단말기'],'표출·운행':T['표출·운행'],'설치 마감':T['설치 마감']};
+  }
+  if(model==='공항 B620'){
+    T={'전원·기동':['전원 인가 / 전원 LED 정상','입력 전압 정상','부팅 정상(에러 없음)','펌웨어 버전 확인'],
+       '통신':['센터 통신 연결(온라인)','LTE/모뎀 신호 정상','WIFI 안테나 연결','이더넷(RJ45) 연결'],
+       '측위(GPS)':['GPS 위치 수신 정상'],
+       '단말 기능':['교통카드 결제 테스트 정상','PSAM 인식 정상','정산 데이터 전송 확인'],
+       '승하차 단말기':['승차 단말기 결제·통신 정상','하차 단말기 결제·통신 정상','승하차 케이블 체결 상태'],
+       '부가 장치':['안내방송 AUDIO 출력 정상','타코미터 연동 정상'],
+       '설치 마감':['차량번호/노선 설정 일치','거치·브라켓 고정 상태','케이블 정리·보호 상태','외관·라벨 확인']};
+  }
+  return T;
+}
+
 function renderChecklist(){
-  var model = el('f-model').value;
-  var tpl = modelTemplate(model);
-  var host = el('chk-host'); host.innerHTML = ''; STATE = {};
-  Object.keys(tpl).forEach(function(grp){
-    var h = '<div class="grp-ttl">'+esc(grp)+'</div>';
-    tpl[grp].forEach(function(item, i){
-      var key = grp+'::'+i;
-      STATE[key] = 'ok';
-      h += '<div class="chk-row" data-key="'+key+'">'+
-        '<div class="flex-1 text-[13px] text-slate-700">'+esc(item)+'</div>'+
-        '<div class="seg">'+
-          '<button class="ok on" onclick="setSeg(this,\''+key+'\',\'ok\')">정상</button>'+
-          '<button class="na" onclick="setSeg(this,\''+key+'\',\'na\')">해당없음</button>'+
-          '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button>'+
-        '</div></div>';
+  var T=template(el('f-model').value); var host=el('chk-host'); host.innerHTML=''; STATE={};
+  Object.keys(T).forEach(function(grp){
+    var h='<div class="grp-ttl">'+esc(grp)+'</div>';
+    T[grp].forEach(function(item,i){
+      var key=grp+'::'+i; STATE[key]='ok';
+      h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1;font-size:13px;color:#314">'+esc(item)+'</div>'+
+        '<div class="seg"><button class="ok on" onclick="setSeg(this,\''+key+'\',\'ok\')">정상</button>'+
+        '<button class="na" onclick="setSeg(this,\''+key+'\',\'na\')">해당없음</button>'+
+        '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button></div></div>';
     });
     host.insertAdjacentHTML('beforeend', h);
   });
   updateVerdict();
 }
-function setSeg(btn, key, val){
-  STATE[key] = val;
-  var row = btn.closest('.chk-row');
-  row.querySelectorAll('.seg button').forEach(function(b){ b.classList.remove('on'); });
-  btn.classList.add('on');
-  updateVerdict();
-}
+function setSeg(btn,key,val){ STATE[key]=val; var r=btn.closest('.chk-row'); r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on'); updateVerdict(); }
+function setAll(val){ el('chk-host').querySelectorAll('.chk-row').forEach(function(r){ var k=r.dataset.key; STATE[k]=val; r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); r.querySelector('.seg .'+val).classList.add('on'); }); updateVerdict(); }
 function updateVerdict(){
-  var anyNo = Object.keys(STATE).some(function(k){ return STATE[k]==='no'; });
-  var v = el('verdict');
-  if(anyNo){ v.textContent='불합격(불량 항목 있음)'; v.className='inline-block px-3 py-1.5 rounded-lg text-[13px] font-extrabold bg-red-100 text-red-700'; }
-  else { v.textContent='합격'; v.className='inline-block px-3 py-1.5 rounded-lg text-[13px] font-extrabold bg-green-100 text-green-700'; }
+  var anyNo=Object.keys(STATE).some(function(k){return STATE[k]==='no';});
+  var v=el('verdict');
+  if(anyNo){ v.textContent='불합격'; v.style.background='#fde2e2'; v.style.color='#b91c1c'; }
+  else { v.textContent='합격'; v.style.background='#dcf5e8'; v.style.color='#15803d'; }
 }
 
 function collectItems(){
-  var model = el('f-model').value, tpl = modelTemplate(model), out=[];
-  Object.keys(tpl).forEach(function(grp){
-    tpl[grp].forEach(function(item,i){
-      var key = grp+'::'+i;
-      out.push({ group:grp, label:item, status:STATE[key]||'ok' });
-    });
-  });
+  var T=template(el('f-model').value), out=[];
+  Object.keys(T).forEach(function(grp){ T[grp].forEach(function(item,i){ out.push({group:grp,label:item,status:STATE[grp+'::'+i]||'ok'}); }); });
   return out;
 }
 function gather(){
-  var items = collectItems();
-  var pass = !items.some(function(x){ return x.status==='no'; });
+  var items=collectItems(), pass=!items.some(function(x){return x.status==='no';});
   return { date:el('f-date').value, center:el('f-center').value, operator:el('f-operator').value.trim(),
     vehicle:el('f-vehicle').value.trim(), model:el('f-model').value, sn:el('f-sn').value.trim(),
     installer:el('f-installer').value.trim(), memo:el('f-memo').value.trim(), items:items, pass:pass };
 }
 
+/* 인쇄(1장, 섹션 2열 균형 배치) */
 function statTxt(s){ return s==='ok'?'정상':(s==='na'?'해당없음':'불량'); }
 function statColor(s){ return s==='no'?'#dc2626':(s==='na'?'#94a3b8':'#15803d'); }
-
-function buildPrint(d){
-  var pa = el('print-area');
-  var lastGrp='', rows='';
-  d.items.forEach(function(it,i){
-    if(it.group!==lastGrp){ rows += '<tr class="grp"><td colspan="3">'+esc(it.group)+'</td></tr>'; lastGrp=it.group; }
-    rows += '<tr><td style="text-align:center;width:34px">'+(i+1)+'</td><td>'+esc(it.label)+'</td>'+
-            '<td style="text-align:center;width:80px;color:'+statColor(it.status)+';font-weight:700">'+statTxt(it.status)+'</td></tr>';
+function sectionBlocks(items){
+  var groups={}, order=[];
+  items.forEach(function(it){ if(!groups[it.group]){groups[it.group]=[]; order.push(it.group);} groups[it.group].push(it); });
+  return order.map(function(g){
+    var rows=groups[g].map(function(it){ return '<tr><td>'+esc(it.label)+'</td><td style="width:62px;text-align:center;color:'+statColor(it.status)+';font-weight:700">'+statTxt(it.status)+'</td></tr>'; }).join('');
+    var html='<table class="pa-ck"><thead><tr class="g"><td colspan="2">'+esc(g)+'</td></tr></thead><tbody>'+rows+'</tbody></table>';
+    return { html:html, n:groups[g].length+1 };
   });
-  var sig = SIG.installer.dataUrl();
-  pa.innerHTML =
-    '<h2>설치 완료 체크리스트</h2><div class="pa-sub">단말기 설치 점검표 · ATEC Mobility</div>'+
-    '<table class="meta"><tr><td class="k">작성일</td><td>'+esc(d.date)+'</td><td class="k">센터</td><td>'+esc(d.center||'-')+'</td></tr>'+
-    '<tr><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td></tr>'+
-    '<tr><td class="k">기종</td><td>'+esc(d.model||'-')+'</td><td class="k">단말기 S/N</td><td>'+esc(d.sn||'-')+'</td></tr></table>'+
-    '<div style="height:10px"></div>'+
-    '<table class="ck"><thead><tr><th>No</th><th>점검 항목</th><th>판정</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-    '<div style="margin-top:12px;font-size:14px;font-weight:800;color:'+(d.pass?'#15803d':'#dc2626')+'">종합 판정 : '+(d.pass?'합격':'불합격(불량 항목 확인 필요)')+'</div>'+
-    (d.memo? '<div style="margin-top:8px;font-size:12px"><b>특이사항</b> · '+esc(d.memo)+'</div>':'')+
-    '<div class="sign-box"><div style="font-weight:700;font-size:12px;color:#7A0B3C;margin-bottom:4px">설치자</div><div>'+esc(d.installer||'')+'</div>'+(sig?'<img class="sign-img" src="'+sig+'">':'<div class="sign-img"></div>')+'</div>'+
-    '<div style="text-align:right;color:#999;font-size:10px;margin-top:12px">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+'</div>';
+}
+function buildPrint(d){
+  var pa=el('print-area');
+  var blocks=sectionBlocks(d.items);
+  var total=blocks.reduce(function(a,b){return a+b.n;},0), half=total/2;
+  var leftH='', rightH='', acc=0;
+  blocks.forEach(function(b){ if(acc<half){ leftH+=b.html; acc+=b.n; } else { rightH+=b.html; } });
+  var sig=SIG.installer.dataUrl();
+  pa.innerHTML=
+    '<div id="pa-head"><div><div class="t">설치 완료 체크리스트</div><div class="s">단말기 설치 점검표</div></div>'+
+      '<div class="co"><b>ATEC MOBILITY</b><br>설치 점검 서식<br>'+esc(d.date||'')+'</div></div>'+
+    '<table class="pa-meta"><tr><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td></tr>'+
+    '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">단말기 S/N</td><td>'+esc(d.sn||'-')+'</td><td class="k">설치자</td><td>'+esc(d.installer||'-')+'</td></tr></table>'+
+    '<div class="pa-cols"><div>'+leftH+'</div><div>'+rightH+'</div></div>'+
+    '<div class="verdict" style="color:'+(d.pass?'#15803d':'#dc2626')+'">종합 판정 : '+(d.pass?'합격':'불합격 (불량 항목 확인 필요)')+'</div>'+
+    (d.memo?'<div style="margin-top:6px;font-size:11px"><b style="color:#047857">특이사항</b> · '+esc(d.memo)+'</div>':'')+
+    '<div class="pa-sign"><div style="font-size:11px;font-weight:700;color:#047857">설치자 확인</div><div style="font-size:12.5px;margin-top:2px">'+esc(d.installer||'')+'</div>'+(sig?'<img src="'+sig+'">':'')+'</div>'+
+    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+' · 본 문서는 전자 발행되었습니다.</div>';
   return pa;
 }
 
@@ -212,14 +271,14 @@ function validate(d){
   if(!d.vehicle){ FC.toast('차량번호를 입력하세요', false); return false; }
   return true;
 }
-function fileName(d){ return (d.vehicle||'차량')+'_설치체크리스트_'+FC.stampSlug()+'.pdf'; }   // 다운로드용(한글 OK)
-function storeKey(d){ return (FC.ascii(d.center)||'etc')+'/'+(FC.ascii(d.vehicle)||'veh')+'_'+FC.stampSlug()+'_'+FC.rand4()+'.pdf'; }  // 스토리지(영문/숫자)
+function dlName(d){ return (d.vehicle||'차량')+'_설치체크리스트_'+FC.stampSlug()+'.pdf'; }
+function storeKey(d){ return (FC.ascii(d.center)||'etc')+'/'+(FC.ascii(d.vehicle)||'veh')+'_'+FC.stampSlug()+'_'+FC.rand4()+'.pdf'; }
 
 function downloadPdf(){
   var d=gather(); if(!validate(d)) return;
-  FC.nodeToPdf(buildPrint(d)).then(function(blob){
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fileName(d); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); },1500); FC.toast('PDF 다운로드 완료');
+  FC.nodeToPdfFit(buildPrint(d)).then(function(blob){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=dlName(d); a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1500); FC.toast('PDF 다운로드 완료');
   }).catch(function(e){ FC.toast('PDF 생성 실패: '+e.message, false); });
 }
 
@@ -231,51 +290,78 @@ function saveCloud(){
   if(saving||sig===lastSig){ FC.toast('이미 저장되었습니다'); return; }
   saving=true; el('save-btn').disabled=true; el('save-btn').textContent='저장 중…';
   var path=storeKey(d);
-  FC.nodeToPdf(buildPrint(d)).then(function(blob){ return FC.uploadPdf('checklist', path, blob); })
+  FC.nodeToPdfFit(buildPrint(d)).then(function(blob){ return FC.uploadPdf('checklist', path, blob); })
   .then(function(){
-    return FC.restInsert('install_checklists', {
-      center:d.center, operator:d.operator, vehicle_no:d.vehicle, model:d.model, terminal_sn:d.sn,
-      items:d.items, pass:d.pass, installer:d.installer, installer_sign:!SIG.installer.isEmpty(),
-      pdf_path:path, memo:d.memo, created_by:FC.myEmail()
-    });
-  }).then(function(){ lastSig=sig; FC.toast('저장되었습니다'); loadList(); })
+    return FC.restInsert('install_checklists', { center:d.center, operator:d.operator, vehicle_no:d.vehicle, model:d.model, terminal_sn:d.sn,
+      items:d.items, pass:d.pass, installer:d.installer, installer_sign:!SIG.installer.isEmpty(), pdf_path:path, memo:d.memo, created_by:FC.myEmail() });
+  }).then(function(){ lastSig=sig; FC.toast('저장되었습니다'); })
   .catch(function(e){ FC.toast('저장 실패: '+e.message, false); })
   .then(function(){ saving=false; el('save-btn').disabled=false; el('save-btn').textContent='체크리스트 저장 (60일 보관)'; });
 }
 
-function loadList(){
-  var box=el('list-box');
-  if(!FC.cloudAvailable()){ box.textContent='클라우드 미연결'; return; }
-  box.textContent='불러오는 중…';
-  FC.restSelect('install_checklists','select=id,center,vehicle_no,model,pass,created_at,pdf_path,created_by&order=created_at.desc&limit=50')
-  .then(function(rows){
-    if(!rows.length){ box.innerHTML='<span class="text-slate-400">아직 저장된 체크리스트가 없습니다.</span>'; return; }
-    box.innerHTML='<div class="divide-y divide-rose-50">'+rows.map(function(r){
-      var dt=(r.created_at||'').replace('T',' ').slice(0,16);
-      var badge=r.pass?'<span class="text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-bold">합격</span>':'<span class="text-[10px] bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-bold">불합격</span>';
-      var del=FC.isAdmin()?'<button onclick="delRec(\''+r.id+'\',\''+enc(r.pdf_path)+'\')" class="text-[11px] text-red-500 hover:underline ml-2">삭제</button>':'';
-      return '<div class="flex items-center justify-between py-2"><div><b class="text-[#7A0B3C]">'+esc(r.vehicle_no||'-')+'</b> '+badge+' <span class="text-slate-400">· '+esc(r.center||'')+' · '+esc(r.model||'')+'</span><div class="text-[11px] text-slate-400">'+dt+' · '+esc(r.created_by||'')+'</div></div>'+
-        '<div><button onclick="openPdf(\''+enc(r.pdf_path)+'\')" class="text-[12px] text-[#C2185B] font-bold hover:underline">PDF 열기</button>'+del+'</div></div>';
-    }).join('')+'</div>';
-  }).catch(function(e){ box.textContent='목록 오류: '+e.message; });
+/* 조회/다운로드 */
+function quickRange(days){
+  var to=new Date(), from=new Date(Date.now()-days*86400000);
+  var f=function(x){ var p=function(n){return('0'+n).slice(-2);}; return x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate()); };
+  el('q-from').value=f(from); el('q-to').value=f(to); runQuery();
 }
-function enc(s){ return encodeURIComponent(s||''); }
+function buildFilter(){
+  var qs='select=id,center,operator,vehicle_no,model,terminal_sn,pass,items,created_at,created_by,pdf_path&order=created_at.desc&limit=300';
+  var from=el('q-from').value, to=el('q-to').value, c=el('q-center').value, m=el('q-model').value, p=el('q-pass').value, v=el('q-vehicle').value.trim();
+  if(from) qs+='&created_at=gte.'+from+'T00:00:00';
+  if(to) qs+='&created_at=lte.'+to+'T23:59:59';
+  if(c) qs+='&center=eq.'+encodeURIComponent(c);
+  if(m) qs+='&model=eq.'+encodeURIComponent(m);
+  if(p) qs+='&pass=eq.'+p;
+  if(v) qs+='&vehicle_no=ilike.*'+encodeURIComponent(v)+'*';
+  return qs;
+}
+var lastRows=[];
+function runQuery(){
+  var box=el('q-results');
+  if(!FC.cloudAvailable()){ box.textContent='클라우드 미연결'; return; }
+  box.textContent='조회 중…';
+  FC.restSelect('install_checklists', buildFilter()).then(function(rows){
+    lastRows=rows; el('q-count').textContent=rows.length+'건';
+    if(!rows.length){ box.innerHTML='<span style="color:#9bb">조건에 맞는 체크리스트가 없습니다.</span>'; return; }
+    box.innerHTML=rows.map(function(r){
+      var dt=(r.created_at||'').replace('T',' ').slice(0,16);
+      var badge=r.pass?'<span style="font-size:10px;background:#dcf5e8;color:#15803d;border-radius:5px;padding:1px 6px;font-weight:700">합격</span>':'<span style="font-size:10px;background:#fde2e2;color:#b91c1c;border-radius:5px;padding:1px 6px;font-weight:700">불합격</span>';
+      var del=FC.isAdmin()?'<button onclick="delRec(\''+r.id+'\',\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#dc2626;background:none;border:none;cursor:pointer;font-size:12px;margin-left:8px">삭제</button>':'';
+      return '<div class="res-row"><div><b style="color:#047857">'+esc(r.vehicle_no||'-')+'</b> '+badge+' <span style="color:#9bb">· '+esc(r.center||'')+' · '+esc(r.model||'')+'</span>'+
+        '<div style="font-size:11px;color:#9bb">'+dt+' · '+esc(r.operator||'')+' · '+esc(r.created_by||'')+'</div></div>'+
+        '<div style="white-space:nowrap"><button onclick="openPdf(\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#047857;background:none;border:none;cursor:pointer;font-weight:700;font-size:12.5px">PDF</button>'+del+'</div></div>';
+    }).join('');
+  }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
+}
+function exportCsv(){
+  if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
+  var header=['작성일','센터','운수사','차량번호','기종','단말기S/N','판정','불량항목','설치자'];
+  var rows=lastRows.map(function(r){
+    var bad=Array.isArray(r.items)?r.items.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(' / '):'';
+    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.terminal_sn||'', r.pass?'합격':'불합격', bad, r.created_by||''];
+  });
+  FC.downloadCsv('설치체크리스트_'+FC.stampSlug()+'.csv', header, rows);
+  FC.toast('CSV 다운로드 완료');
+}
 function openPdf(p){ FC.signedUrl('checklist', decodeURIComponent(p), 600).then(function(u){ if(u) window.open(u,'_blank'); else FC.toast('링크 생성 실패',false); }); }
 function delRec(id,p){
   if(!FC.isAdmin()){ FC.toast('삭제는 관리자만 가능합니다', false); return; }
-  if(!confirm('이 체크리스트를 삭제할까요? (PDF도 함께 삭제)')) return;
+  if(!confirm('이 체크리스트를 삭제할까요? (PDF 포함)')) return;
   FC.removePdf('checklist', decodeURIComponent(p)).then(function(){ return FC.restDelete('install_checklists','id=eq.'+id); })
-  .then(function(){ FC.toast('삭제되었습니다'); loadList(); }).catch(function(e){ FC.toast('삭제 실패: '+e.message, false); });
+  .then(function(){ FC.toast('삭제되었습니다'); runQuery(); }).catch(function(e){ FC.toast('삭제 실패: '+e.message, false); });
 }
 
-// init
-el('f-center').innerHTML='<option value="">선택</option>'+FC.CENTERS.map(function(c){return '<option>'+c+'</option>';}).join('');
-el('f-model').innerHTML='<option value="">선택</option>'+FC.MODELS.map(function(m){return '<option>'+m+'</option>';}).join('');
-el('f-date').value=FC.todayStr();
-el('user-badge').textContent=FC.myEmail()?('작성자 · '+FC.myEmail()):'비로그인';
-el('f-model').value='B710'; renderChecklist();
-SIG.installer=FC.SignaturePad(el('sig-installer'));
-loadList();
+/* init */
+(function(){
+  el('f-center').innerHTML='<option value="">선택</option>'+FC.CENTERS.map(function(c){return '<option>'+c+'</option>';}).join('');
+  el('f-model').innerHTML='<option value="">선택</option>'+FC.FORM_MODELS.map(function(m){return '<option>'+m+'</option>';}).join('');
+  el('q-center').innerHTML='<option value="">전체 센터</option>'+FC.CENTERS.map(function(c){return '<option>'+c+'</option>';}).join('');
+  el('q-model').innerHTML='<option value="">전체 기종</option>'+FC.FORM_MODELS.map(function(m){return '<option>'+m+'</option>';}).join('');
+  el('f-date').value=FC.todayStr();
+  el('f-model').value='서울 B710'; renderChecklist();
+  SIG.installer=FC.SignaturePad(el('sig-installer'));
+})();
 </script>
 </body>
 </html>
