@@ -85,11 +85,12 @@ function verifyVehicle(vnum, vehicleId){
   var match = (vid.length>=pd.length && vid.slice(-pd.length)===pd) || vid.indexOf(pd)>=0;
   return {checked:true, match:match, plateDigits:pd, vehicleId:vid};
 }
-function vehicleMatchBanner(vnum, vehicleId){
+function vehicleMatchBanner(vnum, vehicleId, kind){
   var v=verifyVehicle(vnum, vehicleId);
   if(!v.checked) return '';
-  if(v.match) return '<div class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 mb-2">✅ <b>차량 일치 확인</b> — 조회 차량('+logEsc(vnum)+')과 백업 차량ID('+logEsc(vehicleId)+')가 일치합니다.</div>';
-  return '<div class="text-[12px] font-bold text-[#B91C1C] bg-rose-50 border-2 border-rose-300 rounded-lg px-3 py-2 mb-2">⚠ <b>차량 불일치 주의</b> — 조회한 차량은 <b>'+logEsc(vnum)+'</b>인데 이 백업의 차량ID는 <b>'+logEsc(vehicleId)+'</b>(끝 '+logEsc(v.vehicleId.slice(-6))+')로 <b>다른 차량</b>일 수 있습니다. 백업 파일을 다시 확인하세요.</div>';
+  var lbl = kind ? logEsc(kind)+' 백업 ' : '';   // "통합단말기 백업" / "승하차단말기 백업"
+  if(v.match) return '<div class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 mb-2">✅ <b>'+lbl+'차량 일치 확인</b> — 조회 차량('+logEsc(vnum)+')과 일치합니다.</div>';
+  return '<div class="text-[12px] font-bold text-[#B91C1C] bg-rose-50 border-2 border-rose-300 rounded-lg px-3 py-2 mb-2">⚠ <b>'+lbl+'차량 불일치 주의</b> — 조회한 차량은 <b>'+logEsc(vnum)+'</b>인데 이 '+(kind?logEsc(kind)+' ':'')+'백업의 차량ID는 <b>'+logEsc(vehicleId)+'</b>(끝 '+logEsc(v.vehicleId.slice(-6))+')로 <b>다른 차량</b>입니다. <b>'+(kind?logEsc(kind)+' ':'')+'백업 파일을 다시 확인하세요.</b></div>';
 }
 
 /* ===== 파서 ===== */
@@ -482,7 +483,7 @@ function renderSeungha(self, iso, vnum, vid, targetId, extraFindings){
   const histId=targetId+'-snhist';
   var hasPos=!!self.posLabel;
   var unit=self.posLabel||'승하차';
-  var head=vehicleMatchBanner(vnum, self.vehicleId)
+  var head=vehicleMatchBanner(vnum, self.vehicleId, '승하차단말기')
     +'<div class="flex items-center gap-2 mb-2 flex-wrap">'
     +'<span class="chip bg-slate-100 text-slate-600">'+logEsc(self.sn?'S/N '+self.sn:'승하차')+'</span>'
     +'<span class="chip" style="background:#ede9fe;color:#6D28D9;font-weight:700">'+logEsc(hasPos?unit+' 승하차 단말기':'승하차 단말기')+'</span>'
@@ -618,7 +619,7 @@ function renderModuleLinks(moduleDiag){
 
 function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, moduleDiag){
   const box=document.getElementById('logbk-result');
-  const head=vehicleMatchBanner(vnum, dg.vehicleId)+'<div class="flex items-center gap-2 mb-2 flex-wrap"><span class="chip bg-slate-100 text-slate-600">'+logEsc(dg.model)+(dg.sn&&dg.sn!=='단말기'?' · S/N '+logEsc(dg.sn):'')+'</span></div>';
+  const head=vehicleMatchBanner(vnum, dg.vehicleId, '통합단말기')+'<div class="flex items-center gap-2 mb-2 flex-wrap"><span class="chip bg-slate-100 text-slate-600">'+logEsc(dg.model)+(dg.sn&&dg.sn!=='단말기'?' · S/N '+logEsc(dg.sn):'')+'</span></div>';
   const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad)+renderModuleLinks(moduleDiag);
   if(!dg.findings.length && !extra){
     box.innerHTML=head+'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 통신 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">로그상 승하차·표출기·모뎀 등 통신 이상이 잡히지 않았습니다(정상 범위).</div></div>'
