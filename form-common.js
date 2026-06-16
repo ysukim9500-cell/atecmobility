@@ -196,6 +196,6 @@
     toast: toast, todayStr: todayStr, stampSlug: stampSlug, ascii: ascii, rand4: rand4,
     CENTERS: ['강남', '강서', '강북', '강동'],
     MODELS: ['B700', 'B710', 'B800'],
-    FORM_MODELS: ['서울 B800', '서울 B700', '서울 B710', '공항 B620']
+    FORM_MODELS: ['서울 B800', '서울 B700', '서울 B710', '공항 B620', '태그리스']
   };
 })(window);

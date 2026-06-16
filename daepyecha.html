@@ -10,10 +10,8 @@
 <style>
   :root{ --wine:#7A0B3C; --mag:#C2185B; --ink:#1f2733; }
   *{ box-sizing:border-box; }
-  body{ margin:0; background:#f6eef2; color:var(--ink);
-        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
+  body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
-  /* header */
   .topbar{ background:linear-gradient(120deg,#5e0a2e,#7A0B3C 45%,#C2185B); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .brand{ display:flex; align-items:center; gap:11px; }
@@ -22,11 +20,9 @@
   .brand p{ font-size:11.5px; margin:2px 0 0; color:#f6c9da; }
   .back{ color:#fff; font-size:12.5px; font-weight:700; text-decoration:none; opacity:.92; }
   .back:hover{ opacity:1; }
-  /* tabs */
   .tabs{ display:flex; gap:4px; background:#fff; border:1px solid #efd6e1; border-radius:13px; padding:5px; margin:20px 0 18px; box-shadow:0 8px 22px -16px rgba(122,11,60,.35); }
   .tab{ flex:1; text-align:center; padding:10px; border-radius:9px; font-weight:800; font-size:14px; color:#9a7384; cursor:pointer; border:none; background:none; }
   .tab.on{ background:linear-gradient(135deg,#7A0B3C,#C2185B); color:#fff; box-shadow:0 6px 14px -6px rgba(194,24,91,.5); }
-  /* card */
   .card{ background:#fff; border:1px solid #efd6e1; border-radius:16px; box-shadow:0 10px 30px -22px rgba(122,11,60,.4); padding:22px; }
   .sec-ttl{ font-size:12.5px; font-weight:800; color:var(--wine); display:flex; align-items:center; gap:7px; margin:0 0 12px; }
   .sec-ttl::before{ content:""; width:4px; height:15px; border-radius:3px; background:linear-gradient(#7A0B3C,#C2185B); }
@@ -47,9 +43,19 @@
   .sig-pad{ border:1.5px dashed #d09cb4; border-radius:11px; background:linear-gradient(#fff,#fdf7fa); touch-action:none; width:100%; height:118px; }
   .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#f7e7ef; color:#9a3768; }
   .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #f3e3eb; }
+  .cat-chip{ display:inline-block; font-size:10px; font-weight:800; padding:1px 7px; border-radius:6px; }
   .hide{ display:none !important; }
-  /* PDF 인쇄 영역 */
   #print-area{ position:fixed; left:-99999px; top:0; width:794px; background:#fff; padding:30px 34px; color:#15202b; font-family:'Noto Sans KR',sans-serif; }
+  .doc-page{ width:794px; height:1123px; background:#fff; box-sizing:border-box; display:flex; overflow:hidden; }
+  .doc-frame{ flex:1; margin:16px; border:1.6px solid #7A0B3C; padding:28px 32px 22px; display:flex; flex-direction:column; }
+  .doc-confirm{ text-align:center; font-size:12.5px; color:#3a3a3a; padding-top:26px; }
+  .doc-date{ text-align:center; font-size:13.5px; font-weight:700; letter-spacing:3px; margin:9px 0 16px; color:#222; }
+  .doc-sign{ display:flex; gap:20px; }
+  .doc-sign .b{ flex:1; border:1px solid #9a9a9a; border-radius:6px; padding:10px 14px; min-height:108px; position:relative; }
+  .doc-sign .role{ font-size:11.5px; font-weight:800; color:#7A0B3C; }
+  .doc-sign .nm{ display:block; font-size:13.5px; margin-top:4px; }
+  .doc-sign .seal{ color:#b07; font-size:11px; }
+  .doc-sign img{ position:absolute; right:18px; bottom:10px; height:62px; }
   #pa-head{ display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2.5px solid #7A0B3C; padding-bottom:10px; margin-bottom:4px; }
   #pa-head .t{ font-size:25px; font-weight:800; letter-spacing:7px; color:#111; }
   #pa-head .s{ font-size:11px; color:#7A0B3C; font-weight:700; margin-top:3px; letter-spacing:1px; }
@@ -70,6 +76,10 @@
   .pa-sign .nm{ font-size:12.5px; margin-top:2px; }
   .pa-sign img{ height:58px; margin-top:4px; }
   .pa-foot{ text-align:right; font-size:9px; color:#9a9a9a; margin-top:12px; }
+  table.pa-list{ width:100%; border-collapse:collapse; margin-top:10px; }
+  table.pa-list th{ background:#7A0B3C; color:#fff; font-size:10px; padding:5px 6px; border:1px solid #7A0B3C; }
+  table.pa-list td{ border:1px solid #cfcfcf; padding:4px 6px; font-size:10px; }
+  table.pa-list tr:nth-child(even) td{ background:#faf3f7; }
 </style>
 </head>
 <body>
@@ -77,7 +87,7 @@
 <div class="topbar"><div class="topbar-in">
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg></div>
-    <div><h1>대폐차 자재 지급확인서</h1><p>ATEC Mobility · 전자 지급확인 서식</p></div>
+    <div><h1>대폐차 자재 지급확인서</h1><p>ATEC Mobility · 증차 · 대폐차 · 감차 전자 서식</p></div>
   </div>
   <a href="index.html" class="back">← 포털</a>
 </div></div>
@@ -88,7 +98,7 @@
     <button class="tab" id="tab-browse" onclick="showTab('browse')">조회 · 다운로드</button>
   </div>
 
-  <!-- ===================== 작성 ===================== -->
+  <!-- 작성 -->
   <div id="pane-write">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">기본 정보</div>
@@ -96,10 +106,11 @@
         <div><label class="lbl">작성일</label><input id="f-date" class="inp" type="date"></div>
         <div><label class="lbl">센터</label><select id="f-center" class="inp"></select></div>
         <div><label class="lbl">운수사</label><input id="f-operator" class="inp" placeholder="예) 다모아자동차"></div>
+        <div><label class="lbl">구분</label><select id="f-category" class="inp" onchange="onCategory()"><option>대폐차</option><option>증차</option><option>감차</option></select></div>
         <div><label class="lbl">단말기 기종</label><select id="f-model" class="inp" onchange="onModel()"></select></div>
-        <div><label class="lbl">신규 차량번호</label><input id="f-vehicle" class="inp" placeholder="예) 서울74사1234"></div>
-        <div><label class="lbl">대폐차(폐차) 번호</label><input id="f-scrap" class="inp" placeholder="폐차 차량번호 (없으면 비움)"></div>
+        <div><label class="lbl" id="lbl-vehicle">차량번호</label><input id="f-vehicle" class="inp" placeholder="예) 서울74사1234"></div>
       </div>
+      <p id="cat-hint" class="text-[11.5px]" style="color:#a98;margin-top:8px"></p>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -152,28 +163,28 @@
     </div>
   </div>
 
-  <!-- ===================== 조회 ===================== -->
+  <!-- 조회 -->
   <div id="pane-browse" class="hide">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">조회 조건</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
         <div><label class="lbl">시작일</label><input id="q-from" class="inp" type="date"></div>
         <div><label class="lbl">종료일</label><input id="q-to" class="inp" type="date"></div>
+        <div><label class="lbl">구분</label><select id="q-category" class="inp"><option value="">전체</option><option>대폐차</option><option>증차</option><option>감차</option></select></div>
         <div><label class="lbl">센터</label><select id="q-center" class="inp"></select></div>
         <div><label class="lbl">기종</label><select id="q-model" class="inp"></select></div>
-        <div style="grid-column:span 2"><label class="lbl">차량번호 검색</label><input id="q-vehicle" class="inp" placeholder="번호 일부 입력 (선택)"></div>
+        <div><label class="lbl">차량번호 검색</label><input id="q-vehicle" class="inp" placeholder="번호 일부 (선택)"></div>
       </div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
+        <button class="btn btn-out" onclick="exportPdf()">PDF 다운로드</button>
         <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
       </div>
     </div>
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="sec-ttl" style="margin:0">조회 결과 <span class="pill" id="q-count">0건</span></div>
-      </div>
+      <div class="sec-ttl" style="margin-bottom:8px">조회 결과 <span class="pill" id="q-count">0건</span></div>
       <div id="q-results" style="font-size:13px;color:#86566b">조회 버튼을 눌러 결과를 확인하세요.</div>
     </div>
   </div>
@@ -183,15 +194,17 @@
 
 <script src="form-common.js"></script>
 <script>
-/* ===== 기종별 품명 (서울 B800 / B700 / B710 · 공항 B620) ===== */
 var MATERIALS = {
   '서울 B800': ['GPS 안테나','운전자 틸트 SET','"ㄱ"자 봉 브라켓 200mm','"U"자 봉 브라켓 200mm / 300mm','"ㄷ"자 봉 브라켓 300mm(소켓 포함)','메인단말기 전원케이블','승차케이블','승하차케이블 15M','승하차케이블 17M','표출장치 전원/통신케이블','통합단말기 CAN 케이블','통합단말기 TO LTE모뎀 케이블','볼트류','몰드','클램프','케이블타이'],
   '서울 B700': ['V2X 전원 케이블','C-ITS 통합단말기 전원케이블(10m)','B800 승하차케이블 (15M)','B800 승하차케이블 (17M)','B800 승차케이블','GPS 안테나 (B600)','통합단말기 브라켓','운전자 백브라켓','운전자 틸트 SET','"ㄱ"자 봉 브라켓 200mm','"U"자 봉 브라켓 200mm / 300mm','"ㄷ"자 봉 브라켓 300mm(소켓 포함)','승차 일자봉 U자 200MM / 300MM','승하차 세로 커버','승하차 세로 브라켓','C-ITS GPS안테나','C-ITS 표출기 케이블(8m)','C-ITS 통합단말기 CAN 케이블','C-ITS LTE안테나','C-ITS LTE모뎀케이블','승하차 하부 bottom','승하차 상부 RUBBER COVER','승하차 브라켓 RUBBER COVER','표출장치 설치브라켓','STEEL BAND','GPS연장케이블','볼트류','몰드','클램프','케이블타이'],
   '서울 B710': ['GPS 안테나(일반)','메인단말기 전원케이블 8M','승하차케이블 8M','승하차케이블 16M','승하차케이블 18M','표출장치 전원/통신케이블 8M','통합단말기 CAN 케이블 8M','통합단말기 TO LTE모뎀 케이블','승하차 세로 브라켓','승하차 세로 커버','승하차 하부 bottom','승하차 상부 RUBBER COVER','승하차 브라켓 RUBBER COVER','운전자 일자봉 U자 200MM / 300MM','"ㄷ"자 봉 브라켓(소켓포함)','"ㄱ"자 봉 브라켓 200mm','"U"자 봉 브라켓 200mm / 300mm','표출장치 설치브라켓','통합단말기 설치브라켓','카운티 스텐봉 ㄱ자','메인단말기 전원케이블 3M(전원스위치포함)','승하차케이블 6M','표출장치 전원/통신케이블 1M','통합단말기 CAN 케이블 3M','BRKT Mount - E "U"자형','STEEL BAND','LTE 안테나','볼트류','몰드','클램프','케이블타이'],
-  '공항 B620': ['운전자 백브라켓','운전자 틸트 SET','운전자 블랙커버','승하차 가로 커버','승하차 가로 브라켓','GPS 안테나','LTE 안테나','WIFI 안테나','RJ45이더넷 브라켓','승차 이더켓케이블(6M)','승차 이더켓케이블(1.5M)','케이블(운전자전원 3m)','케이블(운전자전원 6m)','케이블(승차전원 3m)','케이블(승차전원 6m)','케이블(운전자통신 1.5m / 3m)','타코미터 케이블','케이블(안내방송 AUDIO)','승하차 세로 커버','승하차 하부 bottom','승하차 상부 RUBBER COVER','승하차 브라켓 RUBBER COVER','볼트류','몰드','케이블타이','클램프','찍찍이']
+  '공항 B620': ['운전자 백브라켓','운전자 틸트 SET','운전자 블랙커버','승하차 가로 커버','승하차 가로 브라켓','GPS 안테나','LTE 안테나','WIFI 안테나','RJ45이더넷 브라켓','승차 이더켓케이블(6M)','승차 이더켓케이블(1.5M)','케이블(운전자전원 3m)','케이블(운전자전원 6m)','케이블(승차전원 3m)','케이블(승차전원 6m)','케이블(운전자통신 1.5m / 3m)','타코미터 케이블','케이블(안내방송 AUDIO)','승하차 세로 커버','승하차 하부 bottom','승하차 상부 RUBBER COVER','승하차 브라켓 RUBBER COVER','볼트류','몰드','케이블타이','클램프','찍찍이'],
+  '태그리스': ['1x3 비콘단말기','단일 비콘단말기','V형 비콘단말기','태그리스 허브','외부안테나','B700 or B800 & Main HUB, 5M','HUB & Beacon0, 5M','HUB & Beacon1, 4M','HUB & Beacon2, 6M','HUB & Beacon3, 16M','HUB & Beacon4, 6M','HUB & Beacon5, 12M','HUB & Beacon6, 16M']
 };
 var CUSTOM = '__기타__';
-
+var CAT_HINT = { '대폐차':'폐차 후 같은 번호로 신차가 나옵니다. 차량번호 1개만 입력하세요.', '증차':'신규 증차 차량입니다. 신규 차량번호를 입력하세요.', '감차':'감차(폐차)되는 차량입니다. 폐차 차량번호를 입력하세요.' };
+var CAT_LABEL = { '대폐차':'차량번호 (동일 번호 신차)', '증차':'신규 차량번호', '감차':'감차(폐차) 차량번호' };
+var CAT_COLOR = { '대폐차':'background:#f3e6ec;color:#7A0B3C', '증차':'background:#e3f0fb;color:#1d4ed8', '감차':'background:#fdeaea;color:#b91c1c' };
 var SIG = {};
 function el(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -202,6 +215,11 @@ function showTab(t){
   el('tab-write').classList.toggle('on', t==='write');
   el('tab-browse').classList.toggle('on', t==='browse');
   if(t==='browse' && !window.__queried){ window.__queried=true; quickRange(30); }
+}
+function onCategory(){
+  var c=el('f-category').value;
+  el('lbl-vehicle').textContent = CAT_LABEL[c]||'차량번호';
+  el('cat-hint').textContent = CAT_HINT[c]||'';
 }
 
 function curItems(){ return MATERIALS[el('f-model').value] || []; }
@@ -241,11 +259,10 @@ function loadAllItems(){
   renumber();
 }
 function onModel(){
-  // 기종 변경: 모든 행의 품명 옵션 갱신(값 유지 가능하면 유지)
   el('mat-body').querySelectorAll('tr').forEach(function(tr){
     var s=tr.querySelector('.r-name'), v=s.value;
     s.innerHTML=optionTags(v);
-    if(s.value!==v){ s.value=''; } // 새 기종에 없는 품명은 초기화
+    if(s.value!==v){ s.value=''; }
   });
   el('mat-hint').textContent = el('f-model').value ? ('선택 기종: '+el('f-model').value+' — 품명 드롭다운이 갱신되었습니다.') : '기종을 먼저 선택하세요.';
 }
@@ -254,7 +271,6 @@ function renumber(){
   rows.forEach(function(tr,i){ tr.querySelector('.rno').textContent=(i+1); });
   el('mat-count').textContent=rows.length+'개';
 }
-
 function collectItems(){
   var out=[];
   el('mat-body').querySelectorAll('tr').forEach(function(tr){
@@ -267,11 +283,10 @@ function collectItems(){
 }
 function gather(){
   return { date:el('f-date').value, center:el('f-center').value, operator:el('f-operator').value.trim(),
-    vehicle:el('f-vehicle').value.trim(), scrap:el('f-scrap').value.trim(), model:el('f-model').value,
+    category:el('f-category').value, vehicle:el('f-vehicle').value.trim(), model:el('f-model').value,
     issuer:el('f-issuer').value.trim(), receiver:el('f-receiver').value.trim(), memo:el('f-memo').value.trim(), items:collectItems() };
 }
 
-/* ===== 인쇄(1장) ===== */
 function itemRowsTable(list, startNo, withNote){
   var rows = list.map(function(it,i){
     var nm = esc(it.name) + (it.note&&!withNote?' <span style="color:#999">('+esc(it.note)+')</span>':'');
@@ -281,34 +296,39 @@ function itemRowsTable(list, startNo, withNote){
   }).join('');
   return '<table class="pa-items"><thead><tr><th>No</th><th>품명</th><th>수량</th><th>S/N</th>'+(withNote?'<th>비고</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
+function koDate(s){ var m=/(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(!m){ var t=new Date(); return t.getFullYear()+'년 '+('0'+(t.getMonth()+1)).slice(-2)+'월 '+('0'+t.getDate()).slice(-2)+'일'; } return m[1]+'년 '+m[2]+'월 '+m[3]+'일'; }
 function buildPrint(d){
   var pa=el('print-area');
   var n=d.items.length, body;
-  if(n===0){ body='<div style="text-align:center;color:#999;padding:18px">지급 자재 없음</div>'; }
-  else if(n<=16){ body=itemRowsTable(d.items,1,true); }
+  if(n===0){ body='<div style="text-align:center;color:#999;padding:24px">지급 자재 없음</div>'; }
+  else if(n<=18){ body=itemRowsTable(d.items,1,true); }
   else { var half=Math.ceil(n/2); body='<div class="pa-cols"><div>'+itemRowsTable(d.items.slice(0,half),1,false)+'</div><div>'+itemRowsTable(d.items.slice(half),half+1,false)+'</div></div>'; }
   var iSig=SIG.issuer.dataUrl(), rSig=SIG.receiver.dataUrl();
   pa.innerHTML =
-    '<div id="pa-head"><div><div class="t">자 재 지 급 확 인 서</div><div class="s">대폐차 단말기 자재 지급 내역</div></div>'+
-      '<div class="co"><b>ATEC MOBILITY</b><br>전자 지급확인 서식<br>'+esc(d.date||'')+'</div></div>'+
-    '<table class="pa-meta"><tr><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td></tr>'+
-    '<tr><td class="k">신규 차량</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">대폐차 번호</td><td>'+esc(d.scrap||'-')+'</td><td class="k">품목 수</td><td>'+n+'개</td></tr></table>'+
-    body +
-    (d.memo?'<div style="margin-top:8px;font-size:11px"><b style="color:#7A0B3C">메모</b> · '+esc(d.memo)+'</div>':'')+
-    '<div class="pa-sign"><div class="b"><div class="st">지급자 (ATEC)</div><div class="nm">'+esc(d.issuer||'')+'</div>'+(iSig?'<img src="'+iSig+'">':'')+'</div>'+
-      '<div class="b"><div class="st">수령자 (운수사)</div><div class="nm">'+esc(d.receiver||'')+'</div>'+(rSig?'<img src="'+rSig+'">':'')+'</div></div>'+
-    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+' · 본 문서는 전자 발행되었습니다.</div>';
-  return pa;
+    '<div class="doc-page"><div class="doc-frame">'+
+      '<div id="pa-head"><div><div class="t">자 재 지 급 확 인 서</div><div class="s">'+esc(d.category||'대폐차')+' · 단말기 자재 지급 내역</div></div>'+
+        '<div class="co"><b>ATEC MOBILITY</b><br>전자 지급확인 서식</div></div>'+
+      '<table class="pa-meta"><tr><td class="k">구분</td><td>'+esc(d.category||'-')+'</td><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td></tr>'+
+      '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td><td class="k">품목 수</td><td>'+n+'개</td></tr></table>'+
+      '<div style="margin-top:10px">'+body+'</div>'+
+      (d.memo?'<div style="margin-top:8px;font-size:11px"><b style="color:#7A0B3C">메모</b> · '+esc(d.memo)+'</div>':'')+
+      '<div class="doc-confirm">위와 같이 단말기 설치 자재를 정히 <b>지급·수령</b>하였음을 확인합니다.</div>'+
+      '<div class="doc-date">'+koDate(d.date)+'</div>'+
+      '<div class="doc-sign"><div class="b"><span class="role">지급자 (ATEC)</span><span class="nm">'+esc(d.issuer||'')+' <span class="seal">(인)</span></span>'+(iSig?'<img src="'+iSig+'">':'')+'</div>'+
+        '<div class="b"><span class="role">수령자 (운수사)</span><span class="nm">'+esc(d.receiver||'')+' <span class="seal">(인)</span></span>'+(rSig?'<img src="'+rSig+'">':'')+'</div></div>'+
+      '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+' · 본 문서는 전자 발행되었습니다.</div>'+
+    '</div></div>';
+  return pa.querySelector('.doc-page');
 }
 
 function validate(d){
   if(!d.center){ FC.toast('센터를 선택하세요', false); return false; }
   if(!d.model){ FC.toast('기종을 선택하세요', false); return false; }
-  if(!d.vehicle){ FC.toast('신규 차량번호를 입력하세요', false); return false; }
+  if(!d.vehicle){ FC.toast((CAT_LABEL[d.category]||'차량번호')+'를 입력하세요', false); return false; }
   if(!d.items.length){ FC.toast('지급 자재를 1건 이상 입력하세요', false); return false; }
   return true;
 }
-function dlName(d){ return (d.vehicle||'차량')+'_대폐차확인서_'+FC.stampSlug()+'.pdf'; }
+function dlName(d){ return (d.vehicle||'차량')+'_'+(d.category||'대폐차')+'_'+FC.stampSlug()+'.pdf'; }
 function storeKey(d){ return (FC.ascii(d.center)||'etc')+'/'+(FC.ascii(d.vehicle)||'veh')+'_'+FC.stampSlug()+'_'+FC.rand4()+'.pdf'; }
 
 function downloadPdf(){
@@ -329,7 +349,7 @@ function saveCloud(){
   var path=storeKey(d);
   FC.nodeToPdfFit(buildPrint(d)).then(function(blob){ return FC.uploadPdf('daepyecha', path, blob); })
   .then(function(){
-    return FC.restInsert('daepyecha_confirmations', { center:d.center, operator:d.operator, vehicle_no:d.vehicle, model:d.model, scrap_no:d.scrap,
+    return FC.restInsert('daepyecha_confirmations', { center:d.center, operator:d.operator, category:d.category, vehicle_no:d.vehicle, model:d.model,
       items:d.items, issuer:d.issuer, receiver:d.receiver, issuer_sign:!SIG.issuer.isEmpty(), receiver_sign:!SIG.receiver.isEmpty(),
       pdf_path:path, memo:d.memo, created_by:FC.myEmail() });
   }).then(function(){ lastSig=sig; FC.toast('저장되었습니다'); })
@@ -337,17 +357,18 @@ function saveCloud(){
   .then(function(){ saving=false; el('save-btn').disabled=false; el('save-btn').textContent='서명 · 확인서 저장 (60일 보관)'; });
 }
 
-/* ===== 조회/다운로드 ===== */
+/* 조회/다운로드 */
 function quickRange(days){
   var to=new Date(), from=new Date(Date.now()-days*86400000);
   var f=function(x){ var p=function(n){return('0'+n).slice(-2);}; return x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate()); };
   el('q-from').value=f(from); el('q-to').value=f(to); runQuery();
 }
 function buildFilter(){
-  var qs='select=id,center,operator,vehicle_no,model,scrap_no,items,created_at,created_by,pdf_path&order=created_at.desc&limit=300';
-  var from=el('q-from').value, to=el('q-to').value, c=el('q-center').value, m=el('q-model').value, v=el('q-vehicle').value.trim();
+  var qs='select=id,category,center,operator,vehicle_no,model,items,created_at,created_by,pdf_path&order=created_at.desc&limit=300';
+  var from=el('q-from').value, to=el('q-to').value, cat=el('q-category').value, c=el('q-center').value, m=el('q-model').value, v=el('q-vehicle').value.trim();
   if(from) qs+='&created_at=gte.'+from+'T00:00:00';
   if(to) qs+='&created_at=lte.'+to+'T23:59:59';
+  if(cat) qs+='&category=eq.'+encodeURIComponent(cat);
   if(c) qs+='&center=eq.'+encodeURIComponent(c);
   if(m) qs+='&model=eq.'+encodeURIComponent(m);
   if(v) qs+='&vehicle_no=ilike.*'+encodeURIComponent(v)+'*';
@@ -364,21 +385,52 @@ function runQuery(){
     box.innerHTML=rows.map(function(r){
       var dt=(r.created_at||'').replace('T',' ').slice(0,16);
       var cnt=Array.isArray(r.items)?r.items.length:0;
+      var cat=r.category||'대폐차';
+      var chip='<span class="cat-chip" style="'+(CAT_COLOR[cat]||CAT_COLOR['대폐차'])+'">'+esc(cat)+'</span>';
       var del=FC.isAdmin()?'<button onclick="delRec(\''+r.id+'\',\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#dc2626;background:none;border:none;cursor:pointer;font-size:12px;margin-left:8px">삭제</button>':'';
-      return '<div class="res-row"><div><b style="color:#7A0B3C">'+esc(r.vehicle_no||'-')+'</b> <span style="color:#bba">· '+esc(r.center||'')+' · '+esc(r.model||'')+' · '+cnt+'개</span>'+
+      return '<div class="res-row"><div>'+chip+' <b style="color:#7A0B3C">'+esc(r.vehicle_no||'-')+'</b> <span style="color:#bba">· '+esc(r.center||'')+' · '+esc(r.model||'')+' · '+cnt+'개</span>'+
         '<div style="font-size:11px;color:#bba">'+dt+' · '+esc(r.operator||'')+' · '+esc(r.created_by||'')+'</div></div>'+
         '<div style="white-space:nowrap"><button onclick="openPdf(\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#C2185B;background:none;border:none;cursor:pointer;font-weight:700;font-size:12.5px">PDF</button>'+del+'</div></div>';
     }).join('');
   }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
 }
+function filterSummary(){
+  var parts=[];
+  if(el('q-from').value||el('q-to').value) parts.push('기간 '+(el('q-from').value||'~')+' ~ '+(el('q-to').value||''));
+  if(el('q-category').value) parts.push('구분 '+el('q-category').value);
+  if(el('q-center').value) parts.push('센터 '+el('q-center').value);
+  if(el('q-model').value) parts.push('기종 '+el('q-model').value);
+  if(el('q-vehicle').value.trim()) parts.push('차량 '+el('q-vehicle').value.trim());
+  return parts.length?parts.join(' · '):'전체';
+}
+function exportPdf(){
+  if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
+  var pa=el('print-area');
+  var trs=lastRows.map(function(r,i){
+    var its=Array.isArray(r.items)?r.items.map(function(x){return x.name+(x.qty?'×'+x.qty:'');}).join(', '):'';
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc((r.created_at||'').slice(0,10))+'</td><td style="text-align:center">'+esc(r.category||'')+'</td><td>'+esc(r.center||'')+'</td><td>'+esc(r.operator||'')+'</td><td>'+esc(r.vehicle_no||'')+'</td><td>'+esc(r.model||'')+'</td><td style="text-align:center">'+(Array.isArray(r.items)?r.items.length:0)+'</td><td style="font-size:9px">'+esc(its)+'</td></tr>';
+  }).join('');
+  pa.innerHTML =
+    '<div id="pa-head"><div><div class="t" style="letter-spacing:3px;font-size:21px">자재 지급 내역 (조회)</div><div class="s">대폐차 · 증차 · 감차 통합 조회</div></div>'+
+      '<div class="co"><b>ATEC MOBILITY</b><br>'+esc(filterSummary())+'<br>총 '+lastRows.length+'건 · '+new Date().toLocaleDateString('ko-KR')+'</div></div>'+
+    '<table class="pa-list"><thead><tr><th>No</th><th>작성일</th><th>구분</th><th>센터</th><th>운수사</th><th>차량번호</th><th>기종</th><th>품목수</th><th>지급 품목</th></tr></thead><tbody>'+trs+'</tbody></table>'+
+    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+'</div>';
+  FC.nodeToPdf(pa).then(function(blob){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='대폐차_지급내역_'+FC.stampSlug()+'.pdf'; a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1500); FC.toast('PDF 다운로드 완료');
+  }).catch(function(e){ FC.toast('PDF 생성 실패: '+e.message, false); });
+}
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var header=['작성일','센터','운수사','차량번호','기종','대폐차번호','품목수','지급품목','작성자'];
-  var rows=lastRows.map(function(r){
-    var its=Array.isArray(r.items)?r.items.map(function(x){return x.name+(x.qty?'×'+x.qty:'');}).join(' / '):'';
-    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.scrap_no||'', Array.isArray(r.items)?r.items.length:0, its, r.created_by||''];
+  var header=['작성일','구분','센터','운수사','차량번호','기종','No','품명','수량','S/N','비고','작성자'];
+  var rows=[];
+  lastRows.forEach(function(r){
+    var d=(r.created_at||'').slice(0,10), base=[d, r.category||'', r.center||'', r.operator||'', r.vehicle_no||'', r.model||''];
+    var its=Array.isArray(r.items)?r.items:[];
+    if(!its.length){ rows.push(base.concat(['','','','','', r.created_by||''])); return; }
+    its.forEach(function(x,i){ rows.push(base.concat([i+1, x.name||'', x.qty||'', x.sn||'', x.note||'', r.created_by||''])); });
   });
-  FC.downloadCsv('대폐차확인서_'+FC.stampSlug()+'.csv', header, rows);
+  FC.downloadCsv('대폐차지급내역_'+FC.stampSlug()+'.csv', header, rows);
   FC.toast('CSV 다운로드 완료');
 }
 function openPdf(p){ FC.signedUrl('daepyecha', decodeURIComponent(p), 600).then(function(u){ if(u) window.open(u,'_blank'); else FC.toast('링크 생성 실패',false); }); }
@@ -396,6 +448,7 @@ function delRec(id,p){
   el('q-center').innerHTML='<option value="">전체 센터</option>'+FC.CENTERS.map(function(c){return '<option>'+c+'</option>';}).join('');
   el('q-model').innerHTML='<option value="">전체 기종</option>'+FC.FORM_MODELS.map(function(m){return '<option>'+m+'</option>';}).join('');
   el('f-date').value=FC.todayStr();
+  onCategory();
   SIG.issuer=FC.SignaturePad(el('sig-issuer'));
   SIG.receiver=FC.SignaturePad(el('sig-receiver'));
   addRow();

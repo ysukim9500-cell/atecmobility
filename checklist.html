@@ -46,6 +46,16 @@
   .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #eef6f2; }
   .hide{ display:none !important; }
   #print-area{ position:fixed; left:-99999px; top:0; width:794px; background:#fff; padding:30px 34px; color:#15202b; font-family:'Noto Sans KR',sans-serif; }
+  .doc-page{ width:794px; height:1123px; background:#fff; box-sizing:border-box; display:flex; overflow:hidden; }
+  .doc-frame{ flex:1; margin:16px; border:1.6px solid #047857; padding:28px 32px 22px; display:flex; flex-direction:column; }
+  .doc-confirm{ text-align:center; font-size:12.5px; color:#3a3a3a; padding-top:24px; }
+  .doc-date{ text-align:center; font-size:13.5px; font-weight:700; letter-spacing:3px; margin:9px 0 16px; color:#222; }
+  .doc-sign{ display:flex; justify-content:center; }
+  .doc-sign .b{ width:54%; border:1px solid #9a9a9a; border-radius:6px; padding:10px 14px; min-height:104px; position:relative; }
+  .doc-sign .role{ font-size:11.5px; font-weight:800; color:#047857; }
+  .doc-sign .nm{ display:block; font-size:13.5px; margin-top:4px; }
+  .doc-sign .seal{ color:#0a7; font-size:11px; }
+  .doc-sign img{ position:absolute; right:18px; bottom:10px; height:60px; }
   #pa-head{ display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2.5px solid #047857; padding-bottom:10px; }
   #pa-head .t{ font-size:24px; font-weight:800; letter-spacing:5px; color:#111; }
   #pa-head .s{ font-size:11px; color:#047857; font-weight:700; margin-top:3px; }
@@ -141,6 +151,7 @@
       </div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
+        <button class="btn btn-out" onclick="exportPdf()">PDF 다운로드</button>
         <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
@@ -171,30 +182,39 @@ function showTab(t){
 
 /* 기종별 점검표 (서울 B800/B700/B710 · 공항 B620) */
 function template(model){
-  var T={
-    '전원·기동':['전원 인가 / 전원 LED 정상','입력 전압 정상','부팅 정상(에러 없음)','펌웨어 버전 확인'],
-    '통신':['센터 통신 연결(온라인)','LTE/모뎀 신호 정상','데이터 송수신 확인'],
-    '측위(GPS)':['GPS 위치 수신 정상'],
-    '단말 기능':['교통카드 결제 테스트 정상','PSAM 인식 정상','정산 데이터 전송 확인'],
-    '승하차 단말기':['승차 단말기 결제·통신 정상','하차1 단말기 결제·통신 정상','하차2 단말기 결제·통신 정상','승하차 케이블 체결 상태'],
-    '표출·운행':['표출기 노선·정류장 표출 정상','DTG 운행기록 연동'],
-    '설치 마감':['차량번호/노선 설정 일치','거치·브라켓 고정 상태','케이블 정리·보호 상태','외관·라벨 확인']
-  };
-  if(model==='서울 B700'){
-    T={'전원·기동':T['전원·기동'],'통신':T['통신'],'측위(GPS)':T['측위(GPS)'],'단말 기능':T['단말 기능'],
-       'C-ITS / V2X':['V2X 전원 정상','C-ITS 표출기 동작','C-ITS LTE모뎀 통신','C-ITS GPS 안테나 수신'],
-       '승하차 단말기':T['승하차 단말기'],'표출·운행':T['표출·운행'],'설치 마감':T['설치 마감']};
+  if(model==='태그리스'){
+    return {
+      'FW · 설정':['태그리스 FW 버전 확인','비콘 FW 버전 확인','태그리스 사용설정 확인(설정▶차량정보설정)','단말기 FW(AFC/GW) 버전 확인'],
+      '통합단말기 · 허브':['통합단말기 내·외관·커넥터 체결','허브 LED 점등·통신 정상','허브 커넥터·스크류 체결(CI↔MAIN_HUB)','케이블 네임택 확인','외부안테나 마감(0·1·2 실리콘)','브라켓·케이블타이 고정'],
+      '비콘 설치 (0~6)':['비콘0 LED·커넥터·케이블번호·스크류','비콘1 LED·커넥터·케이블번호·스크류','비콘2 LED·커넥터·케이블번호·스크류','비콘3 LED·커넥터·케이블번호·스크류','비콘4 LED·커넥터·케이블번호·스크류','비콘5 LED·커넥터·케이블번호·스크류','비콘6 LED·커넥터·케이블번호·스크류'],
+      '운행 대기중':['표출단말기 시간 표시 정상','허브 외부 LED 작동','비콘별 통신상태(0~6) 정상','표출 상태바 GPS·단말운영·LTE·수집센터·BMS Icon','승하차 통신연결(테두리 녹색)','BLE 아이콘 표시(태그리스 설정)'],
+      '운행 중 · 종료':['비콘 신호 송신(테스트앱 0~6)','운행종료 정상 처리','미전송 거래내역 0건']
+    };
   }
   if(model==='공항 B620'){
-    T={'전원·기동':['전원 인가 / 전원 LED 정상','입력 전압 정상','부팅 정상(에러 없음)','펌웨어 버전 확인'],
-       '통신':['센터 통신 연결(온라인)','LTE/모뎀 신호 정상','WIFI 안테나 연결','이더넷(RJ45) 연결'],
-       '측위(GPS)':['GPS 위치 수신 정상'],
-       '단말 기능':['교통카드 결제 테스트 정상','PSAM 인식 정상','정산 데이터 전송 확인'],
-       '승하차 단말기':['승차 단말기 결제·통신 정상','하차 단말기 결제·통신 정상','승하차 케이블 체결 상태'],
-       '부가 장치':['안내방송 AUDIO 출력 정상','타코미터 연동 정상'],
-       '설치 마감':['차량번호/노선 설정 일치','거치·브라켓 고정 상태','케이블 정리·보호 상태','외관·라벨 확인']};
+    return {
+      '차량 특성':['차량 특성(현대A/기아B/기타C) 확인'],
+      'H/W · 단말기':['운전자·승차 IH 라벨↔LCD 일치','수집센터 IP 설정 확인','운전자단말기 부팅·통신·시간·러버패드·블랙커버','승차단말기 부팅·통신·커넥터·백커버','영수증기 통신·출력 정상','안내방송 전원·음성출력 정상'],
+      'H/W · 설치':['브라켓·케이블타이 고정','GPS·LTE 안테나 커넥터 고정'],
+      '운행 대기중':['표출 시간 표시 정상','운영관리/수집센터 IP 확인','운행시작 정상(BMS·c/t-sys·LTE·GPS 감도)'],
+      '운행 중 · 카드':['BMS 감도(녹색)','c-sys/t-sys 감도(녹색)','LTE/GPS 감도 확인','승차 카드TAG 인식'],
+      '운행 종료':['운행종료 정상 처리','미전송 거래내역 0건']
+    };
   }
-  return T;
+  // 서울 B700 / B710 / B800 공통(엑셀 기준)
+  var t = {
+    '차량 특성':['차량 특성(일반A/저상B/전기차C/기타D)','격벽 설치 유무 기록'],
+    'H/W · 단말기':['표출·승하차 IH 라벨↔LCD 일치','표출단말기 부팅·통신·시간·커넥터·러버패드·블랙커버','승차단말기 부팅·통신·백커버·고무러버','하차1단말기 부팅·통신·백커버·고무러버','하차2단말기 부팅·통신·백커버·고무러버','LTE외장모뎀 램프·통신'],
+    'H/W · 설치':['브라켓·케이블타이 고정','GPS·LTE·타코메타 커넥터 연결','DTG 연결 상태(APP 확인)'],
+    '운행 대기 · 표출 상태바':['GPS Icon 활성(Ant 3↑)','단말운영(T) Icon 표출','LTE Icon 활성(Ant 4↑)','수집센터(D) Icon 표출','BMS(B) Icon 표출','승하차 통신연결(테두리 녹색)'],
+    '운행 대기 · 설정':['표출단말기 시간 표시 정상','FW/OS 버전 최신 확인','차량정보(좌석수) 설정'],
+    '운행 시작 · 카드':['BMS/GPS 앞뒤차·정류장 표시','승차 카드TAG 인식','하차1 카드TAG 인식','하차2 카드TAG 인식'],
+    '운행 종료':['운행종료 정상 처리','미전송 거래내역 0건']
+  };
+  if(model==='서울 B700'){
+    t['운행 대기 · 표출 상태바']=['CITS표출부 GPS Icon 활성','CITS표출부 단말운영(T) Icon','AFC표출부 LTE Icon 활성','AFC표출부 단말운영센터(T) Icon','AFC표출부 수집센터(D) Icon','AFC표출부 BMS(B) Icon','승하차 통신연결(테두리 녹색)'];
+  }
+  return t;
 }
 
 function renderChecklist(){
@@ -245,6 +265,7 @@ function sectionBlocks(items){
     return { html:html, n:groups[g].length+1 };
   });
 }
+function koDate(s){ var m=/(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(!m){ var t=new Date(); return t.getFullYear()+'년 '+('0'+(t.getMonth()+1)).slice(-2)+'월 '+('0'+t.getDate()).slice(-2)+'일'; } return m[1]+'년 '+m[2]+'월 '+m[3]+'일'; }
 function buildPrint(d){
   var pa=el('print-area');
   var blocks=sectionBlocks(d.items);
@@ -253,16 +274,20 @@ function buildPrint(d){
   blocks.forEach(function(b){ if(acc<half){ leftH+=b.html; acc+=b.n; } else { rightH+=b.html; } });
   var sig=SIG.installer.dataUrl();
   pa.innerHTML=
-    '<div id="pa-head"><div><div class="t">설치 완료 체크리스트</div><div class="s">단말기 설치 점검표</div></div>'+
-      '<div class="co"><b>ATEC MOBILITY</b><br>설치 점검 서식<br>'+esc(d.date||'')+'</div></div>'+
-    '<table class="pa-meta"><tr><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td></tr>'+
-    '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">단말기 S/N</td><td>'+esc(d.sn||'-')+'</td><td class="k">설치자</td><td>'+esc(d.installer||'-')+'</td></tr></table>'+
-    '<div class="pa-cols"><div>'+leftH+'</div><div>'+rightH+'</div></div>'+
-    '<div class="verdict" style="color:'+(d.pass?'#15803d':'#dc2626')+'">종합 판정 : '+(d.pass?'합격':'불합격 (불량 항목 확인 필요)')+'</div>'+
-    (d.memo?'<div style="margin-top:6px;font-size:11px"><b style="color:#047857">특이사항</b> · '+esc(d.memo)+'</div>':'')+
-    '<div class="pa-sign"><div style="font-size:11px;font-weight:700;color:#047857">설치자 확인</div><div style="font-size:12.5px;margin-top:2px">'+esc(d.installer||'')+'</div>'+(sig?'<img src="'+sig+'">':'')+'</div>'+
-    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+' · 본 문서는 전자 발행되었습니다.</div>';
-  return pa;
+    '<div class="doc-page"><div class="doc-frame">'+
+      '<div id="pa-head"><div><div class="t">설치 완료 체크리스트</div><div class="s">단말기 설치 점검표</div></div>'+
+        '<div class="co"><b>ATEC MOBILITY</b><br>설치 점검 서식</div></div>'+
+      '<table class="pa-meta"><tr><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td></tr>'+
+      '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">단말기 S/N</td><td>'+esc(d.sn||'-')+'</td><td class="k">설치자</td><td>'+esc(d.installer||'-')+'</td></tr></table>'+
+      '<div class="pa-cols" style="margin-top:8px"><div>'+leftH+'</div><div>'+rightH+'</div></div>'+
+      '<div class="verdict" style="color:'+(d.pass?'#15803d':'#dc2626')+'">종합 판정 : '+(d.pass?'합격':'불합격 (불량 항목 확인 필요)')+'</div>'+
+      (d.memo?'<div style="margin-top:6px;font-size:11px"><b style="color:#047857">특이사항</b> · '+esc(d.memo)+'</div>':'')+
+      '<div class="doc-confirm">위 점검 결과 단말기가 <b>정상 설치</b>되었음을 확인합니다.</div>'+
+      '<div class="doc-date">'+koDate(d.date)+'</div>'+
+      '<div class="doc-sign"><div class="b"><span class="role">설치자 확인</span><span class="nm">'+esc(d.installer||'')+' <span class="seal">(인)</span></span>'+(sig?'<img src="'+sig+'">':'')+'</div></div>'+
+      '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+' · 본 문서는 전자 발행되었습니다.</div>'+
+    '</div></div>';
+  return pa.querySelector('.doc-page');
 }
 
 function validate(d){
@@ -333,6 +358,35 @@ function runQuery(){
         '<div style="white-space:nowrap"><button onclick="openPdf(\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#047857;background:none;border:none;cursor:pointer;font-weight:700;font-size:12.5px">PDF</button>'+del+'</div></div>';
     }).join('');
   }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
+}
+function filterSummary(){
+  var parts=[];
+  if(el('q-from').value||el('q-to').value) parts.push('기간 '+(el('q-from').value||'~')+' ~ '+(el('q-to').value||''));
+  if(el('q-center').value) parts.push('센터 '+el('q-center').value);
+  if(el('q-model').value) parts.push('기종 '+el('q-model').value);
+  if(el('q-pass').value) parts.push('판정 '+(el('q-pass').value==='true'?'합격':'불합격'));
+  if(el('q-vehicle').value.trim()) parts.push('차량 '+el('q-vehicle').value.trim());
+  return parts.length?parts.join(' · '):'전체';
+}
+function exportPdf(){
+  if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
+  var pa=el('print-area');
+  var trs=lastRows.map(function(r,i){
+    var bad=Array.isArray(r.items)?r.items.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(', '):'';
+    var pc=r.pass?'#15803d':'#dc2626';
+    return '<tr><td style="border:1px solid #cfcfcf;padding:4px 6px;text-align:center">'+(i+1)+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc((r.created_at||'').slice(0,10))+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.center||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.operator||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.vehicle_no||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.model||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px;text-align:center;color:'+pc+';font-weight:700">'+(r.pass?'합격':'불합격')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px;font-size:9px;color:#b91c1c">'+esc(bad)+'</td></tr>';
+  }).join('');
+  pa.innerHTML =
+    '<div id="pa-head"><div><div class="t" style="letter-spacing:3px;font-size:21px">설치 체크리스트 (조회)</div><div class="s">단말기 설치 점검 내역</div></div>'+
+      '<div class="co"><b>ATEC MOBILITY</b><br>'+esc(filterSummary())+'<br>총 '+lastRows.length+'건 · '+new Date().toLocaleDateString('ko-KR')+'</div></div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+
+      '<th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">No</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">작성일</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">센터</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">운수사</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">차량번호</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">기종</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">판정</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">불량 항목</th>'+
+    '</tr></thead><tbody>'+trs+'</tbody></table>'+
+    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+'</div>';
+  FC.nodeToPdf(pa).then(function(blob){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='설치체크리스트_내역_'+FC.stampSlug()+'.pdf'; a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1500); FC.toast('PDF 다운로드 완료');
+  }).catch(function(e){ FC.toast('PDF 생성 실패: '+e.message, false); });
 }
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
