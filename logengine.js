@@ -6,7 +6,7 @@
    - 신호등 + 초보자 점검 가이드 → 처리유형/오류유형 기록 → Supabase 누적(재불량 추적)
    참조 전역(terminal.html 정의): SB_URL, SB_KEY
    ============================================================ */
-const LOG_CODES={"3339":["구후불카드 Read 실패","요금처리부","거래/카드","이상"],"3347":["신선불카드 Write 실패","요금처리부","거래/카드","이상"],"7333":["TOPIS 기준 장비 이상 검지(타코/GPS/도어)","BMS","GPS/위치","이상"],"7338":["KSCC 기준 장비 이상 검지(타코/GPS)","BMS","GPS/위치","이상"],"3346":["신선불카드 Read 실패","요금처리부","거래/카드","이상"],"7907":["BMS와 TOPIS간 통신 모듈의 모뎀 연결 실패","BMS","통신","핵심이상"],"3366":["정기권 쓰기 에러","요금처리부","거래/카드","이상"],"93G5":["GPS 정류장 순차적 인식 오류","운전자단말","GPS/위치","핵심이상"],"3368":["모바일 정기권 쓰기 에러","요금처리부","거래/카드","이상"],"333A":["구후불카드 Write 실패","요금처리부","거래/카드","이상"],"7601":["모뎀 상태 정보 5회 이상 수신 실패","BMS","통신","핵심이상"],"150P":["운전자-승하차 통신 30초이상 끊김(승하차2번)","운전자단말","통신","핵심이상"],"150Q":["운전자-승하차 통신 30초이상 끊김(승하차3번)","운전자단말","통신","이상"],"3357":["신후불카드 Write 실패","요금처리부","거래/카드","이상"],"3367":["모바일 정기권 읽기 에러","요금처리부","거래/카드","이상"],"3365":["정기권 읽기 에러","요금처리부","거래/카드","이상"],"1A05":["AFC와 HMI간 통신 연속 끊어짐(30초마다)","운전자단말","통신","이상"],"5203":["운전자-승하차 통신 끊어짐","승하차조작부","통신","이상"],"3703":["G/W와 요금처리부간 통신 끊어짐","요금처리부","통신","핵심이상"],"3356":["신후불카드 Read 실패","요금처리부","거래/카드","이상"],"3312":["CSAM 통신 오류","요금처리부","통신","핵심이상"],"3313":["PSAM 통신 오류","요금처리부","통신","핵심이상"],"9802":["G/W와 단말센터 클라우드간 통신 끊어짐","운전자단말","통신","이상"],"150L":["운전자-승하차 통신 2분이상 끊김(승하차2번)","운전자단말","통신","핵심이상"],"150M":["운전자-승하차 통신 2분이상 끊김(승하차3번)","운전자단말","통신","핵심이상"],"1852":["운전자-수집센터 통신 끊어짐","운전자단말","통신","이상"],"1859":["수집센터 수신메시지 응답시간 초과","운전자단말","통신","이상"],"150O":["운전자-승하차 통신 30초이상 끊김(승하차1번)","운전자단말","통신","핵심이상"],"1A03":["AFC와 HMI간 통신 끊어짐","운전자단말","통신","핵심이상"],"7339":["첫정류장 승차인원 대비 하차인원 초과","BMS","GPS/위치","이상"],"3306":["거래성공/sign3 미수신","요금처리부","거래/카드","이상"],"5205":["승하차 통신끊김 AP상태확인(승하차기준)","승하차조작부","통신","이상"],"5202":["승하차 자체 통신 끊김 감지(AP)","승하차조작부","통신","이상"],"9A03":["G/W와 HMI간 통신모듈 끊어짐","운전자단말","통신","이상"],"150T":["운전자-승하차 통신 5분이상 끊김(승하차2번)","운전자단말","통신","이상"],"150U":["운전자-승하차 통신 5분이상 끊김(승하차3번)","운전자단말","통신","이상"],"9605":["G/W-요금처리부 통신끊김(요금2번)","운전자단말","통신","핵심이상"],"3513":["거래파일 운전자 전송 실패","요금처리부","거래/카드","이상"],"1505":["운전자-승하차 통신 끊어짐(승하차2번)","운전자단말","통신","이상"],"7803":["G/W와 BMS간 통신 끊어짐","BMS","통신","핵심이상"],"1901":["BMS 통신상태 이상으로 인한 Reset","운전자단말","통신","핵심이상"],"9403":["G/W와 BMS간 통신 끊어짐","운전자단말","통신","이상"],"9607":["G/W-요금처리부 통신끊김(요금3번)","운전자단말","통신","핵심이상"],"9231":["DTG 10초이상 응답없음","운전자단말","기타","이상"],"150F":["운전자-승하차 통신 끊어짐(승하차2번)","운전자단말","통신","이상"],"7602":["부팅후 2분이상 모뎀 연결안됨","BMS","통신","핵심이상"],"150K":["운전자-승하차 통신 2분이상 끊김(승하차1번)","운전자단말","통신","핵심이상"],"150Y":["운전자-승하차 통신 10분이상 끊김(승하차3번)","운전자단말","통신","이상"],"150X":["운전자-승하차 통신 10분이상 끊김(승하차2번)","운전자단말","통신","이상"],"1507":["운전자-승하차 통신 끊어짐(승하차3번)","운전자단말","통신","이상"],"1213":["거래검증 타임아웃","운전자단말","거래/카드","이상"],"7905":["BMS-TOPIS 통신모듈 센터연결 끊어짐","BMS","통신","핵심이상"],"9603":["G/W-요금처리부 통신끊김(요금1번)","운전자단말","통신","핵심이상"],"1503":["운전자-승하차 통신 끊어짐(승하차1번)","운전자단말","통신","이상"],"7903":["BMS-TOPIS 통신모듈 모뎀연결 끊어짐","BMS","통신","핵심이상"],"3512":["거래검증실패로 운전자에 거래파일 전송","요금처리부","거래/카드","이상"],"150H":["운전자-승하차 통신 끊어짐(승하차3번)","운전자단말","통신","이상"],"1205":["거래파일 검증 실패","운전자단말","거래/카드","이상"],"5401":["연결끊김으로 카드처리 비활성화","승하차조작부","통신","이상"],"150D":["운전자-승하차 통신 끊어짐(승하차1번)","운전자단말","통신","이상"],"150S":["운전자-승하차 통신 5분이상 끊김(승하차1번)","운전자단말","통신","이상"],"7402":["BMS-운전자 통신모듈 끊어짐","BMS","통신","이상"],"3220":["EBCSAM 초기화 에러","요금처리부","펌웨어/OS","이상"],"3305":["5회 재시도 카드읽기 실패","요금처리부","거래/카드","핵심이상"],"1330":["일부 승하차 운행시작 실패상태로 시작","운전자단말","운행","이상"],"13Y0":["일부 승하차 운행종료 실패상태로 종료","운전자단말","운행","이상"],"9503":["운전자-G/W 통신 끊어짐","운전자단말","통신","이상"],"150W":["운전자-승하차 통신 10분이상 끊김(승하차1번)","운전자단말","통신","이상"],"5303":["승하차-요금처리부 통신 끊어짐","승하차조작부","통신","이상"],"3603":["승하차-요금처리부 통신 끊어짐","요금처리부","통신","이상"],"3230":["CSAM 초기화 에러","요금처리부","펌웨어/OS","핵심이상"],"5404":["운전자 CPU LOAD 5.00 이상","승하차조작부","전원/HW","핵심이상"],"1010":["운전자 어플리케이션 초기화 실패","운전자단말","펌웨어/OS","이상"],"1303":["운전자 CPU LOAD 4.00 이상","운전자단말","전원/HW","이상"],"1302":["운전자 CPU LOAD 3.00 이상","운전자단말","전원/HW","이상"],"1020":["운전자 일련번호(IH) 존재안함","운전자단말","운행","이상"],"9A81":["설치실패(Management)","TMGR","펌웨어/OS","이상"],"9AB1":["설치실패(Diagnostic)","TMGR","펌웨어/OS","이상"],"9AD1":["설치실패(apk_install)","TMGR","펌웨어/OS","이상"],"7301":["BMS CPU LOAD 3.00 이상","BMS","전원/HW","핵심이상"],"9323":["GPS 정류장 로그 생성 실패","운전자단말","GPS/위치","이상"],"93G2":["GPS 비정상(Invalid)","운전자단말","GPS/위치","핵심정상"]};
+const LOG_CODES={"3339":["구후불카드 Read 실패","요금처리부","거래/카드","이상"],"3347":["신선불카드 Write 실패","요금처리부","거래/카드","이상"],"7333":["TOPIS 기준 장비 이상 검지(타코/GPS/도어)","BMS","GPS/위치","이상"],"7338":["KSCC 기준 장비 이상 검지(타코/GPS)","BMS","GPS/위치","이상"],"3346":["신선불카드 Read 실패","요금처리부","거래/카드","이상"],"7907":["BMS와 TOPIS간 통신 모듈의 모뎀 연결 실패","BMS","통신","핵심이상"],"3366":["정기권 쓰기 에러","요금처리부","거래/카드","이상"],"93G5":["GPS 정류장 순차적 인식 오류","운전자단말","GPS/위치","핵심이상"],"3368":["모바일 정기권 쓰기 에러","요금처리부","거래/카드","이상"],"333A":["구후불카드 Write 실패","요금처리부","거래/카드","이상"],"7601":["모뎀 상태 정보 5회 이상 수신 실패","BMS","통신","핵심이상"],"150P":["운전자-승하차 통신 30초이상 끊김(하차1)","운전자단말","통신","핵심이상"],"150Q":["운전자-승하차 통신 30초이상 끊김(하차2)","운전자단말","통신","이상"],"3357":["신후불카드 Write 실패","요금처리부","거래/카드","이상"],"3367":["모바일 정기권 읽기 에러","요금처리부","거래/카드","이상"],"3365":["정기권 읽기 에러","요금처리부","거래/카드","이상"],"1A05":["AFC와 HMI간 통신 연속 끊어짐(30초마다)","운전자단말","통신","이상"],"5203":["운전자-승하차 통신 끊어짐","승하차조작부","통신","이상"],"3703":["G/W와 요금처리부간 통신 끊어짐","요금처리부","통신","핵심이상"],"3356":["신후불카드 Read 실패","요금처리부","거래/카드","이상"],"3312":["CSAM 통신 오류","요금처리부","통신","핵심이상"],"3313":["PSAM 통신 오류","요금처리부","통신","핵심이상"],"9802":["G/W와 단말센터 클라우드간 통신 끊어짐","운전자단말","통신","이상"],"150L":["운전자-승하차 통신 2분이상 끊김(하차1)","운전자단말","통신","핵심이상"],"150M":["운전자-승하차 통신 2분이상 끊김(하차2)","운전자단말","통신","핵심이상"],"1852":["운전자-수집센터 통신 끊어짐","운전자단말","통신","이상"],"1859":["수집센터 수신메시지 응답시간 초과","운전자단말","통신","이상"],"150O":["운전자-승하차 통신 30초이상 끊김(승차)","운전자단말","통신","핵심이상"],"1A03":["AFC와 HMI간 통신 끊어짐","운전자단말","통신","핵심이상"],"7339":["첫정류장 승차인원 대비 하차인원 초과","BMS","GPS/위치","이상"],"3306":["거래성공/sign3 미수신","요금처리부","거래/카드","이상"],"5205":["승하차 통신끊김 AP상태확인(승하차기준)","승하차조작부","통신","이상"],"5202":["승하차 자체 통신 끊김 감지(AP)","승하차조작부","통신","이상"],"9A03":["G/W와 HMI간 통신모듈 끊어짐","운전자단말","통신","이상"],"150T":["운전자-승하차 통신 5분이상 끊김(하차1)","운전자단말","통신","이상"],"150U":["운전자-승하차 통신 5분이상 끊김(하차2)","운전자단말","통신","이상"],"9605":["G/W-요금처리부 통신끊김(요금2번)","운전자단말","통신","핵심이상"],"3513":["거래파일 운전자 전송 실패","요금처리부","거래/카드","이상"],"1505":["운전자-승하차 통신 끊어짐(하차1)","운전자단말","통신","이상"],"7803":["G/W와 BMS간 통신 끊어짐","BMS","통신","핵심이상"],"1901":["BMS 통신상태 이상으로 인한 Reset","운전자단말","통신","핵심이상"],"9403":["G/W와 BMS간 통신 끊어짐","운전자단말","통신","이상"],"9607":["G/W-요금처리부 통신끊김(요금3번)","운전자단말","통신","핵심이상"],"9231":["DTG 10초이상 응답없음","운전자단말","기타","이상"],"150F":["운전자-승하차 통신 끊어짐(하차1)","운전자단말","통신","이상"],"7602":["부팅후 2분이상 모뎀 연결안됨","BMS","통신","핵심이상"],"150K":["운전자-승하차 통신 2분이상 끊김(승차)","운전자단말","통신","핵심이상"],"150Y":["운전자-승하차 통신 10분이상 끊김(하차2)","운전자단말","통신","이상"],"150X":["운전자-승하차 통신 10분이상 끊김(하차1)","운전자단말","통신","이상"],"1507":["운전자-승하차 통신 끊어짐(하차2)","운전자단말","통신","이상"],"1213":["거래검증 타임아웃","운전자단말","거래/카드","이상"],"7905":["BMS-TOPIS 통신모듈 센터연결 끊어짐","BMS","통신","핵심이상"],"9603":["G/W-요금처리부 통신끊김(요금1번)","운전자단말","통신","핵심이상"],"1503":["운전자-승하차 통신 끊어짐(승차)","운전자단말","통신","이상"],"7903":["BMS-TOPIS 통신모듈 모뎀연결 끊어짐","BMS","통신","핵심이상"],"3512":["거래검증실패로 운전자에 거래파일 전송","요금처리부","거래/카드","이상"],"150H":["운전자-승하차 통신 끊어짐(하차2)","운전자단말","통신","이상"],"1205":["거래파일 검증 실패","운전자단말","거래/카드","이상"],"5401":["연결끊김으로 카드처리 비활성화","승하차조작부","통신","이상"],"150D":["운전자-승하차 통신 끊어짐(승차)","운전자단말","통신","이상"],"150S":["운전자-승하차 통신 5분이상 끊김(승차)","운전자단말","통신","이상"],"7402":["BMS-운전자 통신모듈 끊어짐","BMS","통신","이상"],"3220":["EBCSAM 초기화 에러","요금처리부","펌웨어/OS","이상"],"3305":["5회 재시도 카드읽기 실패","요금처리부","거래/카드","핵심이상"],"1330":["일부 승하차 운행시작 실패상태로 시작","운전자단말","운행","이상"],"13Y0":["일부 승하차 운행종료 실패상태로 종료","운전자단말","운행","이상"],"9503":["운전자-G/W 통신 끊어짐","운전자단말","통신","이상"],"150W":["운전자-승하차 통신 10분이상 끊김(승차)","운전자단말","통신","이상"],"5303":["승하차-요금처리부 통신 끊어짐","승하차조작부","통신","이상"],"3603":["승하차-요금처리부 통신 끊어짐","요금처리부","통신","이상"],"3230":["CSAM 초기화 에러","요금처리부","펌웨어/OS","핵심이상"],"5404":["운전자 CPU LOAD 5.00 이상","승하차조작부","전원/HW","핵심이상"],"1010":["운전자 어플리케이션 초기화 실패","운전자단말","펌웨어/OS","이상"],"1303":["운전자 CPU LOAD 4.00 이상","운전자단말","전원/HW","이상"],"1302":["운전자 CPU LOAD 3.00 이상","운전자단말","전원/HW","이상"],"1020":["운전자 일련번호(IH) 존재안함","운전자단말","운행","이상"],"9A81":["설치실패(Management)","TMGR","펌웨어/OS","이상"],"9AB1":["설치실패(Diagnostic)","TMGR","펌웨어/OS","이상"],"9AD1":["설치실패(apk_install)","TMGR","펌웨어/OS","이상"],"7301":["BMS CPU LOAD 3.00 이상","BMS","전원/HW","핵심이상"],"9323":["GPS 정류장 로그 생성 실패","운전자단말","GPS/위치","이상"],"93G2":["GPS 비정상(Invalid)","운전자단말","GPS/위치","핵심정상"]};
 
 const IMP7=new Set(["1A05","150M","150L","150K","150D","150H","150F","150O","150P","150Q","150S","150T","150U","150W","150X","150Y"]);
 
@@ -30,9 +30,9 @@ function logGroupOf(code){
 }
 /* 그룹 → 초보자 점검 가이드 */
 const LOG_GUIDE={
- "승하차1통신":{t:"승하차 1번(승차) 단말기 통신 단절",steps:["승차 단말기 커넥터 체결 확인","승차 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 승차 단말기 → 통합단말기 순 교체"],parts:["승차 케이블","승차 단말기","통합단말기"]},
- "승하차2통신":{t:"승하차 2번(하차1) 단말기 통신 단절",steps:["하차1 단말기 커넥터 체결 확인","하차1 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 하차1 단말기 → 통합단말기 순 교체"],parts:["하차1 케이블","하차1 단말기","통합단말기"]},
- "승하차3통신":{t:"승하차 3번(하차2) 단말기 통신 단절",steps:["하차2 단말기 커넥터 체결 확인","하차2 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 하차2 단말기 → 통합단말기 순 교체"],parts:["하차2 케이블","하차2 단말기","통합단말기"]},
+ "승하차1통신":{t:"승차 단말기 통신 단절",steps:["승차 단말기 커넥터 체결 확인","승차 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 승차 단말기 → 통합단말기 순 교체"],parts:["승차 케이블","승차 단말기","통합단말기"]},
+ "승하차2통신":{t:"하차1 단말기 통신 단절",steps:["하차1 단말기 커넥터 체결 확인","하차1 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 하차1 단말기 → 통합단말기 순 교체"],parts:["하차1 케이블","하차1 단말기","통합단말기"]},
+ "승하차3통신":{t:"하차2 단말기 통신 단절",steps:["하차2 단말기 커넥터 체결 확인","하차2 케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 하차2 단말기 → 통합단말기 순 교체"],parts:["하차2 케이블","하차2 단말기","통합단말기"]},
  "승하차통신":{t:"승하차 단말기 통신 단절",steps:["해당 승하차 단말기 커넥터 체결 확인","케이블 임시 가설로 교체 TEST","통합단말기 포트 Val→sp 이동 점검","재발 시 단말기 → 통합단말기 순 교체"],parts:["승하차 케이블","승하차 단말기","통합단말기"]},
  "표출기통신":{t:"표출기(운전자 화면) 통신 불안정",steps:["표출기↔통합단말기 케이블 접점·삽입 점검","표출기 재부팅","지속 시 표출단말기 교체"],parts:["표출기 케이블","표출단말기"]},
  "모뎀BMS통신":{t:"외장 LTE 모뎀 / BMS 통신 실패",steps:["외장모뎀 전원 LED(ST1/ST2/Pow/LTE) 확인","커넥터 흔들어 접촉·USIM 점검","외장모뎀 교체 → LTE 케이블 → 통합단말기 순","⚠ B700/B710/B800 외장모뎀 혼용 금지"],parts:["외장 LTE 모뎀","LTE 케이블","통합단말기"]},
@@ -242,19 +242,19 @@ var SEUNGHA_UNIT_CODES={
   "하차1":["1505","150F","150L","150P","150T","150X"],
   "하차2":["1507","150H","150M","150Q","150U","150Y"]
 };
-/* 통합단말기 백업에서 본 승하차 유닛별 통신 상태 */
-function analyzeIntegratedSeungha(counts){
+/* 통합단말기 백업에서 본 승하차 유닛별 통신 상태 (+연결된 승하차 S/N 매핑) */
+function analyzeIntegratedSeungha(counts, seunghaSns){
   var units={}; var any=false;
   for(var u in SEUNGHA_UNIT_CODES){
     var n=0, codes=[];
     var arr=SEUNGHA_UNIT_CODES[u];
     for(var i=0;i<arr.length;i++){ if(counts[arr[i]]){ n+=counts[arr[i]]; codes.push([arr[i],counts[arr[i]]]); } }
-    if(n>0){ any=true; units[u]={n:n,codes:codes.sort(function(a,b){return b[1]-a[1];})}; }
+    if(n>0){ any=true; units[u]={n:n, sn:(seunghaSns?(seunghaSns[u]||''):''), codes:codes.sort(function(a,b){return b[1]-a[1];})}; }
   }
   // 전체(유닛 불특정) 승하차 통신 코드: 5203/5205/5303/5401
   var generic=0; ["5203","5205","5303","5401"].forEach(function(c){ if(counts[c]) generic+=counts[c]; });
   if(!any && !generic) return null;
-  return { units:units, generic:generic, failedUnits:Object.keys(units) };
+  return { units:units, generic:generic, failedUnits:Object.keys(units), seunghaSns:seunghaSns||null };
 }
 /* 승하차 debug에서 통합(C2V) 연결 직접증거 추출
    - on_connected / ": connected" = 통합에 실제 연결됨
@@ -349,10 +349,19 @@ function isSeunghaDebugPath(p){ if(/\/backup\//i.test(p)) return false; return /
 /* 통합 모듈연결 로그 .evl (표출기HMI·DTG·BMS mqtt) — logs/backup/ 안에 있음 */
 function isModuleEvlPath(p){ return /(^|\/)logs\/backup\/[0-9]+_(a2h_[a-z]+_recv|h2g_[a-z]+_recv|dtg|b2t_mqtt)\.evl$/i.test(p); }
 function moduleEvlName(p){ var m=(''+p).match(/([0-9]+)_(a2h_[a-z]+_recv|h2g_[a-z]+_recv|dtg|b2t_mqtt)\.evl$/i); return m?m[2].toLowerCase():''; }
+/* 통합 백업에 등록된 승하차 단말기 S/N 목록 파일 */
+function isTransStartPath(p){ return /(^|\/)trans\/trans_drive_start_data\.dat$/i.test(p); }
+/* trans_drive_start_data.dat 에서 연결된 승하차 S/N 3개 추출 (승차/하차1/하차2 순) */
+function parseSeunghaSns(text){
+  var all=(''+text).match(/1553\d{5}|1560\d{5}/g)||[];
+  var uniq=[]; for(var i=0;i<all.length;i++){ if(uniq.indexOf(all[i])<0) uniq.push(all[i]); if(uniq.length>=3) break; }
+  if(!uniq.length) return null;
+  return { 승차:uniq[0]||'', 하차1:uniq[1]||'', 하차2:uniq[2]||'', list:uniq };
+}
 
 /* 폴더(여러 파일) 직접 분석 — 큰 debug 파일은 읽지 않아 가볍다 */
 async function readBackupFromFiles(fileList){
-  const files=Array.prototype.slice.call(fileList); let sn=''; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTerm=''; let activity=false; const debugTexts=[]; let dbgBytes=0; const evlList=[]; let evlBytes=0;
+  const files=Array.prototype.slice.call(fileList); let sn=''; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTerm=''; let activity=false; const debugTexts=[]; let dbgBytes=0; const evlList=[]; let evlBytes=0; let transStart='';
   for(let i=0;i<files.length;i++){ if(sn) break; sn=snFromPath(files[i].webkitRelativePath||files[i].name); }
   const wantDebug=isSeunghaSn(sn);   // 승하차 백업일 때만 debug 읽기(통합은 성능 위해 생략)
   const wantEvl=!isSeunghaSn(sn);    // 통합 백업일 때 모듈연결 .evl 읽기
@@ -362,6 +371,7 @@ async function readBackupFromFiles(fileList){
       if(isImportantPath(p)){ const u8=new Uint8Array(await f.arrayBuffer()); const c=parseImportantEvt(u8); for(const k in c) counts[k]=(counts[k]||0)+c[k]; }
       else if(isAsciiEventPath(p)){ const t=await f.text(); const c=parseAsciiEvt(t); for(const k in c) counts[k]=(counts[k]||0)+c[k]; if(isSeunghaActivityPath(p)) activity=true; }
       else if(isSetTermInfoPath(p)){ if(!setTerm) setTerm=await f.text(); }
+      else if(isTransStartPath(p)){ if(!transStart) transStart=await f.text(); }
       else if(isSdrLogPath(p)){ sdrTexts.push(await f.text()); }
       else if(isPrevpassPath(p)){ prevpass.push(new Uint8Array(await f.arrayBuffer())); }
       else if(wantEvl && evlBytes<3000000 && isModuleEvlPath(p)){ const t=await f.text(); evlList.push({mod:moduleEvlName(p),text:t}); evlBytes+=t.length; }
@@ -369,14 +379,15 @@ async function readBackupFromFiles(fileList){
       else if(isSeunghaActivityPath(p)){ activity=true; }
     }catch(e){}
   }
-  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList};
+  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList,transStart:transStart};
 }
 /* zip 분석 */
 async function readBackupFromZip(file){
-  const zip=await JSZip.loadAsync(file); let sn=''; const imp=[],asc=[],sdr=[],pvp=[],dbg=[],evl=[]; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTermE=null; let activity=false; const debugTexts=[]; const evlList=[];
+  const zip=await JSZip.loadAsync(file); let sn=''; const imp=[],asc=[],sdr=[],pvp=[],dbg=[],evl=[]; const counts={}; const sdrTexts=[]; const prevpass=[]; let setTermE=null; let activity=false; const debugTexts=[]; const evlList=[]; let transStartE=null;
   zip.forEach(function(p,e){ if(e.dir) return; if(!sn) sn=snFromPath(p);
     if(isImportantPath(p)) imp.push(e); else if(isAsciiEventPath(p)){ asc.push(e); if(isSeunghaActivityPath(p)) activity=true; }
     else if(isSetTermInfoPath(p)){ if(!setTermE) setTermE=e; }
+    else if(isTransStartPath(p)){ if(!transStartE) transStartE=e; }
     else if(isSdrLogPath(p)) sdr.push(e); else if(isPrevpassPath(p)) pvp.push(e);
     else if(isModuleEvlPath(p)) evl.push({e:e,mod:moduleEvlName(p)});
     else if(isSeunghaDebugPath(p)) dbg.push(e);
@@ -388,7 +399,8 @@ async function readBackupFromZip(file){
   if(!isSeunghaSn(sn)){ let eb=0; for(let i=0;i<evl.length && eb<3000000;i++){ try{ const t=await evl[i].e.async('string'); evlList.push({mod:evl[i].mod,text:t}); eb+=t.length; }catch(e){} } }
   if(isSeunghaSn(sn)){ let dbgBytes=0; for(let i=0;i<dbg.length && dbgBytes<8000000;i++){ try{ const t=await dbg[i].async('string'); debugTexts.push(t); dbgBytes+=t.length; }catch(e){} } }
   let setTerm=''; if(setTermE){ try{ setTerm=await setTermE.async('string'); }catch(e){} }
-  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList};
+  let transStart=''; if(transStartE){ try{ transStart=await transStartE.async('string'); }catch(e){} }
+  return {sn:sn,counts:counts,sdrTexts:sdrTexts,prevpass:prevpass,setTerm:setTerm,activity:activity,debugTexts:debugTexts,evlList:evlList,transStart:transStart};
 }
 
 /* 메인: 폴더 또는 zip 어느 쪽이든 분석 */
@@ -408,7 +420,8 @@ function analyzeIntegratedData(r, vnum){
   const dg=diagnoseCounts(sn, r.counts);
   const bootDiag=analyzeBootPower(r.sdrTexts||[]);
   const gpsDiag=analyzeGps(r.prevpass||[], r.counts);
-  const integSeungha=analyzeIntegratedSeungha(r.counts);
+  const seunghaSns=parseSeunghaSns(r.transStart||'');   // 연결된 승하차 단말기 S/N(승차/하차1/하차2)
+  const integSeungha=analyzeIntegratedSeungha(r.counts, seunghaSns);
   const moduleDiag=analyzeModuleLinks(r.evlList||[]);
   const selfBad=(bootDiag&&bootDiag.level==='core') ||
     dg.findings.some(function(f){ return (f.group==='모뎀BMS통신'||f.group==='센터통신'||f.group==='GW통신') && f.core; }) ||
@@ -418,7 +431,7 @@ function analyzeIntegratedData(r, vnum){
   if(vehicleId){ if(!window.__integByVeh) window.__integByVeh={};
     const uf={}; if(integSeungha) integSeungha.failedUnits.forEach(function(u){ uf[u]=true; });
     window.__integByVeh[vehicleId]={selfBad:!!selfBad, unitFail:integSeungha?integSeungha.failedUnits:[], unitMap:uf, vnum:vnum}; }
-  return {sn:sn,dg:dg,bootDiag:bootDiag,gpsDiag:gpsDiag,integSeungha:integSeungha,moduleDiag:moduleDiag,selfBad:!!selfBad,vehicleId:vehicleId};
+  return {sn:sn,dg:dg,bootDiag:bootDiag,gpsDiag:gpsDiag,integSeungha:integSeungha,moduleDiag:moduleDiag,selfBad:!!selfBad,vehicleId:vehicleId,seunghaSns:seunghaSns};
 }
 
 /* 메인: 통합(슬롯1)·승하차(슬롯2)를 각각/동시 분석 */
@@ -467,7 +480,7 @@ async function analyzeLogBackup(vnum, vid){
 
     // 통합만
     if(integInfo){
-      window.__lastDiag={vnum:vnum,vid:vid,sn:integInfo.dg.sn,model:integInfo.dg.model,findings:integInfo.dg.findings,bootDiag:integInfo.bootDiag,gpsDiag:integInfo.gpsDiag,integSeungha:integInfo.integSeungha,selfBad:integInfo.selfBad,analyzedAt:new Date().toISOString().slice(0,10)};
+      window.__lastDiag={vnum:vnum,vid:vid,sn:integInfo.dg.sn,model:integInfo.dg.model,findings:integInfo.dg.findings,bootDiag:integInfo.bootDiag,gpsDiag:integInfo.gpsDiag,integSeungha:integInfo.integSeungha,selfBad:integInfo.selfBad,seunghaSns:integInfo.seunghaSns,analyzedAt:new Date().toISOString().slice(0,10)};
       renderDiag(integInfo.dg, vnum, vid, integInfo.bootDiag, integInfo.gpsDiag, integInfo.integSeungha, integInfo.selfBad, integInfo.moduleDiag);
       if(isoBox) isoBox.innerHTML='';
     }
@@ -585,15 +598,18 @@ function renderIntegratedSeungha(integSeungha, selfBad){
   var units=integSeungha.units, names=integSeungha.failedUnits;
   var rows=names.map(function(u){
     var v=units[u]; var codes=v.codes.slice(0,3).map(function(c){return c[0]+'×'+c[1];}).join(', ');
-    return '<li><b>'+logEsc(u)+'</b> 통신실패 '+v.n+'회 <span class="text-[10px] text-slate-400">('+logEsc(codes)+')</span></li>';
+    var snTag=v.sn?(' <span class="chip" style="background:#ede9fe;color:#6D28D9;font-size:10px;font-weight:700">단말기 S/N '+logEsc(v.sn)+'</span>'):'';
+    return '<li><b>'+logEsc(u)+'</b> 통신실패 '+v.n+'회'+snTag+' <span class="text-[10px] text-slate-400">('+logEsc(codes)+')</span></li>';
   }).join('');
   if(!rows && !integSeungha.generic) return '';
+  var snInfo = integSeungha.seunghaSns ? ('<div class="text-[10.5px] text-slate-500 mt-1.5">연결된 승하차 단말기 — 승차 '+logEsc(integSeungha.seunghaSns['승차']||'-')+' · 하차1 '+logEsc(integSeungha.seunghaSns['하차1']||'-')+' · 하차2 '+logEsc(integSeungha.seunghaSns['하차2']||'-')+'</div>') : '';
   var guide = selfBad
     ? '통합단말기 자체 이상(부팅/전원/BMS 또는 다수 유닛 동시)이 함께 보입니다 → <b>통합단말기 문제</b> 가능성이 높습니다.'
-    : '통합은 대체로 정상인데 특정 유닛만 실패 → <b>해당 승하차 단말기 또는 케이블</b> 문제입니다.';
+    : '통합은 대체로 정상인데 특정 유닛만 실패 → <b>해당 승하차 단말기 또는 케이블</b> 문제입니다. (저장 시 그 승하차 단말기 S/N으로 이력 귀속)';
   return '<div class="border-2 rounded-xl p-3 mb-2" style="border-color:#7C3AED;background:#7C3AED0d">'
     +'<div class="text-[13px] font-extrabold text-[#6D28D9]">🚪 승하차 통신불량 — 유닛별</div>'
     +(rows?'<ul class="text-[11.5px] text-slate-700 list-disc pl-5 mt-1 space-y-0.5">'+rows+'</ul>':'<div class="text-[11px] text-slate-500 mt-1">유닛 불특정 승하차 통신 이벤트 '+integSeungha.generic+'회</div>')
+    +snInfo
     +'<div class="text-[11px] text-slate-600 mt-2 bg-white/70 rounded px-2 py-1.5">🔎 '+guide+'</div>'
     +'<div class="text-[11px] text-indigo-700 mt-1.5">💡 정확한 격리: 위 유닛의 <b>승하차 단말기 백업</b>을 이 화면에서 분석하세요. (승하차 살아있고 끊김기록 → 케이블 / 무응답 → 승하차 본체)</div>'
     +'</div>';
@@ -739,8 +755,22 @@ async function saveLogDiagnosis(vnum, vid){
   const primary = d.findings[0] ? d.findings[0].group
     : (d.bootDiag && d.bootDiag.level!=='ok') ? '부팅전원'
     : (d.gpsDiag) ? 'GPS측위' : '정상';
-  const row={ vehicle_no:vnum, terminal_sn:d.sn||'', model:d.model||'', analyzed_at:d.analyzedAt,
-    primary_group: primary, error_type:err, action_type:act, notes:note,
+  // ★ 승하차 유닛 문제면 → 통합이 아니라 "그 승하차 단말기 S/N"으로 귀속(통합 백업의 등록 S/N 사용)
+  const POS_OF_GROUP={'승하차1통신':'승차','승하차2통신':'하차1','승하차3통신':'하차2'};
+  let targetSn='', targetUnit='';
+  if(d.seunghaSns){
+    const posKey=POS_OF_GROUP[primary];
+    if(posKey && d.seunghaSns[posKey]){ targetSn=d.seunghaSns[posKey]; targetUnit=posKey; }
+    else if(d.integSeungha && d.integSeungha.failedUnits && d.integSeungha.failedUnits.length===1 && d.seunghaSns[d.integSeungha.failedUnits[0]]){
+      targetUnit=d.integSeungha.failedUnits[0]; targetSn=d.seunghaSns[targetUnit];
+    }
+  }
+  const rowSn = targetSn || (d.sn||'');
+  const rowModel = targetSn ? logModelOf(targetSn) : (d.model||'');
+  if(targetSn){ faults.unshift({group:'분석원본', n:0, core:false, codes:[['통합S/N', d.sn||''],['대상유닛',targetUnit],['승하차S/N',targetSn]]}); }
+  const finalNote = targetSn ? ('['+targetUnit+' 단말기 '+targetSn+' · 분석원본 통합 '+(d.sn||'')+'] '+note).slice(0,500) : note;
+  const row={ vehicle_no:vnum, terminal_sn:rowSn, model:rowModel, analyzed_at:d.analyzedAt,
+    primary_group: primary, error_type:err, action_type:act, notes:finalNote,
     faults:faults, created_at:new Date().toISOString() };
   try{
     const r=await fetch(SB_URL+'/rest/v1/log_diagnoses',{method:'POST',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify([row])});
@@ -914,6 +944,16 @@ async function aiLogAnalysis(vnum, vid){
     if(d.sn && d.sn!=='단말기'){ snh=await fetchDiag('terminal_sn',d.sn);
       ctx+='\n[동일 단말기(S/N '+d.sn+') 이력 '+snh.length+'건 — 수리 미흡 재발 확인용]\n';
       for(let i=0;i<Math.min(snh.length,10);i++){ const x=snh[i]; ctx+='- '+(x.analyzed_at||'')+' '+(x.vehicle_no||'')+' '+(x.error_type||x.primary_group||'')+' → '+(x.action_type||'-')+'\n'; } }
+    // 통합 백업이 승하차 유닛 문제를 짚었으면, 그 승하차 단말기(S/N) 개체 이력도 함께 조회
+    if(d.integSeungha && d.integSeungha.failedUnits && d.seunghaSns){
+      for(let i=0;i<d.integSeungha.failedUnits.length;i++){
+        const u=d.integSeungha.failedUnits[i]; const usn=d.seunghaSns[u];
+        if(usn && usn!==d.sn){ const uh=await fetchDiag('terminal_sn',usn);
+          ctx+='\n['+u+' 승하차 단말기(S/N '+usn+') 개체 이력 '+uh.length+'건 — 이 유닛 재불량 확인]\n';
+          for(let j=0;j<Math.min(uh.length,6);j++){ const x=uh[j]; ctx+='- '+(x.analyzed_at||'')+' '+(x.error_type||x.primary_group||'')+' → '+(x.action_type||'-')+'\n'; }
+        }
+      }
+    }
     let hasEv=false;
     if(typeof DAILY!=='undefined' && DAILY && vid && DAILY[vid] && DAILY[vid].length){
       hasEv=true; const grp={}; for(let i=0;i<DAILY[vid].length;i++){ const c=DAILY[vid][i].code; grp[c]=(grp[c]||0)+1; }
@@ -921,7 +961,8 @@ async function aiLogAnalysis(vnum, vid){
       ctx+='\n[당일 이벤트]\n'+top.map(function(c){ const E=(typeof EVENTS!=='undefined'&&EVENTS[c])?EVENTS[c]:null; return '- '+c+' '+(E?(E.t||''):'')+' ×'+grp[c]; }).join('\n')+'\n';
     }
     const sys='당신은 ATEC 버스 단말기 장애 분석 전문가입니다. 아래 데이터를 근거로 종합 분석하세요.\n'
-      +'주요 근거(우선): 1)현재 로그 진단 2)이 차량 과거 로그 이력 3)동일 단말기(S/N) 이력.\n'
+      +'주요 근거(우선): 1)현재 로그 진단 2)이 차량 과거 로그 이력 3)동일 단말기(S/N) 개체 이력(통합 및 해당 승하차 단말기).\n'
+      +'용어: 승하차 유닛은 반드시 "승차 / 하차1 / 하차2"로만 표기(승하차1·2·3번 표현 금지).\n'
       +(hasEv?'당일 이벤트가 제공되었으니 보조로 활용하세요.':'당일 이벤트는 제공되지 않았습니다 — 이벤트 관련 추정/언급은 하지 마세요.')+'\n'
       +'한국어로 짧고 명확하게:\n**종합 진단**(1~2문장)\n**재불량/수리 미흡 여부**(S/N·과거 이력 근거. 조치 후 같은 장애 재발 시 수리 미흡 의심 명시)\n**권장 조치**(구체 1~3개, 과거 효과없던 조치 지양).\n면책 문구는 쓰지 마세요(시스템이 자동으로 붙입니다).';
     const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent',{
