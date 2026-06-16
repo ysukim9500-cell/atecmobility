@@ -58,8 +58,14 @@
         'Content-Type': 'application/pdf', 'x-upsert': 'true'
       },
       body: blob
-    }).then(function (r) { if (!r.ok) throw new Error('upload ' + r.status); return path; });
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error('upload ' + r.status + ' ' + (t || '').slice(0, 180)); });
+      return path;
+    });
   }
+  // 스토리지 키는 영문/숫자만 (한글·공백은 400 유발) — 메타데이터엔 원본 한글 유지
+  function ascii(s) { return String(s || '').replace(/[^A-Za-z0-9]+/g, '').slice(0, 24); }
+  function rand4() { return Math.random().toString(36).slice(2, 6); }
   function removePdf(bucket, path) {
     return fetch(SB_URL + '/storage/v1/object/' + bucket + '/' + encodeURI(path), {
       method: 'DELETE', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
@@ -161,7 +167,7 @@
     restInsert: restInsert, restSelect: restSelect, restDelete: restDelete,
     uploadPdf: uploadPdf, removePdf: removePdf, signedUrl: signedUrl,
     SignaturePad: SignaturePad, nodeToPdf: nodeToPdf,
-    toast: toast, todayStr: todayStr, stampSlug: stampSlug,
+    toast: toast, todayStr: todayStr, stampSlug: stampSlug, ascii: ascii, rand4: rand4,
     CENTERS: ['강남', '강서', '강북', '강동'],
     MODELS: ['B700', 'B710', 'B800']
   };

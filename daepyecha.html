@@ -195,8 +195,11 @@ function validate(d){
   return true;
 }
 
-function fileName(d){
+function fileName(d){   // 다운로드용(한글 OK)
   return (d.vehicle||'차량') + '_대폐차확인서_' + FC.stampSlug() + '.pdf';
+}
+function storeKey(d){   // 스토리지 경로(영문/숫자만)
+  return (FC.ascii(d.center)||'etc') + '/' + (FC.ascii(d.vehicle)||'veh') + '_' + FC.stampSlug() + '_' + FC.rand4() + '.pdf';
 }
 
 function downloadPdf(){
@@ -215,7 +218,7 @@ function saveCloud(){
   var sig = JSON.stringify(d);
   if(saving || sig === lastSig){ FC.toast('이미 저장되었습니다'); return; }
   saving = true; el('save-btn').disabled = true; el('save-btn').textContent = '저장 중…';
-  var path = (d.center||'기타') + '/' + fileName(d);
+  var path = storeKey(d);
   FC.nodeToPdf(buildPrint(d)).then(function(blob){
     return FC.uploadPdf('daepyecha', path, blob);
   }).then(function(){

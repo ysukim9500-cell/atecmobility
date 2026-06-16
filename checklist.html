@@ -212,7 +212,8 @@ function validate(d){
   if(!d.vehicle){ FC.toast('차량번호를 입력하세요', false); return false; }
   return true;
 }
-function fileName(d){ return (d.vehicle||'차량')+'_설치체크리스트_'+FC.stampSlug()+'.pdf'; }
+function fileName(d){ return (d.vehicle||'차량')+'_설치체크리스트_'+FC.stampSlug()+'.pdf'; }   // 다운로드용(한글 OK)
+function storeKey(d){ return (FC.ascii(d.center)||'etc')+'/'+(FC.ascii(d.vehicle)||'veh')+'_'+FC.stampSlug()+'_'+FC.rand4()+'.pdf'; }  // 스토리지(영문/숫자)
 
 function downloadPdf(){
   var d=gather(); if(!validate(d)) return;
@@ -229,7 +230,7 @@ function saveCloud(){
   var sig=JSON.stringify(d);
   if(saving||sig===lastSig){ FC.toast('이미 저장되었습니다'); return; }
   saving=true; el('save-btn').disabled=true; el('save-btn').textContent='저장 중…';
-  var path=(d.center||'기타')+'/'+fileName(d);
+  var path=storeKey(d);
   FC.nodeToPdf(buildPrint(d)).then(function(blob){ return FC.uploadPdf('checklist', path, blob); })
   .then(function(){
     return FC.restInsert('install_checklists', {
