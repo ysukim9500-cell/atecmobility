@@ -7,11 +7,22 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{ --wine:#7A0B3C; --mag:#C2185B; --ink:#1f2733; }
   *{ box-sizing:border-box; }
   body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
+  .fg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .fg2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:600px){
+    .wrap{ padding:0 12px 50px; }
+    .fg3{ grid-template-columns:1fr; }
+    .fg2{ grid-template-columns:1fr; }
+    .card{ padding:16px; }
+    table.mat{ min-width:480px; }
+    .tab{ font-size:13px; padding:9px; }
+  }
   .topbar{ background:linear-gradient(120deg,#5e0a2e,#7A0B3C 45%,#C2185B); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .brand{ display:flex; align-items:center; gap:11px; }
@@ -102,7 +113,7 @@
   <div id="pane-write">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">기본 정보</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div class="fg3">
         <div><label class="lbl">작성일</label><input id="f-date" class="inp" type="date"></div>
         <div><label class="lbl">센터</label><select id="f-center" class="inp"></select></div>
         <div><label class="lbl">운수사</label><input id="f-operator" class="inp" placeholder="예) 다모아자동차"></div>
@@ -136,7 +147,7 @@
 
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">서명</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="fg2">
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
             <label class="lbl" style="margin:0">지급자 (ATEC)</label>
@@ -167,7 +178,7 @@
   <div id="pane-browse" class="hide">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">조회 조건</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div class="fg3">
         <div><label class="lbl">시작일</label><input id="q-from" class="inp" type="date"></div>
         <div><label class="lbl">종료일</label><input id="q-to" class="inp" type="date"></div>
         <div><label class="lbl">구분</label><select id="q-category" class="inp"><option value="">전체</option><option>대폐차</option><option>증차</option><option>감차</option></select></div>
@@ -177,7 +188,7 @@
       </div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
-        <button class="btn btn-out" onclick="exportPdf()">PDF 다운로드</button>
+        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 다운로드 (ZIP)</button>
         <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
@@ -203,7 +214,7 @@ var MATERIALS = {
 };
 var CUSTOM = '__기타__';
 var CAT_HINT = { '대폐차':'폐차 후 같은 번호로 신차가 나옵니다. 차량번호 1개만 입력하세요.', '증차':'신규 증차 차량입니다. 신규 차량번호를 입력하세요.', '감차':'감차(폐차)되는 차량입니다. 폐차 차량번호를 입력하세요.' };
-var CAT_LABEL = { '대폐차':'차량번호 (동일 번호 신차)', '증차':'신규 차량번호', '감차':'감차(폐차) 차량번호' };
+var CAT_LABEL = { '대폐차':'차량번호', '증차':'신규 차량번호', '감차':'폐차 차량번호' };
 var CAT_COLOR = { '대폐차':'background:#f3e6ec;color:#7A0B3C', '증차':'background:#e3f0fb;color:#1d4ed8', '감차':'background:#fdeaea;color:#b91c1c' };
 var SIG = {};
 function el(id){ return document.getElementById(id); }
@@ -394,31 +405,27 @@ function runQuery(){
     }).join('');
   }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
 }
-function filterSummary(){
-  var parts=[];
-  if(el('q-from').value||el('q-to').value) parts.push('기간 '+(el('q-from').value||'~')+' ~ '+(el('q-to').value||''));
-  if(el('q-category').value) parts.push('구분 '+el('q-category').value);
-  if(el('q-center').value) parts.push('센터 '+el('q-center').value);
-  if(el('q-model').value) parts.push('기종 '+el('q-model').value);
-  if(el('q-vehicle').value.trim()) parts.push('차량 '+el('q-vehicle').value.trim());
-  return parts.length?parts.join(' · '):'전체';
-}
-function exportPdf(){
+// 조회된 각 건의 PDF를 ZIP으로 묶어 다운로드
+async function exportZip(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var pa=el('print-area');
-  var trs=lastRows.map(function(r,i){
-    var its=Array.isArray(r.items)?r.items.map(function(x){return x.name+(x.qty?'×'+x.qty:'');}).join(', '):'';
-    return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc((r.created_at||'').slice(0,10))+'</td><td style="text-align:center">'+esc(r.category||'')+'</td><td>'+esc(r.center||'')+'</td><td>'+esc(r.operator||'')+'</td><td>'+esc(r.vehicle_no||'')+'</td><td>'+esc(r.model||'')+'</td><td style="text-align:center">'+(Array.isArray(r.items)?r.items.length:0)+'</td><td style="font-size:9px">'+esc(its)+'</td></tr>';
-  }).join('');
-  pa.innerHTML =
-    '<div id="pa-head"><div><div class="t" style="letter-spacing:3px;font-size:21px">자재 지급 내역 (조회)</div><div class="s">대폐차 · 증차 · 감차 통합 조회</div></div>'+
-      '<div class="co"><b>ATEC MOBILITY</b><br>'+esc(filterSummary())+'<br>총 '+lastRows.length+'건 · '+new Date().toLocaleDateString('ko-KR')+'</div></div>'+
-    '<table class="pa-list"><thead><tr><th>No</th><th>작성일</th><th>구분</th><th>센터</th><th>운수사</th><th>차량번호</th><th>기종</th><th>품목수</th><th>지급 품목</th></tr></thead><tbody>'+trs+'</tbody></table>'+
-    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+'</div>';
-  FC.nodeToPdf(pa).then(function(blob){
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='대폐차_지급내역_'+FC.stampSlug()+'.pdf'; a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},1500); FC.toast('PDF 다운로드 완료');
-  }).catch(function(e){ FC.toast('PDF 생성 실패: '+e.message, false); });
+  if(typeof JSZip==='undefined'){ FC.toast('압축 모듈 로딩 실패 — 새로고침 후 재시도', false); return; }
+  FC.toast('PDF '+lastRows.length+'건 압축 중…');
+  var zip=new JSZip(), ok=0;
+  for(var i=0;i<lastRows.length;i++){
+    var r=lastRows[i]; if(!r.pdf_path) continue;
+    try{
+      var url=await FC.signedUrl('daepyecha', r.pdf_path, 600);
+      if(!url) continue;
+      var blob=await (await fetch(url)).blob();
+      var nm=(r.vehicle_no||'차량')+'_'+(r.category||'대폐차')+'_'+(r.created_at||'').slice(0,10)+'_'+(i+1)+'.pdf';
+      zip.file(nm, blob); ok++;
+    }catch(e){}
+  }
+  if(!ok){ FC.toast('다운로드할 PDF가 없습니다', false); return; }
+  var content=await zip.generateAsync({type:'blob'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(content); a.download='대폐차_지급확인서_'+FC.stampSlug()+'.zip'; a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  FC.toast(ok+'건 ZIP 다운로드 완료');
 }
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }

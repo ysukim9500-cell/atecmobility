@@ -7,11 +7,22 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{ --wine:#7A0B3C; --mag:#C2185B; --ink:#1f2733; }
   *{ box-sizing:border-box; }
   body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
+  .fg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media(max-width:600px){
+    .wrap{ padding:0 12px 50px; }
+    .fg3{ grid-template-columns:1fr; }
+    .card{ padding:16px; }
+    .tab{ font-size:13px; padding:9px; }
+    .chk-row{ flex-wrap:wrap; align-items:flex-start; }
+    .chk-row .seg{ width:100%; justify-content:flex-start; margin-top:7px; flex-wrap:wrap; }
+    .seg button{ flex:1; min-width:64px; }
+  }
   .topbar{ background:linear-gradient(120deg,#0b4a3a,#0e7a5f 45%,#10b981); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .brand{ display:flex; align-items:center; gap:11px; }
@@ -41,6 +52,9 @@
   .seg .ok.on{ background:#15803d; color:#fff; border-color:#15803d; }
   .seg .na.on{ background:#94a3b8; color:#fff; border-color:#94a3b8; }
   .seg .no.on{ background:#dc2626; color:#fff; border-color:#dc2626; }
+  .seg .etc.on{ background:#b45309; color:#fff; border-color:#b45309; }
+  .etc-input{ width:100%; border:1px solid #e2c7a8; border-radius:8px; padding:5px 9px; font-size:12.5px; margin-top:5px; background:#fffdf8; }
+  .etc-input:focus{ outline:none; border-color:#d97706; }
   .sig-pad{ border:1.5px dashed #93cbb6; border-radius:11px; background:linear-gradient(#fff,#f5fbf8); touch-action:none; width:100%; height:118px; }
   .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#e6f6ef; color:#3a8a6c; }
   .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #eef6f2; }
@@ -96,13 +110,12 @@
   <div id="pane-write">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">기본 정보</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div class="fg3">
         <div><label class="lbl">작성일</label><input id="f-date" class="inp" type="date"></div>
         <div><label class="lbl">센터</label><select id="f-center" class="inp"></select></div>
         <div><label class="lbl">운수사</label><input id="f-operator" class="inp" placeholder="예) 다모아자동차"></div>
         <div><label class="lbl">차량번호</label><input id="f-vehicle" class="inp" placeholder="예) 서울74사1234"></div>
         <div><label class="lbl">단말기 기종</label><select id="f-model" class="inp" onchange="renderChecklist()"></select></div>
-        <div><label class="lbl">단말기 S/N</label><input id="f-sn" class="inp" placeholder="설치 단말기 S/N"></div>
       </div>
     </div>
 
@@ -141,7 +154,7 @@
   <div id="pane-browse" class="hide">
     <div class="card" style="margin-bottom:16px">
       <div class="sec-ttl">조회 조건</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div class="fg3">
         <div><label class="lbl">시작일</label><input id="q-from" class="inp" type="date"></div>
         <div><label class="lbl">종료일</label><input id="q-to" class="inp" type="date"></div>
         <div><label class="lbl">센터</label><select id="q-center" class="inp"></select></div>
@@ -151,7 +164,7 @@
       </div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
         <button class="btn btn-main" onclick="runQuery()">조회</button>
-        <button class="btn btn-out" onclick="exportPdf()">PDF 다운로드</button>
+        <button class="btn btn-out" onclick="exportZip()">PDF 일괄 다운로드 (ZIP)</button>
         <button class="btn btn-out" onclick="exportCsv()">CSV 다운로드</button>
         <button class="btn btn-soft" onclick="quickRange(7)">최근 7일</button>
         <button class="btn btn-soft" onclick="quickRange(30)">최근 30일</button>
@@ -217,23 +230,35 @@ function template(model){
   return t;
 }
 
+var NOTE={};
 function renderChecklist(){
-  var T=template(el('f-model').value); var host=el('chk-host'); host.innerHTML=''; STATE={};
+  var T=template(el('f-model').value); var host=el('chk-host'); host.innerHTML=''; STATE={}; NOTE={};
   Object.keys(T).forEach(function(grp){
     var h='<div class="grp-ttl">'+esc(grp)+'</div>';
     T[grp].forEach(function(item,i){
       var key=grp+'::'+i; STATE[key]='ok';
-      h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1;font-size:13px;color:#314">'+esc(item)+'</div>'+
+      h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1">'+
+        '<div style="font-size:13px;color:#314">'+esc(item)+'</div>'+
+        '<input class="etc-input" data-key="'+key+'" style="display:none" placeholder="기타 내용 입력" oninput="setNote(this)">'+
+        '</div>'+
         '<div class="seg"><button class="ok on" onclick="setSeg(this,\''+key+'\',\'ok\')">정상</button>'+
         '<button class="na" onclick="setSeg(this,\''+key+'\',\'na\')">해당없음</button>'+
-        '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button></div></div>';
+        '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button>'+
+        '<button class="etc" onclick="setSeg(this,\''+key+'\',\'etc\')">기타</button></div></div>';
     });
     host.insertAdjacentHTML('beforeend', h);
   });
   updateVerdict();
 }
-function setSeg(btn,key,val){ STATE[key]=val; var r=btn.closest('.chk-row'); r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on'); updateVerdict(); }
-function setAll(val){ el('chk-host').querySelectorAll('.chk-row').forEach(function(r){ var k=r.dataset.key; STATE[k]=val; r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); r.querySelector('.seg .'+val).classList.add('on'); }); updateVerdict(); }
+function setSeg(btn,key,val){
+  STATE[key]=val; var r=btn.closest('.chk-row');
+  r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); btn.classList.add('on');
+  var inp=r.querySelector('.etc-input');
+  if(inp){ inp.style.display = (val==='etc')?'block':'none'; if(val==='etc') inp.focus(); }
+  updateVerdict();
+}
+function setNote(inp){ NOTE[inp.dataset.key]=inp.value; }
+function setAll(val){ el('chk-host').querySelectorAll('.chk-row').forEach(function(r){ var k=r.dataset.key; STATE[k]=val; r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); r.querySelector('.seg .'+val).classList.add('on'); var inp=r.querySelector('.etc-input'); if(inp) inp.style.display='none'; }); updateVerdict(); }
 function updateVerdict(){
   var anyNo=Object.keys(STATE).some(function(k){return STATE[k]==='no';});
   var v=el('verdict');
@@ -243,24 +268,27 @@ function updateVerdict(){
 
 function collectItems(){
   var T=template(el('f-model').value), out=[];
-  Object.keys(T).forEach(function(grp){ T[grp].forEach(function(item,i){ out.push({group:grp,label:item,status:STATE[grp+'::'+i]||'ok'}); }); });
+  Object.keys(T).forEach(function(grp){ T[grp].forEach(function(item,i){ var k=grp+'::'+i; out.push({group:grp,label:item,status:STATE[k]||'ok',note:(NOTE[k]||'').trim()}); }); });
   return out;
 }
 function gather(){
   var items=collectItems(), pass=!items.some(function(x){return x.status==='no';});
   return { date:el('f-date').value, center:el('f-center').value, operator:el('f-operator').value.trim(),
-    vehicle:el('f-vehicle').value.trim(), model:el('f-model').value, sn:el('f-sn').value.trim(),
+    vehicle:el('f-vehicle').value.trim(), model:el('f-model').value,
     installer:el('f-installer').value.trim(), memo:el('f-memo').value.trim(), items:items, pass:pass };
 }
 
 /* 인쇄(1장, 섹션 2열 균형 배치) */
-function statTxt(s){ return s==='ok'?'정상':(s==='na'?'해당없음':'불량'); }
-function statColor(s){ return s==='no'?'#dc2626':(s==='na'?'#94a3b8':'#15803d'); }
+function statTxt(s){ return s==='ok'?'정상':(s==='na'?'해당없음':(s==='etc'?'기타':'불량')); }
+function statColor(s){ return s==='no'?'#dc2626':(s==='na'?'#94a3b8':(s==='etc'?'#b45309':'#15803d')); }
 function sectionBlocks(items){
   var groups={}, order=[];
   items.forEach(function(it){ if(!groups[it.group]){groups[it.group]=[]; order.push(it.group);} groups[it.group].push(it); });
   return order.map(function(g){
-    var rows=groups[g].map(function(it){ return '<tr><td>'+esc(it.label)+'</td><td style="width:62px;text-align:center;color:'+statColor(it.status)+';font-weight:700">'+statTxt(it.status)+'</td></tr>'; }).join('');
+    var rows=groups[g].map(function(it){
+      var lab=esc(it.label) + (it.status==='etc'&&it.note?' <span style="color:#b45309;font-size:9px">— '+esc(it.note)+'</span>':'');
+      return '<tr><td>'+lab+'</td><td style="width:58px;text-align:center;color:'+statColor(it.status)+';font-weight:700">'+statTxt(it.status)+'</td></tr>';
+    }).join('');
     var html='<table class="pa-ck"><thead><tr class="g"><td colspan="2">'+esc(g)+'</td></tr></thead><tbody>'+rows+'</tbody></table>';
     return { html:html, n:groups[g].length+1 };
   });
@@ -278,7 +306,7 @@ function buildPrint(d){
       '<div id="pa-head"><div><div class="t">설치 완료 체크리스트</div><div class="s">단말기 설치 점검표</div></div>'+
         '<div class="co"><b>ATEC MOBILITY</b><br>설치 점검 서식</div></div>'+
       '<table class="pa-meta"><tr><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td></tr>'+
-      '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">단말기 S/N</td><td>'+esc(d.sn||'-')+'</td><td class="k">설치자</td><td>'+esc(d.installer||'-')+'</td></tr></table>'+
+      '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">작성일</td><td>'+esc(d.date||'-')+'</td><td class="k">설치자</td><td>'+esc(d.installer||'-')+'</td></tr></table>'+
       '<div class="pa-cols" style="margin-top:8px"><div>'+leftH+'</div><div>'+rightH+'</div></div>'+
       '<div class="verdict" style="color:'+(d.pass?'#15803d':'#dc2626')+'">종합 판정 : '+(d.pass?'합격':'불합격 (불량 항목 확인 필요)')+'</div>'+
       (d.memo?'<div style="margin-top:6px;font-size:11px"><b style="color:#047857">특이사항</b> · '+esc(d.memo)+'</div>':'')+
@@ -317,7 +345,7 @@ function saveCloud(){
   var path=storeKey(d);
   FC.nodeToPdfFit(buildPrint(d)).then(function(blob){ return FC.uploadPdf('checklist', path, blob); })
   .then(function(){
-    return FC.restInsert('install_checklists', { center:d.center, operator:d.operator, vehicle_no:d.vehicle, model:d.model, terminal_sn:d.sn,
+    return FC.restInsert('install_checklists', { center:d.center, operator:d.operator, vehicle_no:d.vehicle, model:d.model,
       items:d.items, pass:d.pass, installer:d.installer, installer_sign:!SIG.installer.isEmpty(), pdf_path:path, memo:d.memo, created_by:FC.myEmail() });
   }).then(function(){ lastSig=sig; FC.toast('저장되었습니다'); })
   .catch(function(e){ FC.toast('저장 실패: '+e.message, false); })
@@ -331,7 +359,7 @@ function quickRange(days){
   el('q-from').value=f(from); el('q-to').value=f(to); runQuery();
 }
 function buildFilter(){
-  var qs='select=id,center,operator,vehicle_no,model,terminal_sn,pass,items,created_at,created_by,pdf_path&order=created_at.desc&limit=300';
+  var qs='select=id,center,operator,vehicle_no,model,pass,items,created_at,created_by,pdf_path&order=created_at.desc&limit=300';
   var from=el('q-from').value, to=el('q-to').value, c=el('q-center').value, m=el('q-model').value, p=el('q-pass').value, v=el('q-vehicle').value.trim();
   if(from) qs+='&created_at=gte.'+from+'T00:00:00';
   if(to) qs+='&created_at=lte.'+to+'T23:59:59';
@@ -359,41 +387,36 @@ function runQuery(){
     }).join('');
   }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
 }
-function filterSummary(){
-  var parts=[];
-  if(el('q-from').value||el('q-to').value) parts.push('기간 '+(el('q-from').value||'~')+' ~ '+(el('q-to').value||''));
-  if(el('q-center').value) parts.push('센터 '+el('q-center').value);
-  if(el('q-model').value) parts.push('기종 '+el('q-model').value);
-  if(el('q-pass').value) parts.push('판정 '+(el('q-pass').value==='true'?'합격':'불합격'));
-  if(el('q-vehicle').value.trim()) parts.push('차량 '+el('q-vehicle').value.trim());
-  return parts.length?parts.join(' · '):'전체';
-}
-function exportPdf(){
+// 조회된 각 건의 PDF를 ZIP으로 묶어 다운로드
+async function exportZip(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var pa=el('print-area');
-  var trs=lastRows.map(function(r,i){
-    var bad=Array.isArray(r.items)?r.items.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(', '):'';
-    var pc=r.pass?'#15803d':'#dc2626';
-    return '<tr><td style="border:1px solid #cfcfcf;padding:4px 6px;text-align:center">'+(i+1)+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc((r.created_at||'').slice(0,10))+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.center||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.operator||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.vehicle_no||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px">'+esc(r.model||'')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px;text-align:center;color:'+pc+';font-weight:700">'+(r.pass?'합격':'불합격')+'</td><td style="border:1px solid #cfcfcf;padding:4px 6px;font-size:9px;color:#b91c1c">'+esc(bad)+'</td></tr>';
-  }).join('');
-  pa.innerHTML =
-    '<div id="pa-head"><div><div class="t" style="letter-spacing:3px;font-size:21px">설치 체크리스트 (조회)</div><div class="s">단말기 설치 점검 내역</div></div>'+
-      '<div class="co"><b>ATEC MOBILITY</b><br>'+esc(filterSummary())+'<br>총 '+lastRows.length+'건 · '+new Date().toLocaleDateString('ko-KR')+'</div></div>'+
-    '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+
-      '<th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">No</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">작성일</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">센터</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">운수사</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">차량번호</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">기종</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">판정</th><th style="background:#047857;color:#fff;font-size:10px;padding:5px 6px;border:1px solid #047857">불량 항목</th>'+
-    '</tr></thead><tbody>'+trs+'</tbody></table>'+
-    '<div class="pa-foot">발행 '+new Date().toLocaleString('ko-KR')+' · '+esc(FC.myEmail()||'')+'</div>';
-  FC.nodeToPdf(pa).then(function(blob){
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='설치체크리스트_내역_'+FC.stampSlug()+'.pdf'; a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},1500); FC.toast('PDF 다운로드 완료');
-  }).catch(function(e){ FC.toast('PDF 생성 실패: '+e.message, false); });
+  if(typeof JSZip==='undefined'){ FC.toast('압축 모듈 로딩 실패 — 새로고침 후 재시도', false); return; }
+  FC.toast('PDF '+lastRows.length+'건 압축 중…');
+  var zip=new JSZip(), ok=0;
+  for(var i=0;i<lastRows.length;i++){
+    var r=lastRows[i]; if(!r.pdf_path) continue;
+    try{
+      var url=await FC.signedUrl('checklist', r.pdf_path, 600);
+      if(!url) continue;
+      var blob=await (await fetch(url)).blob();
+      var nm=(r.vehicle_no||'차량')+'_'+(r.model||'')+'_'+(r.pass?'합격':'불합격')+'_'+(r.created_at||'').slice(0,10)+'_'+(i+1)+'.pdf';
+      zip.file(nm, blob); ok++;
+    }catch(e){}
+  }
+  if(!ok){ FC.toast('다운로드할 PDF가 없습니다', false); return; }
+  var content=await zip.generateAsync({type:'blob'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(content); a.download='설치체크리스트_'+FC.stampSlug()+'.zip'; a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  FC.toast(ok+'건 ZIP 다운로드 완료');
 }
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var header=['작성일','센터','운수사','차량번호','기종','단말기S/N','판정','불량항목','설치자'];
+  var header=['작성일','센터','운수사','차량번호','기종','판정','불량항목','기타항목','설치자'];
   var rows=lastRows.map(function(r){
-    var bad=Array.isArray(r.items)?r.items.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(' / '):'';
-    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.terminal_sn||'', r.pass?'합격':'불합격', bad, r.created_by||''];
+    var its=Array.isArray(r.items)?r.items:[];
+    var bad=its.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(' / ');
+    var etc=its.filter(function(x){return x.status==='etc';}).map(function(x){return x.label+(x.note?'('+x.note+')':'');}).join(' / ');
+    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.pass?'합격':'불합격', bad, etc, r.created_by||''];
   });
   FC.downloadCsv('설치체크리스트_'+FC.stampSlug()+'.csv', header, rows);
   FC.toast('CSV 다운로드 완료');
