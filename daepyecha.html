@@ -56,13 +56,9 @@
   .mi-no{ font-weight:800; color:#b0367a; font-size:13px; min-width:20px; text-align:center; }
   .mi-top .r-name{ flex:1; min-width:0; }
   .mi-del{ background:none; border:none; color:#c98; cursor:pointer; font-weight:700; font-size:17px; line-height:1; padding:2px 6px; flex-shrink:0; }
-  .mi-grid{ display:grid; grid-template-columns:84px 1.3fr 1fr; gap:8px; margin-top:9px; }
+  .mi-grid{ display:grid; grid-template-columns:92px 1fr; gap:9px; margin-top:9px; align-items:end; }
   .mi-lbl{ font-size:10.5px; font-weight:700; color:#a4587d; display:block; margin-bottom:3px; }
   .mi-grid .inp{ padding:7px 9px; }
-  @media(max-width:600px){
-    .mi-grid{ grid-template-columns:84px 1fr; }
-    .mi-grid > div:nth-child(3){ grid-column:1 / -1; }
-  }
   .sig-pad{ border:1.5px dashed #d09cb4; border-radius:11px; background:linear-gradient(#fff,#fdf7fa); touch-action:none; width:100%; height:118px; }
   .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#f7e7ef; color:#9a3768; }
   .res-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 4px; border-bottom:1px solid #f3e3eb; }
@@ -255,8 +251,7 @@ function rowHtml(){
     '<input class="inp r-cname" style="display:none;margin-top:8px" placeholder="품명 직접 입력">'+
     '<div class="mi-grid">'+
       '<div><span class="mi-lbl">수량</span><input class="inp r-qty" type="number" min="0" value="1" style="text-align:center"></div>'+
-      '<div><span class="mi-lbl">S/N</span><input class="inp r-sn" placeholder="S/N"></div>'+
-      '<div><span class="mi-lbl">비고</span><input class="inp r-note"></div>'+
+      '<div><span class="mi-lbl">비고 (S/N 등 기재)</span><input class="inp r-note" placeholder="필요 시 S/N·특이사항"></div>'+
     '</div>'+
   '</div>';
 }
@@ -295,7 +290,7 @@ function collectItems(){
     var sel=it.querySelector('.r-name').value;
     var name = sel===CUSTOM ? it.querySelector('.r-cname').value.trim() : sel;
     if(!name) return;
-    out.push({ name:name, qty:Number(it.querySelector('.r-qty').value||0), sn:it.querySelector('.r-sn').value.trim(), note:it.querySelector('.r-note').value.trim() });
+    out.push({ name:name, qty:Number(it.querySelector('.r-qty').value||0), note:it.querySelector('.r-note').value.trim() });
   });
   return out;
 }
@@ -309,10 +304,10 @@ function itemRowsTable(list, startNo, withNote){
   var rows = list.map(function(it,i){
     var nm = esc(it.name) + (it.note&&!withNote?' <span style="color:#999">('+esc(it.note)+')</span>':'');
     return '<tr><td style="text-align:center;width:26px">'+(startNo+i)+'</td><td>'+nm+'</td>'+
-      '<td style="text-align:center;width:34px">'+(it.qty||'')+'</td><td style="width:96px">'+esc(it.sn||'')+'</td>'+
-      (withNote?'<td>'+esc(it.note||'')+'</td>':'')+'</tr>';
+      '<td style="text-align:center;width:40px">'+(it.qty||'')+'</td>'+
+      (withNote?'<td style="width:34%">'+esc(it.note||'')+'</td>':'')+'</tr>';
   }).join('');
-  return '<table class="pa-items"><thead><tr><th>No</th><th>품명</th><th>수량</th><th>S/N</th>'+(withNote?'<th>비고</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table>';
+  return '<table class="pa-items"><thead><tr><th>No</th><th>품명</th><th>수량</th>'+(withNote?'<th>비고</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function koDate(s){ var m=/(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(!m){ var t=new Date(); return t.getFullYear()+'년 '+('0'+(t.getMonth()+1)).slice(-2)+'월 '+('0'+t.getDate()).slice(-2)+'일'; } return m[1]+'년 '+m[2]+'월 '+m[3]+'일'; }
 function buildPrint(d){
@@ -436,13 +431,13 @@ async function exportZip(){
 }
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var header=['작성일','구분','센터','운수사','차량번호','기종','No','품명','수량','S/N','비고','작성자'];
+  var header=['작성일','구분','센터','운수사','차량번호','기종','No','품명','수량','비고','작성자'];
   var rows=[];
   lastRows.forEach(function(r){
     var d=(r.created_at||'').slice(0,10), base=[d, r.category||'', r.center||'', r.operator||'', r.vehicle_no||'', r.model||''];
     var its=Array.isArray(r.items)?r.items:[];
-    if(!its.length){ rows.push(base.concat(['','','','','', r.created_by||''])); return; }
-    its.forEach(function(x,i){ rows.push(base.concat([i+1, x.name||'', x.qty||'', x.sn||'', x.note||'', r.created_by||''])); });
+    if(!its.length){ rows.push(base.concat(['','','','', r.created_by||''])); return; }
+    its.forEach(function(x,i){ rows.push(base.concat([i+1, x.name||'', x.qty||'', x.note||'', r.created_by||''])); });
   });
   FC.downloadCsv('대폐차지급내역_'+FC.stampSlug()+'.csv', header, rows);
   FC.toast('CSV 다운로드 완료');

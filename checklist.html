@@ -57,6 +57,7 @@
   .seg .na.on{ background:#94a3b8; color:#fff; border-color:#94a3b8; }
   .seg .no.on{ background:#dc2626; color:#fff; border-color:#dc2626; }
   .seg .etc.on{ background:#b45309; color:#fff; border-color:#b45309; }
+  .seg .ch.on{ background:#047857; color:#fff; border-color:#047857; }
   .etc-input{ width:100%; border:1px solid #e2c7a8; border-radius:8px; padding:5px 9px; font-size:12.5px; margin-top:5px; background:#fffdf8; }
   .etc-input:focus{ outline:none; border-color:#d97706; }
   .sig-pad{ border:1.5px dashed #93cbb6; border-radius:11px; background:linear-gradient(#fff,#f5fbf8); touch-action:none; width:100%; height:118px; }
@@ -210,7 +211,7 @@ function template(model){
   }
   if(model==='공항 B620'){
     return {
-      '차량 특성':['차량 특성(현대A/기아B/기타C) 확인'],
+      '차량 특성':[{label:'차량 특성',opts:['현대A','기아B','기타C']}],
       'H/W · 단말기':['운전자·승차 IH 라벨↔LCD 일치','수집센터 IP 설정 확인','운전자단말기 부팅·통신·시간·러버패드·블랙커버','승차단말기 부팅·통신·커넥터·백커버','영수증기 통신·출력 정상','안내방송 전원·음성출력 정상'],
       'H/W · 설치':['브라켓·케이블타이 고정','GPS·LTE 안테나 커넥터 고정'],
       '운행 대기중':['표출 시간 표시 정상','운영관리/수집센터 IP 확인','운행시작 정상(BMS·c/t-sys·LTE·GPS 감도)'],
@@ -220,7 +221,7 @@ function template(model){
   }
   // 서울 B700 / B710 / B800 공통(엑셀 기준)
   var t = {
-    '차량 특성':['차량 특성(일반A/저상B/전기차C/기타D)','격벽 설치 유무 기록'],
+    '차량 특성':[{label:'차량 특성',opts:['일반A','저상B','전기차C','기타D']},{label:'격벽 설치',opts:['설치(O)','미설치(X)']}],
     'H/W · 단말기':['표출·승하차 IH 라벨↔LCD 일치','표출단말기 부팅·통신·시간·커넥터·러버패드·블랙커버','승차단말기 부팅·통신·백커버·고무러버','하차1단말기 부팅·통신·백커버·고무러버','하차2단말기 부팅·통신·백커버·고무러버','LTE외장모뎀 램프·통신'],
     'H/W · 설치':['브라켓·케이블타이 고정','GPS·LTE·타코메타 커넥터 연결','DTG 연결 상태(APP 확인)'],
     '운행 대기 · 표출 상태바':['GPS Icon 활성(Ant 3↑)','단말운영(T) Icon 표출','LTE Icon 활성(Ant 4↑)','수집센터(D) Icon 표출','BMS(B) Icon 표출','승하차 통신연결(테두리 녹색)'],
@@ -234,21 +235,30 @@ function template(model){
   return t;
 }
 
-var NOTE={};
+var NOTE={}, CHOICE={};
 function renderChecklist(){
-  var T=template(el('f-model').value); var host=el('chk-host'); host.innerHTML=''; STATE={}; NOTE={};
+  var T=template(el('f-model').value); var host=el('chk-host'); host.innerHTML=''; STATE={}; NOTE={}; CHOICE={};
   Object.keys(T).forEach(function(grp){
     var h='<div class="grp-ttl">'+esc(grp)+'</div>';
     T[grp].forEach(function(item,i){
-      var key=grp+'::'+i; STATE[key]='ok';
-      h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1">'+
-        '<div style="font-size:13px;color:#314">'+esc(item)+'</div>'+
-        '<input class="etc-input" data-key="'+key+'" style="display:none" placeholder="기타 내용 입력" oninput="setNote(this)">'+
-        '</div>'+
-        '<div class="seg"><button class="ok on" onclick="setSeg(this,\''+key+'\',\'ok\')">정상</button>'+
-        '<button class="na" onclick="setSeg(this,\''+key+'\',\'na\')">해당없음</button>'+
-        '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button>'+
-        '<button class="etc" onclick="setSeg(this,\''+key+'\',\'etc\')">기타</button></div></div>';
+      var key=grp+'::'+i;
+      var isChoice=(item && typeof item==='object');
+      var label=isChoice?item.label:item;
+      if(isChoice){
+        CHOICE[key]=true; STATE[key]=item.opts[0];
+        var seg=item.opts.map(function(o,j){ return '<button class="ch'+(j===0?' on':'')+'" onclick="setSeg(this,\''+key+'\',\''+esc(o)+'\')">'+esc(o)+'</button>'; }).join('');
+        h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1"><div style="font-size:13px;color:#314">'+esc(label)+'</div></div><div class="seg">'+seg+'</div></div>';
+      } else {
+        STATE[key]='ok';
+        h+='<div class="chk-row" data-key="'+key+'"><div style="flex:1">'+
+          '<div style="font-size:13px;color:#314">'+esc(label)+'</div>'+
+          '<input class="etc-input" data-key="'+key+'" style="display:none" placeholder="기타 내용 입력" oninput="setNote(this)">'+
+          '</div>'+
+          '<div class="seg"><button class="ok on" onclick="setSeg(this,\''+key+'\',\'ok\')">정상</button>'+
+          '<button class="na" onclick="setSeg(this,\''+key+'\',\'na\')">해당없음</button>'+
+          '<button class="no" onclick="setSeg(this,\''+key+'\',\'no\')">불량</button>'+
+          '<button class="etc" onclick="setSeg(this,\''+key+'\',\'etc\')">기타</button></div></div>';
+      }
     });
     host.insertAdjacentHTML('beforeend', h);
   });
@@ -262,7 +272,7 @@ function setSeg(btn,key,val){
   updateVerdict();
 }
 function setNote(inp){ NOTE[inp.dataset.key]=inp.value; }
-function setAll(val){ el('chk-host').querySelectorAll('.chk-row').forEach(function(r){ var k=r.dataset.key; STATE[k]=val; r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); r.querySelector('.seg .'+val).classList.add('on'); var inp=r.querySelector('.etc-input'); if(inp) inp.style.display='none'; }); updateVerdict(); }
+function setAll(val){ el('chk-host').querySelectorAll('.chk-row').forEach(function(r){ var k=r.dataset.key; if(CHOICE[k]) return; STATE[k]=val; r.querySelectorAll('.seg button').forEach(function(b){b.classList.remove('on');}); var t=r.querySelector('.seg .'+val); if(t) t.classList.add('on'); var inp=r.querySelector('.etc-input'); if(inp) inp.style.display='none'; }); updateVerdict(); }
 function updateVerdict(){
   var anyNo=Object.keys(STATE).some(function(k){return STATE[k]==='no';});
   var v=el('verdict');
@@ -272,11 +282,11 @@ function updateVerdict(){
 
 function collectItems(){
   var T=template(el('f-model').value), out=[];
-  Object.keys(T).forEach(function(grp){ T[grp].forEach(function(item,i){ var k=grp+'::'+i; out.push({group:grp,label:item,status:STATE[k]||'ok',note:(NOTE[k]||'').trim()}); }); });
+  Object.keys(T).forEach(function(grp){ T[grp].forEach(function(item,i){ var k=grp+'::'+i; var isC=(item&&typeof item==='object'); out.push({group:grp,label:isC?item.label:item,status:STATE[k]||(isC?'':'ok'),note:(NOTE[k]||'').trim(),choice:isC}); }); });
   return out;
 }
 function gather(){
-  var items=collectItems(), pass=!items.some(function(x){return x.status==='no';});
+  var items=collectItems(), pass=!items.some(function(x){return !x.choice && x.status==='no';});
   return { date:el('f-date').value, center:el('f-center').value, operator:el('f-operator').value.trim(),
     vehicle:el('f-vehicle').value.trim(), model:el('f-model').value,
     installer:el('f-installer').value.trim(), memo:el('f-memo').value.trim(), items:items, pass:pass };
@@ -290,8 +300,10 @@ function sectionBlocks(items){
   items.forEach(function(it){ if(!groups[it.group]){groups[it.group]=[]; order.push(it.group);} groups[it.group].push(it); });
   return order.map(function(g){
     var rows=groups[g].map(function(it){
-      var lab=esc(it.label) + (it.status==='etc'&&it.note?' <span style="color:#b45309;font-size:9px">— '+esc(it.note)+'</span>':'');
-      return '<tr><td>'+lab+'</td><td style="width:58px;text-align:center;color:'+statColor(it.status)+';font-weight:700">'+statTxt(it.status)+'</td></tr>';
+      var lab=esc(it.label) + (!it.choice&&it.status==='etc'&&it.note?' <span style="color:#b45309;font-size:9px">— '+esc(it.note)+'</span>':'');
+      var disp=it.choice?esc(it.status):statTxt(it.status);
+      var col=it.choice?'#0b4a3a':statColor(it.status);
+      return '<tr><td>'+lab+'</td><td style="width:70px;text-align:center;color:'+col+';font-weight:700">'+disp+'</td></tr>';
     }).join('');
     var html='<table class="pa-ck"><thead><tr class="g"><td colspan="2">'+esc(g)+'</td></tr></thead><tbody>'+rows+'</tbody></table>';
     return { html:html, n:groups[g].length+1 };
@@ -415,12 +427,13 @@ async function exportZip(){
 }
 function exportCsv(){
   if(!lastRows.length){ FC.toast('먼저 조회하세요', false); return; }
-  var header=['작성일','센터','운수사','차량번호','기종','판정','불량항목','기타항목','설치자'];
+  var header=['작성일','센터','운수사','차량번호','기종','판정','기록(차량특성 등)','불량항목','기타항목','설치자'];
   var rows=lastRows.map(function(r){
     var its=Array.isArray(r.items)?r.items:[];
-    var bad=its.filter(function(x){return x.status==='no';}).map(function(x){return x.label;}).join(' / ');
-    var etc=its.filter(function(x){return x.status==='etc';}).map(function(x){return x.label+(x.note?'('+x.note+')':'');}).join(' / ');
-    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.pass?'합격':'불합격', bad, etc, r.created_by||''];
+    var bad=its.filter(function(x){return !x.choice && x.status==='no';}).map(function(x){return x.label;}).join(' / ');
+    var etc=its.filter(function(x){return !x.choice && x.status==='etc';}).map(function(x){return x.label+(x.note?'('+x.note+')':'');}).join(' / ');
+    var rec=its.filter(function(x){return x.choice;}).map(function(x){return x.label+':'+x.status;}).join(' / ');
+    return [(r.created_at||'').slice(0,10), r.center||'', r.operator||'', r.vehicle_no||'', r.model||'', r.pass?'합격':'불합격', rec, bad, etc, r.created_by||''];
   });
   FC.downloadCsv('설치체크리스트_'+FC.stampSlug()+'.csv', header, rows);
   FC.toast('CSV 다운로드 완료');
