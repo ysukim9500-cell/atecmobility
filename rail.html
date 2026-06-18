@@ -640,6 +640,16 @@ function resetForm(){
   $('#f-msg').textContent='';
   const today=new Date().toISOString().slice(0,10); $('#f-date').value=today; $('#f-pdate').value=today;
 }
+function railToast(text, ok){
+  let t=document.getElementById('rail-toast');
+  if(!t){ t=document.createElement('div'); t.id='rail-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px);z-index:99999;padding:13px 24px;border-radius:13px;font-weight:800;font-size:15px;color:#fff;box-shadow:0 14px 36px -8px rgba(0,0,0,.5);opacity:0;transition:opacity .25s ease,transform .25s ease;pointer-events:none;max-width:90vw;text-align:center';
+    document.body.appendChild(t); }
+  t.style.background = (ok===false) ? '#dc2626' : '#4F46E5';
+  t.textContent = text;
+  requestAnimationFrame(()=>{ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; });
+  clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; }, 2400);
+}
 async function saveFault(){
   const msg=$('#f-msg');
   const station=$('#f-station').value.trim();
@@ -667,6 +677,7 @@ async function saveFault(){
   await persistFaults();
   msg.style.color='#16a34a';
   msg.textContent = CLOUD_OK ? '✓ 클라우드에 저장되었습니다. 대시보드로 이동합니다…' : '✓ 저장되었습니다. (클라우드 연결 실패 — 이 기기에만 임시 저장)';
+  railToast(CLOUD_OK ? '저장되었습니다' : '저장됨 · 클라우드 연결 실패(임시 저장)', CLOUD_OK);
   populateFilters(); renderList(); updateMeta();
   setTimeout(()=>{ resetForm(); goTab('dash'); }, 800);
 }

@@ -199,10 +199,6 @@ html.force-web body{ min-width:1280px; }
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <div>
-          <label class="flt-label">호선</label>
-          <select id="flt-line" class="fld flt-sel"><option value="">전체</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
-        </div>
-        <div>
           <label class="flt-label">모듈</label>
           <select id="flt-module" class="fld flt-sel"><option value="">전체</option></select>
         </div>
@@ -245,13 +241,12 @@ html.force-web body{ min-width:1280px; }
     <div id="rail-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5"></div>
 
     <!-- 메인 그래프 + 기준 선택 -->
-    <div class="grid lg:grid-cols-3 gap-5 mb-5">
-      <div class="lg:col-span-2 panel">
+    <div class="mb-5">
+      <div class="panel">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
           <div class="panel-head" style="margin-bottom:0"><span class="panel-dot"></span><span id="dim-title">모듈별</span> 장애 건수<span class="panel-sub">기준 선택</span></div>
           <div id="dim-tabs" class="flex items-center gap-1 bg-indigo-50 rounded-lg p-1 flex-wrap">
             <button data-dim="module" class="dim-btn active">모듈별</button>
-            <button data-dim="line" class="dim-btn">호선별</button>
             <button data-dim="ftype" class="dim-btn">장애유형별</button>
             <button data-dim="ptype" class="dim-btn">처리유형별</button>
             <button data-dim="worker" class="dim-btn">처리자별</button>
@@ -259,10 +254,6 @@ html.force-web body{ min-width:1280px; }
           </div>
         </div>
         <div class="h-[320px] px-1 pb-1"><canvas id="rch-dim"></canvas></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><span class="panel-dot"></span>호선별 비중</div>
-        <div class="h-[320px] flex items-center justify-center px-1 pb-1"><canvas id="rch-line"></canvas></div>
       </div>
     </div>
 
@@ -305,10 +296,6 @@ html.force-web body{ min-width:1280px; }
           <div id="f-station-info" class="text-[11.5px] text-slate-500 mt-1"></div>
         </div>
 
-        <div>
-          <label class="fld-label">호선</label>
-          <input id="f-line" class="fld" placeholder="자동" readonly style="background:#f8f8fc">
-        </div>
         <div>
           <label class="fld-label req">장비번호</label>
           <select id="f-device" class="fld"><option value="">선택</option></select>
@@ -620,20 +607,29 @@ function onStationPick(){
   const st=STATIONS.find(s=>s.name===name);
   const dev=$('#f-device'); const info=$('#f-station-info');
   if(st){
-    $('#f-line').value=st.line||'';
     dev.innerHTML='<option value="">선택</option>'+(st.devices||[]).map(d=>`<option value="${d}">${d}</option>`).join('');
     if(st.devices&&st.devices.length) dev.value=st.devices[0];
-    info.innerHTML=`<span class="chip ${lineClass(st.line)}">${st.line}호선</span> 관리소: <b>${st.office||'-'}</b> · 장비 ${st.devices.length}대`;
+    info.innerHTML=`관리소: <b>${st.office||'-'}</b> · 장비 ${st.devices.length}대`;
   } else {
-    $('#f-line').value=''; dev.innerHTML='<option value="">선택</option>'; info.textContent='';
+    dev.innerHTML='<option value="">선택</option>'; info.textContent='';
   }
 }
 function resetForm(){
   ['f-station','f-module','f-ftype','f-content','f-ptype','f-pcontent','f-snold','f-snnew','f-worker','f-note'].forEach(id=>$('#'+id).value='');
-  $('#f-line').value=''; $('#f-device').innerHTML='<option value="">선택</option>';
+  $('#f-device').innerHTML='<option value="">선택</option>';
   $('#f-replaced').value='무'; $('#f-result').value='완료'; $('#f-station-info').textContent='';
   $('#f-msg').textContent='';
   const today=new Date().toISOString().slice(0,10); $('#f-date').value=today; $('#f-pdate').value=today;
+}
+function railToast(text, ok){
+  let t=document.getElementById('rail-toast');
+  if(!t){ t=document.createElement('div'); t.id='rail-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px);z-index:99999;padding:13px 24px;border-radius:13px;font-weight:800;font-size:15px;color:#fff;box-shadow:0 14px 36px -8px rgba(0,0,0,.5);opacity:0;transition:opacity .25s ease,transform .25s ease;pointer-events:none;max-width:90vw;text-align:center';
+    document.body.appendChild(t); }
+  t.style.background = (ok===false) ? '#dc2626' : '#4F46E5';
+  t.textContent = text;
+  requestAnimationFrame(()=>{ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; });
+  clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; }, 2400);
 }
 async function saveFault(){
   const msg=$('#f-msg');
@@ -662,6 +658,7 @@ async function saveFault(){
   await persistFaults();
   msg.style.color='#16a34a';
   msg.textContent = CLOUD_OK ? '✓ 클라우드에 저장되었습니다. 대시보드로 이동합니다…' : '✓ 저장되었습니다. (클라우드 연결 실패 — 이 기기에만 임시 저장)';
+  railToast(CLOUD_OK ? '저장되었습니다' : '저장됨 · 클라우드 연결 실패(임시 저장)', CLOUD_OK);
   populateFilters(); renderList(); updateMeta();
   setTimeout(()=>{ resetForm(); goTab('dash'); }, 800);
 }
@@ -669,15 +666,14 @@ async function saveFault(){
 /* ===== dashboard ===== */
 let RANGE={from:'', to:''};   // active date range (empty = all)
 let DIM='module';             // active chart dimension
-const FILT={line:'',module:'',ftype:'',ptype:'',worker:'',station:''};
+const FILT={module:'',ftype:'',ptype:'',worker:'',station:''};
 
-function lineKey(f){ return ['1','2','3','4','5','6','7','8'].includes(String(f.line))?f.line+'호선':'기타'; }
+function lineKey(f){ return '기타'; }
 
 function getFilteredFaults(){
   return FAULTS.filter(f=>{
     if(RANGE.from && (f.date||'')<RANGE.from) return false;
     if(RANGE.to && (f.date||'')>RANGE.to) return false;
-    if(FILT.line && String(f.line)!==FILT.line) return false;
     if(FILT.module && f.module!==FILT.module) return false;
     if(FILT.ftype && f.ftype!==FILT.ftype) return false;
     if(FILT.ptype && f.ptype!==FILT.ptype) return false;
@@ -694,15 +690,15 @@ function populateFilters(){
   fill('#flt-ptype', uniq('ptype'));
   fill('#flt-worker', uniq('worker'));
   // bind change events once
-  ['line','module','ftype','ptype','worker'].forEach(k=>{
+  ['module','ftype','ptype','worker'].forEach(k=>{
     const el=$('#flt-'+k); if(el && !el._bound){ el._bound=true; el.addEventListener('change',()=>{ FILT[k]=el.value; renderDash(); }); }
   });
   const stEl=$('#flt-station'); if(stEl && !stEl._bound){ stEl._bound=true; stEl.addEventListener('input',()=>{ FILT.station=stEl.value.trim(); renderDash(); }); }
 }
 function renderActiveChips(){
-  const labels={line:'호선',module:'모듈',ftype:'장애유형',ptype:'처리유형',worker:'처리자',station:'역사'};
+  const labels={module:'모듈',ftype:'장애유형',ptype:'처리유형',worker:'처리자',station:'역사'};
   const chips=[];
-  Object.keys(labels).forEach(k=>{ if(FILT[k]){ const v=k==='line'?FILT[k]+'호선':FILT[k]; chips.push(`<span class="flt-chip">${labels[k]}: ${v} <button onclick="clearFilter('${k}')">✕</button></span>`); } });
+  Object.keys(labels).forEach(k=>{ if(FILT[k]){ const v=FILT[k]; chips.push(`<span class="flt-chip">${labels[k]}: ${v} <button onclick="clearFilter('${k}')">✕</button></span>`); } });
   if(RANGE.from||RANGE.to){ chips.push(`<span class="flt-chip" style="background:#0EA5E9">기간: ${RANGE.from||'처음'}~${RANGE.to||'끝'} <button onclick="clearRange()">✕</button></span>`); }
   $('#flt-active').innerHTML = chips.length? chips.join('') : '<span class="text-[12px] text-slate-400">필터 없음 — 전체 데이터 표시 중</span>';
 }
@@ -711,7 +707,7 @@ function clearRange(){ RANGE={from:'',to:''}; $('#d-from').value=''; $('#d-to').
 function resetFilters(){
   Object.keys(FILT).forEach(k=>FILT[k]='');
   RANGE={from:'',to:''};
-  ['flt-line','flt-module','flt-ftype','flt-ptype','flt-worker','flt-station','d-from','d-to'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
+  ['flt-module','flt-ftype','flt-ptype','flt-worker','flt-station','d-from','d-to'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
   renderDash();
 }
 function quickRange(days){
@@ -793,12 +789,12 @@ function renderDash(){
 
   // charts (guard against CDN load failure)
   if(typeof Chart!=='undefined'){
-    try{ drawDimChart(F); drawMonthChart(F); drawLineChart(F); }catch(e){ console.error('chart', e); }
+    try{ drawDimChart(F); drawMonthChart(F); }catch(e){ console.error('chart', e); }
   }
 }
 
-const DIM_LABEL={module:'모듈별', line:'호선별', ftype:'장애유형별', ptype:'처리유형별', worker:'처리자별', station:'역사별'};
-const LINE_COLORS={'1호선':'#0d3692','2호선':'#16a34a','3호선':'#ea580c','4호선':'#0284c7','5호선':'#7c3aed','6호선':'#a16207','7호선':'#4d7c0f','8호선':'#db2777','기타':'#94a3b8'};
+const DIM_LABEL={module:'모듈별', ftype:'장애유형별', ptype:'처리유형별', worker:'처리자별', station:'역사별'};
+const LINE_COLORS={};
 
 // 그라데이션 헬퍼
 function vGrad(ctx, area, c1, c2){ if(!area) return c1; const g=ctx.createLinearGradient(0,area.bottom,0,area.top); g.addColorStop(0,c1); g.addColorStop(1,c2); return g; }
@@ -847,20 +843,7 @@ function drawMonthChart(F){
               x:{grid:{display:false},border:{display:false},ticks:{font:Object.assign({size:11},CHART_FONT),color:'#94a3b8'}}},
       animation:{duration:700,easing:'easeOutQuart'}}});
 }
-function drawLineChart(F){
-  const m={}; F.forEach(f=>{ const k=lineKey(f); m[k]=(m[k]||0)+1; });
-  const order=['1호선','2호선','3호선','4호선','5호선','6호선','7호선','8호선','기타'].filter(k=>m[k]);
-  const total=order.reduce((s,k)=>s+m[k],0)||1;
-  if(charts.line) charts.line.destroy();
-  charts.line=new Chart($('#rch-line'),{type:'doughnut',
-    data:{labels:order,datasets:[{data:order.map(k=>m[k]),backgroundColor:order.map(k=>LINE_COLORS[k]),borderWidth:3,borderColor:'#fff',hoverOffset:8,hoverBorderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'64%',
-      plugins:{legend:{position:'right',labels:{font:Object.assign({size:11.5},CHART_FONT),boxWidth:11,boxHeight:11,usePointStyle:true,pointStyle:'circle',padding:9,color:'#475569'}},
-        tooltip:Object.assign(tipStyle(),{callbacks:{label:c=>`${c.label}  ${num(c.parsed)}건 (${(c.parsed/total*100).toFixed(1)}%)`}})},
-      animation:{animateRotate:true,duration:700}},
-    plugins:[{id:'centerText',beforeDraw(ch){ const {ctx,chartArea}=ch; if(!chartArea) return; const cx=(chartArea.left+chartArea.right)/2, cy=(chartArea.top+chartArea.bottom)/2; ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font="800 24px 'Pretendard',sans-serif"; ctx.fillStyle='#3730A3'; ctx.fillText(num(total), cx, cy-6); ctx.font="600 11px 'Pretendard',sans-serif"; ctx.fillStyle='#94a3b8'; ctx.fillText('총 건수', cx, cy+14); ctx.restore(); }}]
-  });
-}
+/* 호선 도넛 차트 제거됨 (한국철도공사 광역철도는 호선 미사용) */
 
 /* dimension toggle */
 document.addEventListener('click', e=>{
