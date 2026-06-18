@@ -225,14 +225,26 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
       </div>
     </a>
 
-    <!-- 철도 키오스크 장애 관리 시스템 (권한 필요) -->
+    <!-- 교통카드키오스크 장애 관리 시스템 (권한 필요) -->
     <a href="rail.html" id="launch-rail" data-perm="rail" class="launch-card block bg-white border border-indigo-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:5">
       <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#3730A3,#6366F1)">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
-      <div class="text-base font-extrabold text-[#3730A3]">철도 키오스크 장애 관리 시스템</div>
+      <div class="text-base font-extrabold text-[#3730A3]">교통카드키오스크 장애 관리 시스템</div>
       <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#6366F1]">들어가기
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- 한국철도공사 광역철도 장애 관리 시스템 (권한 필요) -->
+    <a href="rail2.html" id="launch-rail2" data-perm="rail" class="launch-card block bg-white border border-sky-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:6">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0369A1,#0EA5E9)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-base font-extrabold text-[#0369A1]">한국철도공사 광역철도 장애 관리 시스템</div>
+      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">한국철도공사 광역철도 신형 자동발매기의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0EA5E9]">들어가기
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </a>
@@ -260,7 +272,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
         (고정 관리자 <b>ysukim@atecmobility.com</b> 계정은 보호되어 변경·삭제할 수 없습니다.)
       </div>
       <div class="text-[11px] text-slate-500 mt-2 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed">
-        🚆 <b class="text-[#3730A3]">철도 시스템 권한</b>: 신규 가입자는 <b>버스 단말기 + 센터 배정</b>만 사용할 수 있습니다. 사용자 목록의 <b>"🚆 부여"</b> 버튼을 누르면 그 사용자에게 <b>철도 키오스크 시스템</b> 접근 권한이 부여됩니다. <b>"🚆 허용 ✓"</b>를 다시 누르면 권한이 회수됩니다. 관리자는 자동으로 모든 권한을 보유합니다.
+        🚆 <b class="text-[#3730A3]">철도 시스템 권한</b>: 신규 가입자는 <b>버스 단말기 + 센터 배정</b>만 사용할 수 있습니다. 사용자 목록의 <b>"🚆 부여"</b> 버튼을 누르면 그 사용자에게 <b>교통카드키오스크 + 한국철도공사 광역철도</b> 장애 관리 시스템 접근 권한이 부여됩니다. <b>"🚆 허용 ✓"</b>를 다시 누르면 권한이 회수됩니다. 관리자는 자동으로 모든 권한을 보유합니다.
       </div>
     </div>
     <div id="admin-pending" class="mb-4"></div>
