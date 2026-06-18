@@ -19,8 +19,13 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
 :root{ --rail-deep:#312E81; --rail-indigo:#3730A3; --rail-main:#4F46E5; --rail-bright:#6366F1; --rail-sky:#0EA5E9; }
-*{ font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; }
+*{ font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; word-break:keep-all; }
 body{ background:#f6f7fb; color:#1e293b; }
+/* 모바일 헤더 우측(요약+계정) 줄바꿈 허용 */
+@media(max-width:767px){
+  header .rail-wrap > div:last-child{ flex-wrap:wrap; }
+  #rail-meta, #rail-user{ font-size:11px; }
+}
 .no-scrollbar::-webkit-scrollbar{ display:none; }
 .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
 
