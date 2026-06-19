@@ -981,6 +981,16 @@ function railToast(text, ok){
   requestAnimationFrame(()=>{ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; });
   clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; }, 2400);
 }
+// 장애 등록 시 관리자(수신자 목록)에게 이메일 알림 — 실패해도 저장에는 영향 없음
+async function railNotify(rec){
+  try{
+    await fetch(SB_URL+'/functions/v1/rail-notify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({ system:'한국철도공사 광역철도', listKey:'railkr_notify_emails', date:rec.date, line:rec.line, station:rec.station, device:rec.device, module:rec.module, ftype:rec.ftype, content:rec.content, result:rec.result, worker:rec.worker })
+    });
+  }catch(e){ console.warn('rail-notify skip', e); }
+}
 async function saveFault(){
   const msg=$('#f-msg');
   const station=$('#f-station').value.trim();
@@ -1009,6 +1019,7 @@ async function saveFault(){
   msg.style.color='#16a34a';
   msg.textContent = CLOUD_OK ? '✓ 클라우드에 저장되었습니다. 대시보드로 이동합니다…' : '✓ 저장되었습니다. (클라우드 연결 실패 — 이 기기에만 임시 저장)';
   railToast(CLOUD_OK ? '저장되었습니다' : '저장됨 · 클라우드 연결 실패(임시 저장)', CLOUD_OK);
+  railNotify(rec);
   populateFilters(); renderList(); updateMeta();
   setTimeout(()=>{ resetForm(); goTab('dash'); }, 800);
 }

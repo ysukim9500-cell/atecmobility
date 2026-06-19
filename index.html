@@ -202,7 +202,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
 
   <div id="launcher-grid" class="grid md:grid-cols-3 gap-5">
     <!-- 단말기 시스템 -->
-    <a href="terminal.html" style="order:1" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
+    <a href="terminal.html" data-perm="terminal" style="order:1" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
       <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 7h8M8 11h8M8 15h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
@@ -214,7 +214,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
     </a>
 
     <!-- 센터배정 시스템 -->
-    <a href="center.html" style="order:4" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
+    <a href="center.html" data-perm="center" style="order:4" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
       <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0891B2,#26A69A)">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="white" stroke-width="1.8"/></svg>
       </div>
@@ -238,7 +238,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
     </a>
 
     <!-- 한국철도공사 광역철도 장애 관리 시스템 (권한 필요) -->
-    <a href="rail2.html" id="launch-rail2" data-perm="rail" class="launch-card block bg-white border border-sky-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:6">
+    <a href="rail2.html" id="launch-rail2" data-perm="railkr" class="launch-card block bg-white border border-sky-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:6">
       <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0369A1,#0EA5E9)">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
@@ -250,7 +250,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
     </a>
 
     <!-- 자재 지급확인서 · 설치 체크리스트 (외부 시스템) -->
-    <a href="https://bustime-beta.vercel.app/daepyecha" target="_blank" rel="noopener" style="order:2" class="launch-card block bg-white border border-amber-100 rounded-2xl shadow-sm p-5 sm:p-6">
+    <a href="https://bustime-beta.vercel.app/daepyecha" target="_blank" rel="noopener" data-perm="forms" style="order:2" class="launch-card block bg-white border border-amber-100 rounded-2xl shadow-sm p-5 sm:p-6">
       <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#B45309,#F59E0B)">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
@@ -262,38 +262,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
     </a>
   </div>
 
-  <!-- ADMIN: USER MANAGEMENT (admin only) -->
-  <div id="admin-section" class="mt-8" data-admin style="display:none">
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-      <h2 class="text-sm font-extrabold text-[#7A0B3C]">사용자 관리</h2>
-      <p class="text-[12px] text-slate-500 mt-1">가입 신청 승인/거부, 권한 변경, 비밀번호 재설정, 계정 삭제를 관리합니다.</p>
-      <div class="text-[11px] text-slate-500 mt-2 bg-rose-50/60 border border-rose-100 rounded-lg px-3 py-2 leading-relaxed">
-        💡 <b class="text-[#C2185B]">관리자 권한 부여 방법</b>: 아래 사용자 목록에서 일반 사용자 오른쪽의 <b>'관리자로'</b> 버튼을 누르면 그 사람이 관리자가 됩니다. 다시 <b>'일반으로'</b>를 누르면 해제됩니다.
-        (고정 관리자 <b>ysukim@atecmobility.com</b> 계정은 보호되어 변경·삭제할 수 없습니다.)
-      </div>
-      <div class="text-[11px] text-slate-500 mt-2 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed">
-        🚆 <b class="text-[#3730A3]">철도 시스템 권한</b>: 신규 가입자는 <b>버스 단말기 + 센터 배정</b>만 사용할 수 있습니다. 사용자 목록의 <b>"🚆 부여"</b> 버튼을 누르면 그 사용자에게 <b>교통카드키오스크 + 한국철도공사 광역철도</b> 장애 관리 시스템 접근 권한이 부여됩니다. <b>"🚆 허용 ✓"</b>를 다시 누르면 권한이 회수됩니다. 관리자는 자동으로 모든 권한을 보유합니다.
-      </div>
-    </div>
-    <div id="admin-pending" class="mb-4"></div>
-    <div id="admin-resets" class="mb-4"></div>
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-3">전체 사용자</h3>
-      <div class="overflow-x-auto">
-        <table class="w-full text-[12px]">
-          <thead><tr class="text-slate-400 border-b border-rose-100 text-left">
-            <th class="py-1.5 pr-2 font-semibold">이메일</th><th class="py-1.5 pr-2 font-semibold">이름</th>
-            <th class="py-1.5 pr-2 font-semibold">권한</th><th class="py-1.5 pr-2 font-semibold">상태</th>
-            <th class="py-1.5 pr-2 font-semibold">철도</th>
-            <th class="py-1.5 pr-2 font-semibold">가입일</th>
-            <th class="py-1.5 pr-2 font-semibold cursor-pointer select-none hover:text-[#C2185B]" onclick="toggleRecentSort()" title="클릭 시 최근 접속순 상위 5명만 표시"><span id="recent-th">최근 접속일 ⇅</span></th>
-            <th class="py-1.5 pr-2 font-semibold text-right">관리</th>
-          </tr></thead>
-          <tbody id="admin-users"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <!-- 관리자 콘솔은 별도 페이지(admin.html)로 분리되었습니다. 상단 '⚙ 관리자' 버튼으로 진입합니다. -->
 
   <footer class="text-center text-[11px] text-slate-400 mt-10 pb-4">
     ATEC Mobility · 통합 관제 포털 · 계정·데이터는 브라우저 내에서만 처리됩니다
@@ -395,6 +364,22 @@ async function cloudUserDelete(username){
   if(!r.ok){ const t=await r.text(); throw new Error('user delete '+r.status+' '+t); }
   return true;
 }
+// shared_data 의 key/payload 읽기·쓰기 (범용 KV)
+async function cloudDataGet(key){
+  if(!cloudAvailable()) return null;
+  const url=`${SB_URL}/rest/v1/${SB_DATA}?key=eq.${encodeURIComponent(key)}&select=payload`;
+  const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) return null;
+  const rows=await r.json(); if(!rows||!rows[0]||rows[0].payload==null) return null;
+  try{ return JSON.parse(rows[0].payload); }catch(e){ return null; }
+}
+async function cloudDataPut(key, obj){
+  if(!cloudAvailable()) throw new Error('cloud unavailable');
+  const url=`${SB_URL}/rest/v1/${SB_DATA}?on_conflict=key`;
+  const body=[{key, payload:JSON.stringify(obj), updated_at:new Date().toISOString()}];
+  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error('data put '+r.status+' '+t); }
+  return true;
+}
 
 /* ============ AUTH ============ */
 async function sha256(s){
@@ -478,7 +463,7 @@ async function doSignup(){
   if(pw!==pw2) return set('비밀번호가 일치하지 않습니다.');
   if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 계정 저장을 지원하지 않습니다.');
   if(await getUser(u)) return set('이미 가입된 이메일입니다.');
-  await userPut({ username:u, name, pwhash:await sha256(pw), role:'user', status:'approved', perms:[], created:nowStamp(), resetReq:false, tempPw:false });
+  await userPut({ username:u, name, pwhash:await sha256(pw), role:'user', status:'approved', perms:['terminal'], _permMig:true, created:nowStamp(), resetReq:false, tempPw:false });
   set('가입 완료! 잠시 후 로그인 화면으로 이동합니다.', true);
   setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; $('#li-pw').focus(); }, 1500);
 }
@@ -492,7 +477,7 @@ async function doLogin(){
   if(!user || user.pwhash!==await sha256(pw)) return set('이메일 또는 비밀번호가 올바르지 않습니다.');
   if(user.status==='pending') return set('아직 관리자 승인 대기 중인 계정입니다.');
   if(user.status==='rejected') return set('승인이 거부된 계정입니다. 관리자에게 문의하세요.');
-  ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:user.perms||[]};
+  ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:effectivePerms(user)};
   user.lastLogin=nowStamp();           // 최근 접속일자 기록
   if(user.resetReq){ user.resetReq=false; }
   await userPut(user);
@@ -532,6 +517,25 @@ function logout(){
 }
 function isAdmin(){ return ME && ME.role==='admin'; }
 function hasPerm(p){ if(!ME) return false; if(ME.role==='admin') return true; return Array.isArray(ME.perms) && ME.perms.includes(p); }
+/* 포털 카드(시스템) 권한 모듈 */
+const PERM_MODULES=[
+  {key:'terminal', label:'단말기'},
+  {key:'forms',    label:'자재서식'},
+  {key:'center',   label:'센터배정'},
+  {key:'rail',     label:'교통카드'},
+  {key:'railkr',   label:'한국철도'},
+];
+const ALL_PERMS=PERM_MODULES.map(m=>m.key);
+/* 사용자의 유효 권한 (관리자=전체 / 레거시 사용자=기존엔 단말기·자재·센터가 항상 보였으므로 기본 부여) */
+function effectivePerms(u){
+  if(!u) return [];
+  if(u.role==='admin') return ALL_PERMS.slice();
+  let p=Array.isArray(u.perms)?u.perms.slice():[];
+  if(!u._permMig){
+    p=Array.from(new Set([...p,'terminal','forms','center', ...(p.includes('rail')?['railkr']:[])]));
+  }
+  return p;
+}
 function applyPermVisibility(){
   document.querySelectorAll('[data-perm]').forEach(el=>{
     const p = el.getAttribute('data-perm');
@@ -550,6 +554,7 @@ function renderUserBadge(){
   const roleChip = isAdmin()? '<span class="bg-amber-400 text-amber-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ml-1">관리자</span>' : '<span class="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-bold ml-1">일반</span>';
   b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="shrink-0"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
     <span class="font-bold truncate max-w-[120px]">${ME?ME.name:''}</span>${roleChip}
+    ${isAdmin()? '<a href="admin.html" class="ub-btn ml-1 bg-amber-400 text-amber-900 hover:bg-amber-300 rounded px-2 py-1 text-[11px] font-extrabold transition" title="관리자 콘솔">⚙ 관리자</a>':''}
     <button onclick="showHelp()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition" title="사용법 도움말">❓ 도움말</button>
     <button onclick="promptChangePw(false)" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🔑 비밀번호</button>
     <button onclick="logout()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🚪 로그아웃</button>`;
@@ -617,7 +622,6 @@ function enterApp(){
   $('#app-root').classList.remove('hidden');
   renderUserBadge();
   applyRoleVisibility();
-  if(isAdmin()) renderAdmin();
 }
 
 /* ============ ADMIN ============ */
@@ -668,20 +672,21 @@ async function renderAdmin(){
       ? `<button onclick="setRole('${u.username}','user')" ${me?'disabled':''} class="text-[11px] border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
       : `<button onclick="setRole('${u.username}','admin')" class="text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-0.5 hover:bg-amber-50">관리자로</button>`;
     const rankBadge = RECENT_SORT ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#C2185B] text-white text-[10px] font-bold mr-1">${i+1}</span>` : '';
-    // 철도 권한: 관리자는 자동 부여, 일반은 perms 배열에 'rail' 포함 여부
+    // 시스템 접근: 관리자는 전체 자동, 일반은 카드별 ON/OFF
     const isAdminRow = u.role==='admin';
-    const hasRail = isAdminRow || (Array.isArray(u.perms) && u.perms.includes('rail'));
-    const railCell = isAdminRow
-      ? '<span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">자동</span>'
-      : (hasRail
-          ? `<button onclick="toggleRailPerm('${u.username}',false)" class="text-[11px] border border-indigo-300 bg-indigo-50 text-indigo-700 rounded px-2 py-0.5 hover:bg-indigo-100 font-bold" title="클릭하면 권한 회수">🚆 허용 ✓</button>`
-          : `<button onclick="toggleRailPerm('${u.username}',true)" class="text-[11px] border border-slate-200 text-slate-500 rounded px-2 py-0.5 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300" title="클릭하면 철도 시스템 권한 부여">🚆 부여</button>`);
+    const uperms = effectivePerms(u);
+    const permCell = isAdminRow
+      ? '<span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">전체</span>'
+      : `<div class="flex flex-wrap gap-0.5" style="max-width:230px">`+PERM_MODULES.map(m=>{
+          const on = uperms.includes(m.key);
+          return `<button onclick="togglePerm('${u.username}','${m.key}')" class="text-[10px] rounded px-1.5 py-0.5 border ${on?'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold':'bg-slate-50 border-slate-200 text-slate-400'}" title="${on?'클릭=숨김':'클릭=표시'}">${on?'✓ ':''}${m.label}</button>`;
+        }).join('')+`</div>`;
     return `<tr class="border-b border-rose-50">
       <td class="py-1.5 pr-2 font-mono font-bold text-[#C2185B]">${rankBadge}${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
       <td class="py-1.5 pr-2 text-slate-700">${u.name}</td>
       <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#fef3c7;color:#b45309;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
       <td class="py-1.5 pr-2">${statusChip(u.status)}</td>
-      <td class="py-1.5 pr-2">${railCell}</td>
+      <td class="py-1.5 pr-2">${permCell}</td>
       <td class="py-1.5 pr-2 text-slate-400 text-[11px]">${u.created||'-'}</td>
       <td class="py-1.5 pr-2 text-[11px] ${u.lastLogin?'text-[#3730A3] font-semibold':'text-slate-300'}">${u.lastLogin?'🕒 '+u.lastLogin:'미접속'}</td>
       <td class="py-1.5 pr-2 text-right whitespace-nowrap">
@@ -692,9 +697,45 @@ async function renderAdmin(){
       </td>
     </tr>`;
   }).join('') + (RECENT_SORT ? `<tr><td colspan="8" class="py-2 text-center text-[11px] text-slate-400">최근 접속순 상위 ${list.length}명 표시 중 · <button onclick="toggleRecentSort()" class="text-[#C2185B] font-semibold underline">전체 보기</button></td></tr>` : '');
+  renderNotifyEmails();
 }
 let RECENT_SORT=false;
 function toggleRecentSort(){ RECENT_SORT=!RECENT_SORT; renderAdmin(); }
+
+/* ===== 철도 장애 알림 이메일 수신자 관리 (shared_data:'rail_notify_emails') ===== */
+let NOTIFY_EMAILS=null;   // 캐시
+async function loadNotifyEmails(force){
+  if(NOTIFY_EMAILS && !force) return NOTIFY_EMAILS;
+  const obj = await cloudDataGet('rail_notify_emails');
+  NOTIFY_EMAILS = (obj && Array.isArray(obj.emails)) ? obj.emails : [];
+  return NOTIFY_EMAILS;
+}
+async function saveNotifyEmails(){
+  await cloudDataPut('rail_notify_emails', {emails:NOTIFY_EMAILS, updated:nowStamp()});
+}
+async function renderNotifyEmails(){
+  const box=$('#email-list'); if(!box) return;
+  const list = await loadNotifyEmails(true);
+  if(!list.length){ box.innerHTML='<span class="text-[12px] text-slate-400">등록된 수신자가 없습니다. 위에 이메일을 추가하세요.</span>'; return; }
+  box.innerHTML = list.map(e=>`<span class="inline-flex items-center gap-1 text-[12px] bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full pl-3 pr-1.5 py-1">${e}<button onclick="removeNotifyEmail('${e.replace(/'/g,"\\'")}')" class="w-4 h-4 inline-flex items-center justify-center rounded-full bg-indigo-200 text-indigo-700 hover:bg-red-200 hover:text-red-700 font-bold leading-none" title="삭제">×</button></span>`).join('');
+}
+async function addNotifyEmail(){
+  const inp=$('#email-input'); if(!inp) return;
+  const e=normEmail(inp.value);
+  if(!e){ return; }
+  if(!EMAIL_RE.test(e)){ alert('올바른 이메일 형식이 아닙니다.'); return; }
+  await loadNotifyEmails();
+  if(NOTIFY_EMAILS.includes(e)){ alert('이미 등록된 주소입니다.'); inp.value=''; return; }
+  NOTIFY_EMAILS.push(e);
+  try{ await saveNotifyEmails(); inp.value=''; renderNotifyEmails(); }
+  catch(err){ alert('저장 실패: '+err.message); }
+}
+async function removeNotifyEmail(e){
+  await loadNotifyEmails();
+  NOTIFY_EMAILS = NOTIFY_EMAILS.filter(x=>x!==e);
+  try{ await saveNotifyEmails(); renderNotifyEmails(); }
+  catch(err){ alert('삭제 실패: '+err.message); }
+}
 async function approveUser(u){ const x=await getUser(u); if(!x)return; x.status='approved'; await userPut(x); renderAdmin(); }
 async function rejectUser(u){ if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 변경할 수 없습니다.'); return; } const x=await getUser(u); if(!x)return; x.status='rejected'; await userPut(x); renderAdmin(); }
 function genTempPw(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<8;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
@@ -705,16 +746,15 @@ async function issueTempPw(u){
   alert(`'${x.name}'(${x.username}) 님의 임시 비밀번호가 발급되었습니다.\n\n임시 비밀번호:  ${temp}\n\n이 비밀번호를 해당 사용자에게 전달하세요. 사용자는 로그인하면 즉시 새 비밀번호로 변경하게 됩니다.`);
 }
 async function dismissReset(u){ const x=await getUser(u); if(!x)return; x.resetReq=false; await userPut(x); renderAdmin(); }
-async function toggleRailPerm(u, grant){
+async function togglePerm(u, key){
   const x = await getUser(u); if(!x) return;
-  if(x.role==='admin'){ alert('관리자는 자동으로 모든 시스템 권한을 보유합니다.'); return; }
-  x.perms = Array.isArray(x.perms) ? x.perms.slice() : [];
-  const i = x.perms.indexOf('rail');
-  if(grant && i<0) x.perms.push('rail');
-  if(!grant && i>=0) x.perms.splice(i,1);
+  if(x.role==='admin'){ alert('관리자는 자동으로 모든 시스템을 사용할 수 있습니다.'); return; }
+  let p = effectivePerms(x);            // 현재 유효 권한(레거시 마이그레이션 반영)
+  const i = p.indexOf(key);
+  if(i<0) p.push(key); else p.splice(i,1);
+  x.perms = p; x._permMig = true;       // 명시적 권한으로 확정
   await userPut(x);
-  // 본인이 본인 권한 변경한 경우 즉시 ME 반영
-  if(ME && u===ME.username){ ME.perms = x.perms.slice(); saveSession(); applyPermVisibility(); }
+  if(ME && u===ME.username){ ME.perms = p.slice(); saveSession(); applyPermVisibility(); }
   renderAdmin();
 }
 async function setRole(u,role){
@@ -742,7 +782,7 @@ async function initAuth(){
   let sess=null; try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
   if(sess && sess.username){
     const user=await getUser(sess.username);
-    if(user && user.status==='approved'){ ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:user.perms||[]}; enterApp(); return; }
+    if(user && user.status==='approved'){ ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:effectivePerms(user)}; enterApp(); return; }
   }
   await checkFirstRun();
   showAuth('login');

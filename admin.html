@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>관리자 콘솔 · ATEC Mobility</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *{ word-break:keep-all; -webkit-tap-highlight-color:transparent; }
+  body{ background:#fdf2f6; font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo',sans-serif; }
+  .chip{ display:inline-block; border-radius:9999px; padding:2px 8px; font-size:11px; font-weight:700; }
+  /* 탭 타깃 충분히 크게(모바일) */
+  .tapbtn{ min-height:34px; }
+  @media (max-width:640px){
+    .tapbtn{ min-height:40px; }
+  }
+  /* 권한 토글 버튼 */
+  .pbtn{ font-size:12px; border-radius:8px; padding:6px 10px; border:1px solid; line-height:1; font-weight:700; }
+  @media (max-width:640px){ .pbtn{ font-size:13px; padding:8px 11px; } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- 권한 없음 차단 화면 -->
+<div id="guard" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6" style="background:#fdf2f6">
+  <div class="bg-white rounded-2xl shadow-xl border border-rose-100 max-w-sm w-full p-6 text-center">
+    <div class="text-4xl mb-2">🔒</div>
+    <div class="text-base font-extrabold text-[#7A0B3C] mb-1">관리자 전용 화면</div>
+    <p id="guard-msg" class="text-[13px] text-slate-500 leading-relaxed mb-4">관리자 권한이 필요합니다.</p>
+    <a href="index.html" class="inline-block bg-[#C2185B] text-white font-bold rounded-xl px-5 py-2.5 text-sm hover:opacity-90">메인으로 돌아가기</a>
+  </div>
+</div>
+
+<!-- 헤더 -->
+<header class="sticky top-0 z-30 text-white px-3 py-2.5 sm:px-5 sm:py-3 flex items-center gap-2 shadow" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
+  <a href="index.html" class="tapbtn shrink-0 bg-white/15 hover:bg-white/30 rounded-lg px-2.5 py-1.5 text-[12px] font-bold flex items-center gap-1" title="메인으로">← 메인</a>
+  <div class="flex-1 min-w-0">
+    <div class="text-[15px] sm:text-base font-extrabold leading-tight">⚙ 관리자 콘솔</div>
+    <div class="text-[11px] opacity-80 truncate" id="hdr-sub">ATEC Mobility · 장애 관리 시스템</div>
+  </div>
+  <button onclick="logout()" class="tapbtn shrink-0 bg-white/15 hover:bg-white/30 rounded-lg px-2.5 py-1.5 text-[12px] font-bold">로그아웃</button>
+</header>
+
+<main id="app" class="hidden max-w-3xl mx-auto px-3 sm:px-5 py-4 space-y-4">
+
+  <!-- 승인 대기 -->
+  <div id="box-pending"></div>
+  <!-- 비밀번호 재설정 요청 -->
+  <div id="box-resets"></div>
+
+  <!-- 철도 장애 알림 이메일 (시스템별 분리) -->
+  <section class="bg-white border border-indigo-100 rounded-xl shadow-sm p-4">
+    <h2 class="text-sm font-extrabold text-[#3730A3] mb-1">🔔 철도 장애 등록 알림 이메일</h2>
+    <p class="text-[12px] text-slate-500 leading-relaxed mb-3">시스템별로 <b>따로</b> 관리됩니다. 장애가 등록되면 해당 시스템에 등록된 주소로만 자동 발송됩니다.</p>
+
+    <!-- 교통카드키오스크 -->
+    <div class="rounded-lg border border-slate-200 p-3 mb-3">
+      <div class="text-[13px] font-extrabold text-[#7A0B3C] mb-2">🚏 교통카드키오스크</div>
+      <div class="flex gap-2 mb-2">
+        <input id="in-rail" type="email" inputmode="email" placeholder="alarm@example.com"
+          class="flex-1 min-w-0 text-[14px] border border-slate-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-400"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addEmail('rail_notify_emails');}">
+        <button onclick="addEmail('rail_notify_emails')" class="tapbtn shrink-0 text-[14px] font-bold bg-indigo-600 text-white rounded-lg px-4 hover:bg-indigo-700">추가</button>
+      </div>
+      <div id="list-rail" class="flex flex-wrap gap-1.5"></div>
+    </div>
+
+    <!-- 한국철도공사 광역철도 -->
+    <div class="rounded-lg border border-slate-200 p-3">
+      <div class="text-[13px] font-extrabold text-[#0F5132] mb-2">🚆 한국철도공사 광역철도</div>
+      <div class="flex gap-2 mb-2">
+        <input id="in-railkr" type="email" inputmode="email" placeholder="alarm@example.com"
+          class="flex-1 min-w-0 text-[14px] border border-slate-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addEmail('railkr_notify_emails');}">
+        <button onclick="addEmail('railkr_notify_emails')" class="tapbtn shrink-0 text-[14px] font-bold bg-emerald-600 text-white rounded-lg px-4 hover:bg-emerald-700">추가</button>
+      </div>
+      <div id="list-railkr" class="flex flex-wrap gap-1.5"></div>
+    </div>
+  </section>
+
+  <!-- 사용자 관리 안내 -->
+  <section class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-sm font-extrabold text-[#7A0B3C]">👥 사용자 관리</h2>
+      <span id="user-count" class="text-[11px] text-slate-400"></span>
+    </div>
+    <div class="text-[11px] text-slate-500 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed mb-3">
+      🗂️ <b class="text-[#3730A3]">시스템 접근(메인 카드)</b>: 각 직원 카드에서 <b>단말기 · 자재서식 · 센터배정 · 교통카드 · 한국철도</b> 버튼을 눌러 보일 카드를 켜고(<b>초록</b>)/끌(<b>회색</b>) 수 있습니다. 신규 가입자는 <b>단말기만</b> 보입니다. 관리자는 자동으로 전체 사용.
+    </div>
+    <div id="user-cards" class="space-y-2.5"></div>
+  </section>
+
+  <footer class="text-center text-[11px] text-slate-400 pt-2 pb-8">ATEC Mobility · 관리자 콘솔</footer>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+
+/* ===== 고정 관리자 ===== */
+const ADMIN_EMAIL='ysukim@atecmobility.com';
+
+/* ===== Supabase ===== */
+const SB_URL='https://eiyksjcqntenmetmhmij.supabase.co';
+const SB_KEY='sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
+const SB_USERS='shared_users';
+const SB_DATA='shared_data';
+function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, extra||{}); }
+function cloudAvailable(){ return !!(SB_URL && SB_KEY && SB_URL.indexOf('http')===0); }
+
+async function cloudUsersGetAll(){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?select=username,data`;
+  const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) throw new Error('users get '+r.status);
+  const rows=await r.json();
+  return rows.map(row=>{ try{ return Object.assign({username:row.username}, JSON.parse(row.data)); }catch(e){ return {username:row.username}; } });
+}
+async function cloudUserPut(user){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?on_conflict=username`;
+  const {username, ...rest}=user;
+  const body=[{username, data:JSON.stringify(rest), updated_at:new Date().toISOString()}];
+  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error('user put '+r.status+' '+t); } return true;
+}
+async function cloudUserDelete(username){
+  const url=`${SB_URL}/rest/v1/${SB_USERS}?username=eq.${encodeURIComponent(username)}`;
+  const r=await fetch(url,{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});
+  if(!r.ok){ const t=await r.text(); throw new Error('user delete '+r.status+' '+t); } return true;
+}
+async function cloudDataGet(key){
+  const url=`${SB_URL}/rest/v1/${SB_DATA}?key=eq.${encodeURIComponent(key)}&select=payload`;
+  const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) return null;
+  const rows=await r.json(); if(!rows||!rows[0]||rows[0].payload==null) return null;
+  try{ return JSON.parse(rows[0].payload); }catch(e){ return null; }
+}
+async function cloudDataPut(key, obj){
+  const url=`${SB_URL}/rest/v1/${SB_DATA}?on_conflict=key`;
+  const body=[{key, payload:JSON.stringify(obj), updated_at:new Date().toISOString()}];
+  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error('data put '+r.status+' '+t); } return true;
+}
+
+/* ===== 공통 유틸 ===== */
+async function sha256(s){
+  try{ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+  catch(e){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return 'x'+(h>>>0).toString(16); }
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function normEmail(e){ return (e||'').trim().toLowerCase(); }
+function nowStamp(){ const d=new Date(); const p=n=>('0'+n).slice(-2); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function genTempPw(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let s=''; for(let i=0;i<8;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function getUsers(){ try{ return await cloudUsersGetAll(); }catch(e){ console.warn(e); return []; } }
+async function getUser(u){ const all=await getUsers(); return all.find(x=>x.username===normEmail(u)); }
+async function userPut(user){ await cloudUserPut(user); }
+async function userDelete(username){ await cloudUserDelete(username); }
+
+/* ===== 권한 모듈 ===== */
+const PERM_MODULES=[
+  {key:'terminal', label:'단말기'},
+  {key:'forms',    label:'자재서식'},
+  {key:'center',   label:'센터배정'},
+  {key:'rail',     label:'교통카드'},
+  {key:'railkr',   label:'한국철도'},
+];
+const ALL_PERMS=PERM_MODULES.map(m=>m.key);
+function effectivePerms(u){
+  if(!u) return [];
+  if(u.role==='admin') return ALL_PERMS.slice();
+  let p=Array.isArray(u.perms)?u.perms.slice():[];
+  if(!u._permMig){ p=Array.from(new Set([...p,'terminal','forms','center', ...(p.includes('rail')?['railkr']:[])])); }
+  return p;
+}
+
+/* ===== 세션 가드 ===== */
+let ME=null;
+async function boot(){
+  let sess=null; try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
+  if(!sess || !sess.username){ return blockGuard('로그인이 필요합니다. 메인에서 로그인 후 다시 시도하세요.'); }
+  // 클라우드에서 최신 권한 확인
+  let u=null; try{ u=await getUser(sess.username); }catch(e){}
+  if(!u){ return blockGuard('계정 정보를 확인할 수 없습니다.'); }
+  if(u.role!=='admin'){ return blockGuard('이 계정은 관리자 권한이 없습니다.'); }
+  ME=u;
+  $('#hdr-sub').textContent = (u.name||u.username)+' (관리자)';
+  $('#app').classList.remove('hidden');
+  await renderEmails('rail_notify_emails');
+  await renderEmails('railkr_notify_emails');
+  await renderUsers();
+}
+function blockGuard(msg){ $('#guard-msg').textContent=msg; $('#guard').classList.remove('hidden'); }
+function logout(){ try{ sessionStorage.removeItem('atec_session'); }catch(e){} location.href='index.html'; }
+
+/* ===== 이메일 수신자 (시스템별) ===== */
+const EMAIL_INPUTS={ 'rail_notify_emails':'#in-rail', 'railkr_notify_emails':'#in-railkr' };
+const EMAIL_LISTS ={ 'rail_notify_emails':'#list-rail', 'railkr_notify_emails':'#list-railkr' };
+const CACHE={};
+async function loadEmails(key, force){
+  if(CACHE[key] && !force) return CACHE[key];
+  const obj=await cloudDataGet(key);
+  CACHE[key]=(obj && Array.isArray(obj.emails))?obj.emails:[];
+  return CACHE[key];
+}
+async function saveEmails(key){ await cloudDataPut(key,{emails:CACHE[key], updated:nowStamp()}); }
+async function renderEmails(key){
+  const box=$(EMAIL_LISTS[key]); if(!box) return;
+  const list=await loadEmails(key,true);
+  if(!list.length){ box.innerHTML='<span class="text-[12px] text-slate-400">등록된 수신자가 없습니다.</span>'; return; }
+  box.innerHTML=list.map(e=>`<span class="inline-flex items-center gap-1.5 text-[13px] bg-slate-100 border border-slate-200 text-slate-700 rounded-full pl-3 pr-1.5 py-1.5">${esc(e)}<button onclick="removeEmail('${key}','${e.replace(/'/g,"\\'")}')" class="w-5 h-5 inline-flex items-center justify-center rounded-full bg-slate-300 text-slate-700 hover:bg-red-200 hover:text-red-700 font-bold leading-none" title="삭제">×</button></span>`).join('');
+}
+async function addEmail(key){
+  const inp=$(EMAIL_INPUTS[key]); if(!inp) return;
+  const e=normEmail(inp.value); if(!e) return;
+  if(!EMAIL_RE.test(e)){ alert('올바른 이메일 형식이 아닙니다.'); return; }
+  await loadEmails(key);
+  if(CACHE[key].includes(e)){ alert('이미 등록된 주소입니다.'); inp.value=''; return; }
+  CACHE[key].push(e);
+  try{ await saveEmails(key); inp.value=''; renderEmails(key); }
+  catch(err){ alert('저장 실패: '+err.message); }
+}
+async function removeEmail(key, e){
+  await loadEmails(key);
+  CACHE[key]=CACHE[key].filter(x=>x!==e);
+  try{ await saveEmails(key); renderEmails(key); }
+  catch(err){ alert('삭제 실패: '+err.message); }
+}
+
+/* ===== 사용자 목록 (모바일 카드형) ===== */
+function statusChip(s){ return ({approved:'<span class="chip" style="background:#dcfce7;color:#16A34A">승인됨</span>',pending:'<span class="chip" style="background:#fef9c3;color:#a16207">대기</span>',rejected:'<span class="chip" style="background:#fee2e2;color:#B91C1C">거부됨</span>'}[s]||esc(s)); }
+
+async function renderUsers(){
+  const users=await getUsers();
+  // 대기/요청 박스
+  const pending=users.filter(u=>u.status==='pending');
+  const pbox=$('#box-pending');
+  pbox.innerHTML = pending.length ? `<section class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+    <div class="text-[13px] font-extrabold text-amber-800 mb-2">⏳ 승인 대기 (${pending.length}명)</div>
+    <div class="space-y-2">${pending.map(u=>`
+      <div class="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-amber-100 px-3 py-2">
+        <div class="flex-1 min-w-0 text-[13px]"><b class="text-slate-800">${esc(u.name)}</b> <span class="text-slate-400 text-[11px] break-all">${esc(u.username)}</span></div>
+        <button onclick="approveUser('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md px-3 py-1.5">승인</button>
+        <button onclick="rejectUser('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-red-600 border border-red-200 hover:bg-red-50 rounded-md px-3 py-1.5">거부</button>
+      </div>`).join('')}</div></section>` : '';
+
+  const resets=users.filter(u=>u.resetReq);
+  const rbox=$('#box-resets');
+  rbox.innerHTML = resets.length ? `<section class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+    <div class="text-[13px] font-extrabold text-[#B91C1C] mb-2">🔑 비밀번호 재설정 요청 (${resets.length}건)</div>
+    <div class="space-y-2">${resets.map(u=>`
+      <div class="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
+        <div class="flex-1 min-w-0 text-[13px]"><b class="text-slate-800">${esc(u.name)}</b> <span class="text-slate-400 text-[11px] break-all">${esc(u.username)}</span></div>
+        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-white bg-[#C2185B] hover:opacity-90 rounded-md px-3 py-1.5">임시 비밀번호 발급</button>
+        <button onclick="dismissReset('${esc(u.username)}')" class="tapbtn text-[12px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-3 py-1.5">무시</button>
+      </div>`).join('')}</div></section>` : '';
+
+  $('#user-count').textContent = `총 ${users.length}명`;
+
+  const sorted=users.slice().sort((a,b)=>(a.created||'').localeCompare(b.created||''));
+  $('#user-cards').innerHTML = sorted.map(u=>{
+    const me = ME && u.username===ME.username;
+    const isAdminRow = u.role==='admin';
+    const uperms = effectivePerms(u);
+    const roleChip = isAdminRow ? '<span class="chip" style="background:#fef3c7;color:#b45309">관리자</span>' : '<span class="chip" style="background:#f1f5f9;color:#64748b">일반</span>';
+    const permArea = isAdminRow
+      ? '<span class="chip" style="background:#e0e7ff;color:#3730A3">전체 시스템 자동 사용</span>'
+      : PERM_MODULES.map(m=>{ const on=uperms.includes(m.key);
+          return `<button onclick="togglePerm('${esc(u.username)}','${m.key}')" class="pbtn tapbtn ${on?'bg-emerald-50 border-emerald-300 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-400'}">${on?'✓ ':''}${m.label}</button>`;
+        }).join('');
+    const roleBtn = isAdminRow
+      ? `<button onclick="setRole('${esc(u.username)}','user')" ${me?'disabled':''} class="tapbtn text-[12px] border border-slate-200 rounded-md px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
+      : `<button onclick="setRole('${esc(u.username)}','admin')" class="tapbtn text-[12px] border border-amber-300 text-amber-700 rounded-md px-3 py-1.5 hover:bg-amber-50">관리자로</button>`;
+    return `<div class="border border-rose-100 rounded-xl p-3 bg-white">
+      <div class="flex items-start gap-2 mb-2">
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-[#C2185B] text-[14px] break-all">${esc(u.username)}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}</div>
+          <div class="text-[13px] text-slate-700">${esc(u.name)} ${roleChip} ${statusChip(u.status)}
+            ${u.resetReq?'<span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}
+            ${u.tempPw?'<span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">가입 ${esc(u.created||'-')}${u.lastLogin?' · 최근 '+esc(u.lastLogin):''}</div>
+        </div>
+      </div>
+      <div class="mb-2">
+        <div class="text-[11px] text-slate-400 mb-1">시스템 접근(메인 카드)</div>
+        <div class="flex flex-wrap gap-1.5">${permArea}</div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 pt-1 border-t border-rose-50">
+        ${u.status==='pending'?`<button onclick="approveUser('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-emerald-700 border border-emerald-200 rounded-md px-3 py-1.5 hover:bg-emerald-50">승인</button>`:''}
+        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] border border-rose-200 text-[#C2185B] rounded-md px-3 py-1.5 hover:bg-rose-50">PW재설정</button>
+        ${roleBtn}
+        <button onclick="deleteUser('${esc(u.username)}')" ${me?'disabled':''} class="tapbtn text-[12px] text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50 disabled:opacity-40 ml-auto">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== 사용자 액션 ===== */
+async function togglePerm(u, key){
+  const x=await getUser(u); if(!x) return;
+  if(x.role==='admin'){ alert('관리자는 자동으로 모든 시스템을 사용합니다.'); return; }
+  let p=effectivePerms(x);
+  const i=p.indexOf(key); if(i<0) p.push(key); else p.splice(i,1);
+  x.perms=p; x._permMig=true;
+  try{ await userPut(x); renderUsers(); }catch(e){ alert('저장 실패: '+e.message); }
+}
+async function setRole(u, role){
+  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정의 권한은 변경할 수 없습니다.'); return; }
+  if(ME && u===ME.username && role==='user'){ if(!confirm('본인 관리자 권한을 해제하면 이 화면을 더 이상 사용할 수 없습니다. 계속할까요?')) return; }
+  const x=await getUser(u); if(!x) return;
+  x.role=role; try{ await userPut(x); }catch(e){ return alert('실패: '+e.message); }
+  if(ME && u===ME.username && role==='user'){ return location.href='index.html'; }
+  renderUsers();
+}
+async function deleteUser(u){
+  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 삭제할 수 없습니다.'); return; }
+  if(ME && u===ME.username){ alert('본인 계정은 삭제할 수 없습니다.'); return; }
+  if(!confirm(`'${u}' 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+  try{ await userDelete(u); renderUsers(); }catch(e){ alert('삭제 실패: '+e.message); }
+}
+async function approveUser(u){ const x=await getUser(u); if(!x) return; x.status='approved'; await userPut(x); renderUsers(); }
+async function rejectUser(u){ if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 변경할 수 없습니다.'); return; } const x=await getUser(u); if(!x) return; x.status='rejected'; await userPut(x); renderUsers(); }
+async function issueTempPw(u){
+  const x=await getUser(u); if(!x) return;
+  const temp=genTempPw(); x.pwhash=await sha256(temp); x.tempPw=true; x.resetReq=false;
+  try{ await userPut(x); }catch(e){ return alert('실패: '+e.message); }
+  renderUsers();
+  alert(`'${x.name}'(${x.username}) 님의 임시 비밀번호\n\n임시 비밀번호:  ${temp}\n\n이 비밀번호를 전달하세요. 로그인 후 새 비밀번호로 변경하게 됩니다.`);
+}
+async function dismissReset(u){ const x=await getUser(u); if(!x) return; x.resetReq=false; await userPut(x); renderUsers(); }
+
+boot();
+</script>
+</body>
+</html>
