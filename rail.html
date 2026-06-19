@@ -371,9 +371,10 @@ html.force-web body{ min-width:1280px; }
         </div>
       </div>
 
+      <div id="f-edit-banner" class="hidden mt-3 mb-1 text-[13px] font-bold rounded-lg px-3 py-2" style="background:#eef0fb;color:#3730A3;border:1px solid #c7d2fe">✏ 수정 모드입니다 — 기존 기록을 고치고 있습니다. 「수정 저장」을 누르면 해당 기록이 갱신됩니다. <button onclick="cancelEdit()" class="ml-1 underline">수정 취소</button></div>
       <div id="f-msg" class="text-[13px] font-semibold mt-4 min-h-[20px]"></div>
       <div class="flex items-center gap-2.5 mt-1">
-        <button onclick="saveFault()" class="btn-main px-6 py-2.5 text-sm">저장하기</button>
+        <button id="f-save-btn" onclick="saveFault()" class="btn-main px-6 py-2.5 text-sm">저장하기</button>
         <button onclick="resetForm()" class="btn-ghost px-5 py-2.5 text-sm">초기화</button>
       </div>
     </div>
@@ -639,6 +640,7 @@ function resetForm(){
   $('#f-replaced').value='무'; $('#f-result').value='완료'; $('#f-station-info').textContent='';
   $('#f-msg').textContent='';
   const today=new Date().toISOString().slice(0,10); $('#f-date').value=today; $('#f-pdate').value=today;
+  EDIT_ID=null; setEditUI(false);
 }
 function railToast(text, ok){
   let t=document.getElementById('rail-toast');
@@ -673,22 +675,35 @@ async function saveFault(){
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
   const createdStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  const rec={
+  const base={
     date:$('#f-date').value, week:'', line:st?String(st.line):'', station:station, device:device,
     module:module, ftype:ftype, content:$('#f-content').value.trim(),
     pdate:$('#f-pdate').value, ptype:$('#f-ptype').value.trim(), pcontent:$('#f-pcontent').value.trim(),
     replaced:$('#f-replaced').value, sn_old:$('#f-snold').value.trim(), sn_new:$('#f-snnew').value.trim(),
-    result:$('#f-result').value, worker:$('#f-worker').value.trim(), note:$('#f-note').value.trim(),
-    _user:true, _ts:Date.now(), _id:'r'+Date.now()+Math.random().toString(36).slice(2,7),
-    _by: sess?(sess.name||sess.username):'', created:createdStr
+    result:$('#f-result').value, worker:$('#f-worker').value.trim(), note:$('#f-note').value.trim()
   };
-  USER_FAULTS.push(rec); rebuildFaults();
-  msg.style.color='#475569'; msg.textContent='저장 중…';
+  let rec; const isEdit = !!EDIT_ID;
+  if(isEdit){
+    const idx=USER_FAULTS.findIndex(x=>x._id===EDIT_ID);
+    if(idx<0){ msg.style.color='#e11d48'; msg.textContent='수정할 기록을 찾을 수 없습니다. (이미 삭제되었을 수 있습니다)'; EDIT_ID=null; setEditUI(false); return; }
+    rec=Object.assign({}, USER_FAULTS[idx], base, {_ts:Date.now(), _edited:createdStr});
+    USER_FAULTS[idx]=rec;
+  } else {
+    rec=Object.assign({}, base, {
+      _user:true, _ts:Date.now(), _id:'r'+Date.now()+Math.random().toString(36).slice(2,7),
+      _by: sess?(sess.name||sess.username):'', created:createdStr
+    });
+    USER_FAULTS.push(rec);
+  }
+  rebuildFaults();
+  msg.style.color='#475569'; msg.textContent = isEdit ? '수정 중…' : '저장 중…';
   await persistFaults();
   msg.style.color='#16a34a';
-  msg.textContent = CLOUD_OK ? '✓ 클라우드에 저장되었습니다. 대시보드로 이동합니다…' : '✓ 저장되었습니다. (클라우드 연결 실패 — 이 기기에만 임시 저장)';
-  railToast(CLOUD_OK ? '저장되었습니다' : '저장됨 · 클라우드 연결 실패(임시 저장)', CLOUD_OK);
-  railNotify(rec);
+  msg.textContent = isEdit ? '✓ 수정되었습니다. 대시보드로 이동합니다…'
+                 : (CLOUD_OK ? '✓ 클라우드에 저장되었습니다. 대시보드로 이동합니다…' : '✓ 저장되었습니다. (클라우드 연결 실패 — 이 기기에만 임시 저장)');
+  railToast(isEdit ? '수정되었습니다' : (CLOUD_OK ? '저장되었습니다' : '저장됨 · 클라우드 연결 실패(임시 저장)'), CLOUD_OK);
+  if(!isEdit) railNotify(rec);
+  EDIT_ID=null; setEditUI(false);
   populateFilters(); renderList(); updateMeta();
   setTimeout(()=>{ resetForm(); goTab('dash'); }, 800);
 }
@@ -946,7 +961,7 @@ function renderList(){
     <td>${f.result==='완료'?'<span class="chip" style="background:#dcfce7;color:#166534">완료</span>':(f.result||'-')}</td>
     <td class="desk-only">${f.worker||'-'}</td>
     <td class="desk-only whitespace-nowrap text-[11.5px] text-slate-500">${f.created?`<span title="작성완료 시각">🕒 ${f.created}</span>`:'<span class="text-slate-300">(기존)</span>'}</td>
-    <td class="whitespace-nowrap">${f._user?'<span class="chip" style="background:#eef0fb;color:#4F46E5">내 입력</span>':''}${isAdmin?` <button onclick="deleteFault('${f._id||''}',this)" title="삭제" class="text-[11px] font-semibold text-slate-400 border border-slate-200 rounded-md px-2 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">✕ 삭제</button>`:''}</td>
+    <td class="whitespace-nowrap">${f._user?'<span class="chip" style="background:#eef0fb;color:#4F46E5">내 입력</span>':''}${isAdmin && f._user && f._id?` <button onclick="editFault('${f._id}')" title="수정" class="text-[11px] font-semibold text-indigo-500 border border-indigo-200 rounded-md px-2 py-1 hover:bg-indigo-50 hover:text-indigo-700 transition">✎ 수정</button>`:''}${isAdmin?` <button onclick="deleteFault('${f._id||''}',this)" title="삭제" class="text-[11px] font-semibold text-slate-400 border border-slate-200 rounded-md px-2 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">✕ 삭제</button>`:''}</td>
   </tr>`).join('') || `<tr><td colspan="14" class="text-center text-slate-400 py-8">조건에 맞는 장애가 없습니다.</td></tr>`;
 }
 
@@ -960,6 +975,41 @@ async function deleteFault(id, btn){
   USER_FAULTS.splice(idx,1); rebuildFaults();
   await persistFaults();
   renderList(); renderDash(); updateMeta();
+}
+
+/* ===== edit (admin only) — 작성완료 기록 수정 후 재저장 ===== */
+let EDIT_ID=null;
+function setEditUI(on){
+  const b=$('#f-save-btn'); if(b) b.textContent = on ? '수정 저장' : '저장하기';
+  const banner=$('#f-edit-banner'); if(banner) banner.classList.toggle('hidden', !on);
+}
+function cancelEdit(){ EDIT_ID=null; setEditUI(false); resetForm(); goTab('list'); }
+function editFault(id){
+  if(!(sess && sess.role==='admin')){ alert('관리자만 수정할 수 있습니다.'); return; }
+  if(!id){ alert('원본 시드 데이터는 수정할 수 없습니다. (사용자가 입력한 기록만 수정 가능)'); return; }
+  const f=USER_FAULTS.find(x=>x._id===id);
+  if(!f){ alert('해당 기록을 찾을 수 없습니다.'); return; }
+  goTab('entry');
+  $('#f-date').value=f.date||'';
+  $('#f-station').value=f.station||'';
+  onStationPick();                       // 호선·장비번호 목록 채움
+  $('#f-device').value=f.device||'';
+  $('#f-module').value=f.module||'';
+  $('#f-ftype').value=f.ftype||'';
+  $('#f-content').value=f.content||'';
+  $('#f-pdate').value=f.pdate||'';
+  $('#f-ptype').value=f.ptype||'';
+  $('#f-pcontent').value=f.pcontent||'';
+  $('#f-replaced').value=f.replaced||'무';
+  $('#f-snold').value=f.sn_old||'';
+  $('#f-snnew').value=f.sn_new||'';
+  $('#f-result').value=f.result||'완료';
+  $('#f-worker').value=f.worker||'';
+  $('#f-note').value=f.note||'';
+  EDIT_ID=id; setEditUI(true);
+  $('#f-msg').style.color='#4F46E5';
+  $('#f-msg').textContent='✏ 수정 모드 — 내용을 고친 뒤 「수정 저장」을 누르세요.';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* ===== excel (원본과 동일 양식) ===== */
