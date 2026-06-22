@@ -308,6 +308,7 @@ html.force-web body{ min-width:1280px; }
         <div>
           <label class="fld-label">호선</label>
           <input id="f-line" class="fld" placeholder="자동" readonly style="background:#f8f8fc">
+          <select id="f-line-sel" class="fld" onchange="onLinePick()" style="display:none"></select>
         </div>
         <div>
           <label class="fld-label req">장비번호</label>
@@ -621,24 +622,53 @@ function initEntryDefaults(){
   $('#f-date').value=today; $('#f-pdate').value=today;
   $('#f-station').addEventListener('input', onStationPick);
 }
+let SELSTATION=null;            // 현재 선택된 역사(호선까지 확정된 객체)
+// 선택된 역사 적용(호선·장비·안내)
+function applyStation(st){
+  SELSTATION=st;
+  const dev=$('#f-device'); const info=$('#f-station-info');
+  $('#f-line').value=st.line||'';
+  dev.innerHTML='<option value="">선택</option>'+(st.devices||[]).map(d=>`<option value="${d}">${d}</option>`).join('');
+  if(st.devices&&st.devices.length) dev.value=st.devices[0];
+  info.innerHTML=`<span class="chip ${lineClass(st.line)}">${st.line}호선</span> 관리소: <b>${st.office||'-'}</b> · 장비 ${st.devices.length}대`;
+}
 function onStationPick(){
   const name=$('#f-station').value.trim();
-  const st=STATIONS.find(s=>s.name===name);
   const dev=$('#f-device'); const info=$('#f-station-info');
-  if(st){
-    $('#f-line').value=st.line||'';
-    dev.innerHTML='<option value="">선택</option>'+(st.devices||[]).map(d=>`<option value="${d}">${d}</option>`).join('');
-    if(st.devices&&st.devices.length) dev.value=st.devices[0];
-    info.innerHTML=`<span class="chip ${lineClass(st.line)}">${st.line}호선</span> 관리소: <b>${st.office||'-'}</b> · 장비 ${st.devices.length}대`;
-  } else {
-    $('#f-line').value=''; dev.innerHTML='<option value="">선택</option>'; info.textContent='';
+  const lineInp=$('#f-line'); const lineSel=$('#f-line-sel');
+  const matches=STATIONS.filter(s=>s.name===name);
+  window.__stMatches=matches;
+  if(matches.length===0){
+    SELSTATION=null;
+    lineInp.style.display=''; lineInp.value=''; lineSel.style.display='none'; lineSel.innerHTML='';
+    dev.innerHTML='<option value="">선택</option>'; info.textContent='';
+    return;
   }
+  if(matches.length===1){
+    lineSel.style.display='none'; lineSel.innerHTML=''; lineInp.style.display='';
+    applyStation(matches[0]);
+    return;
+  }
+  // 같은 역명이 여러 호선 → 호선 선택 드롭다운 표시
+  SELSTATION=null;
+  lineInp.style.display='none';
+  lineSel.style.display='';
+  lineSel.innerHTML='<option value="">호선 선택</option>'+matches.map((s,i)=>`<option value="${i}">${s.line}호선 (관리소 ${s.office||'-'})</option>`).join('');
+  dev.innerHTML='<option value="">선택</option>';
+  info.innerHTML='<span class="text-rose-600 font-bold">⚠ 이 역은 여러 호선에 있습니다 — 호선을 선택하세요.</span>';
+}
+function onLinePick(){
+  const i=$('#f-line-sel').value;
+  const ms=window.__stMatches||[];
+  if(i==='' || !ms[+i]){ SELSTATION=null; $('#f-device').innerHTML='<option value="">선택</option>'; return; }
+  applyStation(ms[+i]);
 }
 function resetForm(){
   ['f-station','f-module','f-ftype','f-content','f-ptype','f-pcontent','f-snold','f-snnew','f-worker','f-note'].forEach(id=>$('#'+id).value='');
   $('#f-line').value=''; $('#f-device').innerHTML='<option value="">선택</option>';
   $('#f-replaced').value='무'; $('#f-result').value='완료'; $('#f-station-info').textContent='';
   $('#f-msg').textContent='';
+  SELSTATION=null; const _ls=$('#f-line-sel'); if(_ls){ _ls.style.display='none'; _ls.innerHTML=''; } $('#f-line').style.display='';
   const today=new Date().toISOString().slice(0,10); $('#f-date').value=today; $('#f-pdate').value=today;
   EDIT_ID=null; setEditUI(false);
 }
@@ -671,7 +701,13 @@ async function saveFault(){
   if(!$('#f-date').value || !station || !device || !module || !ftype){
     msg.style.color='#e11d48'; msg.textContent='필수 항목(접수일자·역사·장비번호·모듈명·장애유형)을 입력하세요.'; return;
   }
-  const st=STATIONS.find(s=>s.name===station);
+  // 호선 확정: 선택된 역사 우선, 없으면 단일 매칭만 자동 / 여러 호선이면 선택 요구
+  let st = SELSTATION;
+  if(!st){
+    const ms=STATIONS.filter(s=>s.name===station);
+    if(ms.length===1) st=ms[0];
+    else if(ms.length>1){ msg.style.color='#e11d48'; msg.textContent='이 역은 여러 호선에 있습니다. 호선을 선택해 주세요.'; return; }
+  }
   const now=new Date();
   const pad=n=>String(n).padStart(2,'0');
   const createdStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -993,6 +1029,12 @@ function editFault(id){
   $('#f-date').value=f.date||'';
   $('#f-station').value=f.station||'';
   onStationPick();                       // 호선·장비번호 목록 채움
+  // 같은 역명이 여러 호선이면 기록된 호선으로 선택
+  const _ms=window.__stMatches||[];
+  if(_ms.length>1){
+    const _i=_ms.findIndex(s=>String(s.line)===String(f.line));
+    if(_i>=0){ $('#f-line-sel').value=String(_i); onLinePick(); }
+  }
   $('#f-device').value=f.device||'';
   $('#f-module').value=f.module||'';
   $('#f-ftype').value=f.ftype||'';
