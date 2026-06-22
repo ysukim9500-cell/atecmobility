@@ -2338,8 +2338,40 @@ function renderVehicleNoFault(vnum, m){
         <div><span class="text-slate-400">센터</span> <b class="text-slate-700">${escHtml(m.ct||'-')}</b></div>
         <div class="sm:col-span-2"><span class="text-slate-400">노선</span> <b class="text-slate-700">${escHtml(rt||'-')}</b></div>
       </div>
-      <p class="text-[12px] text-slate-500 mt-3 bg-emerald-50/60 border border-emerald-100 rounded-lg px-3 py-2">이 차량은 등록된 <b>장애·AS 접수 이력이 없습니다</b> (무사고). 차량 기본정보만 표시합니다.</p>
+      <p class="text-[12px] text-slate-500 mt-3 bg-emerald-50/60 border border-emerald-100 rounded-lg px-3 py-2">이 차량은 등록된 <b>장애·AS 접수 이력이 없습니다</b> (무사고). 백업을 올리면 아래에서 로그 분석을 받을 수 있습니다.</p>
     </div>
+
+    <!-- 로그백업 분석 (장애이력 없는 차량도 동일 제공) -->
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+      <h3 class="text-sm font-extrabold text-[#7A0B3C] mb-1">📂 단말기 로그백업 분석</h3>
+      <p class="text-[11px] text-slate-500 mb-2"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
+      <div class="space-y-3">
+        <div class="border border-rose-100 rounded-lg p-2.5" style="background:#fff5f8">
+          <div class="text-[12px] font-extrabold text-[#7A0B3C] mb-1">① 통합단말기 백업</div>
+          <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
+          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
+          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+        </div>
+        <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#f5f4ff">
+          <div class="text-[12px] font-extrabold text-[#3730A3] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
+          <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
+          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
+          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
+        </div>
+        <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
+        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">🔍 분석하기</button>
+      </div>
+      <div id="logbk-iso" class="mt-3"></div>
+      <div id="logbk-result" class="mt-3"></div>
+    </div>
+    <div id="logbk-action" class="bg-white border border-rose-100 rounded-xl shadow-sm p-4" style="display:none"></div>
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+      <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
+      <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
+    </div>
+
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
       <h3 class="text-sm font-extrabold text-[#7A0B3C] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
       <div id="eta-box-nf">—</div>
@@ -2348,6 +2380,7 @@ function renderVehicleNoFault(vnum, m){
   $('#result').innerHTML = html;
   window.__tlItems = [];
   if(rt){ try{ loadDepotEta(vnum, rt, 'eta-box-nf'); }catch(e){} }
+  if(typeof loadLogHistory==='function'){ try{ loadLogHistory(vnum); }catch(e){} }
 }
 loadVehicleMaster();
 
