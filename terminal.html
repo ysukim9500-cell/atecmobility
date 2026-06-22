@@ -2308,6 +2308,49 @@ function initEventControls(){
   initScopeControls();
 }
 
+/* ====== 전체 차량 마스터 (장애이력 없는 차량까지 검색) ====== */
+let VM = (typeof window!=='undefined' && window.__VEH_MASTER__) ? window.__VEH_MASTER__ : {};
+const MODEL_LABEL = {B800:'서울시내버스(B800)', B700:'서울시내버스(B700)', B710:'서울마을버스(B710)', B620:'공항버스(B620)'};
+async function loadVehicleMaster(){
+  if(VM && Object.keys(VM).length) return;
+  try{ const r=await fetch('vehicles.json',{cache:'force-cache'}); if(r.ok){ VM=await r.json(); console.log('[veh-master] loaded', Object.keys(VM).length); } }
+  catch(e){ console.warn('vehicle master load skip', e); }
+}
+function suggestMeta(m){
+  if(KB.vehicles[m]) return KB.vehicles[m].items.length+'건 · '+KB.vehicles[m].op;
+  const x=VM[m]; if(x) return (MODEL_LABEL[x.m]||x.m)+' · '+(x.op||'')+' · 이력없음';
+  return '';
+}
+function renderVehicleNoFault(vnum, m){
+  m = m || {};
+  const modelLabel = MODEL_LABEL[m.m]||m.m||'-';
+  const rt = m.rt||'';
+  const html = `
+  <div class="space-y-4">
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-lg font-extrabold text-[#7A0B3C]">${escHtml(vnum)}</span>
+        <span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">${escHtml(modelLabel)}</span>
+        <span class="chip" style="background:#dcfce7;color:#16A34A;font-weight:700">장애 이력 없음</span>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-3 text-[13px]">
+        <div><span class="text-slate-400">운수사</span> <b class="text-slate-700">${escHtml(m.op||'-')}</b></div>
+        <div><span class="text-slate-400">센터</span> <b class="text-slate-700">${escHtml(m.ct||'-')}</b></div>
+        <div class="sm:col-span-2"><span class="text-slate-400">노선</span> <b class="text-slate-700">${escHtml(rt||'-')}</b></div>
+      </div>
+      <p class="text-[12px] text-slate-500 mt-3 bg-emerald-50/60 border border-emerald-100 rounded-lg px-3 py-2">이 차량은 등록된 <b>장애·AS 접수 이력이 없습니다</b> (무사고). 차량 기본정보만 표시합니다.</p>
+    </div>
+    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+      <h3 class="text-sm font-extrabold text-[#7A0B3C] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
+      <div id="eta-box-nf">—</div>
+    </div>
+  </div>`;
+  $('#result').innerHTML = html;
+  window.__tlItems = [];
+  if(rt){ try{ loadDepotEta(vnum, rt, 'eta-box-nf'); }catch(e){} }
+}
+loadVehicleMaster();
+
 /* ============ SEARCH ============ */
 $('#q').addEventListener('input', e=>{
   const v=e.target.value.trim();
@@ -2315,7 +2358,7 @@ $('#q').addEventListener('input', e=>{
   const matches = matchVehicles(v).slice(0,8);
   if(matches.length===1 && matches[0]===normalizeFull(v)){ $('#suggest').innerHTML=''; }
   else $('#suggest').innerHTML = `<div class="absolute z-20 left-0 right-0 bg-white border border-rose-200 rounded-lg shadow-lg mt-1 overflow-hidden">
-    ${matches.map(m=>`<div onclick="$('#q').value='${m}';doSearch('${m}');" class="px-4 py-2 text-sm hover:bg-rose-50 cursor-pointer flex justify-between"><span>${m}</span><span class="text-[11px] text-slate-400">${KB.vehicles[m].items.length}건 · ${KB.vehicles[m].op}</span></div>`).join('')||'<div class="px-4 py-2 text-sm text-slate-400">일치하는 차량 없음</div>'}
+    ${matches.map(m=>`<div onclick="$('#q').value='${m}';doSearch('${m}');" class="px-4 py-2 text-sm hover:bg-rose-50 cursor-pointer flex justify-between"><span>${m}</span><span class="text-[11px] text-slate-400">${suggestMeta(m)}</span></div>`).join('')||'<div class="px-4 py-2 text-sm text-slate-400">일치하는 차량 없음</div>'}
   </div>`;
 });
 $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const m=matchVehicles(e.target.value.trim()); if(m[0]){$('#q').value=m[0];doSearch(m[0]);} } });
@@ -2323,12 +2366,16 @@ $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const m=matchVehic
 function normalizeFull(v){ return v; }
 function matchVehicles(v){
   v=v.replace(/\s/g,'');
+  if(KB.vehicles[v] || VM[v]) return [v];
+  // 장애이력 차량(KB) + 전체 차량 마스터(VM)를 합쳐 검색
+  const seen=new Set(Object.keys(KB.vehicles));
   const keys=Object.keys(KB.vehicles);
-  if(KB.vehicles[v]) return [v];
+  for(const k in VM){ if(!seen.has(k)){ keys.push(k); seen.add(k); } }
   // match by tail digits or substring
   const digits = v.replace(/\D/g,'');
-  let res = keys.filter(k=>k.includes(v));
-  if(digits.length>=3) res = res.concat(keys.filter(k=>k.replace(/\D/g,'').endsWith(digits) && !res.includes(k)));
+  const inRes=new Set();
+  let res = keys.filter(k=>{ if(k.includes(v)){ inRes.add(k); return true; } return false; });
+  if(digits.length>=3) res = res.concat(keys.filter(k=>k.replace(/\D/g,'').endsWith(digits) && !inRes.has(k)));
   return [...new Set(res)];
 }
 
@@ -2336,14 +2383,15 @@ function doSearch(v){
   $('#suggest').innerHTML='';
   if(!v){ setTab('dash'); return; }
   const veh = KB.vehicles[v];
-  if(!veh){ setTab('dash'); return; }
+  if(!veh && !VM[v]){ setTab('dash'); return; }
   window.__curVeh = v;
   ['dash','preempt','events'].forEach(id=>$('#'+id).classList.add('hidden'));
   $('#result').classList.remove('hidden');
   CURTAB='search';
   const bb=$('#back-bar'); if(bb) bb.classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='search'));
-  renderVehicle(v, veh);
+  if(veh){ renderVehicle(v, veh); }
+  else { renderVehicleNoFault(v, VM[v]); }
   // apply global channel filter to timeline if active
   if(GF.ch && window.__tlItems && window.__tlItems.some(it=>it.recv===GF.ch)){ filterTL(GF.ch); }
   window.scrollTo({top:0,behavior:'smooth'});
