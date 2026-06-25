@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ATEC Mobility | 교통카드키오스크 장애 관리 시스템</title>
 <script>
 (function(){
@@ -177,6 +177,60 @@ html.force-mobile #rail-tabs .rtab{ border-radius:12px !important; }
 html.force-mobile #rail-tabs .rtab:not(.active){ color:#9AA0B4 !important; }
 html.force-mobile #rail-tabs .rtab.active{ background:transparent !important; color:var(--rail-main) !important; box-shadow:none !important; }
 html.force-mobile body{ padding-bottom:76px !important; }
+
+/* ============================================================
+   정밀 타이포 보정 v2 — 한글 가독성(30년차 기준)
+   · 본문 행간 1.6 · 제목만 음수 자간 · 모바일 숫자/라벨 정돈
+   ============================================================ */
+body{ line-break:strict; -webkit-text-size-adjust:100%; letter-spacing:-0.003em; }
+p, li, td, .rt-sub, .kpi-sub, .flt-label{ line-height:1.6; }
+h1, h2, h3, .kpi-val, .rt-num, .panel-head{ letter-spacing:-0.018em; }
+p, li, td{ text-wrap:pretty; }
+
+/* 모바일 글자 최소크기·행간 보장 */
+html.force-mobile{ font-size:15px !important; }
+@media (max-width:767px){ html:not(.force-web){ font-size:15px !important; } }
+html.force-mobile .kpi .kpi-val,
+html:not(.force-web) .kpi .kpi-val{ font-size:22px !important; line-height:1.12 !important; }
+html.force-mobile .kpi .kpi-label,
+html:not(.force-web) .kpi .kpi-label{ font-size:11.5px !important; line-height:1.4 !important; }
+html.force-mobile .kpi .kpi-sub,
+html:not(.force-web) .kpi .kpi-sub{ font-size:11px !important; line-height:1.45 !important; }
+html.force-mobile .rtile,
+html:not(.force-web) .rtile{ padding:12px 13px !important; border-radius:13px !important; }
+html.force-mobile .rtile .rt-name,
+html:not(.force-web) .rtile .rt-name{ font-size:12px !important; line-height:1.35 !important; }
+html.force-mobile .rtile .rt-num,
+html:not(.force-web) .rtile .rt-num{ font-size:22px !important; line-height:1.1 !important; }
+html.force-mobile .rtile .rt-sub,
+html:not(.force-web) .rtile .rt-sub{ font-size:10.5px !important; }
+html.force-mobile .chip,
+html:not(.force-web) .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
+html.force-mobile .rtbl,
+html:not(.force-web) .rtbl{ font-size:12px !important; }
+html.force-mobile .rtbl td,
+html:not(.force-web) .rtbl td{ line-height:1.5 !important; }
+
+/* 카드 숨통 + 하단탭 라벨 가독성 */
+html.force-mobile .panel,
+html:not(.force-web) .panel{ padding:15px 15px 13px !important; border-radius:15px !important; margin-bottom:12px !important; }
+html.force-mobile .rtab,
+html:not(.force-web) .rtab{ padding:7px 2px !important; gap:4px !important; }
+html.force-mobile .rtab-short,
+html:not(.force-web) .rtab-short{ font-size:10.5px !important; font-weight:700 !important; letter-spacing:-0.01em !important; }
+html.force-mobile .rtab-ico,
+html:not(.force-web) .rtab-ico{ width:21px !important; height:21px !important; }
+
+/* ============================================================
+   기기 호환 안정화 레이어 v3 — 폰 기종 무관 정렬 유지
+   ============================================================ */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body{ overflow-x:clip; }
+img, video, canvas, table{ max-width:100%; }
+@supports (padding:max(0px)){
+  body{ padding-left:max(0px,env(safe-area-inset-left)); padding-right:max(0px,env(safe-area-inset-right)); }
+}
+@media (max-width:767px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; } }
 </style>
 </head>
 <body>

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ATEC Mobility | 통합 관제 포털</title>
 <script>
 (function(){
@@ -67,6 +67,77 @@ body{ background:#F7F4F6 !important; }
 .rounded-2xl{ border-radius:18px !important; }
 @media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
 html.force-mobile button{ min-height:44px !important; }
+
+/* ============================================================
+   정밀 타이포 보정 v2 — 한글 가독성(30년차 기준)
+   · 어절 단위 줄바꿈(keep-all) · 본문 행간 1.65 · 제목만 음수 자간
+   ============================================================ */
+body{ word-break:keep-all; line-break:strict; -webkit-text-size-adjust:100%; letter-spacing:-0.003em; }
+p, li, .launch-card, .chip, label, a, button{ word-break:keep-all; }
+h1, h2, h3{ letter-spacing:-0.02em; }
+.launch-card p, .launch-card .text-slate-500, .launch-card .text-slate-600{ line-height:1.6 !important; }
+.launch-card h3, .launch-card .font-bold{ letter-spacing:-0.015em; line-height:1.35; }
+p{ text-wrap:pretty; }
+
+/* 모바일: 과축소 복원 + 카드 숨통 */
+html.force-mobile{ font-size:15px !important; }
+@media (max-width:767px){ html:not(.force-web){ font-size:15px !important; } }
+html.force-mobile .launch-card,
+html:not(.force-web) .launch-card{ padding:20px !important; }
+html.force-mobile #user-badge button,
+html:not(.force-web) #user-badge button,
+html.force-mobile .ub-btn,
+html:not(.force-web) .ub-btn{ font-size:11px !important; padding:5px 10px !important; }
+html.force-mobile .launch-card .text-\[11px\],
+html:not(.force-web) .launch-card .text-\[11px\]{ font-size:11.5px !important; line-height:1.55 !important; }
+
+/* ================= ATEC 리디자인 v3 · 새 비주얼 시스템 ================= */
+:root{
+  --ink:#26191F; --wine:#7A0B3C; --wine-deep:#56072C; --magenta:#B0184E;
+  --paper:#F4F0EA; --surface:#ffffff; --line:#E8E0DA; --muted:#8A7F86; --soft:#FBF8F4;
+}
+body{ background:var(--paper) !important; color:var(--ink); }
+#auth-overlay{ background:var(--paper) !important; }
+.text-slate-800{ color:var(--ink) !important; }
+.text-slate-500, .text-slate-600{ color:#6F656C !important; }
+.border-rose-100, .border-rose-200, .border-indigo-100, .border-sky-100, .border-amber-100{ border-color:var(--line) !important; }
+.text-\[\#C2185B\]{ color:var(--magenta) !important; }
+
+.v3-eyebrow{ font-size:12px; font-weight:800; letter-spacing:.18em; color:var(--magenta); }
+.v3-title{ font-weight:800; letter-spacing:-.02em; color:var(--ink); }
+.v3-card{ background:var(--surface); border:1px solid var(--line); border-radius:20px;
+  box-shadow:0 1px 2px rgba(38,25,31,.03), 0 16px 34px -26px rgba(38,25,31,.28); transition:transform .18s, box-shadow .18s; }
+.v3-card:hover{ transform:translateY(-3px); box-shadow:0 22px 44px -24px rgba(38,25,31,.36); }
+.sys-ico{ width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+
+.hero3{ position:relative; overflow:hidden; background:var(--wine-deep); }
+.hero3 > img.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.92; }
+.hero3 > .scrim{ position:absolute; inset:0; background:linear-gradient(105deg, rgba(40,5,22,.95) 0%, rgba(86,7,44,.86) 46%, rgba(122,11,60,.52) 100%); }
+.hero3 > .grid3{ position:absolute; inset:0; opacity:.10; background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size:34px 34px; }
+
+.launch3{ display:block; background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:22px;
+  box-shadow:0 1px 2px rgba(38,25,31,.03), 0 16px 34px -26px rgba(38,25,31,.28);
+  transition:transform .18s, box-shadow .18s, border-color .18s; position:relative; overflow:hidden; }
+.launch3:hover{ transform:translateY(-3px); box-shadow:0 26px 50px -24px rgba(38,25,31,.42); border-color:#DFD4CD; }
+.launch3 .ico{ width:54px; height:54px; border-radius:16px; display:flex; align-items:center; justify-content:center; }
+.launch3 .arrow{ transition:transform .18s; }
+.launch3:hover .arrow{ transform:translateX(4px); }
+
+/* ---- 모바일 우선 (사용성) ---- */
+html.force-mobile .launch3, html:not(.force-web) .launch3{ padding:18px !important; border-radius:18px !important; }
+html.force-mobile .launch3 .ico, html:not(.force-web) .launch3 .ico{ width:48px !important; height:48px !important; border-radius:14px !important; }
+html.force-mobile .sys-ico, html:not(.force-web) .sys-ico{ width:44px !important; height:44px !important; }
+
+/* ============================================================
+   기기 호환 안정화 레이어 v3 — 폰 기종 무관 정렬 유지
+   ============================================================ */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body{ overflow-x:clip; }
+img, video, canvas, table{ max-width:100%; }
+@supports (padding:max(0px)){
+  body{ padding-left:max(0px,env(safe-area-inset-left)); padding-right:max(0px,env(safe-area-inset-right)); }
+}
+@media (max-width:767px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; } }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 500px at 80% -120px, #fdeef4, transparent), #fbf7f9;">
@@ -92,48 +163,48 @@ html.force-mobile button{ min-height:44px !important; }
     </div>
   </nav>
 
-  <!-- HERO -->
-  <header class="relative overflow-hidden text-white" style="background:linear-gradient(150deg,#5E0930 0%,#7A0B3C 48%,#A8124F 100%)">
-    <div class="absolute inset-0 opacity-[0.10]" style="background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px);background-size:34px 34px;"></div>
-    <div class="absolute -right-40 -top-48 w-[34rem] h-[34rem] rounded-full" style="background:radial-gradient(circle,rgba(236,64,122,.5),transparent 70%)"></div>
-    <div class="absolute -left-40 -bottom-56 w-[34rem] h-[34rem] rounded-full" style="background:radial-gradient(circle,rgba(168,18,79,.55),transparent 70%)"></div>
-    <div class="relative max-w-[1180px] mx-auto px-5 py-16 sm:py-24 grid lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
+  <!-- HERO (이미지 중심) -->
+  <header class="hero3 text-white">
+    <img class="bg" alt="서울 시내버스" src="https://commons.wikimedia.org/wiki/Special:FilePath/Seoul%20Bus%20705%20-%20Hyundai%20-%20Super%20Aero%20City%20(Wheelchair%20Accessible%20Low-entrance)%20-%20Namdaemun%20Road%20(16374090867).jpg?width=1600" onerror="this.onerror=null;this.src='https://picsum.photos/seed/seoulbus/1600/1100'">
+    <div class="scrim"></div>
+    <div class="grid3"></div>
+    <div class="relative max-w-[1180px] mx-auto px-5 pt-14 pb-16 sm:pt-20 sm:pb-24 grid lg:grid-cols-[1.06fr_0.94fr] gap-10 lg:gap-14 items-center">
       <div>
-        <div class="inline-flex items-center gap-1.5 bg-white/12 border border-white/20 rounded-full px-3 py-1 mb-5">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-          <span class="text-[11.5px] font-bold text-pink-50">버스 단말기 · 철도 키오스크 통합 장애 관리</span>
+        <div class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-6" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px)">
+          <span class="w-1.5 h-1.5 rounded-full" style="background:#7CE0B0;box-shadow:0 0 8px #7CE0B0"></span>
+          <span class="text-[11.5px] font-bold" style="color:#FBE7EF">버스 단말기 · 철도 키오스크 통합 장애 관리</span>
         </div>
-        <h1 class="text-[34px] sm:text-[52px] font-extrabold leading-[1.1] tracking-tight">장애를 데이터로<br><span class="text-pink-200">먼저 잡습니다</span></h1>
-        <p class="text-[14px] sm:text-[17px] text-pink-100/85 mt-5 leading-relaxed max-w-xl">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 장애 이력을 한 곳에서 관리하는 ATEC Mobility 운영자 전용 포털입니다.</p>
-        <div class="flex flex-wrap items-center gap-3 mt-8">
-          <button onclick="showAuth('login')" class="text-[14px] font-bold bg-white text-[#7A0B3C] px-6 py-3 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition">로그인하고 시작하기</button>
-          <a href="#systems" class="text-[14px] font-bold text-white/90 px-5 py-3 rounded-xl border border-white/30 hover:bg-white/10 transition">시스템 둘러보기 ↓</a>
+        <h1 class="font-extrabold tracking-tight" style="font-size:clamp(34px,6.4vw,58px);line-height:1.08">장애를 데이터로<br><span style="color:#F4B8D0">먼저 잡습니다</span></h1>
+        <p class="mt-6 max-w-xl" style="font-size:clamp(14px,2.1vw,18px);line-height:1.7;color:rgba(255,233,243,.9)">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 장애 이력을 한 곳에서 관리하는 ATEC Mobility 운영자 전용 포털입니다.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-9">
+          <button onclick="showAuth('login')" class="font-bold rounded-2xl px-7 py-4 transition active:scale-[.98]" style="background:#fff;color:var(--wine);font-size:15px;box-shadow:0 18px 40px -16px rgba(0,0,0,.55)">로그인하고 시작하기</button>
+          <a href="#systems" class="text-center font-bold rounded-2xl px-6 py-4 transition" style="border:1px solid rgba(255,255,255,.34);color:#fff;font-size:15px">시스템 둘러보기 ↓</a>
         </div>
       </div>
       <!-- HERO 비주얼: 실시간 진단 미리보기 목업 -->
-      <div class="hidden lg:block relative">
-        <div class="relative rounded-2xl p-5 shadow-2xl backdrop-blur" style="background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22)">
+      <div class="relative">
+        <div class="relative rounded-2xl p-5" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(12px);box-shadow:0 30px 60px -28px rgba(0,0,0,.6)">
           <div class="flex items-center justify-between mb-4">
             <div class="text-[13px] font-extrabold text-white">서울70사 1234 · 실시간 진단</div>
-            <span class="text-[10px] font-bold text-emerald-100 bg-emerald-400/25 rounded-full px-2 py-0.5">● LIVE</span>
+            <span class="text-[10px] font-bold rounded-full px-2 py-0.5" style="background:rgba(124,224,176,.22);color:#CFF6E4">● LIVE</span>
           </div>
           <div class="space-y-2.5">
-            <div class="rounded-lg p-3 flex items-center justify-between" style="background:rgba(255,255,255,.10)">
-              <span class="text-[12.5px] text-white/90">통합단말기 통신</span>
-              <span class="text-[11px] font-bold text-emerald-100 bg-emerald-400/20 rounded-full px-2 py-0.5">정상</span>
+            <div class="rounded-xl p-3 flex items-center justify-between" style="background:rgba(255,255,255,.1)">
+              <span class="text-[12.5px]" style="color:rgba(255,255,255,.92)">통합단말기 통신</span>
+              <span class="text-[11px] font-bold rounded-full px-2 py-0.5" style="background:rgba(124,224,176,.2);color:#CFF6E4">정상</span>
             </div>
-            <div class="rounded-lg p-3 flex items-center justify-between" style="background:rgba(255,255,255,.10)">
-              <span class="text-[12.5px] text-white/90">하차2 단말기</span>
-              <span class="text-[11px] font-bold text-rose-100 bg-rose-400/25 rounded-full px-2 py-0.5">교체 권장</span>
+            <div class="rounded-xl p-3 flex items-center justify-between" style="background:rgba(255,255,255,.1)">
+              <span class="text-[12.5px]" style="color:rgba(255,255,255,.92)">하차2 단말기</span>
+              <span class="text-[11px] font-bold rounded-full px-2 py-0.5" style="background:rgba(244,184,208,.25);color:#FFD9E6">교체 권장</span>
             </div>
-            <div class="rounded-lg p-3" style="background:rgba(255,255,255,.10)">
-              <div class="flex items-center justify-between mb-2"><span class="text-[12.5px] text-white/90">원인 격리</span><span class="text-[11px] font-bold text-amber-100">케이블 추정 72%</span></div>
-              <div class="h-1.5 rounded-full" style="background:rgba(255,255,255,.18)"><div class="h-1.5 rounded-full" style="width:72%;background:linear-gradient(90deg,#f9a8d4,#fff)"></div></div>
+            <div class="rounded-xl p-3" style="background:rgba(255,255,255,.1)">
+              <div class="flex items-center justify-between mb-2"><span class="text-[12.5px]" style="color:rgba(255,255,255,.92)">원인 격리</span><span class="text-[11px] font-bold" style="color:#FBE3B0">케이블 추정 72%</span></div>
+              <div class="h-1.5 rounded-full" style="background:rgba(255,255,255,.18)"><div class="h-1.5 rounded-full" style="width:72%;background:linear-gradient(90deg,#F4B8D0,#fff)"></div></div>
             </div>
           </div>
         </div>
-        <div class="absolute -top-4 -right-3 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold text-[#7A0B3C] flex items-center gap-1.5">🔔 Teams 알림 전송</div>
-        <div class="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold text-[#7A0B3C] flex items-center gap-1.5">🅿️ 차고지 도착 8분</div>
+        <div class="hidden sm:flex absolute -top-4 -right-2 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold items-center gap-1.5" style="color:var(--wine)">🔔 Teams 알림 전송</div>
+        <div class="hidden sm:flex absolute -bottom-4 -left-3 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold items-center gap-1.5" style="color:var(--wine)">🅿️ 차고지 도착 8분</div>
       </div>
     </div>
   </header>
@@ -141,35 +212,30 @@ html.force-mobile button{ min-height:44px !important; }
   <!-- 시스템 소개 -->
   <section id="systems" class="max-w-[1180px] mx-auto px-5 py-16 sm:py-20">
     <div class="text-center mb-10">
-      <div class="text-[12px] font-extrabold tracking-widest text-[#C2185B] mb-2">INTEGRATED SYSTEMS</div>
-      <h2 class="text-[26px] sm:text-[32px] font-extrabold text-slate-800 tracking-tight">하나의 포털, 다섯 개의 운영 시스템</h2>
+      <div class="v3-eyebrow mb-2">INTEGRATED SYSTEMS</div>
+      <h2 class="v3-title text-[26px] sm:text-[34px]">하나의 포털, 네 개의 운영 시스템</h2>
       <p class="text-[14px] text-slate-500 mt-3 max-w-2xl mx-auto">현장에서 발생하는 모든 장애와 운영 업무를 한 화면에서. 권한에 따라 필요한 시스템만 보입니다.</p>
     </div>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-      <div class="bg-white rounded-2xl border border-rose-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition p-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:linear-gradient(135deg,#fde4ee,#fbcfe0)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#C2185B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3 class="text-[16px] font-extrabold text-slate-800 mb-1.5">버스 단말기 장애 관리</h3>
-        <p class="text-[13px] text-slate-500 leading-relaxed">로그 백업 분석·선제 점검·차량 검색·이벤트 분석으로 통합/승하차 단말기 장애를 진단합니다.</p>
+      <div class="v3-card p-6">
+        <div class="sys-ico mb-4" style="background:#FBEDF3;border:1px solid #F2D9E5"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#B0184E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">버스 단말기 장애 관리</h3>
+        <p class="text-[13px] leading-relaxed" style="color:#6F656C">로그 백업 분석·선제 점검·차량 검색·이벤트 분석으로 통합/승하차 단말기 장애를 진단합니다.</p>
       </div>
-      <div class="bg-white rounded-2xl border border-rose-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition p-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#3730A3" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#3730A3" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-        <h3 class="text-[16px] font-extrabold text-slate-800 mb-1.5">교통카드 키오스크</h3>
-        <p class="text-[13px] text-slate-500 leading-relaxed">역사·호선·모듈별 장애를 등록·집계하고 대시보드로 추이를 분석합니다.</p>
+      <div class="v3-card p-6">
+        <div class="sys-ico mb-4" style="background:#ECEBFB;border:1px solid #DCDBF6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#3730A3" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#3730A3" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">교통카드 키오스크</h3>
+        <p class="text-[13px] leading-relaxed" style="color:#6F656C">역사·호선·모듈별 장애를 등록·집계하고 대시보드로 추이를 분석합니다.</p>
       </div>
-      <div class="bg-white rounded-2xl border border-rose-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition p-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:linear-gradient(135deg,#d1fae5,#a7f3d0)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#0F5132" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#0F5132" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-        <h3 class="text-[16px] font-extrabold text-slate-800 mb-1.5">한국철도공사 광역철도</h3>
-        <p class="text-[13px] text-slate-500 leading-relaxed">신형 발매기 장애를 노선별로 관리하고 Teams 알림으로 담당자에게 즉시 전파합니다.</p>
+      <div class="v3-card p-6">
+        <div class="sys-ico mb-4" style="background:#E6F2FB;border:1px solid #D2E7F6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#0369A1" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#0369A1" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">한국철도공사 광역철도</h3>
+        <p class="text-[13px] leading-relaxed" style="color:#6F656C">신형 발매기 장애를 노선별로 관리하고 Teams 알림으로 담당자에게 즉시 전파합니다.</p>
       </div>
-      <div class="bg-white rounded-2xl border border-rose-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition p-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:linear-gradient(135deg,#fef3c7,#fde68a)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 20H4V4h16v8M14 16l3 3 4-5" stroke="#B45309" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3 class="text-[16px] font-extrabold text-slate-800 mb-1.5">센터 배정</h3>
-        <p class="text-[13px] text-slate-500 leading-relaxed">운수사를 4개 센터에 배정하고 지도에서 권역을 비교·관리합니다.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-rose-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition p-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:linear-gradient(135deg,#fae8ff,#f5d0fe)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 3h7l5 5v13H7z M14 3v5h5M9.5 13h5M9.5 16.5h5" stroke="#86198F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3 class="text-[16px] font-extrabold text-slate-800 mb-1.5">전자 서식</h3>
-        <p class="text-[13px] text-slate-500 leading-relaxed">대폐차 자재 지급확인서·설치 체크리스트를 전자서명하고 PDF로 보관합니다.</p>
+      <div class="v3-card p-6">
+        <div class="sys-ico mb-4" style="background:#FBF1E0;border:1px solid #F4E4C6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 3h7l5 5v13H7z M14 3v5h5M9.5 13h5M9.5 16.5h5" stroke="#B45309" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">전자 서식</h3>
+        <p class="text-[13px] leading-relaxed" style="color:#6F656C">대폐차 자재 지급확인서·설치 체크리스트를 전자서명하고 PDF로 보관합니다.</p>
       </div>
       <div class="rounded-2xl p-6 text-white flex flex-col justify-center" style="background:linear-gradient(150deg,#7A0B3C,#C2185B)">
         <div class="text-[15px] font-extrabold mb-1.5">권한별 맞춤 화면</div>
@@ -345,67 +411,56 @@ html.force-mobile button{ min-height:44px !important; }
 </header>
 
 <div class="max-w-[1280px] mx-auto px-4 sm:px-5 py-6 sm:py-8">
-  <h1 class="text-lg font-extrabold text-[#7A0B3C] mb-1">시스템 선택</h1>
-  <p class="text-[13px] text-slate-500 mb-6">사용할 관제 시스템을 선택하세요.</p>
+  <div class="v3-eyebrow mb-1.5">SYSTEM LAUNCHER</div>
+  <h1 class="v3-title text-[22px] sm:text-[26px] mb-1">시스템 선택</h1>
+  <p class="text-[13.5px] mb-6" style="color:#6F656C">사용할 관제 시스템을 선택하세요. 권한에 따라 필요한 카드만 표시됩니다.</p>
 
-  <div id="launcher-grid" class="grid md:grid-cols-3 gap-5">
+  <div id="launcher-grid" class="grid md:grid-cols-3 gap-4 sm:gap-5">
     <!-- 단말기 시스템 -->
-    <a href="terminal.html" data-perm="terminal" style="order:1" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
-      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 7h8M8 11h8M8 15h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <a href="terminal.html" data-perm="terminal" style="order:1" class="launch3">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#7A0B3C,#B0184E)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 7h8M8 11h8M8 15h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
-      <div class="text-base font-extrabold text-[#7A0B3C]">단말기 장애 현장처리 판정 시스템</div>
-      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">차량번호 검색으로 과거 이력·재불량 위험·권장 조치를 확인하고, 선제 점검 대상과 이벤트 로그를 분석합니다.</p>
-      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#C2185B]">들어가기
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </a>
-
-    <!-- 센터배정 시스템 -->
-    <a href="center.html" data-perm="center" style="order:4" class="launch-card block bg-white border border-rose-100 rounded-2xl shadow-sm p-5 sm:p-6">
-      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0891B2,#26A69A)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="white" stroke-width="1.8"/></svg>
-      </div>
-      <div class="text-base font-extrabold text-[#0E7490]">센터 배정 최적화 관제 시스템</div>
-      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">운수사 위치·장애접수를 지도에 표시하고, 변경 전/후 센터 배정을 비교해 최적 배정을 검토합니다.</p>
-      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0891B2]">들어가기
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </a>
-
-    <!-- 교통카드키오스크 장애 관리 시스템 (권한 필요) -->
-    <a href="rail.html" id="launch-rail" data-perm="rail" class="launch-card block bg-white border border-indigo-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:5">
-      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#3730A3,#6366F1)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </div>
-      <div class="text-base font-extrabold text-[#3730A3]">교통카드키오스크 장애 관리 시스템</div>
-      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
-      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#6366F1]">들어가기
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </a>
-
-    <!-- 한국철도공사 광역철도 장애 관리 시스템 (권한 필요) -->
-    <a href="rail2.html" id="launch-rail2" data-perm="railkr" class="launch-card block bg-white border border-sky-100 rounded-2xl shadow-sm p-5 sm:p-6" style="display:none;order:6">
-      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#0369A1,#0EA5E9)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </div>
-      <div class="text-base font-extrabold text-[#0369A1]">한국철도공사 광역철도 장애 관리 시스템</div>
-      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">한국철도공사 광역철도 신형 자동발매기의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
-      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#0EA5E9]">들어가기
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="text-[16px] font-extrabold" style="color:var(--wine)">단말기 장애 현장처리 판정 시스템</div>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">차량번호 검색으로 과거 이력·재불량 위험·권장 조치를 확인하고, 선제 점검 대상과 이벤트 로그를 분석합니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:var(--magenta)">들어가기
+        <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </a>
 
     <!-- 자재 지급확인서 · 설치 체크리스트 (외부 시스템) -->
-    <a href="https://bustime-beta.vercel.app/daepyecha" target="_blank" rel="noopener" data-perm="forms" style="order:2" class="launch-card block bg-white border border-amber-100 rounded-2xl shadow-sm p-5 sm:p-6">
-      <div class="w-14 h-14 rounded-2xl grid place-items-center mb-4" style="background:linear-gradient(135deg,#B45309,#F59E0B)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <a href="https://bustime-beta.vercel.app/daepyecha" target="_blank" rel="noopener" data-perm="forms" style="order:2" class="launch3">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#B45309,#F59E0B)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
-      <div class="text-base font-extrabold text-[#B45309]">자재 지급확인서 · 설치 체크리스트</div>
-      <p class="text-[12px] text-slate-500 mt-1.5 leading-relaxed">대폐차·증차·감차 자재 지급확인서와 기종별 설치 완료 체크리스트를 전자서식으로 작성·서명하고 PDF로 저장합니다.</p>
-      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#B45309]">바로가기
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="text-[16px] font-extrabold" style="color:#B45309">자재 지급확인서 · 설치 체크리스트</div>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">대폐차·증차·감차 자재 지급확인서와 기종별 설치 완료 체크리스트를 전자서식으로 작성·서명하고 PDF로 저장합니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#B45309">바로가기
+        <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- 교통카드키오스크 장애 관리 시스템 (권한 필요) -->
+    <a href="rail.html" id="launch-rail" data-perm="rail" class="launch3" style="display:none;order:3">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#3730A3,#6366F1)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-[16px] font-extrabold" style="color:#3730A3">교통카드키오스크 장애 관리 시스템</div>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#6366F1">들어가기
+        <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- 한국철도공사 광역철도 장애 관리 시스템 (권한 필요) -->
+    <a href="rail2.html" id="launch-rail2" data-perm="railkr" class="launch3" style="display:none;order:4">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#0369A1,#0EA5E9)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-[16px] font-extrabold" style="color:#0369A1">한국철도공사 광역철도 장애 관리 시스템</div>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">한국철도공사 광역철도 신형 자동발매기의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#0EA5E9">들어가기
+        <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </a>
   </div>
@@ -739,10 +794,10 @@ function helpContentPortal(){
       </div>
 
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🏠 포털 두 시스템</div>
+        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🏠 포털 시스템</div>
         <ul class="list-disc pl-5 text-[12px]">
           <li><b>📟 단말기 시스템</b>: 장애접수 분석, 선제 점검 대상, 차량 검색, 이벤트 분석</li>
-          <li><b>🗺 센터 배정 시스템</b>: 운수사를 4개 센터에 배정하고 지도에서 비교</li>
+          <li><b>🚏 교통카드 키오스크 · 🚆 광역철도</b>: 역사·노선별 장애 등록·집계·분석 (권한 필요)</li>
         </ul>
       </div>
 
