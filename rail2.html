@@ -1595,8 +1595,9 @@ boot();
       +'<div id="m-detail-body"></div><div id="m-detail-actions" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click',function(e){ if(e.target===ov) closeDetail(); });
+    ov.addEventListener('touchmove',function(e){ var card=ov.firstElementChild; if(card && !card.contains(e.target)) e.preventDefault(); },{passive:false});
   }
-  window.closeDetail=function(){ var m=document.getElementById('m-detail'); if(m) m.style.display='none'; };
+  window.closeDetail=function(){ var m=document.getElementById('m-detail'); if(m) m.style.display='none'; document.documentElement.style.overflow=''; document.body.style.overflow=''; };
   function openDetail(tr){
     ensure();
     var tbl=tr.closest('table'); if(!tbl) return;
@@ -1617,6 +1618,7 @@ boot();
       row.appendChild(ls); row.appendChild(vs); body.appendChild(row);
     });
     document.getElementById('m-detail').style.display='flex';
+    document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
   }
   document.addEventListener('click',function(e){
     var tr=e.target.closest('#l-rows tr'); if(!tr) return;
