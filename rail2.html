@@ -231,6 +231,58 @@ img, video, canvas, table{ max-width:100%; }
   body{ padding-left:max(0px,env(safe-area-inset-left)); padding-right:max(0px,env(safe-area-inset-right)); }
 }
 @media (max-width:767px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; } }
+
+/* ============================================================
+   모바일 사용성 v4 — 목록 표 카드화 · 터치 컨트롤
+   ============================================================ */
+@media (max-width:767px){
+  html:not(.force-web) #tab-list thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  html:not(.force-web) #tab-list table, html:not(.force-web) #tab-list tbody, html:not(.force-web) #tab-list tr, html:not(.force-web) #tab-list td{ display:block !important; width:auto !important; }
+  html:not(.force-web) #tab-list td.desk-only{ display:none !important; }
+  html:not(.force-web) #tab-list tr{ background:#fff; border:1px solid #E6E7F4 !important; border-radius:14px; padding:9px 13px; margin-bottom:10px; box-shadow:0 1px 2px rgba(49,46,129,.05); }
+  html:not(.force-web) #tab-list td{ border:none !important; padding:6px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13.5px; text-align:right; line-height:1.45; }
+  html:not(.force-web) #tab-list td::before{ content:attr(data-label); color:#8A90A6; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; letter-spacing:-.01em; }
+  html:not(.force-web) #tab-list td:last-child{ justify-content:flex-end; gap:8px; padding-top:9px !important; margin-top:3px; border-top:1px dashed #ECEDF5 !important; }
+  html:not(.force-web) #tab-list td:last-child::before{ content:''; }
+  html:not(.force-web) #tab-list .overflow-x-auto{ overflow:visible !important; }
+  html:not(.force-web) select.fld, html:not(.force-web) input.fld{ min-height:44px !important; }
+  html:not(.force-web) #f-save-btn, html:not(.force-web) #f-save-btn + button{ flex:1 1 0 !important; justify-content:center; }
+}
+html.force-mobile #tab-list thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+html.force-mobile #tab-list table, html.force-mobile #tab-list tbody, html.force-mobile #tab-list tr, html.force-mobile #tab-list td{ display:block !important; width:auto !important; }
+html.force-mobile #tab-list td.desk-only{ display:none !important; }
+html.force-mobile #tab-list tr{ background:#fff; border:1px solid #E6E7F4 !important; border-radius:14px; padding:9px 13px; margin-bottom:10px; box-shadow:0 1px 2px rgba(49,46,129,.05); }
+html.force-mobile #tab-list td{ border:none !important; padding:6px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13.5px; text-align:right; line-height:1.45; }
+html.force-mobile #tab-list td::before{ content:attr(data-label); color:#8A90A6; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; letter-spacing:-.01em; }
+html.force-mobile #tab-list td:last-child{ justify-content:flex-end; gap:8px; padding-top:9px !important; margin-top:3px; border-top:1px dashed #ECEDF5 !important; }
+html.force-mobile #tab-list td:last-child::before{ content:''; }
+html.force-mobile #tab-list .overflow-x-auto{ overflow:visible !important; }
+html.force-mobile select.fld, html.force-mobile input.fld{ min-height:44px !important; }
+html.force-mobile #f-save-btn, html.force-mobile #f-save-btn + button{ flex:1 1 0 !important; justify-content:center; }
+
+/* ============================================================
+   모바일 v5 — 헤더 줄바꿈 · 날짜 입력 정돈
+   ============================================================ */
+@media (max-width:767px){
+  html:not(.force-web) header .rail-wrap{ padding-top:13px !important; padding-bottom:13px !important; gap:10px !important; }
+  html:not(.force-web) header div:has(> #rail-meta){ width:100%; flex-wrap:wrap; gap:8px !important; }
+  html:not(.force-web) #rail-meta{ font-size:10.5px !important; padding:6px 10px !important; line-height:1.45 !important; flex:1 1 auto; }
+  html:not(.force-web) #rail-user{ flex-wrap:wrap; }
+  html:not(.force-web) div:has(> #d-from){ row-gap:8px !important; }
+  html:not(.force-web) div:has(> #d-from) > #d-from, html:not(.force-web) div:has(> #d-from) > #d-to{ flex:0 0 auto !important; width:138px !important; }
+  html:not(.force-web) div:has(> #l-from) > #l-from, html:not(.force-web) div:has(> #l-from) > #l-to{ flex:0 0 auto !important; width:138px !important; }
+}
+html.force-mobile header .rail-wrap{ padding-top:13px !important; padding-bottom:13px !important; gap:10px !important; }
+html.force-mobile header div:has(> #rail-meta){ width:100%; flex-wrap:wrap; gap:8px !important; }
+html.force-mobile #rail-meta{ font-size:10.5px !important; padding:6px 10px !important; line-height:1.45 !important; flex:1 1 auto; }
+html.force-mobile #rail-user{ flex-wrap:wrap; }
+html.force-mobile div:has(> #d-from){ row-gap:8px !important; }
+html.force-mobile div:has(> #d-from) > #d-from, html.force-mobile div:has(> #d-from) > #d-to{ flex:0 0 auto !important; width:138px !important; }
+html.force-mobile div:has(> #l-from) > #l-from, html.force-mobile div:has(> #l-from) > #l-to{ flex:0 0 auto !important; width:138px !important; }
+@media (max-width:767px){
+  html:not(.force-web) div:has(> #d-from) .btn-ghost, html:not(.force-web) div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
+}
+html.force-mobile div:has(> #d-from) .btn-ghost, html.force-mobile div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
 </style>
 </head>
 <body>
@@ -1468,6 +1520,22 @@ function goTab(t){
 $$('.rtab').forEach(btn=>btn.addEventListener('click',()=>goTab(btn.dataset.rtab)));
 
 boot();
+</script>
+<script>
+/* 모바일 카드형 목록: 각 셀에 컬럼명(data-label) 부여 — 표시 전용, 기능 불변 */
+(function(){
+  function labelize(){
+    var tbl=document.querySelector('#tab-list table'); if(!tbl) return;
+    var ths=[].map.call(tbl.querySelectorAll('thead th'), function(th){ return th.textContent.trim(); });
+    [].forEach.call(tbl.querySelectorAll('tbody tr'), function(tr){
+      [].forEach.call(tr.children, function(td,i){ if(ths[i]) td.setAttribute('data-label', ths[i]); });
+    });
+  }
+  var box=document.getElementById('l-rows');
+  if(box){ try{ new MutationObserver(labelize).observe(box,{childList:true,subtree:true}); }catch(e){} }
+  if(document.readyState!=='loading') setTimeout(labelize,400); else document.addEventListener('DOMContentLoaded',function(){ setTimeout(labelize,400); });
+  setTimeout(labelize,1400);
+})();
 </script>
 </body>
 </html>

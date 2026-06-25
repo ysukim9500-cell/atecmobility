@@ -576,6 +576,27 @@ img, video, canvas, table{ max-width:100%; }
   body{ padding-left:max(0px,env(safe-area-inset-left)); padding-right:max(0px,env(safe-area-inset-right)); }
 }
 @media (max-width:767px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; } }
+
+/* ============================================================
+   모바일 사용성 v4 — 데이터 표 카드화(옆 스크롤 제거)
+   · .overflow-x-auto 안의 thead 있는 표에만 적용
+   ============================================================ */
+@media (max-width:767px){
+  html:not(.force-web) .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  html:not(.force-web) .overflow-x-auto table, html:not(.force-web) .overflow-x-auto tbody, html:not(.force-web) .overflow-x-auto table tr, html:not(.force-web) .overflow-x-auto table td{ display:block !important; width:auto !important; }
+  html:not(.force-web) .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(122,11,60,.05); }
+  html:not(.force-web) .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
+  html:not(.force-web) .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
+  html:not(.force-web) .overflow-x-auto table td:empty{ display:none !important; }
+  html:not(.force-web) .overflow-x-auto{ overflow:visible !important; }
+}
+html.force-mobile .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+html.force-mobile .overflow-x-auto table, html.force-mobile .overflow-x-auto tbody, html.force-mobile .overflow-x-auto table tr, html.force-mobile .overflow-x-auto table td{ display:block !important; width:auto !important; }
+html.force-mobile .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(122,11,60,.05); }
+html.force-mobile .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
+html.force-mobile .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
+html.force-mobile .overflow-x-auto table td:empty{ display:none !important; }
+html.force-mobile .overflow-x-auto{ overflow:visible !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #fdeef4, transparent), #fbf7f9;">
@@ -4131,5 +4152,24 @@ initAuth();
 <!-- 로그백업 분석 엔진 (브라우저 전용) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="logengine.js"></script>
+<script>
+/* 모바일 카드형 표: 헤더명을 각 셀 data-label로 — 표시 전용, 기능 불변 */
+(function(){
+  function labelize(){
+    document.querySelectorAll('.overflow-x-auto table').forEach(function(tbl){
+      var head=tbl.querySelector('thead'); if(!head) return;
+      var ths=[].map.call(head.querySelectorAll('th'), function(th){ return th.textContent.trim(); });
+      if(!ths.length) return;
+      [].forEach.call(tbl.querySelectorAll('tbody tr'), function(tr){
+        [].forEach.call(tr.children, function(td,i){ if(ths[i] && td.getAttribute('data-label')!==ths[i]) td.setAttribute('data-label', ths[i]); });
+      });
+    });
+  }
+  var t; function deb(){ clearTimeout(t); t=setTimeout(labelize,300); }
+  document.addEventListener('click', deb, true);
+  if(document.readyState!=='loading') setTimeout(labelize,600); else document.addEventListener('DOMContentLoaded',function(){ setTimeout(labelize,600); });
+  setTimeout(labelize,1800);
+})();
+</script>
 </body>
 </html>
