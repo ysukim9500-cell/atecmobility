@@ -82,16 +82,43 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
     <div class="absolute inset-0 opacity-[0.10]" style="background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px);background-size:34px 34px;"></div>
     <div class="absolute -right-40 -top-48 w-[34rem] h-[34rem] rounded-full" style="background:radial-gradient(circle,rgba(236,64,122,.5),transparent 70%)"></div>
     <div class="absolute -left-40 -bottom-56 w-[34rem] h-[34rem] rounded-full" style="background:radial-gradient(circle,rgba(168,18,79,.55),transparent 70%)"></div>
-    <div class="relative max-w-[1180px] mx-auto px-5 py-20 sm:py-28">
-      <div class="inline-flex items-center gap-1.5 bg-white/12 border border-white/20 rounded-full px-3 py-1 mb-5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-        <span class="text-[11.5px] font-bold text-pink-50">버스 단말기 · 철도 키오스크 통합 장애 관리</span>
+    <div class="relative max-w-[1180px] mx-auto px-5 py-16 sm:py-24 grid lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
+      <div>
+        <div class="inline-flex items-center gap-1.5 bg-white/12 border border-white/20 rounded-full px-3 py-1 mb-5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+          <span class="text-[11.5px] font-bold text-pink-50">버스 단말기 · 철도 키오스크 통합 장애 관리</span>
+        </div>
+        <h1 class="text-[34px] sm:text-[52px] font-extrabold leading-[1.1] tracking-tight">장애를 데이터로<br><span class="text-pink-200">먼저 잡습니다</span></h1>
+        <p class="text-[14px] sm:text-[17px] text-pink-100/85 mt-5 leading-relaxed max-w-xl">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 장애 이력을 한 곳에서 관리하는 ATEC Mobility 운영자 전용 포털입니다.</p>
+        <div class="flex flex-wrap items-center gap-3 mt-8">
+          <button onclick="showAuth('login')" class="text-[14px] font-bold bg-white text-[#7A0B3C] px-6 py-3 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition">로그인하고 시작하기</button>
+          <a href="#systems" class="text-[14px] font-bold text-white/90 px-5 py-3 rounded-xl border border-white/30 hover:bg-white/10 transition">시스템 둘러보기 ↓</a>
+        </div>
       </div>
-      <h1 class="text-[34px] sm:text-[52px] font-extrabold leading-[1.1] tracking-tight">장애를 데이터로<br><span class="text-pink-200">먼저 잡습니다</span></h1>
-      <p class="text-[14px] sm:text-[17px] text-pink-100/85 mt-5 leading-relaxed max-w-xl">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 장애 이력을 한 곳에서 관리하는 ATEC Mobility 운영자 전용 포털입니다.</p>
-      <div class="flex flex-wrap items-center gap-3 mt-8">
-        <button onclick="showAuth('login')" class="text-[14px] font-bold bg-white text-[#7A0B3C] px-6 py-3 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition">로그인하고 시작하기</button>
-        <a href="#systems" class="text-[14px] font-bold text-white/90 px-5 py-3 rounded-xl border border-white/30 hover:bg-white/10 transition">시스템 둘러보기 ↓</a>
+      <!-- HERO 비주얼: 실시간 진단 미리보기 목업 -->
+      <div class="hidden lg:block relative">
+        <div class="relative rounded-2xl p-5 shadow-2xl backdrop-blur" style="background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22)">
+          <div class="flex items-center justify-between mb-4">
+            <div class="text-[13px] font-extrabold text-white">서울70사 1234 · 실시간 진단</div>
+            <span class="text-[10px] font-bold text-emerald-100 bg-emerald-400/25 rounded-full px-2 py-0.5">● LIVE</span>
+          </div>
+          <div class="space-y-2.5">
+            <div class="rounded-lg p-3 flex items-center justify-between" style="background:rgba(255,255,255,.10)">
+              <span class="text-[12.5px] text-white/90">통합단말기 통신</span>
+              <span class="text-[11px] font-bold text-emerald-100 bg-emerald-400/20 rounded-full px-2 py-0.5">정상</span>
+            </div>
+            <div class="rounded-lg p-3 flex items-center justify-between" style="background:rgba(255,255,255,.10)">
+              <span class="text-[12.5px] text-white/90">하차2 단말기</span>
+              <span class="text-[11px] font-bold text-rose-100 bg-rose-400/25 rounded-full px-2 py-0.5">교체 권장</span>
+            </div>
+            <div class="rounded-lg p-3" style="background:rgba(255,255,255,.10)">
+              <div class="flex items-center justify-between mb-2"><span class="text-[12.5px] text-white/90">원인 격리</span><span class="text-[11px] font-bold text-amber-100">케이블 추정 72%</span></div>
+              <div class="h-1.5 rounded-full" style="background:rgba(255,255,255,.18)"><div class="h-1.5 rounded-full" style="width:72%;background:linear-gradient(90deg,#f9a8d4,#fff)"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="absolute -top-4 -right-3 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold text-[#7A0B3C] flex items-center gap-1.5">🔔 Teams 알림 전송</div>
+        <div class="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-xl px-3 py-2 text-[12px] font-extrabold text-[#7A0B3C] flex items-center gap-1.5">🅿️ 차고지 도착 8분</div>
       </div>
     </div>
   </header>
@@ -734,6 +761,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeHelp(); });
 
 function enterApp(){
   $('#auth-overlay').classList.add('hidden');
+  const m=$('#login-modal'); if(m) m.classList.add('hidden');   // 로그인 후 모달 닫기
   $('#app-root').classList.remove('hidden');
   renderUserBadge();
   applyRoleVisibility();

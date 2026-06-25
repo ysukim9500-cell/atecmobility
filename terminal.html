@@ -447,6 +447,59 @@ html.force-mobile select, html.force-mobile textarea{ font-size:16px !important;
 html.force-mobile .searchbar{ padding:13px 14px !important; border-radius:14px !important; }
 html.force-mobile .searchbar input{ font-size:16px !important; }
 html.force-mobile button{ min-height:40px; }
+
+/* ============================================================
+   ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
+   ① 팔레트 톤 정리  ② 카드 정렬·여백 통일  ③ 모바일 하단 탭바
+   ============================================================ */
+:root{
+  --atec-magenta:#B0184E;
+  --atec-pink:#C42B66;
+  --atec-rose:#D45C86;
+  --atec-bg:#F7F4F6;
+  --atec-line:#ECE4E8;
+}
+/* 배경: 분홍 그라데이션 → 차분한 웜 화이트 */
+body{ background:var(--atec-bg) !important; }
+
+/* 패널·카드: 테두리 차분하게 · 그림자 부드럽게 · 모서리 통일 */
+.panel{ border-color:#EDE6E9 !important; border-radius:16px !important;
+  box-shadow:0 1px 2px rgba(42,37,48,.04), 0 8px 24px -16px rgba(42,37,48,.16) !important; }
+.panel::before{ opacity:.5 !important; }
+.bg-white.border-rose-100, .bg-white.border-rose-200{ border-color:#EDE6E9 !important; }
+.border-rose-100{ border-color:#EFE7EB !important; }
+.rounded-xl{ border-radius:14px !important; }
+.searchbar, .border-rose-200{ border-color:#E6DCE2 !important; }
+.sec-title{ border-left-color:var(--atec-magenta) !important; }
+.tab-btn.active{ background:linear-gradient(115deg,#5E0930,#7A0B3C 60%,#9A1450) !important; }
+
+/* 터치 영역 키우기 */
+@media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
+html.force-mobile button{ min-height:44px !important; }
+
+/* ===== 모바일: 상단 탭 → 하단 탭바 도킹 (같은 요소 재배치 · 기능/권한 그대로) ===== */
+@media (max-width:767px){
+  html:not(.force-web) #tabs{
+    position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
+    width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+    border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important;
+    box-shadow:0 -6px 20px -12px rgba(42,37,48,.22) !important;
+    padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
+  html:not(.force-web) #tabs .tab-btn{ border-radius:12px !important; }
+  html:not(.force-web) #tabs .tab-btn:not(.active){ color:#ABA3AA !important; }
+  html:not(.force-web) #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-magenta) !important; }
+  html:not(.force-web) body{ padding-bottom:76px !important; }
+}
+html.force-mobile #tabs{
+  position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
+  width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+  border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important;
+  box-shadow:0 -6px 20px -12px rgba(42,37,48,.22) !important;
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
+html.force-mobile #tabs .tab-btn{ border-radius:12px !important; }
+html.force-mobile #tabs .tab-btn:not(.active){ color:#ABA3AA !important; }
+html.force-mobile #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-magenta) !important; }
+html.force-mobile body{ padding-bottom:76px !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #fdeef4, transparent), #fbf7f9;">
