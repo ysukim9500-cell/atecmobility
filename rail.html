@@ -139,6 +139,44 @@ html.force-mobile .rail-hdr-sub{ display:none; }
 html.force-mobile .desk-only{ display:none !important; }
 
 html.force-web body{ min-width:1280px; }
+
+/* ============================================================
+   ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
+   ① 톤 차분하게  ② 카드 정렬·여백 통일  ③ 모바일 하단 탭바
+   ============================================================ */
+.panel{ border-color:#E7E7F2 !important; border-radius:16px !important;
+  box-shadow:0 1px 2px rgba(49,46,129,.04), 0 8px 24px -16px rgba(49,46,129,.14) !important; }
+.panel::before{ opacity:.5 !important; }
+.border-indigo-100{ border-color:#E6E7F4 !important; }
+.rounded-xl{ border-radius:14px !important; }
+.rtab.active{ box-shadow:0 4px 12px -8px rgba(49,46,129,.5) !important; }
+
+@media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
+html.force-mobile button{ min-height:44px !important; }
+
+/* ===== 모바일: 상단 탭 → 하단 탭바 도킹 (같은 요소 재배치 · 기능 그대로) ===== */
+@media (max-width:767px){
+  html:not(.force-web) #rail-tabs{
+    position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
+    width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+    border:none !important; border-top:1px solid #E6E7F4 !important; background:#fff !important;
+    box-shadow:0 -6px 20px -12px rgba(49,46,129,.2) !important;
+    padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
+  html:not(.force-web) #rail-tabs .rtab{ border-radius:12px !important; }
+  html:not(.force-web) #rail-tabs .rtab:not(.active){ color:#9AA0B4 !important; }
+  html:not(.force-web) #rail-tabs .rtab.active{ background:transparent !important; color:var(--rail-main) !important; box-shadow:none !important; }
+  html:not(.force-web) body{ padding-bottom:76px !important; }
+}
+html.force-mobile #rail-tabs{
+  position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
+  width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+  border:none !important; border-top:1px solid #E6E7F4 !important; background:#fff !important;
+  box-shadow:0 -6px 20px -12px rgba(49,46,129,.2) !important;
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
+html.force-mobile #rail-tabs .rtab{ border-radius:12px !important; }
+html.force-mobile #rail-tabs .rtab:not(.active){ color:#9AA0B4 !important; }
+html.force-mobile #rail-tabs .rtab.active{ background:transparent !important; color:var(--rail-main) !important; box-shadow:none !important; }
+html.force-mobile body{ padding-bottom:76px !important; }
 </style>
 </head>
 <body>

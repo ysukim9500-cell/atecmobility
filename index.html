@@ -52,6 +52,21 @@ html.force-web body{ min-width:1100px; }
 }
 html.force-mobile #user-badge{ flex-wrap:wrap; }
 html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important; }
+
+/* ============================================================
+   ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
+   톤 차분하게 · 카드 정렬/그림자 통일 · 터치영역 확대
+   ============================================================ */
+:root{ --atec-magenta:#B0184E; --atec-pink:#C42B66; --atec-rose:#D45C86; }
+body{ background:#F7F4F6 !important; }
+#auth-overlay{ background:#F7F4F6 !important; }
+.launch-card{ box-shadow:0 1px 2px rgba(42,37,48,.04), 0 8px 22px -16px rgba(42,37,48,.16) !important; }
+.launch-card:hover{ box-shadow:0 16px 36px -18px rgba(42,37,48,.30) !important; }
+.border-rose-100{ border-color:#EFE7EB !important; }
+.border-rose-200{ border-color:#E6DCE2 !important; }
+.rounded-2xl{ border-radius:18px !important; }
+@media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
+html.force-mobile button{ min-height:44px !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 500px at 80% -120px, #fdeef4, transparent), #fbf7f9;">
