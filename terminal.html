@@ -597,6 +597,26 @@ html.force-mobile .overflow-x-auto table td{ border:none !important; padding:5px
 html.force-mobile .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
 html.force-mobile .overflow-x-auto table td:empty{ display:none !important; }
 html.force-mobile .overflow-x-auto{ overflow:visible !important; }
+
+/* ============================================================
+   모바일 v6 — 헤더(클라우드 기준 박스 + 사용자 버튼) 슬림화
+   ============================================================ */
+@media (max-width:767px){
+  html:not(.force-web) #kb-status{ padding:7px 11px !important; }
+  html:not(.force-web) #kb-meta > div:first-child{ font-size:12px !important; }
+  html:not(.force-web) #kb-meta > div:nth-child(2){ padding:3px 8px !important; margin-top:4px !important; }
+  html:not(.force-web) #kb-meta > div:nth-child(3){ display:none !important; }
+  html:not(.force-web) #user-badge{ padding:5px 8px !important; gap:5px !important; flex-wrap:nowrap !important; overflow-x:auto; justify-content:flex-start; }
+  html:not(.force-web) #user-badge::-webkit-scrollbar{ display:none; }
+  html:not(.force-web) #user-badge button, html:not(.force-web) #user-badge .ub-btn{ font-size:10px !important; padding:4px 8px !important; min-height:0 !important; flex:0 0 auto; white-space:nowrap; }
+}
+html.force-mobile #kb-status{ padding:7px 11px !important; }
+html.force-mobile #kb-meta > div:first-child{ font-size:12px !important; }
+html.force-mobile #kb-meta > div:nth-child(2){ padding:3px 8px !important; margin-top:4px !important; }
+html.force-mobile #kb-meta > div:nth-child(3){ display:none !important; }
+html.force-mobile #user-badge{ padding:5px 8px !important; gap:5px !important; flex-wrap:nowrap !important; overflow-x:auto; justify-content:flex-start; }
+html.force-mobile #user-badge::-webkit-scrollbar{ display:none; }
+html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ font-size:10px !important; padding:4px 8px !important; min-height:0 !important; flex:0 0 auto; white-space:nowrap; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #fdeef4, transparent), #fbf7f9;">

@@ -284,6 +284,51 @@ html.force-mobile div:has(> #l-from) > #l-from, html.force-mobile div:has(> #l-f
   html:not(.force-web) div:has(> #d-from) .btn-ghost, html:not(.force-web) div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
 }
 html.force-mobile div:has(> #d-from) .btn-ghost, html.force-mobile div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
+
+/* ============================================================
+   모바일 v7 — 키오스크 목록: 카드 → 핵심 4열 가로표 + 탭하면 상세 시트
+   열 순서: 1접수일·3역명·6장애유형·11결과
+   ============================================================ */
+@media (max-width:767px){
+  html:not(.force-web) #tab-list thead{ position:static !important; width:auto !important; height:auto !important; clip:auto !important; overflow:visible !important; }
+  html:not(.force-web) #tab-list table{ display:table !important; width:100% !important; }
+  html:not(.force-web) #tab-list tbody{ display:table-row-group !important; }
+  html:not(.force-web) #tab-list tr{ display:table-row !important; background:transparent !important; border:none !important; border-bottom:1px solid #EEF0F8 !important; border-radius:0 !important; padding:0 !important; margin:0 !important; box-shadow:none !important; cursor:pointer; }
+  html:not(.force-web) #tab-list td, html:not(.force-web) #tab-list th{ display:none !important; border:none !important; padding:10px 6px !important; text-align:left !important; font-size:12.5px !important; line-height:1.4 !important; vertical-align:middle; }
+  html:not(.force-web) #tab-list td::before, html:not(.force-web) #tab-list td:last-child::before{ content:none !important; }
+  html:not(.force-web) #tab-list td:nth-child(1), html:not(.force-web) #tab-list th:nth-child(1),
+  html:not(.force-web) #tab-list td:nth-child(3), html:not(.force-web) #tab-list th:nth-child(3),
+  html:not(.force-web) #tab-list td:nth-child(6), html:not(.force-web) #tab-list th:nth-child(6),
+  html:not(.force-web) #tab-list td:nth-child(11), html:not(.force-web) #tab-list th:nth-child(11){ display:table-cell !important; }
+  html:not(.force-web) #tab-list thead th:nth-child(1), html:not(.force-web) #tab-list thead th:nth-child(3), html:not(.force-web) #tab-list thead th:nth-child(6), html:not(.force-web) #tab-list thead th:nth-child(11){ font-size:11px !important; color:#9AA0B4 !important; font-weight:700 !important; padding:7px 6px !important; }
+  html:not(.force-web) #tab-list td:nth-child(11){ color:#3730A3 !important; font-weight:700 !important; white-space:nowrap; }
+  html:not(.force-web) #tab-list td:nth-child(11)::after{ content:' \203a'; color:#C7CAD6; font-weight:400; }
+}
+html.force-mobile #tab-list thead{ position:static !important; width:auto !important; height:auto !important; clip:auto !important; overflow:visible !important; }
+html.force-mobile #tab-list table{ display:table !important; width:100% !important; }
+html.force-mobile #tab-list tbody{ display:table-row-group !important; }
+html.force-mobile #tab-list tr{ display:table-row !important; background:transparent !important; border:none !important; border-bottom:1px solid #EEF0F8 !important; border-radius:0 !important; padding:0 !important; margin:0 !important; box-shadow:none !important; cursor:pointer; }
+html.force-mobile #tab-list td, html.force-mobile #tab-list th{ display:none !important; border:none !important; padding:10px 6px !important; text-align:left !important; font-size:12.5px !important; line-height:1.4 !important; vertical-align:middle; }
+html.force-mobile #tab-list td::before, html.force-mobile #tab-list td:last-child::before{ content:none !important; }
+html.force-mobile #tab-list td:nth-child(1), html.force-mobile #tab-list th:nth-child(1),
+html.force-mobile #tab-list td:nth-child(3), html.force-mobile #tab-list th:nth-child(3),
+html.force-mobile #tab-list td:nth-child(6), html.force-mobile #tab-list th:nth-child(6),
+html.force-mobile #tab-list td:nth-child(11), html.force-mobile #tab-list th:nth-child(11){ display:table-cell !important; }
+html.force-mobile #tab-list thead th:nth-child(1), html.force-mobile #tab-list thead th:nth-child(3), html.force-mobile #tab-list thead th:nth-child(6), html.force-mobile #tab-list thead th:nth-child(11){ font-size:11px !important; color:#9AA0B4 !important; font-weight:700 !important; padding:7px 6px !important; }
+html.force-mobile #tab-list td:nth-child(11){ color:#3730A3 !important; font-weight:700 !important; white-space:nowrap; }
+html.force-mobile #tab-list td:nth-child(11)::after{ content:' \203a'; color:#C7CAD6; font-weight:400; }
+
+/* v8 — 헤더 슬림(제목/패딩 축소) */
+@media (max-width:767px){
+  html:not(.force-web) header .rail-wrap{ padding-top:11px !important; padding-bottom:11px !important; gap:7px !important; }
+  html:not(.force-web) header h1{ font-size:15px !important; line-height:1.28 !important; margin-top:3px !important; }
+  html:not(.force-web) header h1 svg{ width:16px !important; height:16px !important; }
+  html:not(.force-web) header span.rounded-full{ font-size:9px !important; padding:1px 7px !important; }
+}
+html.force-mobile header .rail-wrap{ padding-top:11px !important; padding-bottom:11px !important; gap:7px !important; }
+html.force-mobile header h1{ font-size:15px !important; line-height:1.28 !important; margin-top:3px !important; }
+html.force-mobile header h1 svg{ width:16px !important; height:16px !important; }
+html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1px 7px !important; }
 </style>
 </head>
 <body>
@@ -1247,6 +1292,51 @@ boot();
   if(box){ try{ new MutationObserver(labelize).observe(box,{childList:true,subtree:true}); }catch(e){} }
   if(document.readyState!=='loading') setTimeout(labelize,400); else document.addEventListener('DOMContentLoaded',function(){ setTimeout(labelize,400); });
   setTimeout(labelize,1400);
+})();
+</script>
+<script>
+/* 모바일 목록: 행 탭 → 상세 시트 (표시 전용, 기능 불변) */
+(function(){
+  function isMobile(){ return window.innerWidth<=767 || document.documentElement.classList.contains('force-mobile'); }
+  function ensure(){
+    if(document.getElementById('m-detail')) return;
+    var ov=document.createElement('div'); ov.id='m-detail';
+    ov.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:rgba(30,5,40,.45);align-items:flex-end;justify-content:center;';
+    ov.innerHTML='<div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;max-height:86vh;overflow:auto;padding:16px 18px 26px;box-shadow:0 -10px 40px rgba(0,0,0,.25);">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div id="m-detail-title" style="font-weight:800;color:#3730A3;font-size:15px;">상세 내역</div>'
+      +'<button type="button" onclick="closeDetail()" style="width:30px;height:30px;border:none;background:#F2F3F9;border-radius:8px;color:#6B7280;font-size:15px;cursor:pointer;">\u2715</button></div>'
+      +'<div id="m-detail-body"></div><div id="m-detail-actions" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',function(e){ if(e.target===ov) closeDetail(); });
+  }
+  window.closeDetail=function(){ var m=document.getElementById('m-detail'); if(m) m.style.display='none'; };
+  function openDetail(tr){
+    ensure();
+    var tbl=tr.closest('table'); if(!tbl) return;
+    var ths=[].map.call(tbl.querySelectorAll('thead th'),function(x){return x.textContent.trim();});
+    var body=document.getElementById('m-detail-body'); body.innerHTML='';
+    var actions=document.getElementById('m-detail-actions'); actions.innerHTML='';
+    var title=document.getElementById('m-detail-title'); title.textContent='상세 내역';
+    [].forEach.call(tr.children,function(td,i){
+      var label=ths[i]||'';
+      if(label==='관리'){ [].forEach.call(td.querySelectorAll('button,a'),function(b){ var c=b.cloneNode(true); c.style.flex='1 1 auto'; c.style.minHeight='40px'; actions.appendChild(c); }); return; }
+      var val=td.textContent.trim();
+      if(label==='역명' && val){ title.textContent=val+' · 상세'; }
+      if(!val) return;
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F2F3F9;font-size:13.5px;align-items:flex-start;';
+      var ls=document.createElement('span'); ls.style.cssText='color:#8A90A6;font-weight:700;font-size:12px;flex:0 0 38%;'; ls.textContent=label;
+      var vs=document.createElement('span'); vs.style.cssText='text-align:right;color:#26282F;flex:1;word-break:break-all;'; vs.textContent=val;
+      row.appendChild(ls); row.appendChild(vs); body.appendChild(row);
+    });
+    document.getElementById('m-detail').style.display='flex';
+  }
+  document.addEventListener('click',function(e){
+    var tr=e.target.closest('#l-rows tr'); if(!tr) return;
+    if(!isMobile()) return;
+    if(e.target.closest('button,a,input,select,label')) return;
+    e.preventDefault(); openDetail(tr);
+  }, false);
 })();
 </script>
 </body>

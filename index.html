@@ -343,21 +343,17 @@ img, video, canvas, table{ max-width:100%; }
       <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">로그인</div>
       <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
       <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')doLogin()">
-      <!-- 모드 선택: 모바일 / 웹 -->
+      <!-- 모드 선택: 모바일 / 웹 (슬림) -->
       <div class="mb-3">
-        <div class="text-[11px] font-bold text-slate-500 mb-1.5">화면 모드 선택 <span class="text-[#C2185B]">*</span></div>
+        <div class="text-[11px] font-bold text-slate-500 mb-1.5">화면 모드 <span class="text-[#C2185B]">*</span></div>
         <div class="grid grid-cols-2 gap-2">
-          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg px-3 py-2 text-center transition" data-mode="web">
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="web">
             <input type="radio" name="ui-mode" value="web" class="hidden" onchange="selectMode('web')">
-            <div class="text-[18px]">🖥</div>
-            <div class="text-[11px] font-bold text-slate-700 mt-0.5">웹</div>
-            <div class="text-[10px] text-slate-400">PC·태블릿</div>
+            <span class="text-[15px]">🖥</span><span class="text-[13px] font-bold text-slate-700 whitespace-nowrap">웹</span>
           </label>
-          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg px-3 py-2 text-center transition" data-mode="mobile">
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="mobile">
             <input type="radio" name="ui-mode" value="mobile" class="hidden" onchange="selectMode('mobile')">
-            <div class="text-[18px]">📱</div>
-            <div class="text-[11px] font-bold text-slate-700 mt-0.5">모바일</div>
-            <div class="text-[10px] text-slate-400">휴대폰</div>
+            <span class="text-[15px]">📱</span><span class="text-[13px] font-bold text-slate-700 whitespace-nowrap">모바일</span>
           </label>
         </div>
       </div>
