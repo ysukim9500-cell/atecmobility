@@ -85,40 +85,39 @@
     return '기타';
   }
 
-  // ------- 장애유형 → 조치가이드 (2026 상반기 접수 15,451건 실증 통계 반영) -------
-  // 각 조치의 %는 동일 증상 접수에서 실제 그 조치로 해결(완료)된 비율. n=통계 모수.
+  // ------- 장애유형 → 조치가이드 (점검 순서는 접수 실증 통계 기반, 표기는 간결하게) -------
   var ACTION_KB = {
-    BMS_DOWN:      { name:'BMS 통신 단절',   steps:['모뎀 USIM 탈거→접점 세척→재삽입 (현장 해결률 42%·모뎀계열 접수 1,476건)','외장 LTE 모뎀 교체 (39%)','지속 시 통합단말기(BMS B/D) 교체 (BMS불량 접수의 77%가 통합 교체로 종결)'], parts:['외장 LTE 모뎀','통합단말기(BMS B/D)'], note:'⚠ B700/B710/B800 외장모뎀 혼용 금지 · 교체 전 거래백업' },
-    BMS_WARN:      { name:'BMS 통신 이상',   steps:['모뎀 USIM 세척·재삽입 (현장 42%)','외장 LTE 모뎀 LED/커넥터 점검'], parts:['외장 LTE 모뎀'] },
-    MQTT_PATH:     { name:'BMS↔TOPIS MQTT 경로 이상', steps:['모뎀 USIM 세척·재삽입 (현장 42%)','브로커(14.33.246.7:1883) 도달성 확인','외장 LTE 모뎀 교체 (39%)'], parts:['외장 LTE 모뎀'] },
-    SERVER_CONN:   { name:'서버연결 불량',   steps:['통합단말기 교체 검토 (서버연결대기 접수 466건의 81%가 통합 교체로 종결)','표출기 LTE 감도·수집센터 IP 설정 확인'], parts:['통합단말기','외장 LTE 모뎀'] },
-    SERVER_DEAD:   { name:'서버연결 전면 실패', steps:['거래내역 백업 선행(유실 방지)','통합단말기 교체 (현장 81%·n=466)','안 되면 표출단말기 교체 (13%)'], parts:['통합단말기','표출단말기(HMI)'], note:'미전송 유실 위험 — 백업 우선' },
-    TRANS_BACKLOG: { name:'거래 미전송 누적', steps:['거래내역 백업 선행(유실 방지)','통신 복구(모뎀 USIM 세척→모뎀 점검)','통합단말기 교체 검토'], parts:['통합단말기'], note:'지속 시 수리센터 입고' },
-    TRANS_WARN:    { name:'거래 미전송 조짐', steps:['거래백업 상태 확인','통신 점검(USIM 세척 포함)'], parts:[] },
+    BMS_DOWN:      { name:'BMS 통신 단절',   steps:['모뎀 USIM 세척·재삽입','외장 LTE 모뎀 교체','통합단말기(BMS B/D) 교체'], parts:['외장 LTE 모뎀','통합단말기'], note:'B700/B710/B800 외장모뎀 혼용 금지 · 교체 전 거래백업' },
+    BMS_WARN:      { name:'BMS 통신 이상',   steps:['모뎀 USIM 세척·재삽입','모뎀 LED·커넥터 점검'], parts:['외장 LTE 모뎀'] },
+    MQTT_PATH:     { name:'BMS↔TOPIS 통신경로 이상', steps:['모뎀 USIM 세척·재삽입','외장 LTE 모뎀 교체'], parts:['외장 LTE 모뎀'] },
+    SERVER_CONN:   { name:'서버연결 불량',   steps:['통합단말기 교체 검토','표출기 LTE 감도·수집센터 IP 확인'], parts:['통합단말기'] },
+    SERVER_DEAD:   { name:'서버연결 전면 실패', steps:['거래내역 백업 선행','통합단말기 교체','안 되면 표출단말기 교체'], parts:['통합단말기','표출단말기'], note:'미전송 유실 위험 — 백업 우선' },
+    TRANS_BACKLOG: { name:'거래 미전송 누적', steps:['거래내역 백업 선행','통신 복구(USIM 세척→모뎀 점검)','통합단말기 교체 검토'], parts:['통합단말기'], note:'지속 시 수리센터 입고' },
+    TRANS_WARN:    { name:'거래 미전송 조짐', steps:['거래백업 상태 확인','통신 점검'], parts:[] },
     NET_BACKLOG_CORE:{ name:'센터 미전송 대량', steps:['미전송 즉시 백업 보존','통신 복구 후 재전송 확인'], parts:[], note:'유실위험' },
     NET_BACKLOG:   { name:'센터 미전송 잔량', steps:['미전송 보존 후 통신 복구'], parts:[] },
-    COMM_QUALITY:  { name:'통신품질 저하',   steps:['모뎀 USIM 세척·재삽입 (현장 42%)','모뎀 신호감도·안테나 체결 확인','외장 LTE 모뎀 교체 (39%)'], parts:['외장 LTE 모뎀','안테나'] },
+    COMM_QUALITY:  { name:'통신품질 저하',   steps:['모뎀 USIM 세척·재삽입','신호감도·안테나 체결 확인','외장 LTE 모뎀 교체'], parts:['외장 LTE 모뎀','안테나'] },
     WATCHDOG:      { name:'워치독 과다리셋', steps:['모듈 안정성 점검','통합단말기 점검'], parts:['통합단말기'] },
-    REBOOT_LOOP:   { name:'연속재부팅',     steps:['차량 Fuse 확인·교체 (전원계열 접수 117건 중 1위 27%)','통합단말기 전원 케이블 재연결 (24%)','케이블 결선작업 (9%)','통합단말기 교체 (8%)'], parts:['차량 퓨즈','전원 케이블','통합단말기'] },
-    POWER_ABN:     { name:'비정상 전원차단', steps:['차량 Fuse 확인 (현장 27%)','전원 케이블 재연결 (24%)','전원부 점검'], parts:['차량 퓨즈','전원 케이블'] },
-    POWER_TREND:   { name:'전원/재부팅 열화 추세', steps:['차량 Fuse·전원 케이블 우선 점검 (전원계열 현장 조치 1·2위)','다일간 재부팅 추세 확인','전원부·배선 점검'], parts:['차량 퓨즈','전원 케이블'] },
-    GPS_WARN:      { name:'GPS 수신 불량',   steps:['GPS 안테나 위치 변경(시야 확보) (현장 47%·GPS 접수 1,071건)','GPS 안테나 교체 (24%)','GPS 커넥터 재연결 (14%)'], parts:['GPS 안테나'] },
-    GPS_ANT:       { name:'GPS 안테나 이상(편측)', steps:['해당(앞/뒤) 안테나 커넥터 재연결 (현장 14%)','안테나 위치 변경 (47%)','안테나 교체 (24%)'], parts:['GPS 안테나'] },
+    REBOOT_LOOP:   { name:'연속재부팅',     steps:['차량 Fuse 확인·교체','전원 케이블 재연결','케이블 결선 점검','통합단말기 교체'], parts:['차량 퓨즈','전원 케이블','통합단말기'] },
+    POWER_ABN:     { name:'비정상 전원차단', steps:['차량 Fuse 확인·교체','전원 케이블 재연결','전원부 점검'], parts:['차량 퓨즈','전원 케이블'] },
+    POWER_TREND:   { name:'전원/재부팅 열화', steps:['차량 Fuse·전원 케이블 점검','전원부·배선 점검'], parts:['차량 퓨즈','전원 케이블'] },
+    GPS_WARN:      { name:'GPS 수신 불량',   steps:['GPS 안테나 위치 변경(시야 확보)','GPS 안테나 교체','GPS 커넥터 재연결'], parts:['GPS 안테나'] },
+    GPS_ANT:       { name:'GPS 안테나 이상(편측)', steps:['해당(앞/뒤) 안테나 커넥터 재연결','안테나 위치 변경','안테나 교체'], parts:['GPS 안테나'] },
     DATA_LOSS:     { name:'데이터 유실(누락)', steps:['전송/저장 경로 점검'], parts:[] },
-    LINK_FLAPPING: { name:'모듈 링크 플래핑(접촉불량 의심)', steps:['해당 링크 커넥터 재체결','케이블 교체','승하차 링크면 위치 맞교체로 격리 확인'], parts:['연결 케이블'], note:'짧은 주기 반복 단절 → 접촉불량 패턴' },
+    LINK_FLAPPING: { name:'모듈 링크 접촉불량 의심', steps:['해당 링크 커넥터 재체결','케이블 교체','승하차 링크면 위치 맞교체로 격리 확인'], parts:['연결 케이블'], note:'짧은 주기 반복 단절 패턴' },
     LINK_CUT:      { name:'모듈 링크 단선 의심', steps:['케이블 단선 확인','모듈 전원 확인'], parts:['연결 케이블','해당 모듈'] },
-    EVT_GROUP:     { name:'이벤트 경고',     steps:['해당 부위 점검(코드 상세 참조)'], parts:[] },
-    CARD_READER:   { name:'카드리더 오류 과다', steps:['해당 단말기 교체 (카드무감 접수 202건: 승차 39%·하차1 28%·하차2 21%)','SAM 세척·재삽입','카드리더 접점 청소'], parts:['승하차 단말기'] }
+    EVT_GROUP:     { name:'이벤트 경고',     steps:['해당 부위 점검(세부 이벤트 참조)'], parts:[] },
+    CARD_READER:   { name:'카드리더 오류 과다', steps:['해당 단말기 교체','SAM 세척·재삽입','카드리더 접점 청소'], parts:['승하차 단말기'] }
   };
-  // 이벤트 그룹별 실증 조치 (EVT_GROUP 발화 시 그룹에 맞는 가이드로 대체)
+  // 이벤트 그룹별 조치 (EVT_GROUP 발화 시 그룹에 맞는 가이드로 대체)
   var EVT_GROUP_ACTIONS = {
-    '승하차통신': { steps:['해당 유닛 단말기 교체 (하차통신 접수 1,629건: 하차1 23%·하차2 18%)','승하차 위치 맞교체로 격리 확인 (15%)','통신 케이블 교체 (11%)'], parts:['승하차 단말기','통신 케이블'] },
-    '표출기통신': { steps:['표출단말기 교체 (화면·부팅계열 접수의 95~97%)','표출기 케이블 재연결'], parts:['표출단말기(HMI)'] },
-    '카드SAM':   { steps:['해당 단말기 교체 (카드무감: 승차 39%·하차1 28%·하차2 21%)','SAM 세척·재삽입'], parts:['승하차 단말기'] },
-    'GW통신':    { steps:['통합단말기 교체 검토 (CITS불량 접수 469건의 91%)','케이블 재연결'], parts:['통합단말기'] },
-    '전원HW':    { steps:['차량 Fuse 확인 (현장 27%)','전원 케이블 재연결 (24%)'], parts:['차량 퓨즈','전원 케이블'] },
-    '펌웨어':    { steps:['F/W·OS 재적용 (펌웨어 접수 310건 중 13%)','지속 시 표출(36%)/통합(25%) 교체'], parts:[] },
-    '운행':      { steps:['통합단말기 교체 (운행시작안됨 접수 209건의 67%)','표출단말기 교체 (20%)'], parts:['통합단말기','표출단말기(HMI)'] }
+    '승하차통신': { steps:['해당 유닛 단말기 교체','승하차 위치 맞교체로 격리 확인','통신 케이블 교체'], parts:['승하차 단말기','통신 케이블'] },
+    '표출기통신': { steps:['표출단말기 교체','표출기 케이블 재연결'], parts:['표출단말기'] },
+    '카드SAM':   { steps:['해당 단말기 교체','SAM 세척·재삽입'], parts:['승하차 단말기'] },
+    'GW통신':    { steps:['통합단말기 교체 검토','케이블 재연결'], parts:['통합단말기'] },
+    '전원HW':    { steps:['차량 Fuse 확인','전원 케이블 재연결'], parts:['차량 퓨즈','전원 케이블'] },
+    '펌웨어':    { steps:['F/W·OS 재적용','지속 시 표출/통합 단말기 교체'], parts:[] },
+    '운행':      { steps:['통합단말기 교체','표출단말기 교체'], parts:['통합단말기','표출단말기'] }
   };
 
   // ---------------- 유틸 ----------------
@@ -457,9 +456,11 @@
         if(b.bak&&b.bak.rapid>0){ ev.push('과거 백업에도 rapid '+b.bak.rapid+'회'); src.push('sdr_backup'); }
         add('REBOOT_LOOP','core',ev,src,{definitive:true});
       } else if(b.cur.abnormal>=CONFIG.reboot_abnormal_warn){
-        add('POWER_ABN','warn',['정상종료 없는 재시작 '+b.cur.abnormal+'회'],['sdr']);
+        add('POWER_ABN','core',['정상종료 없는 재시작 '+b.cur.abnormal+'회'],['sdr'],{definitive:true});
       } else if(b.bak&&(b.cur.rapidDays+(b.bak.rapidDays||0))>=CONFIG.sdr_trend_days_warn&&(b.cur.rapid+b.bak.rapid)>=CONFIG.sdr_trend_min_rapid){
-        add('POWER_TREND','warn',['rapid 발생일수 '+(b.cur.rapidDays+b.bak.rapidDays)+'일 (현재 '+b.cur.rapid+'·과거 '+b.bak.rapid+')'],['sdr','sdr_backup']);
+        // 현재 백업에도 rapid가 있으면 진행형 → 핵심, 과거 추세만이면 주의
+        var trendSev=(b.cur.rapid>0)?'core':'warn';
+        add('POWER_TREND',trendSev,['rapid 발생일수 '+(b.cur.rapidDays+b.bak.rapidDays)+'일 (현재 '+b.cur.rapid+'·과거 '+b.bak.rapid+')'],['sdr','sdr_backup'],trendSev==='core'?{definitive:true}:undefined);
       }
     }
 
@@ -499,8 +500,10 @@
           var ev2=[gname+' 핵심이상 이벤트 '+G.core+'회 ('+top(G.codes,3)+')'];
           if(gname==='승하차통신'){ var ub=unitBreakdown(e.codes); if(ub) ev2.push('유닛별: '+ub); }
           var ga=EVT_GROUP_ACTIONS[gname];
-          add('EVT_GROUP','warn',ev2,['event'],
-            ga?{name:'이벤트 경고: '+gname, action:ga.steps.join(' → '), parts:ga.parts}:{name:'이벤트 경고: '+gname});
+          var gSev=(gname==='승하차통신')?'core':'warn'; // 승하차 통신 이벤트는 핵심 장애
+          var gName=(gname==='승하차통신')?'승하차 통신장애':'이벤트 경고: '+gname;
+          add('EVT_GROUP',gSev,ev2,['event'],
+            ga?{name:gName, action:ga.steps.join(' → '), parts:ga.parts, definitive:(gSev==='core')}:{name:gName});
         }
       });
     }
