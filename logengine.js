@@ -723,14 +723,20 @@ function setupCombo(id, options){
 
 /* ===== Supabase 저장 (결과만, 원본 X) ===== */
 function logSbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, extra||{}); }
+var __logSaving=false, __lastSavedSig='';   // 중복 저장 방지(진행중 + 동일진단)
 async function saveLogDiagnosis(vnum, vid){
   const msg=document.getElementById('logbk-save-msg');
   function set(t,ok){ if(msg){ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; } }
+  if(__logSaving){ return; }   // 저장 진행 중 — 더블클릭 무시
   const d=window.__lastDiag; if(!d){ set('먼저 분석을 실행하세요.'); return; }
   const err=(document.getElementById('logbk-err')||{}).value||'';
   const act=(document.getElementById('logbk-act')||{}).value||'';
   const note=(document.getElementById('logbk-note')||{}).value||'';
   if(!act){ set('처리유형을 입력/선택하세요.'); return; }
+  // 동일 진단(같은 차량·단말기·진단일·오류·처리·메모)은 한 번만 저장
+  const __sig=(vnum||'')+'|'+(d.sn||'')+'|'+(d.analyzedAt||'')+'|'+(d.seungha?'S':'I')+'|'+err+'|'+act+'|'+note;
+  if(__sig===__lastSavedSig){ logToast('이미 저장된 진단입니다.', false); return; }
+  __logSaving=true;
   // ===== 승하차 백업 저장 (고장 격리 결과) =====
   if(d.seungha){
     var s=d.seungha, iso=d.iso||{};
@@ -743,8 +749,9 @@ async function saveLogDiagnosis(vnum, vid){
     try{
       const r=await fetch(SB_URL+'/rest/v1/log_diagnoses',{method:'POST',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify([srow])});
       if(!r.ok){ const t=await r.text(); throw new Error('저장 실패 '+r.status+' '+t.slice(0,120)); }
-      set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true); loadLogHistory(vnum);
+      __lastSavedSig=__sig; set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true); loadLogHistory(vnum);
     }catch(e){ set(''+(e.message||e)); logToast('저장 실패: '+(e.message||e), false); }
+    finally{ __logSaving=false; }
     return;
   }
   const faults=d.findings.map(function(f){ return {group:f.group, n:f.n, core:f.core, codes:f.codes.slice(0,5)}; });
@@ -775,13 +782,14 @@ async function saveLogDiagnosis(vnum, vid){
   try{
     const r=await fetch(SB_URL+'/rest/v1/log_diagnoses',{method:'POST',headers:logSbHeaders({'Prefer':'return=minimal'}),body:JSON.stringify([row])});
     if(!r.ok){ const t=await r.text(); throw new Error('저장 실패 '+r.status+' '+t.slice(0,120)); }
-    set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true);
+    __lastSavedSig=__sig; set('저장됐습니다. 이력에 누적됩니다.', true); logToast('저장되었습니다.', true);
     loadLogHistory(vnum);
     // 백업 점검 완료 → 즉시 선제점검 대상에서 제외
     try{ if(typeof INSPECTED_BK!=='undefined' && INSPECTED_BK.add) INSPECTED_BK.add(vnum); }catch(e){}
     try{ if(typeof updatePreemptBadge==='function') updatePreemptBadge(); }catch(e){}
     try{ if(typeof renderPreempt==='function' && typeof CURTAB!=='undefined' && CURTAB==='preempt') renderPreempt(); }catch(e){}
-  }catch(e){ set(''+(e.message||e)); }
+  }catch(e){ set(''+(e.message||e)); logToast('저장 실패: '+(e.message||e), false); }
+  finally{ __logSaving=false; }
 }
 
 /* ===== 진단·처리 이력 + 재불량 분석 ===== */
@@ -1108,3 +1116,116 @@ function initSnTab(){
   loadBadTerminals();
 }
 /* logengine.js — end */
+
+/* ============================================================
+ * 정밀진단 v3 뇌 이식 (2026-07-08)
+ * 기존 분석 파이프라인은 그대로 두고, 같은 업로드 파일로
+ * DiagEngineV3(diagengine.v3.js)를 돌려 결과 카드를 맨 위에 추가.
+ * v3 실패 시에도 기존 분석 결과에는 영향 없음(완전 격리).
+ * ============================================================ */
+var __V3_TEXT=/\.(dmp|log|evl)$|_sdr\.log$|term_c_info\.dat$/i;
+var __V3_BIN=/\/event\/important\/[^/]*\.evt$/i;
+var __V3_EVT=/\/event\/EVENT_[^/]*\.evt$/i;
+var __V3_ARC=/\.evl\.tar\.gz$|_sdr\.log\.\d+\.tgz$/i;
+
+async function __v3Gunzip(buf){
+  var ds=new DecompressionStream('gzip');
+  return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer());
+}
+function __v3PushArc(out, rel, u8){
+  try{
+    DiagEngineV3.util.untar(u8).forEach(function(ent){
+      var tx=new TextDecoder().decode(ent.data);
+      out.push({path:rel+'#'+ent.name, size:ent.data.length,
+        text:(function(t){return function(){return t;};})(tx),
+        bytes:(function(d){return function(){return d;};})(ent.data)});
+    });
+  }catch(e){}
+}
+async function __v3FromFolder(files){
+  var out=[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i], rel=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
+    var p={path:rel,size:f.size,_t:'',_b:null,text:function(){return this._t;},bytes:function(){return this._b;}};
+    if(__V3_TEXT.test(rel)||(__V3_EVT.test(rel)&&!__V3_BIN.test(rel))) p._t=await f.text();
+    if(__V3_BIN.test(rel)) p._b=new Uint8Array(await f.arrayBuffer());
+    out.push(p);
+    if(__V3_ARC.test(rel)){ try{ __v3PushArc(out, rel, await __v3Gunzip(await f.arrayBuffer())); }catch(e){} }
+  }
+  return out;
+}
+async function __v3FromZip(zfile){
+  var out=[];
+  if(typeof JSZip==='undefined') return out;
+  var zip=await JSZip.loadAsync(zfile);
+  var names=Object.keys(zip.files);
+  for(var i=0;i<names.length;i++){
+    var ent=zip.files[names[i]];
+    if(ent.dir) continue;
+    var rel=names[i].replace(/\\/g,'/');
+    var p={path:rel,size:0,_t:'',_b:null,text:function(){return this._t;},bytes:function(){return this._b;}};
+    if(__V3_TEXT.test(rel)||(__V3_EVT.test(rel)&&!__V3_BIN.test(rel))){
+      var u8t=await ent.async('uint8array'); p._t=new TextDecoder().decode(u8t); p.size=u8t.length;
+    } else if(__V3_BIN.test(rel)){
+      p._b=await ent.async('uint8array'); p.size=p._b.length;
+    } else if(__V3_ARC.test(rel)){
+      var raw=await ent.async('uint8array'); p.size=raw.length;
+      try{ __v3PushArc(out, rel, await __v3Gunzip(raw)); }catch(e){}
+    }
+    out.push(p);
+  }
+  return out;
+}
+async function __v3Slot(folderId, zipId){
+  var fEl=document.getElementById(folderId), zEl=document.getElementById(zipId);
+  if(fEl&&fEl.files&&fEl.files.length) return await __v3FromFolder(Array.prototype.slice.call(fEl.files));
+  if(zEl&&zEl.files&&zEl.files[0]) return await __v3FromZip(zEl.files[0]);
+  return null;
+}
+function __v3Esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function __v3CardHtml(r){
+  var DOT={core:'🔴',warn:'🟡',ok:'🟢',nodata:'⚪'};
+  var BORDER={core:'#B91C1C',warn:'#B45309',ok:'#16A34A',nodata:'#6B7280'};
+  var h='<div style="border:1px solid #E5E7EB;border-left:6px solid '+BORDER[r.severity]+';border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff">';
+  h+='<div style="font-weight:800;font-size:14px;margin-bottom:2px">🧠 정밀진단 v3 '+DOT[r.severity]+' <span style="font-weight:600">'+__v3Esc(r.sn||'?')+'</span>'
+    +' <span style="font-size:11px;background:#F3F4F6;border-radius:6px;padding:2px 7px">'+__v3Esc(r.model||'-')+'</span>'
+    +(r.vehicleId?' <span style="font-size:11px;background:#F3F4F6;border-radius:6px;padding:2px 7px">차량 '+__v3Esc(r.vehicleId)+'</span>':'')
+    +(r.swOk?' <span style="font-size:11px;background:#ECFDF5;color:#065F46;border-radius:6px;padding:2px 7px">OS 최신</span>':'')+'</div>';
+  h+='<div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">신형 엔진(공식코드 226종·격리판정) · 조치순서는 상반기 접수 15,451건 실증 통계 기준</div>';
+  if(r.severity==='nodata'){ h+='<div style="font-size:12.5px;background:#F9FAFB;border-radius:8px;padding:8px 10px">⚪ '+__v3Esc(r.note||'판독 가능한 로그 없음')+'</div>'; }
+  else if(!r.findings.length){ h+='<div style="font-size:12.5px;background:#ECFDF5;border-radius:8px;padding:8px 10px">🟢 정상 신호 — 특이 장애 미검출</div>'; }
+  r.findings.forEach(function(f){
+    var bg=f.severity==='core'?'#FEF2F2':'#FFFBEB';
+    h+='<div style="font-size:12.5px;background:'+bg+';border-radius:8px;padding:8px 10px;margin-top:6px">'
+      +'<b>['+(f.severity==='core'?'핵심':'주의')+'] '+__v3Esc(f.name)+'</b>'
+      +' <span style="font-size:10.5px;background:'+(f.confidence==='high'?'#DBEAFE':'#F3F4F6')+';color:'+(f.confidence==='high'?'#1E40AF':'#4B5563')+';border-radius:5px;padding:1px 6px">'
+      +(f.confidence==='high'?'신뢰도 높음·'+__v3Esc(f.sources.join('+')):'단일 근거')+'</span>'
+      +'<div style="margin-top:3px;color:#374151">근거: '+__v3Esc(f.evidence)+'</div>'
+      +'<div style="color:#374151">조치: '+__v3Esc(f.action)+'</div>'
+      +(f.parts&&f.parts.length?'<div style="color:#374151">교체부품: '+__v3Esc(f.parts.join(', '))+'</div>':'')
+      +(f.note?'<div style="color:#92400E;margin-top:2px">⚠ '+__v3Esc(f.note)+'</div>':'')+'</div>';
+  });
+  h+='</div>';
+  return h;
+}
+async function runV3Overlay(){
+  if(typeof DiagEngineV3==='undefined') return;
+  var box=document.getElementById('logbk-result'); if(!box) return;
+  var slots=[await __v3Slot('logbk-folder','logbk-file'), await __v3Slot('logbk2-folder','logbk2-file')];
+  var cards='';
+  window.__lastDiagV3=[];
+  for(var i=0;i<slots.length;i++){
+    if(!slots[i]||!slots[i].length) continue;
+    try{
+      var r=DiagEngineV3.diagnose(slots[i]);
+      window.__lastDiagV3.push(r);
+      cards+=__v3CardHtml(r);
+    }catch(e){ cards+='<div style="font-size:12px;color:#B91C1C">v3 분석 오류: '+__v3Esc(e.message||e)+'</div>'; }
+  }
+  if(cards) box.insertAdjacentHTML('afterbegin', cards);
+}
+var __origAnalyzeLogBackup=analyzeLogBackup;
+analyzeLogBackup=async function(vnum, vid){
+  await __origAnalyzeLogBackup(vnum, vid);
+  try{ await runV3Overlay(); }catch(e){ console.warn('v3 overlay', e); }
+};
