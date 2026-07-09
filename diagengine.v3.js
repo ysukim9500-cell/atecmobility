@@ -50,6 +50,13 @@
     gps_ant_min_samples:      20,  // 안테나 판정 최소 샘플
     gps_ant_zero_pct:         95,  // 한쪽만 무신호 ≥ → 해당 안테나 이상
     evl_cut_min_disc:          2,  // 단선 의심 최소 단절 횟수(오탐 방지)
+    seungha_reinit_warn:       6,  // 승하차 5분내 재초기화 ≥ → 부팅/전원 주의 (신규·검증중)
+    seungha_reinit_core:      10,  // ≥ → 핵심
+    sam_fault_warn:            3,  // SAM 핵심이상 코드(3312/3313/3230) 합 ≥ → SAM 불량 의심
+    sam_fault_core:           10,  // ≥ → 핵심
+    storage_fault_warn:        1,  // 파일시스템 손상(1D20/1D30/7D30) ≥ → 주의
+    storage_fault_core:        5,  // ≥ → 핵심
+    fan_fault_warn:            1,  // Fan Error(F010) ≥ → 주의
     seungha_selfloss_warn:     3,  // 승하차 자체끊김 ≥ → 격리판정 발동(오탐 방지)
     sdr_trend_min_rapid:       5   // 전원열화 추세 최소 rapid 총횟수(소량 노이즈 오탐 방지)
   };
@@ -107,7 +114,11 @@
     LINK_FLAPPING: { name:'모듈 링크 접촉불량 의심', steps:['해당 링크 커넥터 재체결','케이블 교체','승하차 링크면 위치 맞교체로 격리 확인'], parts:['연결 케이블'], note:'짧은 주기 반복 단절 패턴' },
     LINK_CUT:      { name:'모듈 링크 단선 의심', steps:['케이블 단선 확인','모듈 전원 확인'], parts:['연결 케이블','해당 모듈'] },
     EVT_GROUP:     { name:'이벤트 경고',     steps:['해당 부위 점검(세부 이벤트 참조)'], parts:[] },
-    CARD_READER:   { name:'카드리더 오류 과다', steps:['해당 단말기 교체','SAM 세척·재삽입','카드리더 접점 청소'], parts:['승하차 단말기'] }
+    CARD_READER:   { name:'카드리더 오류 과다', steps:['해당 단말기 교체','SAM 세척·재삽입','카드리더 접점 청소'], parts:['승하차 단말기'] },
+    SEUNGHA_BOOT:  { name:'승하차 부팅/전원 이상', steps:['승하차 전원 커넥터·케이블 점검','증상 지속 시 승하차 단말기 교체'], parts:['승하차 단말기','전원 케이블'], note:'신규 신호 — 현장 확인으로 검증 중' },
+    SAM_FAULT:     { name:'SAM 불량 의심', steps:['SAM 세척·재삽입','SAM 카드 교체','지속 시 해당 단말기 교체'], parts:['SAM 카드','해당 단말기'] },
+    STORAGE_FAULT: { name:'저장장치(파일시스템) 이상', steps:['거래내역 즉시 백업(유실 예방)','단말기 교체 검토'], parts:['해당 단말기'], note:'파일시스템 손상은 재발 시 데이터 유실로 이어짐' },
+    FAN_FAULT:     { name:'냉각팬 이상', steps:['팬 동작·이물질 확인','팬 교체','방치 시 과열로 본체 손상 주의'], parts:['냉각팬'] }
   };
   // 이벤트 그룹별 조치 (EVT_GROUP 발화 시 그룹에 맞는 가이드로 대체)
   var EVT_GROUP_ACTIONS = {
@@ -335,9 +346,22 @@
     var dmp=sel(files,P.fareDmp,notBak), tr=sel(files,P.trlog), day=sel(files,P.dayTrn);
     if(!dmp.length&&!tr.length&&!day.length) return null;
     var R={ card_err:0, fail_info:0, dmp_days:daysOf(dmp), trlog_records:0, trlog_days:daysOf(tr),
-            backup_days:day.length };
+            backup_days:day.length, reinit_total:0, reinit_rapid:0 };
+    var TS=/^\[(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
     dmp.forEach(function(f){ var t=txt(f);
-      R.card_err+=occ(t,'card_err'); R.fail_info+=occ(t,'fail info cnt'); });
+      R.card_err+=occ(t,'card_err'); R.fail_info+=occ(t,'fail info cnt');
+      // 부팅(재초기화) 시각 분석: 5분 내 재초기화 = 비정상 재부팅 의심
+      var times=[];
+      t.split(/\r?\n/).forEach(function(L){
+        if(L.indexOf('apply_init()')<0) return;
+        var m=TS.exec(L); if(!m) return;
+        times.push(((+m[1]*31)+(+m[2]))*86400 + (+m[3])*3600 + (+m[4])*60 + (+m[5]));
+      });
+      times.sort(function(a,b){return a-b;});
+      for(var i=1;i<times.length;i++){ R.reinit_total++;
+        var gap=times[i]-times[i-1];
+        if(gap>=0&&gap<300) R.reinit_rapid++; }
+    });
     tr.forEach(function(f){ R.trlog_records+=occ(txt(f),'\nTS'); });
     R.card_err_per_day=Math.round(R.card_err/R.dmp_days);
     return R;
@@ -492,6 +516,7 @@
     if(e){
       var covered={'모뎀BMS통신':F.some(function(x){return /^BMS|MQTT/.test(x.code);}),
                    '센터통신':F.some(function(x){return /^SERVER/.test(x.code);}),
+                   '카드SAM':F.some(function(x){return x.code==='SAM_FAULT';}),
                    'GPS위치':F.some(function(x){return /^GPS/.test(x.code);})};
       Object.keys(e.groups).forEach(function(gname){
         var G=e.groups[gname];
@@ -506,6 +531,33 @@
             ga?{name:gName, action:ga.steps.join(' → '), parts:ga.parts, definitive:(gSev==='core')}:{name:gName});
         }
       });
+    }
+
+    // ---- 승하차 부팅/전원 (fare dmp 재초기화 시간분석 — 신규) ----
+    if(fa&&fa.reinit_rapid>=CONFIG.seungha_reinit_core)
+      add('SEUNGHA_BOOT','core',['5분 내 재초기화 '+fa.reinit_rapid+'회 (총 초기화 간격 '+fa.reinit_total+'건)'],['fare_dmp'],{definitive:true});
+    else if(fa&&fa.reinit_rapid>=CONFIG.seungha_reinit_warn)
+      add('SEUNGHA_BOOT','warn',['5분 내 재초기화 '+fa.reinit_rapid+'회 (총 초기화 간격 '+fa.reinit_total+'건)'],['fare_dmp']);
+
+    // ---- SAM 불량 (공식표 핵심이상: 3312 CSAM통신·3313 PSAM통신·3230 CSAM초기화) ----
+    if(e){
+      var samN=(e.codes['3312']||0)+(e.codes['3313']||0)+(e.codes['3230']||0)+(e.codes['3220']||0);
+      if(samN>=CONFIG.sam_fault_warn){
+        var samL=['3312','3313','3230','3220'].filter(function(c){return e.codes[c];}).map(function(c){return c+'×'+e.codes[c];}).join(', ');
+        add('SAM_FAULT', samN>=CONFIG.sam_fault_core?'core':'warn', ['SAM 이상 이벤트 '+samN+'회 ('+samL+')'],['event'], samN>=CONFIG.sam_fault_core?{definitive:true}:undefined);
+      }
+    }
+
+    // ---- 저장장치(파일시스템)·냉각팬 (dmesg·Fan 이벤트 — HW 직접신호) ----
+    if(e){
+      var stN=(e.codes['1D20']||0)+(e.codes['1D30']||0)+(e.codes['7D30']||0);
+      if(stN>=CONFIG.storage_fault_warn){
+        var stL=['1D20','1D30','7D30'].filter(function(c){return e.codes[c];}).map(function(c){return c+'×'+e.codes[c];}).join(', ');
+        add('STORAGE_FAULT', stN>=CONFIG.storage_fault_core?'core':'warn',
+          ['파일시스템 오류 이벤트 '+stN+'회 ('+stL+')'],['event'], stN>=CONFIG.storage_fault_core?{definitive:true}:undefined);
+      }
+      if((e.codes['F010']||0)>=CONFIG.fan_fault_warn)
+        add('FAN_FAULT','warn',['Fan Error(F010) '+e.codes['F010']+'회'],['event']);
     }
 
     // ---- fare(156/155) 카드리더 ----
@@ -542,6 +594,156 @@
     return F;
   }
 
+
+  // ---------------- 쉬운 말 설명 + 종합 결론 (v3.1) ----------------
+  function _num(ev,re){ var m=re.exec(ev||''); return m?m[1]:null; }
+  function plainOf(f){
+    var ev=f.evidence||'';
+    switch(f.code){
+      case 'BMS_DOWN': return '관제(BMS) 쪽 통신이 완전히 끊겼습니다. 응답 확인(ping)을 '+(_num(ev,/Unreach (\d+)/)||'수천')+'번 보냈지만 한 번도 답이 없었습니다.';
+      case 'BMS_WARN': return '관제(BMS) 쪽 통신이 불안합니다. 응답 확인이 계속 실패하고 있습니다.';
+      case 'MQTT_PATH': return '단말기가 관제 서버(TOPIS)로 가는 통신 길이 막혀 있습니다.';
+      case 'SERVER_DEAD': return '서버에 한 번도 연결되지 못했습니다. 결제내역이 유실될 수 있어 백업이 급합니다.';
+      case 'SERVER_CONN': { var p=_num(ev,/성공률 (\d+)%/); return '서버 연결이 자주 실패합니다'+(p?' (10번 시도하면 '+Math.round(p/10)+'번 정도만 성공)':'')+'.'; }
+      case 'TRANS_BACKLOG': return '카드 결제내역이 서버로 못 올라가고 계속 재전송을 시도 중입니다. 방치하면 정산 문제가 됩니다.';
+      case 'TRANS_WARN': return '결제내역 전송이 평소보다 자주 재시도되고 있습니다.';
+      case 'NET_BACKLOG_CORE': return '서버로 보내지 못한 결제파일이 '+(_num(ev,/대기 (\d+)건/)||'수십')+'건 쌓여 있습니다. 유실 위험이 있으니 백업부터 하세요.';
+      case 'NET_BACKLOG': return '아직 서버로 못 보낸 결제파일이 조금 남아 있습니다.';
+      case 'COMM_QUALITY': return '통신 상태가 불안정합니다. 하루 평균 '+(_num(ev,/일평균 ([\d,]+)/)||'수천')+'번꼴로 응답이 늦거나 끊깁니다.';
+      case 'WATCHDOG': return '내부 모듈이 계속 멈춰서 자동 리셋이 반복되고 있습니다.';
+      case 'REBOOT_LOOP': return '단말기가 켜진 지 5분도 안 돼 다시 꺼졌다 켜지기를 '+(_num(ev,/재시작 (\d+)회/)||'여러')+'번 반복했습니다. 전원 계통 문제입니다.';
+      case 'POWER_ABN': return '전원이 정상 종료 절차 없이 뚝 끊긴 기록이 '+(_num(ev,/재시작 (\d+)회/)||'여러')+'번 있습니다.';
+      case 'POWER_TREND': return '이 단말기는 예전부터 재부팅이 잦았습니다. 전원 계통(퓨즈·케이블)을 의심하세요.';
+      case 'GPS_WARN': return 'GPS 위치를 제대로 못 잡고 있습니다. 정류장 안내·간격 표시가 이상해질 수 있습니다.';
+      case 'GPS_ANT': return 'GPS 안테나 한쪽(앞 또는 뒤)만 신호가 없습니다. 해당 안테나 배선 문제입니다.';
+      case 'DATA_LOSS': return '기록됐어야 할 데이터 일부가 누락됐습니다.';
+      case 'LINK_FLAPPING': return '내부 연결이 붙었다 끊겼다를 짧은 주기로 반복합니다. 커넥터 접촉불량의 전형적인 패턴입니다.';
+      case 'LINK_CUT': return '내부 연결이 끊긴 뒤 다시 붙지 못했습니다. 케이블 단선이 의심됩니다.';
+      case 'CARD_READER': return '카드 인식 오류가 비정상적으로 많습니다.';
+      case 'SEUNGHA_BOOT': return '승하차 단말기가 켜진 지 5분도 안 돼 다시 초기화되기를 '+(_num(ev,/재초기화 (\d+)회/)||'여러')+'번 반복했습니다. 전원·본체 문제가 의심됩니다.';
+      case 'SAM_FAULT': return '요금 결제용 보안모듈(SAM)에서 통신/초기화 오류가 반복됐습니다. SAM 카드 접촉 문제이거나 SAM 자체 불량입니다.';
+      case 'STORAGE_FAULT': return '단말기 저장장치에서 파일시스템 오류가 감지됐습니다. 거래내역이 손상될 수 있으니 백업을 서두르세요.';
+      case 'FAN_FAULT': return '냉각팬 오류가 기록됐습니다. 방치하면 과열로 다른 부품까지 상할 수 있습니다.';
+      case 'SEUNGHA_ISO': return ev.indexOf('연결시도')>=0
+        ? '승하차 단말기가 계속 연결을 시도했지만 통합단말기에 한 번도 닿지 못했습니다. 중간 케이블이나 포트 문제입니다.'
+        : '승하차 단말기는 살아있는데 통신이 자꾸 끊깁니다. 케이블·커넥터 접촉불량이 의심됩니다.';
+      case 'EVT_GROUP':
+        if(f.name.indexOf('승하차')>=0) return '운전자석과 승하차 단말기 사이 통신이 끊긴 기록이 반복적으로 남아 있습니다.';
+        if(f.name.indexOf('표출기')>=0) return '표출단말기(운전자 화면)와의 통신이 끊긴 기록이 있습니다.';
+        if(f.name.indexOf('모뎀')>=0) return '모뎀 상태 이상 이벤트가 반복 기록됐습니다.';
+        if(f.name.indexOf('전원')>=0) return '전원 관련 이상 이벤트가 기록됐습니다.';
+        if(f.name.indexOf('카드')>=0) return '카드 결제 관련 오류 이벤트가 기록됐습니다.';
+        if(f.name.indexOf('운행')>=0) return '운행 시작/종료가 정상 처리되지 못한 기록이 있습니다.';
+        if(f.name.indexOf('펌웨어')>=0) return '프로그램(펌웨어) 관련 오류가 기록됐습니다.';
+        return '해당 부위에서 이상 이벤트가 반복 기록됐습니다.';
+      default: return '';
+    }
+  }
+  // 종합 결론: 어떤 판정이 원인 축인지 우선순위로 선정
+  var _PRI={SEUNGHA_BOOT:1,SAM_FAULT:8,STORAGE_FAULT:6,FAN_FAULT:17,SEUNGHA_ISO:1,BMS_DOWN:2,SERVER_DEAD:3,REBOOT_LOOP:4,POWER_ABN:5,
+            NET_BACKLOG_CORE:6,TRANS_BACKLOG:7,GPS_ANT:8,LINK_CUT:9,LINK_FLAPPING:10,
+            MQTT_PATH:11,POWER_TREND:12,SERVER_CONN:13,COMM_QUALITY:14,BMS_WARN:15,
+            GPS_WARN:16,CARD_READER:17,WATCHDOG:18,EVT_GROUP:19,DATA_LOSS:20,TRANS_WARN:21,NET_BACKLOG:22};
+  var _CAUSE={
+    BMS_DOWN:'외장 LTE 모뎀 / BMS 통신 계통', BMS_WARN:'외장 LTE 모뎀', MQTT_PATH:'외장 LTE 모뎀 / 통신 경로',
+    SERVER_DEAD:'통합단말기 (서버통신부)', SERVER_CONN:'통합단말기 / LTE 통신',
+    TRANS_BACKLOG:'통합단말기 (거래전송)', TRANS_WARN:'거래 전송 경로', NET_BACKLOG_CORE:'통합단말기 (거래전송)', NET_BACKLOG:'거래 전송 경로',
+    COMM_QUALITY:'모뎀·안테나 (통신품질)', WATCHDOG:'통합단말기',
+    REBOOT_LOOP:'전원 계통 (차량 퓨즈·케이블)', POWER_ABN:'전원 계통 (차량 퓨즈·케이블)', POWER_TREND:'전원 계통',
+    GPS_WARN:'GPS 안테나', GPS_ANT:'GPS 안테나 배선', DATA_LOSS:'저장/전송 경로',
+    LINK_FLAPPING:'연결 케이블·커넥터', LINK_CUT:'연결 케이블', CARD_READER:'승하차 단말기 (카드부)',
+    SEUNGHA_ISO:'승하차 연결 케이블·포트', SEUNGHA_BOOT:'승하차 단말기 전원/본체', SAM_FAULT:'SAM 카드(보안모듈)', STORAGE_FAULT:'단말기 저장장치', FAN_FAULT:'냉각팬', EVT_GROUP:'이벤트 검출 부위'
+  };
+  function buildSummary(F, sev){
+    if(sev==='nodata') return { headline:'백업에 판독 가능한 로그가 없습니다', sub:'백업 절차 또는 단말 저장장치를 확인하세요.', firstStep:'', parts:[] };
+    if(!F.length) return { headline:'정상 — 장애 신호 없음', sub:'통신·전원·승하차·GPS 모두 정상 범위입니다.', firstStep:'', parts:[] };
+    var sorted=F.slice().sort(function(a,b){
+      var sa=(a.severity==='core'?0:100)+(_PRI[a.code]||50);
+      var sb=(b.severity==='core'?0:100)+(_PRI[b.code]||50);
+      return sa-sb;
+    });
+    var top=sorted[0];
+    var cause=(top.code==='EVT_GROUP'&&top.name.indexOf('승하차')>=0)?'승하차 단말기·연결 케이블':(_CAUSE[top.code]||'점검 필요 부위');
+    var firstStep=String(top.action||'').split(' → ')[0]||'';
+    var parts=[]; sorted.forEach(function(f){ (f.parts||[]).forEach(function(p){ if(parts.indexOf(p)<0) parts.push(p); }); });
+    var coreN=F.filter(function(x){return x.severity==='core';}).length;
+    return {
+      headline:(sev==='core'?'고장 확정적 — ':'점검 필요 — ')+cause+' 이상',
+      sub: plainOf(top)||top.name,
+      firstStep:firstStep,
+      parts:parts.slice(0,4),
+      counts:{core:coreN, warn:F.length-coreN},
+      topName: top.name
+    };
+  }
+
+
+  // ---------------- 교차 격리 판정 (통합+승하차 동시 업로드 시) ----------------
+  // PDF 격리표 완전체: 통합 / 승하차 본체 / 케이블·포트 3자 구분
+  function crossIsolate(integR, seunghaR){
+    if(!integR||!seunghaR) return null;
+    // 차량 불일치 안전장치
+    if(integR.vehicleId&&seunghaR.vehicleId&&String(integR.vehicleId)!==String(seunghaR.vehicleId)){
+      return { verdict:'판정 보류', target:null, severity:'warn', confidence:'medium',
+        reasons:['통합(차량 '+integR.vehicleId+')과 승하차(차량 '+seunghaR.vehicleId+') 백업이 서로 다른 차량의 것입니다.'],
+        action:'같은 차량의 백업인지 확인 후 다시 분석', parts:[] };
+    }
+    // 통합 측 증거
+    var integCore = integR.findings.filter(function(f){ return f.severity==='core'; });
+    var integSelfBad = integCore.some(function(f){ return {REBOOT_LOOP:1,POWER_ABN:1,BMS_DOWN:1,SERVER_DEAD:1,WATCHDOG:1}[f.code]; });
+    var unitFail=[]; // 통합이 기록한 실패 유닛
+    var iev = integR.signals && integR.signals.events;
+    if(iev){ Object.keys(SEUNGHA_UNIT_CODES).forEach(function(u){ var n=0;
+      SEUNGHA_UNIT_CODES[u].forEach(function(c){ n+=iev.codes[c]||0; });
+      if(n>0) unitFail.push(u+'('+n+'회)'); }); }
+    if(unitFail.length>=2) integSelfBad=true; // 여러 유닛 동시 실패 = 통합 측 의심
+    // 승하차 측 증거
+    var sg = seunghaR.signals && seunghaR.signals.seungha;
+    var link = sg && sg.link;
+    var seunghaAlive = seunghaR.severity!=='nodata' && (!sg || sg.alive);
+
+    var R={ parts:[], reasons:[] };
+    if(integSelfBad){
+      R.verdict='통합단말기 원인'; R.target='통합단말기'; R.severity='core'; R.confidence='high';
+      R.reasons.push('통합단말기 백업 자체에서 핵심 이상이 확인됨: '+(integCore.map(function(f){return f.name;}).join(', ')||'다수 유닛 동시 실패'));
+      if(unitFail.length) R.reasons.push('통합이 기록한 승하차 통신실패: '+unitFail.join(', ')+(unitFail.length>=2?' — 여러 유닛이 동시에 실패하면 개별 승하차보다 통합 쪽 원인':''));
+      if(link&&link.state==='active') R.reasons.push('승하차 단말기는 통합과 연결·송신 기록이 있어 본체 정상(직접증거)');
+      R.action='통합단말기 우선 점검·교체 → 교체 후 승하차 통신 회복 확인';
+      R.parts=['통합단말기'];
+    } else if(link&&link.state==='tryingNoConn'){
+      var multiDay=sg.dmp_days>=2;
+      R.verdict='케이블 단선 / 통합 포트 불량'; R.target='통신 케이블·통합 포트';
+      R.severity=multiDay?'core':'warn'; R.confidence=multiDay?'high':'medium';
+      R.reasons.push('승하차는 연결을 '+link.tryConn+'회 시도했지만 통합에 한 번도 닿지 못함(직접증거)');
+      R.reasons.push('통합단말기 백업에는 자체 핵심 이상이 없음 → 본체보다 중간 연결이 문제');
+      if(!multiDay) R.reasons.push('로그가 1일치뿐 — 백업 직후 벤치 부팅 기록일 수 있어 차량 장착 상태 재확인 권장');
+      R.action='케이블 단선·커넥터 탈락 확인(임시 가설교체 TEST) → 통합 포트를 예비포트(sp)로 이동 → 그래도 안 되면 통합 포트 점검';
+      R.parts=['통신 케이블'];
+    } else if(!seunghaAlive){
+      R.verdict='승하차 단말기 본체 불량'; R.target='승하차 단말기'; R.severity='core'; R.confidence='high';
+      R.reasons.push('승하차 백업에 가동 흔적(거래·이벤트·연결)이 전혀 없음 → 무응답/미부팅(직접증거)');
+      R.reasons.push('통합단말기는 자체 이상이 없음');
+      if(unitFail.length) R.reasons.push('통합도 해당 유닛 통신실패를 기록: '+unitFail.join(', '));
+      R.action='승하차 단말기 전원·커넥터 확인 → 전원 정상인데 무응답이면 승하차 단말기 교체';
+      R.parts=['승하차 단말기'];
+    } else if(sg&&sg.selfLoss>=CONFIG.seungha_selfloss_warn){
+      var both = unitFail.length>0;
+      R.verdict='케이블/커넥터 간헐 접촉불량'; R.target='연결 케이블·커넥터';
+      R.severity=both?'core':'warn'; R.confidence=both?'high':'medium';
+      R.reasons.push('승하차는 통합과 연결·송신 기록이 있는데 통신끊김도 '+sg.selfLoss+'회 반복 → 붙었다 끊겼다 하는 패턴');
+      if(both) R.reasons.push('통합도 동일 유닛 통신실패를 기록('+unitFail.join(', ')+') → 양쪽 본체 정상, 사이 연결이 문제(교차확증)');
+      R.action='커넥터 재체결 → 임시 케이블 교체 TEST → 통합 포트 예비포트(sp) 이동 → 회복되면 케이블/커넥터 확정';
+      R.parts=['연결 케이블','커넥터'];
+    } else {
+      R.verdict='격리: 특이 없음'; R.target=null; R.severity='ok'; R.confidence='high';
+      R.reasons.push('통합·승하차 모두 상대측 통신 이상의 직접증거가 없습니다.');
+      if(unitFail.length) R.reasons.push('다만 통합에 유닛 통신실패 기록이 있음: '+unitFail.join(', ')+' — 간헐 증상이면 커넥터 재체결 권장');
+      R.action=unitFail.length?'해당 유닛 커넥터 재체결 후 경과 관찰':'추가 조치 불필요';
+      R.parts=[];
+    }
+    return R;
+  }
+
   // ---------------- 진입점 ----------------
   function diagnose(files){
     var sn=snOf(files);
@@ -554,15 +756,18 @@
     if(!hasSignal){
       return { sn:sn, vehicleId:null, model:modelOf(sn), series:seriesOf(sn),
                severity:'nodata', swOk:false, findings:[], signals:S,
-               note:'백업에 판독 가능한 로그 없음 — 백업 절차 또는 단말 저장장치 확인 필요' };
+               note:'백업에 판독 가능한 로그 없음 — 백업 절차 또는 단말 저장장치 확인 필요',
+               summary:buildSummary([], 'nodata') };
     }
     var F=judge(S, modelOf(sn));
     var sev=F.some(function(x){return x.severity==='core';})?'core':(F.length?'warn':'ok');
+    F.forEach(function(f){ f.plain=plainOf(f); });
     return { sn:sn, vehicleId:vehId(files,q,e), model:modelOf(sn), series:seriesOf(sn),
-             severity:sev, swOk:!!(S.fw&&S.fw.sw_ok), findings:F, signals:S };
+             severity:sev, swOk:!!(S.fw&&S.fw.sw_ok), findings:F, signals:S,
+             summary:buildSummary(F, sev) };
   }
 
-  var API={ diagnose:diagnose, CONFIG:CONFIG, ACTION_KB:ACTION_KB, LOG_CODES:LOG_CODES,
+  var API={ diagnose:diagnose, crossIsolate:crossIsolate, CONFIG:CONFIG, ACTION_KB:ACTION_KB, LOG_CODES:LOG_CODES,
             util:{ untar:untar }, _judge:judge };
   if(typeof module!=='undefined'&&module.exports) module.exports=API;
   root.DiagEngineV3=API;

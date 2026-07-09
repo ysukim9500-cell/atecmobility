@@ -1118,10 +1118,7 @@ function initSnTab(){
 /* logengine.js — end */
 
 /* ============================================================
- * 정밀진단 v3 뇌 이식 (2026-07-08 v2: 완전 교체 모드)
- * [분석하기] 실행 시 기존 파이프라인을 돌려 저장카드·이력·__lastDiag를
- * 만들되, 화면의 진단 카드는 v3 결과로 교체한다.
- * v3 분석이 없으면(파일 미인식 등) 기존 화면을 그대로 둔다(안전망).
+ * 정밀진단 v3 뇌 이식 (v3: 종합판정 배너 + 쉬운 설명 카드)
  * ============================================================ */
 var __V3_TEXT=/\.(dmp|log|evl)$|_sdr\.log$|term_c_info\.dat$/i;
 var __V3_BIN=/\/event\/important\/[^/]*\.evt$/i;
@@ -1183,40 +1180,96 @@ async function __v3Slot(folderId, zipId){
   return null;
 }
 function __v3Esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-/* 기존 카드와 동일한 형식: 🔴[핵심] 제목 / 🔎 판단 근거 / ✅ 점검 순서 / 점검 부품 */
-function __v3CardHtml(r, vnum){
+function __v3Icon(f){
+  var c=f.code, n=f.name||'';
+  if(/^BMS|MQTT|COMM/.test(c)) return '📡';
+  if(/^SERVER/.test(c)) return '🌐';
+  if(/^TRANS|^NET/.test(c)) return '💳';
+  if(/REBOOT|POWER/.test(c)) return '🔌';
+  if(/^GPS/.test(c)) return '🛰️';
+  if(/LINK/.test(c)) return '🔗';
+  if(c==='SEUNGHA_ISO') return '🚏';
+  if(c==='CARD_READER') return '💳';
+  if(c==='DATA_LOSS') return '📉';
+  if(c==='WATCHDOG') return '⏱️';
+  if(c==='EVT_GROUP'){ if(n.indexOf('승하차')>=0) return '🚏'; if(n.indexOf('표출기')>=0) return '🖥️'; if(n.indexOf('전원')>=0) return '🔌'; if(n.indexOf('GPS')>=0) return '🛰️'; return '📋'; }
+  return '🔧';
+}
+/* ── 종합 판정 배너 ── */
+function __v3Banner(r, vnum){
+  var s=r.summary||{}, sev=r.severity;
+  var TH={ core:{bg:'linear-gradient(135deg,#7F1D1D,#B91C1C)',lamp:'🔴',label:'핵심 장애'},
+           warn:{bg:'linear-gradient(135deg,#92400E,#D97706)',lamp:'🟡',label:'점검 필요'},
+           ok:{bg:'linear-gradient(135deg,#065F46,#16A34A)',lamp:'🟢',label:'정상'},
+           nodata:{bg:'linear-gradient(135deg,#374151,#6B7280)',lamp:'⚪',label:'판독 불가'} }[sev];
   var banner=(typeof vehicleMatchBanner==='function')?vehicleMatchBanner(vnum, r.vehicleId, '단말기'):'';
-  var h=banner+'<div class="flex items-center gap-2 mb-2 flex-wrap">'
-    +'<span class="chip bg-slate-100 text-slate-600">'+__v3Esc(r.model||'-')+(r.sn?' · S/N '+__v3Esc(r.sn):'')+'</span>'
-    +(r.vehicleId?'<span class="chip bg-slate-100 text-slate-600">차량ID '+__v3Esc(r.vehicleId)+'</span>':'')
-    +(r.swOk?'<span class="chip bg-emerald-50 text-emerald-700">OS 최신</span>':'')
-    +'<span class="chip" style="background:#7A0B3C18;color:#7A0B3C;font-weight:700">정밀진단 v3</span></div>';
-  if(r.severity==='nodata'){
-    h+='<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[13px] text-slate-600"><b>⚪ 판독 가능한 로그가 없습니다.</b><div class="text-[11px] mt-1">'+__v3Esc(r.note||'백업 절차 또는 단말 저장장치를 확인하세요.')+'</div></div>';
-    return h;
-  }
-  if(!r.findings.length){
-    h+='<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">통신·전원·승하차·GPS 등에서 이상 신호가 잡히지 않았습니다(정상 범위).</div></div>';
-    return h;
-  }
-  r.findings.forEach(function(f){
+  var h=banner+'<div style="background:'+TH.bg+';border-radius:14px;padding:14px 16px;color:#fff;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,.15)">';
+  h+='<div style="display:flex;align-items:center;gap:12px">'
+    +'<div style="font-size:34px;line-height:1">'+TH.lamp+'</div>'
+    +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:11px;opacity:.85;font-weight:700;letter-spacing:.5px">종합 판정 · '+TH.label+(s.counts?(' (핵심 '+s.counts.core+'·주의 '+s.counts.warn+')'):'')+'</div>'
+      +'<div style="font-size:16px;font-weight:800;margin-top:2px">'+__v3Esc(s.headline||'')+'</div>'
+      +'<div style="font-size:12px;opacity:.92;margin-top:3px">'+__v3Esc(s.sub||'')+'</div>'
+    +'</div></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:11px">'
+    +'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">'+__v3Esc(r.model||'-')+(r.sn?' · '+__v3Esc(r.sn):'')+'</span>'
+    +(r.vehicleId?'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">차량 '+__v3Esc(r.vehicleId)+'</span>':'')
+    +(r.swOk?'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">OS 최신 — SW 재설치 불필요</span>':'')
+    +'</div>';
+  if(s.firstStep) h+='<div style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 12px;margin-top:10px;font-size:13px"><b>👉 지금 바로:</b> '+__v3Esc(s.firstStep)+'</div>';
+  if(s.parts&&s.parts.length) h+='<div style="margin-top:8px;font-size:12px"><b>🎒 준비 부품:</b> '+s.parts.map(__v3Esc).join(' · ')+'</div>';
+  h+='</div>';
+  return h;
+}
+/* ── 개별 판정 카드 ── */
+function __v3CardHtml(r, vnum){
+  var h=__v3Banner(r, vnum);
+  if(r.severity==='nodata' || !r.findings.length) return h;
+  r.findings.forEach(function(f,idx){
     var core=(f.severity==='core');
+    var col=core?'#B91C1C':'#B45309';
+    var steps=String(f.action||'').split(' → ');
+    var stepHtml=steps.map(function(st,i){
+      return '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:'+(i?'5px':'0')+'">'
+        +'<span style="min-width:20px;height:20px;border-radius:50%;background:'+(i===0?col:'#E5E7EB')+';color:'+(i===0?'#fff':'#374151')+';font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">'+(i+1)+'</span>'
+        +'<span style="font-size:12.5px;color:#1F2937;'+(i===0?'font-weight:700':'')+'">'+__v3Esc(st)+'</span></div>';
+    }).join('');
     var evid=String(f.evidence||'').split(' · ').map(function(x){return '<li>'+__v3Esc(x)+'</li>';}).join('');
-    var steps=String(f.action||'').split(' → ').map(function(s){return '<li>'+__v3Esc(s)+'</li>';}).join('');
-    var parts=(f.parts&&f.parts.length)?('<div class="text-[11px] text-slate-500 mt-1.5">점검 부품: '+f.parts.map(function(p){return '<span class="chip bg-rose-50 text-[#B91C1C] border border-rose-200" style="font-size:11px">'+__v3Esc(p)+'</span>';}).join(' ')+'</div>'):'';
-    h+='<div class="border border-rose-100 rounded-lg p-3 mb-2 '+(core?'bg-rose-50/40':'bg-amber-50/40')+'">'
-      +'<div class="text-[13px] font-extrabold '+(core?'text-[#B91C1C]':'text-[#B45309]')+'">'+(core?'🔴':'🟡')+' ['+(core?'핵심':'주의')+'] '+__v3Esc(f.name)
-      +(f.confidence==='high'?' <span class="text-[10px] font-semibold" style="color:#1E40AF">교차확인됨</span>':'')+'</div>'
-      +'<div class="text-[11px] text-slate-500 mt-2 font-semibold">🔎 판단 근거</div>'
-      +'<ul class="text-[11px] text-slate-700 list-disc pl-5 mt-0.5 space-y-0.5">'+evid+'</ul>'
-      +'<div class="text-[11px] text-slate-500 mt-2 font-semibold">✅ 점검 순서</div>'
-      +'<ol class="text-[12px] text-slate-700 list-decimal pl-5 mt-0.5 space-y-0.5">'+steps+'</ol>'
-      +parts
-      +(f.note?'<div class="text-[11px] mt-1.5" style="color:#92400E">⚠ '+__v3Esc(f.note)+'</div>':'')
+    h+='<div style="background:#fff;border:1px solid '+(core?'#FECACA':'#FDE68A')+';border-left:5px solid '+col+';border-radius:12px;padding:12px 14px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:20px">'+__v3Icon(f)+'</span>'
+        +'<div style="flex:1"><span style="font-size:13.5px;font-weight:800;color:'+col+'">['+(core?'핵심':'주의')+'] '+__v3Esc(f.name)+'</span>'
+        +(f.confidence==='high'?' <span style="font-size:10px;background:#DBEAFE;color:#1E40AF;border-radius:6px;padding:1px 7px;font-weight:700">교차확인 '+f.sources.length+'곳</span>':'')
+        +'</div></div>'
+      +(f.plain?'<div style="font-size:12.5px;color:#374151;margin-top:6px;background:'+(core?'#FEF2F2':'#FFFBEB')+';border-radius:8px;padding:8px 10px">'+__v3Esc(f.plain)+'</div>':'')
+      +'<div style="font-size:11px;color:#6B7280;margin-top:9px;font-weight:700">✅ 점검 순서</div>'
+      +'<div style="margin-top:5px">'+stepHtml+'</div>'
+      +(f.parts&&f.parts.length?'<div style="margin-top:8px;font-size:11px;color:#6B7280">점검 부품: '+f.parts.map(function(p){return '<span style="background:#FEE2E2;color:#B91C1C;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;margin-right:3px">'+__v3Esc(p)+'</span>';}).join('')+'</div>':'')
+      +(f.note?'<div style="font-size:11px;color:#92400E;margin-top:7px">⚠ '+__v3Esc(f.note)+'</div>':'')
+      +'<details style="margin-top:8px"><summary style="font-size:11px;color:#9CA3AF;cursor:pointer">🔎 자세한 근거 (로그 수치)</summary>'
+        +'<ul style="font-size:11px;color:#4B5563;margin:5px 0 0;padding-left:18px">'+evid+'</ul>'
+        +'<div style="font-size:10.5px;color:#9CA3AF;margin-top:3px">근거 출처: '+__v3Esc((f.sources||[]).join(', '))+'</div>'
+      +'</details>'
       +'</div>';
   });
   return h;
 }
+
+function __v3IsoCard(iso){
+  var TH={core:{bg:'linear-gradient(135deg,#4C1D95,#7C3AED)',lamp:'🔗'},
+          warn:{bg:'linear-gradient(135deg,#5B21B6,#8B5CF6)',lamp:'🔗'},
+          ok:{bg:'linear-gradient(135deg,#065F46,#16A34A)',lamp:'🔗'}}[iso.severity]||{bg:'linear-gradient(135deg,#4C1D95,#7C3AED)',lamp:'🔗'};
+  var h='<div style="background:'+TH.bg+';border-radius:14px;padding:14px 16px;color:#fff;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,.18)">';
+  h+='<div style="font-size:11px;opacity:.85;font-weight:700;letter-spacing:.5px">'+TH.lamp+' 원인 격리 판정 — 통합+승하차 교차 분석'+(iso.confidence==='high'?' · 교차확증됨':'')+'</div>';
+  h+='<div style="font-size:17px;font-weight:800;margin-top:3px">'+__v3Esc(iso.verdict)+'</div>';
+  h+='<ul style="font-size:12px;opacity:.94;margin:7px 0 0;padding-left:17px">'
+    +iso.reasons.map(function(r){return '<li style="margin-top:2px">'+__v3Esc(r)+'</li>';}).join('')+'</ul>';
+  if(iso.action) h+='<div style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 12px;margin-top:10px;font-size:13px"><b>👉 점검:</b> '+__v3Esc(iso.action)+'</div>';
+  if(iso.parts&&iso.parts.length) h+='<div style="margin-top:8px;font-size:12px"><b>🎒 준비 부품:</b> '+iso.parts.map(__v3Esc).join(' · ')+'</div>';
+  h+='</div>';
+  return h;
+}
+
 async function runV3Overlay(vnum, vid){
   if(typeof DiagEngineV3==='undefined') return false;
   var box=document.getElementById('logbk-result'); if(!box) return false;
@@ -1234,16 +1287,28 @@ async function runV3Overlay(vnum, vid){
     }catch(e){}
   }
   if(!got) return false; // v3 실패 시 기존 화면 유지(안전망)
+  // 통합+승하차 쌍이면 교차 격리 판정을 최상단에
+  try{
+    var rs=window.__lastDiagV3;
+    if(rs.length===2 && typeof DiagEngineV3.crossIsolate==='function'){
+      var integR=null, seunghaR=null;
+      rs.forEach(function(r){ if(r.series==='승하차/정산') seunghaR=r; else if(r.series==='통합단말') integR=r; });
+      if(integR&&seunghaR){
+        var iso=DiagEngineV3.crossIsolate(integR, seunghaR);
+        if(iso) html=__v3IsoCard(iso)+html;
+      }
+    }
+  }catch(e){}
   var vnE=(''+(vnum||'')).replace(/'/g,"\\'"), vidE=(''+(vid||'')).replace(/'/g,"\\'");
   html+='<button onclick="aiLogAnalysis(\''+vnE+'\',\''+vidE+'\')" class="w-full text-[12px] font-bold text-white rounded-lg py-2 mt-1 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">🤖 로그+이력+S/N 종합 AI 분석</button>'
     +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
-  box.innerHTML=html;                       // 구엔진 카드 제거 → v3 카드로 교체
-  var isoBox=document.getElementById('logbk-iso'); if(isoBox) isoBox.innerHTML=''; // 구 격리카드 제거(v3에 포함)
+  box.innerHTML=html;
+  var isoBox=document.getElementById('logbk-iso'); if(isoBox) isoBox.innerHTML='';
   try{ if(firstSn&&typeof loadSnHistory==='function') loadSnHistory(firstSn,'logbk-snhist'); }catch(e){}
   return true;
 }
 var __origAnalyzeLogBackup=analyzeLogBackup;
 analyzeLogBackup=async function(vnum, vid){
-  await __origAnalyzeLogBackup(vnum, vid);   // 저장카드·이력·__lastDiag 유지용
+  await __origAnalyzeLogBackup(vnum, vid);
   try{ await runV3Overlay(vnum, vid); }catch(e){ console.warn('v3 overlay', e); }
 };
