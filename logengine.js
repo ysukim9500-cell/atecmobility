@@ -1242,14 +1242,15 @@ function __v3CardHtml(r, vnum){
         +(f.confidence==='high'?' <span style="font-size:10px;background:#DBEAFE;color:#1E40AF;border-radius:6px;padding:1px 7px;font-weight:700">교차확인 '+f.sources.length+'곳</span>':'')
         +'</div></div>'
       +(f.plain?'<div style="font-size:12.5px;color:#374151;margin-top:6px;background:'+(core?'#FEF2F2':'#FFFBEB')+';border-radius:8px;padding:8px 10px">'+__v3Esc(f.plain)+'</div>':'')
+      +(f.evidence?'<div style="background:#F1F6FE;border-left:3px solid #3B82F6;border-radius:0 6px 6px 0;padding:7px 10px;margin-top:8px">'
+        +'<div style="font-size:11px;color:#1D4ED8;font-weight:700;margin-bottom:2px">📊 판단 근거 (로그 수치)</div>'
+        +String(f.evidence).split(' · ').map(function(x){return '<div style="font-size:12px;color:#1F2937;line-height:1.6">· '+__v3Esc(x)+'</div>';}).join('')
+        +((f.sources&&f.sources.length)?'<div style="font-size:10.5px;color:#6B7280;margin-top:3px">근거 출처: '+__v3Esc(f.sources.join(', '))+'</div>':'')
+        +'</div>':'')
       +'<div style="font-size:11px;color:#6B7280;margin-top:9px;font-weight:700">✅ 점검 순서</div>'
       +'<div style="margin-top:5px">'+stepHtml+'</div>'
       +(f.parts&&f.parts.length?'<div style="margin-top:8px;font-size:11px;color:#6B7280">점검 부품: '+f.parts.map(function(p){return '<span style="background:#FEE2E2;color:#B91C1C;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;margin-right:3px">'+__v3Esc(p)+'</span>';}).join('')+'</div>':'')
       +(f.note?'<div style="font-size:11px;color:#92400E;margin-top:7px">⚠ '+__v3Esc(f.note)+'</div>':'')
-      +'<details style="margin-top:8px"><summary style="font-size:11px;color:#9CA3AF;cursor:pointer">🔎 자세한 근거 (로그 수치)</summary>'
-        +'<ul style="font-size:11px;color:#4B5563;margin:5px 0 0;padding-left:18px">'+evid+'</ul>'
-        +'<div style="font-size:10.5px;color:#9CA3AF;margin-top:3px">근거 출처: '+__v3Esc((f.sources||[]).join(', '))+'</div>'
-      +'</details>'
       +'</div>';
   });
   return h;
