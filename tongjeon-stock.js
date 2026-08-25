@@ -161,7 +161,7 @@
       var hint = document.getElementById('r-hint');
       if (hint) {
         hint.textContent = noDone
-          ? '옮겨온 기록 ' + TJ.num(noDone) + '건은 완료일이 없습니다. 원본 엑셀에 완료일 항목이 없었습니다. 앞으로 이 화면에서 완료 처리하면 날짜가 남습니다.'
+          ? '옮겨온 기록 ' + TJ.num(noDone) + '건은 완료일이 없습니다(원본 엑셀에 없던 항목). 이 화면에서 완료 처리하면 날짜가 남습니다.'
           : '';
       }
     });
