@@ -469,14 +469,14 @@ img, video, canvas, table{ max-width:100%; }
 </div>
 </div>
 
+<script src="atec-auth.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let ME = null;
 
 /* ====== 고정 관리자 설정 (이 이메일만 관리자) ====== */
-const ADMIN_EMAIL='ysukim@atecmobility.com';
-const ADMIN_NAME='관리자';
-const ADMIN_PWHASH='7ba1cbd8435a7d0da85e4185b8c65932268ff9b6634d08c36bd687b523a201b9'; // SHA-256 of the admin password
+/* 관리자 계정은 더 이상 소스에 박아두지 않는다.
+   역할은 Supabase profiles.role 이 정하고, 비밀번호는 Auth 가 보관한다. */
 
 /* ============ IndexedDB (계정 공유: atec_maint / users) ============ */
 const DB_NAME='atec_maint', DB_VER=2;
@@ -501,107 +501,107 @@ function idbDelete(store,key){ return openDB().then(db=>new Promise((res,rej)=>{
 function idbAvailable(){ try{ return typeof indexedDB!=='undefined'; }catch(e){ return false; } }
 function nowStamp(){ const d=new Date(); const p=n=>('0'+n).slice(-2); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 
-/* ============ CLOUD (Supabase) — 계정 동기화 ============ */
-const SB_URL='https://eiyksjcqntenmetmhmij.supabase.co';
-const SB_KEY='sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
-const SB_USERS='shared_users';
-const SB_DATA='shared_data';
-function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, extra||{}); }
-function cloudAvailable(){ return !!(SB_URL && SB_KEY && SB_URL.indexOf('http')===0); }
-// 브랜드 요약(가벼움) 읽기: shared_data 의 'brand_summary' 키
+/* ============ CLOUD (Supabase) ============
+   계정·인증은 atec-auth.js(Supabase Auth)가 담당한다.
+   여기서는 공용 데이터(shared_data) 접근과 관리자용 profiles 조작만 다룬다. */
+const SB_URL = AtecAuth.SB_URL;
+const SB_KEY = AtecAuth.SB_KEY;
+const SB_DATA = 'shared_data';
+function cloudAvailable(){ return true; }
+
+/* 로그인 화면 통계: 로그인 전에도 보여야 하므로 공개키로 읽는다
+   (brand_summary 키 하나만 공개 정책으로 열려 있다) */
 async function loadBrandSummary(){
-  // 기본 폴백값(요약이 아직 없을 때) — 누적값 표시
-  const now=new Date();
   setBrandFallback();
-  if(!cloudAvailable()) return;
   try{
-    const url=`${SB_URL}/rest/v1/${SB_DATA}?key=eq.brand_summary&select=payload`;
-    const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) return;
-    const rows=await r.json(); if(!rows||!rows[0]||!rows[0].payload) return;
-    const s=JSON.parse(rows[0].payload);
-    applyBrandSummary(s);
+    const r = await fetch(SB_URL + '/rest/v1/' + SB_DATA + '?key=eq.brand_summary&select=payload',
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+    if(!r.ok) return;
+    const rows = await r.json();
+    if(!rows || !rows[0] || !rows[0].payload) return;
+    applyBrandSummary(JSON.parse(rows[0].payload));
   }catch(e){ console.warn('brand summary load skip', e); }
 }
-function setBrandFallback(){
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  const now=new Date();
-  set('brand-period', `${now.getFullYear()}년 ${now.getMonth()+1}월 기준`);
-  // 아직 요약 게시 전: 누적 기준 안내
-  const bus=document.getElementById('brand-bus-cnt'), rail=document.getElementById('brand-rail-cnt');
-  if(bus && bus.textContent==='—'){ set('brand-bus-cnt','12,532'); set('brand-bus-sub','누적 접수 (월별 집계 대기)'); }
-  if(rail && rail.textContent==='—'){ set('brand-rail-cnt','2,765'); set('brand-rail-sub','누적 접수 (월별 집계 대기)'); }
-}
-function applyBrandSummary(s){
-  s=s||{};
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el && v!=null) el.textContent=v; };
-  const now=new Date(); const mon=(now.getMonth()+1);
-  set('brand-period', `${now.getFullYear()}년 ${mon}월 기준`);
-  if(s.bus){ set('brand-bus-cnt', (s.bus.month||0).toLocaleString('ko-KR')); set('brand-bus-sub', `이번 달 · 누적 ${(s.bus.total||0).toLocaleString('ko-KR')}건`); }
-  if(s.rail){ set('brand-rail-cnt', (s.rail.month||0).toLocaleString('ko-KR')); set('brand-rail-sub', `이번 달 · 누적 ${(s.rail.total||0).toLocaleString('ko-KR')}건`); }
-}
-// 클라우드의 모든 계정 가져오기
-async function cloudUsersGetAll(){
-  const url=`${SB_URL}/rest/v1/${SB_USERS}?select=username,data`;
-  const r=await fetch(url,{headers:sbHeaders()});
-  if(!r.ok) throw new Error('users get '+r.status);
-  const rows=await r.json();
-  return rows.map(row=>{ try{ return Object.assign({username:row.username}, JSON.parse(row.data)); }catch(e){ return {username:row.username}; } });
-}
-// 계정 저장(upsert)
-async function cloudUserPut(user){
-  const url=`${SB_URL}/rest/v1/${SB_USERS}?on_conflict=username`;
-  const {username, ...rest}=user;
-  const body=[{username, data:JSON.stringify(rest), updated_at:new Date().toISOString()}];
-  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
-  if(!r.ok){ const t=await r.text(); throw new Error('user put '+r.status+' '+t); }
-  return true;
-}
-// 계정 삭제
-async function cloudUserDelete(username){
-  const url=`${SB_URL}/rest/v1/${SB_USERS}?username=eq.${encodeURIComponent(username)}`;
-  const r=await fetch(url,{method:'DELETE',headers:sbHeaders({'Prefer':'return=minimal'})});
-  if(!r.ok){ const t=await r.text(); throw new Error('user delete '+r.status+' '+t); }
-  return true;
-}
-// shared_data 의 key/payload 읽기·쓰기 (범용 KV)
+
 async function cloudDataGet(key){
-  if(!cloudAvailable()) return null;
-  const url=`${SB_URL}/rest/v1/${SB_DATA}?key=eq.${encodeURIComponent(key)}&select=payload`;
-  const r=await fetch(url,{headers:sbHeaders()}); if(!r.ok) return null;
-  const rows=await r.json(); if(!rows||!rows[0]||rows[0].payload==null) return null;
+  const r = await AtecAuth.authFetch(SB_URL + '/rest/v1/' + SB_DATA + '?key=eq.' + encodeURIComponent(key) + '&select=payload');
+  if(!r.ok) return null;
+  const rows = await r.json();
+  if(!rows || !rows[0] || rows[0].payload == null) return null;
   try{ return JSON.parse(rows[0].payload); }catch(e){ return null; }
 }
 async function cloudDataPut(key, obj){
-  if(!cloudAvailable()) throw new Error('cloud unavailable');
-  const url=`${SB_URL}/rest/v1/${SB_DATA}?on_conflict=key`;
-  const body=[{key, payload:JSON.stringify(obj), updated_at:new Date().toISOString()}];
-  const r=await fetch(url,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(body)});
-  if(!r.ok){ const t=await r.text(); throw new Error('data put '+r.status+' '+t); }
+  const r = await AtecAuth.authFetch(SB_URL + '/rest/v1/' + SB_DATA + '?on_conflict=key', {
+    method:'POST',
+    headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ key:key, payload:JSON.stringify(obj), updated_at:new Date().toISOString(), updated_by:(ME&&ME.username)||'' }])
+  });
+  if(!r.ok) throw new Error('data put ' + r.status + ' ' + (await r.text()));
   return true;
 }
 
 /* ============ AUTH ============ */
-async function sha256(s){
-  try{ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-  catch(e){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return 'x'+(h>>>0).toString(16); }
-}
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function normEmail(e){ return (e||'').trim().toLowerCase(); }
+
+/** 날짜 표시용(관리자 표에서 기존 형식과 맞춘다) */
+function fmtTs(iso){
+  if(!iso) return '';
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const p=n=>('0'+n).slice(-2);
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+/** profiles → 화면이 기대하는 사용자 객체 모양으로 변환 */
+function mapProfile(p, resetSet){
+  return {
+    id: p.id,
+    username: p.email,
+    name: p.name || p.email,
+    role: p.role,
+    status: p.status,
+    perms: Array.isArray(p.perms) ? p.perms : [],
+    _permMig: true,                       // 새 모델은 권한이 명시적으로 저장된다
+    created: fmtTs(p.created_at),
+    lastLogin: fmtTs(p.last_login),
+    tempPw: !!p.must_change_pw,
+    resetReq: !!(resetSet && resetSet.has(p.email)),
+    resetReqAt: (resetSet && resetSet.get) ? fmtTs(resetSet.get(p.email)) : ''
+  };
+}
+
 async function getUsers(){
-  if(cloudAvailable()){ try{ return await cloudUsersGetAll(); }catch(e){ console.warn('cloud users failed, fallback to local', e); } }
-  if(!idbAvailable()) return [];
-  try{ return await idbGetAll('users'); }catch(e){ return []; }
+  const r = await AtecAuth.authFetch(SB_URL + '/rest/v1/profiles?select=id,email,name,role,status,perms,created_at,last_login,must_change_pw&order=created_at');
+  if(!r.ok) return [];
+  const rows = await r.json();
+  // 재설정 요청 목록(관리자만 조회 가능)
+  let reqMap = new Map();
+  try{
+    const rr = await AtecAuth.authFetch(SB_URL + '/rest/v1/reset_requests?select=email,requested_at');
+    if(rr.ok){ (await rr.json()).forEach(x=>reqMap.set(x.email, x.requested_at)); }
+  }catch(e){}
+  return rows.map(p=>mapProfile(p, reqMap));
 }
 async function getUser(u){ const all=await getUsers(); return all.find(x=>x.username===normEmail(u)); }
-/* 계정 저장/삭제: 클라우드 우선, 실패 시 로컬 */
-async function userPut(user){
-  if(cloudAvailable()){ try{ await cloudUserPut(user); return; }catch(e){ console.warn('cloud user put failed', e); throw e; } }
-  if(idbAvailable()) await userPut(user);
+
+/** 관리자만 호출된다(정책상 일반 사용자는 서버에서 거부됨) */
+async function patchProfile(id, patch){
+  const r = await AtecAuth.authFetch(SB_URL + '/rest/v1/profiles?id=eq.' + id, {
+    method:'PATCH', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify(patch)
+  });
+  if(!r.ok) throw new Error('저장 실패 ' + r.status);
+  return true;
 }
-async function userDelete(username){
-  if(cloudAvailable()){ try{ await cloudUserDelete(username); return; }catch(e){ console.warn('cloud user delete failed', e); throw e; } }
-  if(idbAvailable()) await idbDelete('users',username);
+/** Auth 계정 자체를 다루는 작업(비번 재설정·삭제)은 서버 함수가 대행한다 */
+async function adminUsersCall(payload){
+  const r = await AtecAuth.authFetch(SB_URL + '/functions/v1/admin-users', {
+    method:'POST', body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error) throw new Error(j.error || ('요청 실패 ' + r.status));
+  return j;
 }
+
 function showAuth(which){
   $('#auth-overlay').classList.remove('hidden');
   $('#app-root').classList.add('hidden');
@@ -611,7 +611,6 @@ function showAuth(which){
   $('#reset-form').classList.toggle('hidden', which!=='reset');
   setTimeout(()=>{ const el = which==='signup'?$('#su-user'):(which==='reset'?$('#rs-user'):$('#li-user')); if(el&&el.focus) el.focus(); }, 60);
 }
-// 랜딩만 표시(모달 닫힘) — 최초 진입·로그아웃 시
 function showLanding(){
   $('#auth-overlay').classList.remove('hidden');
   $('#app-root').classList.add('hidden');
@@ -620,16 +619,14 @@ function showLanding(){
 }
 function closeLoginModal(){ const m=$('#login-modal'); if(m) m.classList.add('hidden'); }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLoginModal(); });
+
 /* 화면 모드(웹/모바일) 선택 */
 let UI_MODE='';
 function selectMode(m){
   UI_MODE=m;
-  document.querySelectorAll('.mode-card').forEach(c=>{
-    c.classList.toggle('selected', c.dataset.mode===m);
-  });
+  document.querySelectorAll('.mode-card').forEach(c=>{ c.classList.toggle('selected', c.dataset.mode===m); });
 }
 function getUIMode(){
-  // 우선 사용자가 선택한 값, 없으면 sessionStorage(이전 선택), 없으면 화면 폭으로 추정
   if(UI_MODE) return UI_MODE;
   let m=null; try{ m=sessionStorage.getItem('atec_ui_mode'); }catch(e){}
   if(m) return m;
@@ -639,87 +636,93 @@ function applyUIMode(mode){
   document.documentElement.classList.toggle('force-mobile', mode==='mobile');
   try{ sessionStorage.setItem('atec_ui_mode', mode); }catch(e){}
 }
-async function checkFirstRun(){
-  // 고정 관리자만 관리자입니다. 안내 문구 표시 안 함.
-  $('#first-admin-note').classList.add('hidden');
-}
-/* 고정 관리자 계정을 자동 등록(없으면 생성). 비밀번호 해시는 고정값으로 항상 보정 */
-async function ensureAdminAccount(){
-  if(!idbAvailable() && !cloudAvailable()) return;
-  try{
-    const u=await getUser(ADMIN_EMAIL);
-    if(!u){
-      await userPut({ username:ADMIN_EMAIL, name:ADMIN_NAME, pwhash:ADMIN_PWHASH,
-        role:'admin', status:'approved', created:nowStamp(), resetReq:false, tempPw:false, fixedAdmin:true });
-    } else {
-      // 항상 관리자/승인 상태 유지 (권한 강등·삭제 방지)
-      let changed=false;
-      if(u.role!=='admin'){ u.role='admin'; changed=true; }
-      if(u.status!=='approved'){ u.status='approved'; changed=true; }
-      if(!u.fixedAdmin){ u.fixedAdmin=true; changed=true; }
-      if(changed) await userPut(u);
-    }
-  }catch(e){}
-}
+async function checkFirstRun(){ $('#first-admin-note').classList.add('hidden'); }
+
 async function doSignup(){
   const u=normEmail($('#su-user').value), name=($('#su-name').value||'').trim(), pw=$('#su-pw').value||'', pw2=$('#su-pw2').value||'';
   const msg=$('#su-msg'); const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
   if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
-  if(u===ADMIN_EMAIL) return set('이 이메일은 사용할 수 없습니다.');
   if(!name) return set('이름을 입력하세요.');
   if(pw.length<6) return set('비밀번호는 6자 이상이어야 합니다.');
   if(pw!==pw2) return set('비밀번호가 일치하지 않습니다.');
-  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 계정 저장을 지원하지 않습니다.');
-  if(await getUser(u)) return set('이미 가입된 이메일입니다.');
-  await userPut({ username:u, name, pwhash:await sha256(pw), role:'user', status:'approved', perms:['terminal'], _permMig:true, created:nowStamp(), resetReq:false, tempPw:false });
-  set('가입 완료! 잠시 후 로그인 화면으로 이동합니다.', true);
-  setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; $('#li-pw').focus(); }, 1500);
+  set('가입 처리 중…', true);
+  const r = await AtecAuth.signup(u, pw, name);
+  if(r.error) return set(r.error);
+  set('가입 완료! 관리자 승인 후 이용하실 수 있습니다.', true);
+  setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; $('#li-pw').focus(); }, 2000);
 }
+
+/* 구계정 전환: 기존 비밀번호가 확인되면 새 비밀번호를 받아 전환한다 */
+let MIGRATE_CTX=null;
 async function doLogin(){
   const u=normEmail($('#li-user').value), pw=$('#li-pw').value||'';
   const msg=$('#li-msg'); const set=t=>{ msg.textContent=t; msg.style.color='#B91C1C'; };
   if(!u||!pw) return set('이메일과 비밀번호를 입력하세요.');
   if(!UI_MODE) return set('화면 모드(웹/모바일)를 선택하세요.');
-  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 로그인 저장을 지원하지 않습니다.');
-  const user=await getUser(u);
-  if(!user || user.pwhash!==await sha256(pw)) return set('이메일 또는 비밀번호가 올바르지 않습니다.');
-  if(user.status==='pending') return set('아직 관리자 승인 대기 중인 계정입니다.');
-  if(user.status==='rejected') return set('승인이 거부된 계정입니다. 관리자에게 문의하세요.');
-  ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:effectivePerms(user)};
-  user.lastLogin=nowStamp();           // 최근 접속일자 기록
-  if(user.resetReq){ user.resetReq=false; }
-  await userPut(user);
-  applyUIMode(UI_MODE);  // 선택한 모드 적용·저장
-  saveSession();
+  msg.style.color='#64748B'; msg.textContent='확인 중…';
+
+  const r = await AtecAuth.login(u, pw);
+  if(r.needsMigration){
+    MIGRATE_CTX={ email:u, oldPw:pw };
+    msg.textContent='';
+    promptMigrate();
+    return;
+  }
+  if(r.error) return set(r.error);
+  ME = r.profile;
+  applyUIMode(UI_MODE);
   enterApp();
-  if(user.tempPw){ setTimeout(()=>promptChangePw(true), 300); }
+  if(r.profile && r.profile.mustChangePw) setTimeout(()=>promptChangePw(true), 300);
 }
+
+/** 전환 안내 → 새 비밀번호 입력 */
+async function promptMigrate(){
+  alert('보안 강화를 위해 로그인 방식이 바뀌었습니다.\n\n비밀번호를 다시 설정해 주세요. (기존과 같은 비밀번호도 사용할 수 있습니다)');
+  const np = prompt('새 비밀번호를 입력하세요 (6자 이상)');
+  if(np===null){ MIGRATE_CTX=null; return; }
+  if((np||'').length<6){ alert('비밀번호는 6자 이상이어야 합니다.'); return promptMigrate(); }
+  const np2 = prompt('확인을 위해 새 비밀번호를 한 번 더 입력하세요.');
+  if(np2===null){ MIGRATE_CTX=null; return; }
+  if(np!==np2){ alert('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.'); return promptMigrate(); }
+
+  const msg=$('#li-msg'); msg.style.color='#64748B'; msg.textContent='전환 중…';
+  const r = await AtecAuth.migrate(MIGRATE_CTX.email, MIGRATE_CTX.oldPw, np);
+  MIGRATE_CTX=null;
+  if(r.error){ msg.style.color='#B91C1C'; msg.textContent=r.error; return; }
+  ME = r.profile;
+  msg.textContent='';
+  applyUIMode(UI_MODE || getUIMode());
+  enterApp();
+}
+
 async function requestReset(){
   const u=normEmail($('#rs-user').value); const msg=$('#rs-msg'); const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
   if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
-  if(!idbAvailable() && !cloudAvailable()) return set('이 브라우저는 계정 기능을 지원하지 않습니다.');
-  const user=await getUser(u);
-  if(user){ user.resetReq=true; user.resetReqAt=nowStamp(); await userPut(user); }
+  try{
+    await fetch(SB_URL + '/rest/v1/reset_requests', {
+      method:'POST',
+      headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', 'Prefer':'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify([{ email:u }])
+    });
+  }catch(e){}
   set('재설정 요청이 접수되었습니다. 관리자가 임시 비밀번호를 발급해 드립니다.', true);
   setTimeout(()=>{ showAuth('login'); $('#li-user').value=u; }, 1800);
 }
+
 async function promptChangePw(forced){
-  const cur = forced? null : prompt('현재 비밀번호를 입력하세요.');
-  if(!forced && cur===null) return;
   const np = prompt(forced? '임시 비밀번호로 로그인하셨습니다.\n새 비밀번호를 입력하세요 (6자 이상).' : '새 비밀번호를 입력하세요 (6자 이상).');
   if(np===null) return;
   if((np||'').length<6){ alert('비밀번호는 6자 이상이어야 합니다.'); return; }
-  const user=await getUser(ME.username); if(!user) return;
-  if(!forced && user.pwhash!==await sha256(cur)){ alert('현재 비밀번호가 올바르지 않습니다.'); return; }
-  user.pwhash=await sha256(np); user.tempPw=false; user.resetReq=false;
-  await userPut(user);
+  const r = await AtecAuth.changePassword(np);
+  if(r.error){ alert(r.error); return; }
+  try{ await AtecAuth.authFetch(SB_URL + '/rest/v1/rpc/clear_must_change_pw', { method:'POST', body:'{}' }); }catch(e){}
   alert('비밀번호가 변경되었습니다.');
 }
-/* 세션: sessionStorage에 저장 → 같은 탭에서 시스템 이동 시 유지, 브라우저/탭 닫으면 자동 로그아웃 */
-function saveSession(){ try{ sessionStorage.setItem('atec_session', JSON.stringify(ME)); }catch(e){} }
+
+function saveSession(){ /* 세션은 atec-auth.js 가 토큰으로 관리한다 */ }
 function logout(){
   ME=null;
-  try{ sessionStorage.removeItem('atec_session'); }catch(e){}
+  AtecAuth.logout();
   $('#li-user').value=''; $('#li-pw').value=''; $('#li-msg').textContent='';
   showLanding(); checkFirstRun();
 }
@@ -945,37 +948,44 @@ async function removeNotifyEmail(e){
   try{ await saveNotifyEmails(); renderNotifyEmails(); }
   catch(err){ alert('삭제 실패: '+err.message); }
 }
-async function approveUser(u){ const x=await getUser(u); if(!x)return; x.status='approved'; await userPut(x); renderAdmin(); }
-async function rejectUser(u){ if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 변경할 수 없습니다.'); return; } const x=await getUser(u); if(!x)return; x.status='rejected'; await userPut(x); renderAdmin(); }
+async function approveUser(u){ const x=await getUser(u); if(!x)return; try{ await patchProfile(x.id,{status:'approved'}); }catch(e){ return alert(e.message); } renderAdmin(); }
+async function rejectUser(u){ const x=await getUser(u); if(!x)return; if(x.role==='admin'){ alert('관리자 계정은 거부할 수 없습니다.'); return; } try{ await patchProfile(x.id,{status:'rejected'}); }catch(e){ return alert(e.message); } renderAdmin(); }
 function genTempPw(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<8;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
 async function issueTempPw(u){
   const x=await getUser(u); if(!x) return;
-  const temp=genTempPw(); x.pwhash=await sha256(temp); x.tempPw=true; x.resetReq=false;
-  await userPut(x); renderAdmin();
+  const temp=genTempPw();
+  try{ await adminUsersCall({ action:'setPassword', email:u, password:temp }); }
+  catch(e){ return alert('임시 비밀번호 발급 실패: '+e.message); }
+  renderAdmin();
   alert(`'${x.name}'(${x.username}) 님의 임시 비밀번호가 발급되었습니다.\n\n임시 비밀번호:  ${temp}\n\n이 비밀번호를 해당 사용자에게 전달하세요. 사용자는 로그인하면 즉시 새 비밀번호로 변경하게 됩니다.`);
 }
-async function dismissReset(u){ const x=await getUser(u); if(!x)return; x.resetReq=false; await userPut(x); renderAdmin(); }
+async function dismissReset(u){ try{ await AtecAuth.authFetch(SB_URL+'/rest/v1/reset_requests?email=eq.'+encodeURIComponent(u), { method:'DELETE', headers:{'Prefer':'return=minimal'} }); }catch(e){} renderAdmin(); }
 async function togglePerm(u, key){
   const x = await getUser(u); if(!x) return;
   if(x.role==='admin'){ alert('관리자는 자동으로 모든 시스템을 사용할 수 있습니다.'); return; }
   let p = effectivePerms(x);            // 현재 유효 권한(레거시 마이그레이션 반영)
   const i = p.indexOf(key);
   if(i<0) p.push(key); else p.splice(i,1);
-  x.perms = p; x._permMig = true;       // 명시적 권한으로 확정
-  await userPut(x);
-  if(ME && u===ME.username){ ME.perms = p.slice(); saveSession(); applyPermVisibility(); }
+  try{ await patchProfile(x.id,{perms:p}); }catch(e){ return alert(e.message); }
+  if(ME && u===ME.username){ ME.perms = p.slice(); applyPermVisibility(); }
   renderAdmin();
 }
 async function setRole(u,role){
-  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정의 권한은 변경할 수 없습니다.'); return; }
   const x=await getUser(u); if(!x)return;
-  x.role=role; await userPut(x); renderAdmin(); renderUserBadge();
+  if(ME && u===ME.username && role==='user'){ if(!confirm('본인 관리자 권한을 해제하면 이 화면을 더 이상 사용할 수 없습니다. 계속할까요?')) return; }
+  if(role==='user' && x.role==='admin'){
+    const admins=(await getUsers()).filter(y=>y.role==='admin'&&y.status==='approved');
+    if(admins.length<=1){ alert('마지막 관리자는 일반으로 변경할 수 없습니다.'); return; }
+  }
+  try{ await patchProfile(x.id,{role:role}); }catch(e){ return alert(e.message); }
+  if(ME && u===ME.username){ await AtecAuth.loadProfile(); ME=AtecAuth.me(); applyRoleVisibility(); }
+  renderAdmin(); renderUserBadge();
 }
 async function deleteUser(u){
-  if(u===ADMIN_EMAIL){ alert('고정 관리자 계정은 삭제할 수 없습니다.'); return; }
   if(ME&&u===ME.username){ alert('본인 계정은 삭제할 수 없습니다.'); return; }
   if(!confirm(`'${u}' 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
-  await userDelete(u); renderAdmin();
+  try{ await adminUsersCall({ action:'deleteUser', email:u }); }catch(e){ return alert(e.message); }
+  renderAdmin();
 }
 
 /* ============ INIT ============ */
@@ -987,11 +997,13 @@ async function initAuth(){
     selectMode(guess);
     applyUIMode(guess);
   }catch(e){}
-  await ensureAdminAccount(); // 고정 관리자 자동 등록
-  let sess=null; try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
-  if(sess && sess.username){
-    const user=await getUser(sess.username);
-    if(user && user.status==='approved'){ ME={username:user.username,name:user.name,role:user.role,status:user.status,perms:effectivePerms(user)}; enterApp(); return; }
+  // 토큰이 살아 있으면 서버에 확인하고 바로 입장
+  if(AtecAuth.token()){
+    try{
+      const p = await AtecAuth.loadProfile();
+      if(p && p.status==='approved'){ ME=p; enterApp(); return; }
+      AtecAuth.logout();
+    }catch(e){ AtecAuth.logout(); }
   }
   await checkFirstRun();
   showLanding();

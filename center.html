@@ -78,6 +78,7 @@
 </head>
 <body class="text-slate-800 min-h-screen bg-white">
 <!-- ===== 로그인 가드: 포털에서 로그인하지 않으면 포털로 이동 ===== -->
+<script src="atec-auth.js"></script>
 <script>
 (function(){
   var sess=null;
@@ -86,7 +87,7 @@
   else { window.__ME=sess; }
 })();
 function gotoPortal(){ location.href='index.html'; }
-function atecLogout(){ try{ sessionStorage.removeItem('atec_session'); }catch(e){} location.href='index.html'; }
+function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
 </script>
 
     <header class="atec-header relative overflow-hidden text-white">

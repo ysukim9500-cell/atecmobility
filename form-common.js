@@ -14,7 +14,7 @@
   function headers(extra) {
     return Object.assign({
       'apikey': SB_KEY,
-      'Authorization': 'Bearer ' + SB_KEY,
+      'Authorization': 'Bearer ' + ((window.AtecAuth && AtecAuth.token()) || SB_KEY),
       'Content-Type': 'application/json'
     }, extra || {});
   }
@@ -54,7 +54,7 @@
     return fetch(SB_URL + '/storage/v1/object/' + bucket + '/' + encodeURI(path), {
       method: 'POST',
       headers: {
-        'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
+        'apikey': SB_KEY, 'Authorization': 'Bearer ' + ((window.AtecAuth && AtecAuth.token()) || SB_KEY),
         'Content-Type': 'application/pdf', 'x-upsert': 'true'
       },
       body: blob
@@ -68,7 +68,7 @@
   function rand4() { return Math.random().toString(36).slice(2, 6); }
   function removePdf(bucket, path) {
     return fetch(SB_URL + '/storage/v1/object/' + bucket + '/' + encodeURI(path), {
-      method: 'DELETE', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      method: 'DELETE', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + ((window.AtecAuth && AtecAuth.token()) || SB_KEY) }
     }).then(function (r) { return r.ok; });
   }
   // 비공개 버킷: 서명 URL(다운로드 링크) 생성

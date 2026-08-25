@@ -6,11 +6,15 @@
 <title>ATEC Mobility | 한국철도공사 광역철도 장애 관리 시스템</title>
 <script>
 (function(){
-  try{
-    var m=sessionStorage.getItem('atec_ui_mode');
-    if(m==='mobile') document.documentElement.classList.add('force-mobile');
-    if(m==='web') document.documentElement.classList.add('force-web');
-  }catch(e){}
+  var de=document.documentElement, mode='';
+  try{ mode=sessionStorage.getItem('atec_ui_mode')||''; }catch(e){}
+  if(mode==='mobile') de.classList.add('force-mobile');
+  if(mode==='web') de.classList.add('force-web');
+  /* 모바일 표시는 is-mobile 클래스 하나로 판정 (강제모드 우선, 아니면 뷰포트) */
+  var mq=window.matchMedia('(max-width:767px)');
+  function sync(){ de.classList.toggle('is-mobile', mode==='mobile' || (mode!=='web' && mq.matches)); }
+  sync();
+  if(mq.addEventListener) mq.addEventListener('change', sync); else if(mq.addListener) mq.addListener(sync);
 })();
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -21,11 +25,6 @@
 :root{ --rail-deep:#312E81; --rail-indigo:#3730A3; --rail-main:#4F46E5; --rail-bright:#6366F1; --rail-sky:#0EA5E9; }
 *{ font-family:'Pretendard',-apple-system,'Malgun Gothic',sans-serif; word-break:keep-all; }
 body{ background:#f6f7fb; color:#1e293b; }
-/* 모바일 헤더 우측(요약+계정) 줄바꿈 허용 */
-@media(max-width:767px){
-  header .rail-wrap > div:last-child{ flex-wrap:wrap; }
-  #rail-meta, #rail-user{ font-size:11px; }
-}
 .no-scrollbar::-webkit-scrollbar{ display:none; }
 .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
 
@@ -104,229 +103,161 @@ textarea.fld{ resize:vertical; min-height:62px; line-height:1.5; }
 .ln4{background:#0284c7;color:#fff}.ln5{background:#7c3aed;color:#fff}.ln6{background:#a16207;color:#fff}
 .ln7{background:#4d7c0f;color:#fff}.ln8{background:#db2777;color:#fff}.lnx{background:#64748b;color:#fff}
 
-/* ===== MOBILE ===== */
-@media (max-width:767px){
-  html:not(.force-web) .rail-wrap{ padding-left:12px !important; padding-right:12px !important; }
-  html:not(.force-web) .panel{ padding:14px 14px 12px !important; border-radius:14px !important; }
-  html:not(.force-web) .panel-head{ font-size:13px !important; }
-  html:not(.force-web) .kpi{ padding:13px 14px !important; border-radius:14px !important; }
-  html:not(.force-web) .kpi .kpi-val{ font-size:25px !important; }
-  html:not(.force-web) .kpi .kpi-ico{ width:46px !important; height:46px !important; }
-  html:not(.force-web) .rtile{ padding:10px 12px !important; }
-  html:not(.force-web) .rtile .rt-num{ font-size:21px !important; }
-  html:not(.force-web) #rail-tabs{ width:100%; gap:3px !important; padding:4px !important; }
-  html:not(.force-web) .rtab{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; font-size:11px !important; }
-  html:not(.force-web) .rtab-ico{ width:19px !important; height:19px !important; }
-  html:not(.force-web) .rtab-full{ display:none; }
-  html:not(.force-web) .rtab-short{ display:inline; font-size:11px !important; }
-  html:not(.force-web) .rail-hdr-sub{ display:none; }
-  html:not(.force-web) .desk-only{ display:none !important; }
-}
-html.force-mobile .rail-wrap{ padding-left:12px !important; padding-right:12px !important; }
-html.force-mobile .panel{ padding:14px 14px 12px !important; border-radius:14px !important; }
-html.force-mobile .panel-head{ font-size:13px !important; }
-html.force-mobile .kpi{ padding:13px 14px !important; border-radius:14px !important; }
-html.force-mobile .kpi .kpi-val{ font-size:25px !important; }
-html.force-mobile .kpi .kpi-ico{ width:46px !important; height:46px !important; }
-html.force-mobile .rtile{ padding:10px 12px !important; }
-html.force-mobile .rtile .rt-num{ font-size:21px !important; }
-html.force-mobile #rail-tabs{ width:100%; gap:3px !important; padding:4px !important; }
-html.force-mobile .rtab{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; font-size:11px !important; }
-html.force-mobile .rtab-ico{ width:19px !important; height:19px !important; }
-html.force-mobile .rtab-full{ display:none; }
-html.force-mobile .rtab-short{ display:inline; font-size:11px !important; }
-html.force-mobile .rail-hdr-sub{ display:none; }
-html.force-mobile .desk-only{ display:none !important; }
-
-html.force-web body{ min-width:1280px; }
-
 /* ============================================================
-   ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
-   ① 톤 차분하게  ② 카드 정렬·여백 통일  ③ 모바일 하단 탭바
+   표시 레이어 v9 — 단일 통합 (구 v2~v8 모바일 패치 전면 교체)
+   · 모바일 판정: html.is-mobile 클래스 하나로 통일 (뷰포트 + 강제모드)
+   · 기능(JS 로직·id·데이터)은 변경하지 않음 — 표시 전용
    ============================================================ */
-.panel{ border-color:#E7E7F2 !important; border-radius:16px !important;
-  box-shadow:0 1px 2px rgba(49,46,129,.04), 0 8px 24px -16px rgba(49,46,129,.14) !important; }
-.panel::before{ opacity:.5 !important; }
-.border-indigo-100{ border-color:#E6E7F4 !important; }
-.rounded-xl{ border-radius:14px !important; }
-.rtab.active{ box-shadow:0 4px 12px -8px rgba(49,46,129,.5) !important; }
 
-@media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
-html.force-mobile button{ min-height:44px !important; }
-
-/* ===== 모바일: 상단 탭 → 하단 탭바 도킹 (같은 요소 재배치 · 기능 그대로) ===== */
-@media (max-width:767px){
-  html:not(.force-web) #rail-tabs{
-    position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
-    width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
-    border:none !important; border-top:1px solid #E6E7F4 !important; background:#fff !important;
-    box-shadow:0 -6px 20px -12px rgba(49,46,129,.2) !important;
-    padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
-  html:not(.force-web) #rail-tabs .rtab{ border-radius:12px !important; }
-  html:not(.force-web) #rail-tabs .rtab:not(.active){ color:#9AA0B4 !important; }
-  html:not(.force-web) #rail-tabs .rtab.active{ background:transparent !important; color:var(--rail-main) !important; box-shadow:none !important; }
-  html:not(.force-web) body{ padding-bottom:76px !important; }
-}
-html.force-mobile #rail-tabs{
-  position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
-  width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
-  border:none !important; border-top:1px solid #E6E7F4 !important; background:#fff !important;
-  box-shadow:0 -6px 20px -12px rgba(49,46,129,.2) !important;
-  padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
-html.force-mobile #rail-tabs .rtab{ border-radius:12px !important; }
-html.force-mobile #rail-tabs .rtab:not(.active){ color:#9AA0B4 !important; }
-html.force-mobile #rail-tabs .rtab.active{ background:transparent !important; color:var(--rail-main) !important; box-shadow:none !important; }
-html.force-mobile body{ padding-bottom:76px !important; }
-
-/* ============================================================
-   정밀 타이포 보정 v2 — 한글 가독성(30년차 기준)
-   · 본문 행간 1.6 · 제목만 음수 자간 · 모바일 숫자/라벨 정돈
-   ============================================================ */
-body{ line-break:strict; -webkit-text-size-adjust:100%; letter-spacing:-0.003em; }
+/* —— 공통(데스크톱 포함) 기본 다듬기 —— */
+body{ line-break:strict; -webkit-text-size-adjust:100%; text-size-adjust:100%; letter-spacing:-0.003em; overflow-x:clip; }
+img, video, canvas, table{ max-width:100%; }
+p, li, td{ text-wrap:pretty; }
 p, li, td, .rt-sub, .kpi-sub, .flt-label{ line-height:1.6; }
 h1, h2, h3, .kpi-val, .rt-num, .panel-head{ letter-spacing:-0.018em; }
-p, li, td{ text-wrap:pretty; }
-
-/* 모바일 글자 최소크기·행간 보장 */
-html.force-mobile{ font-size:15px !important; }
-@media (max-width:767px){ html:not(.force-web){ font-size:15px !important; } }
-html.force-mobile .kpi .kpi-val,
-html:not(.force-web) .kpi .kpi-val{ font-size:22px !important; line-height:1.12 !important; }
-html.force-mobile .kpi .kpi-label,
-html:not(.force-web) .kpi .kpi-label{ font-size:11.5px !important; line-height:1.4 !important; }
-html.force-mobile .kpi .kpi-sub,
-html:not(.force-web) .kpi .kpi-sub{ font-size:11px !important; line-height:1.45 !important; }
-html.force-mobile .rtile,
-html:not(.force-web) .rtile{ padding:12px 13px !important; border-radius:13px !important; }
-html.force-mobile .rtile .rt-name,
-html:not(.force-web) .rtile .rt-name{ font-size:12px !important; line-height:1.35 !important; }
-html.force-mobile .rtile .rt-num,
-html:not(.force-web) .rtile .rt-num{ font-size:22px !important; line-height:1.1 !important; }
-html.force-mobile .rtile .rt-sub,
-html:not(.force-web) .rtile .rt-sub{ font-size:10.5px !important; }
-html.force-mobile .chip,
-html:not(.force-web) .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
-html.force-mobile .rtbl,
-html:not(.force-web) .rtbl{ font-size:12px !important; }
-html.force-mobile .rtbl td,
-html:not(.force-web) .rtbl td{ line-height:1.5 !important; }
-
-/* 카드 숨통 + 하단탭 라벨 가독성 */
-html.force-mobile .panel,
-html:not(.force-web) .panel{ padding:15px 15px 13px !important; border-radius:15px !important; margin-bottom:12px !important; }
-html.force-mobile .rtab,
-html:not(.force-web) .rtab{ padding:7px 2px !important; gap:4px !important; }
-html.force-mobile .rtab-short,
-html:not(.force-web) .rtab-short{ font-size:10.5px !important; font-weight:700 !important; letter-spacing:-0.01em !important; }
-html.force-mobile .rtab-ico,
-html:not(.force-web) .rtab-ico{ width:21px !important; height:21px !important; }
-
-/* ============================================================
-   기기 호환 안정화 레이어 v3 — 폰 기종 무관 정렬 유지
-   ============================================================ */
-html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
-body{ overflow-x:clip; }
-img, video, canvas, table{ max-width:100%; }
+.kpi-val, .rt-num, .rtbl td, #l-count, #d-summary{ font-variant-numeric:tabular-nums; }
+.panel{ border-color:#E7E7F2; border-radius:16px; box-shadow:0 1px 2px rgba(49,46,129,.04), 0 8px 24px -16px rgba(49,46,129,.14); }
+.panel::before{ opacity:.5; }
+.border-indigo-100{ border-color:#E6E7F4 !important; }
+.rtab.active{ box-shadow:0 4px 12px -8px rgba(49,46,129,.5); }
 @supports (padding:max(0px)){
   body{ padding-left:max(0px,env(safe-area-inset-left)); padding-right:max(0px,env(safe-area-inset-right)); }
 }
-@media (max-width:767px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; } }
+
+/* 기간 행 구조 (데스크톱: 한 줄 흐름) */
+.rng-main{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rng-quick{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.rng-tail{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rng-tail{ justify-content:space-between; }
+
+/* 상세 필터 접기 버튼 (데스크톱: 숨김·항상 펼침) */
+#flt-toggle{ display:none; }
+
+/* 입력 폼 섹션 제목 */
+.fsec{ grid-column:1 / -1; display:flex; align-items:baseline; gap:8px; margin-top:8px; padding-top:16px; border-top:1px dashed #E6E7F4; }
+.fsec.first{ margin-top:0; padding-top:0; border-top:none; }
+.fsec b{ font-size:13px; font-weight:800; color:#3730A3; letter-spacing:-.01em; }
+.fsec b::before{ content:''; display:inline-block; width:7px; height:7px; border-radius:2px; background:var(--rail-main); transform:rotate(45deg); margin-right:7px; vertical-align:1px; }
+.fsec span{ font-size:11.5px; font-weight:600; color:#9994c9; }
+
+html.force-web body{ min-width:1280px; }
+
+/* —— 모바일 상세 시트 (행 탭 → 열림) —— */
+#m-detail{ display:none; position:fixed; inset:0; z-index:9999; background:rgba(23,20,60,.5); align-items:flex-end; justify-content:center; }
+#m-detail.open{ display:flex; }
+#m-detail .sheet{ background:#fff; width:100%; max-width:520px; border-radius:22px 22px 0 0; max-height:86vh; overflow:auto; padding:10px 18px calc(22px + env(safe-area-inset-bottom)); box-shadow:0 -12px 44px rgba(23,20,60,.3); }
+#m-detail.open .sheet{ animation:sheetUp .22s ease; }
+@keyframes sheetUp{ from{ transform:translateY(16px); opacity:.4; } to{ transform:none; opacity:1; } }
+#m-detail .grab{ width:38px; height:4px; border-radius:99px; background:#E3E4F0; margin:2px auto 12px; }
+#m-detail .sheet-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+#m-detail .sheet-title{ font-weight:800; color:#3730A3; font-size:15.5px; letter-spacing:-.01em; }
+#m-detail .sheet-close{ width:32px; height:32px; min-height:32px; border:none; background:#F2F3F9; border-radius:9px; color:#6B7280; font-size:15px; cursor:pointer; }
+#m-detail .drow{ display:flex; justify-content:space-between; gap:14px; padding:10px 0; border-bottom:1px solid #F2F3F9; font-size:13.5px; align-items:flex-start; }
+#m-detail .drow .dl{ color:#8A90A6; font-weight:700; font-size:12px; flex:0 0 34%; line-height:1.5; }
+#m-detail .drow .dv{ text-align:right; color:#26282F; flex:1; word-break:break-all; line-height:1.5; }
+#m-detail .sheet-actions{ margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; }
+#m-detail .sheet-actions button{ flex:1 1 auto; min-height:44px; font-size:13px; }
 
 /* ============================================================
-   모바일 사용성 v4 — 목록 표 카드화 · 터치 컨트롤
+   모바일 레이어 — html.is-mobile 에만 작성 (단일 소스)
    ============================================================ */
-@media (max-width:767px){
-  html:not(.force-web) #tab-list thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-  html:not(.force-web) #tab-list table, html:not(.force-web) #tab-list tbody, html:not(.force-web) #tab-list tr, html:not(.force-web) #tab-list td{ display:block !important; width:auto !important; }
-  html:not(.force-web) #tab-list td.desk-only{ display:none !important; }
-  html:not(.force-web) #tab-list tr{ background:#fff; border:1px solid #E6E7F4 !important; border-radius:14px; padding:9px 13px; margin-bottom:10px; box-shadow:0 1px 2px rgba(49,46,129,.05); }
-  html:not(.force-web) #tab-list td{ border:none !important; padding:6px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13.5px; text-align:right; line-height:1.45; }
-  html:not(.force-web) #tab-list td::before{ content:attr(data-label); color:#8A90A6; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; letter-spacing:-.01em; }
-  html:not(.force-web) #tab-list td:last-child{ justify-content:flex-end; gap:8px; padding-top:9px !important; margin-top:3px; border-top:1px dashed #ECEDF5 !important; }
-  html:not(.force-web) #tab-list td:last-child::before{ content:''; }
-  html:not(.force-web) #tab-list .overflow-x-auto{ overflow:visible !important; }
-  html:not(.force-web) select.fld, html:not(.force-web) input.fld{ min-height:44px !important; }
-  html:not(.force-web) #f-save-btn, html:not(.force-web) #f-save-btn + button{ flex:1 1 0 !important; justify-content:center; }
-}
-html.force-mobile #tab-list thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-html.force-mobile #tab-list table, html.force-mobile #tab-list tbody, html.force-mobile #tab-list tr, html.force-mobile #tab-list td{ display:block !important; width:auto !important; }
-html.force-mobile #tab-list td.desk-only{ display:none !important; }
-html.force-mobile #tab-list tr{ background:#fff; border:1px solid #E6E7F4 !important; border-radius:14px; padding:9px 13px; margin-bottom:10px; box-shadow:0 1px 2px rgba(49,46,129,.05); }
-html.force-mobile #tab-list td{ border:none !important; padding:6px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13.5px; text-align:right; line-height:1.45; }
-html.force-mobile #tab-list td::before{ content:attr(data-label); color:#8A90A6; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; letter-spacing:-.01em; }
-html.force-mobile #tab-list td:last-child{ justify-content:flex-end; gap:8px; padding-top:9px !important; margin-top:3px; border-top:1px dashed #ECEDF5 !important; }
-html.force-mobile #tab-list td:last-child::before{ content:''; }
-html.force-mobile #tab-list .overflow-x-auto{ overflow:visible !important; }
-html.force-mobile select.fld, html.force-mobile input.fld{ min-height:44px !important; }
-html.force-mobile #f-save-btn, html.force-mobile #f-save-btn + button{ flex:1 1 0 !important; justify-content:center; }
+html.is-mobile{ font-size:15px; }
+html.is-mobile body{ padding-bottom:88px; }
+html.is-mobile .rail-wrap{ padding-left:14px !important; padding-right:14px !important; }
+html.is-mobile .desk-only{ display:none !important; }
 
-/* ============================================================
-   모바일 v5 — 헤더 줄바꿈 · 날짜 입력 정돈
-   ============================================================ */
-@media (max-width:767px){
-  html:not(.force-web) header .rail-wrap{ padding-top:13px !important; padding-bottom:13px !important; gap:10px !important; }
-  html:not(.force-web) header div:has(> #rail-meta){ width:100%; flex-wrap:wrap; gap:8px !important; }
-  html:not(.force-web) #rail-meta{ font-size:10.5px !important; padding:6px 10px !important; line-height:1.45 !important; flex:1 1 auto; }
-  html:not(.force-web) #rail-user{ flex-wrap:wrap; }
-  html:not(.force-web) div:has(> #d-from){ row-gap:8px !important; }
-  html:not(.force-web) div:has(> #d-from) > #d-from, html:not(.force-web) div:has(> #d-from) > #d-to{ flex:0 0 auto !important; width:138px !important; }
-  html:not(.force-web) div:has(> #l-from) > #l-from, html:not(.force-web) div:has(> #l-from) > #l-to{ flex:0 0 auto !important; width:138px !important; }
-}
-html.force-mobile header .rail-wrap{ padding-top:13px !important; padding-bottom:13px !important; gap:10px !important; }
-html.force-mobile header div:has(> #rail-meta){ width:100%; flex-wrap:wrap; gap:8px !important; }
-html.force-mobile #rail-meta{ font-size:10.5px !important; padding:6px 10px !important; line-height:1.45 !important; flex:1 1 auto; }
-html.force-mobile #rail-user{ flex-wrap:wrap; }
-html.force-mobile div:has(> #d-from){ row-gap:8px !important; }
-html.force-mobile div:has(> #d-from) > #d-from, html.force-mobile div:has(> #d-from) > #d-to{ flex:0 0 auto !important; width:138px !important; }
-html.force-mobile div:has(> #l-from) > #l-from, html.force-mobile div:has(> #l-from) > #l-to{ flex:0 0 auto !important; width:138px !important; }
-@media (max-width:767px){
-  html:not(.force-web) div:has(> #d-from) .btn-ghost, html:not(.force-web) div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
-}
-html.force-mobile div:has(> #d-from) .btn-ghost, html.force-mobile div:has(> #l-from) .btn-ghost{ min-height:36px !important; padding:5px 12px !important; font-size:12px !important; }
+/* 터치 타깃 44px · 입력 16px(iOS 자동확대 방지) */
+html.is-mobile button{ min-height:44px; }
+html.is-mobile #rail-user button, html.is-mobile .flt-chip button{ min-height:0; }
+html.is-mobile input:not([type=checkbox]):not([type=radio]), html.is-mobile select, html.is-mobile textarea{ font-size:16px !important; min-height:44px; }
 
-/* ============================================================
-   모바일 v7 — 키오스크 목록: 카드 → 핵심 4열 가로표 + 탭하면 상세 시트
-   ============================================================ */
-@media (max-width:767px){
-  html:not(.force-web) #tab-list thead{ position:static !important; width:auto !important; height:auto !important; clip:auto !important; overflow:visible !important; }
-  html:not(.force-web) #tab-list table{ display:table !important; width:100% !important; }
-  html:not(.force-web) #tab-list tbody{ display:table-row-group !important; }
-  html:not(.force-web) #tab-list tr{ display:table-row !important; background:transparent !important; border:none !important; border-bottom:1px solid #EEF0F8 !important; border-radius:0 !important; padding:0 !important; margin:0 !important; box-shadow:none !important; cursor:pointer; }
-  html:not(.force-web) #tab-list td, html:not(.force-web) #tab-list th{ display:none !important; border:none !important; padding:10px 6px !important; text-align:left !important; font-size:12.5px !important; line-height:1.4 !important; vertical-align:middle; }
-  html:not(.force-web) #tab-list td::before, html:not(.force-web) #tab-list td:last-child::before{ content:none !important; }
-  html:not(.force-web) #tab-list td:nth-child(1), html:not(.force-web) #tab-list th:nth-child(1),
-  html:not(.force-web) #tab-list td:nth-child(3), html:not(.force-web) #tab-list th:nth-child(3),
-  html:not(.force-web) #tab-list td:nth-child(6), html:not(.force-web) #tab-list th:nth-child(6),
-  html:not(.force-web) #tab-list td:nth-child(11), html:not(.force-web) #tab-list th:nth-child(11){ display:table-cell !important; }
-  html:not(.force-web) #tab-list thead th:nth-child(1), html:not(.force-web) #tab-list thead th:nth-child(3), html:not(.force-web) #tab-list thead th:nth-child(6), html:not(.force-web) #tab-list thead th:nth-child(11){ font-size:11px !important; color:#9AA0B4 !important; font-weight:700 !important; padding:7px 6px !important; }
-  html:not(.force-web) #tab-list td:nth-child(11){ color:#3730A3 !important; font-weight:700 !important; white-space:nowrap; }
-  html:not(.force-web) #tab-list td:nth-child(11)::after{ content:' \203a'; color:#C7CAD6; font-weight:400; }
-}
-html.force-mobile #tab-list thead{ position:static !important; width:auto !important; height:auto !important; clip:auto !important; overflow:visible !important; }
-html.force-mobile #tab-list table{ display:table !important; width:100% !important; }
-html.force-mobile #tab-list tbody{ display:table-row-group !important; }
-html.force-mobile #tab-list tr{ display:table-row !important; background:transparent !important; border:none !important; border-bottom:1px solid #EEF0F8 !important; border-radius:0 !important; padding:0 !important; margin:0 !important; box-shadow:none !important; cursor:pointer; }
-html.force-mobile #tab-list td, html.force-mobile #tab-list th{ display:none !important; border:none !important; padding:10px 6px !important; text-align:left !important; font-size:12.5px !important; line-height:1.4 !important; vertical-align:middle; }
-html.force-mobile #tab-list td::before, html.force-mobile #tab-list td:last-child::before{ content:none !important; }
-html.force-mobile #tab-list td:nth-child(1), html.force-mobile #tab-list th:nth-child(1),
-html.force-mobile #tab-list td:nth-child(3), html.force-mobile #tab-list th:nth-child(3),
-html.force-mobile #tab-list td:nth-child(6), html.force-mobile #tab-list th:nth-child(6),
-html.force-mobile #tab-list td:nth-child(11), html.force-mobile #tab-list th:nth-child(11){ display:table-cell !important; }
-html.force-mobile #tab-list thead th:nth-child(1), html.force-mobile #tab-list thead th:nth-child(3), html.force-mobile #tab-list thead th:nth-child(6), html.force-mobile #tab-list thead th:nth-child(11){ font-size:11px !important; color:#9AA0B4 !important; font-weight:700 !important; padding:7px 6px !important; }
-html.force-mobile #tab-list td:nth-child(11){ color:#3730A3 !important; font-weight:700 !important; white-space:nowrap; }
-html.force-mobile #tab-list td:nth-child(11)::after{ content:' \203a'; color:#C7CAD6; font-weight:400; }
+/* — 헤더: 슬림 앱바 + 상태 스트립 — */
+html.is-mobile header .rail-wrap{ padding-top:12px !important; padding-bottom:12px !important; gap:9px !important; }
+html.is-mobile header h1{ font-size:16px !important; line-height:1.3 !important; margin-top:4px !important; }
+html.is-mobile header h1 svg{ width:17px !important; height:17px !important; flex:0 0 auto; }
+html.is-mobile header span.rounded-full{ font-size:9.5px !important; padding:1px 8px !important; }
+html.is-mobile .rail-hdr-sub{ display:none; }
+html.is-mobile header .rail-wrap > div:last-child{ width:100%; display:flex; align-items:stretch; gap:8px; }
+html.is-mobile #rail-meta{ flex:1 1 auto; font-size:11px !important; line-height:1.5 !important; padding:7px 11px !important; border-radius:11px !important; }
+html.is-mobile #rail-user{ flex:0 0 auto; font-size:11px !important; padding:7px 10px !important; border-radius:11px !important; flex-wrap:wrap; row-gap:2px; justify-content:flex-end; max-width:46%; }
 
-/* v8 — 헤더 슬림(제목/패딩 축소) */
-@media (max-width:767px){
-  html:not(.force-web) header .rail-wrap{ padding-top:11px !important; padding-bottom:11px !important; gap:7px !important; }
-  html:not(.force-web) header h1{ font-size:15px !important; line-height:1.28 !important; margin-top:3px !important; }
-  html:not(.force-web) header h1 svg{ width:16px !important; height:16px !important; }
-  html:not(.force-web) header span.rounded-full{ font-size:9px !important; padding:1px 7px !important; }
-}
-html.force-mobile header .rail-wrap{ padding-top:11px !important; padding-bottom:11px !important; gap:7px !important; }
-html.force-mobile header h1{ font-size:15px !important; line-height:1.28 !important; margin-top:3px !important; }
-html.force-mobile header h1 svg{ width:16px !important; height:16px !important; }
-html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1px 7px !important; }
+/* — 카드·간격: 4px 그리드 — */
+html.is-mobile .panel{ padding:16px 15px 14px !important; border-radius:15px !important; }
+html.is-mobile .panel-head{ font-size:13.5px !important; flex-wrap:wrap; }
+html.is-mobile .panel-sub{ flex-basis:100%; margin-left:17px; margin-top:1px; }
+html.is-mobile .gap-4{ gap:10px !important; }
+html.is-mobile .gap-5{ gap:12px !important; }
+html.is-mobile .mb-4{ margin-bottom:12px !important; }
+html.is-mobile .mb-5{ margin-bottom:12px !important; }
+
+/* — KPI — */
+html.is-mobile .kpi{ padding:13px 14px !important; border-radius:14px !important; }
+html.is-mobile .kpi .kpi-label{ font-size:11.5px !important; }
+html.is-mobile .kpi .kpi-val{ font-size:23px !important; line-height:1.15 !important; margin-top:3px !important; }
+html.is-mobile .kpi .kpi-sub{ font-size:10.5px !important; margin-top:3px !important; }
+html.is-mobile .kpi .kpi-ico{ width:44px !important; height:44px !important; }
+
+/* — 타일·칩·차트 — */
+html.is-mobile .rtile{ padding:12px 13px !important; border-radius:13px !important; }
+html.is-mobile .rtile .rt-name{ font-size:12px !important; }
+html.is-mobile .rtile .rt-num{ font-size:22px !important; }
+html.is-mobile .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
+html.is-mobile .h-\[320px\]{ height:230px !important; }
+html.is-mobile .h-\[260px\]{ height:200px !important; }
+html.is-mobile #dim-tabs{ width:100%; flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+html.is-mobile #dim-tabs::-webkit-scrollbar{ display:none; }
+html.is-mobile .dim-btn{ flex:0 0 auto; min-height:36px; }
+
+/* — 분석 조건(필터) — */
+html.is-mobile #flt-toggle{ display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#4F46E5; background:#EEF0FB; border-radius:9px; padding:5px 12px; min-height:36px; }
+html.is-mobile .flt-grid{ grid-template-columns:1fr 1fr !important; gap:8px !important; }
+html.is-mobile .flt-grid.m-collapsed{ display:none !important; }
+html.is-mobile .flt-sel{ min-height:44px !important; }
+html.is-mobile .rng-main{ display:grid; grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr) auto; align-items:center; gap:7px; width:100%; }
+html.is-mobile .rng-main .rng-label{ grid-column:1 / -1; margin-bottom:-2px; }
+html.is-mobile .rng-main input[type=date]{ width:100% !important; min-width:0 !important; padding:8px 6px !important; font-size:13.5px !important; }
+html.is-mobile .rng-main .rng-tilde{ text-align:center; }
+html.is-mobile .rng-main .btn-main{ min-height:44px; padding:0 14px !important; }
+html.is-mobile .rng-quick{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; width:100%; }
+html.is-mobile .rng-quick.q3{ grid-template-columns:repeat(3,1fr); }
+html.is-mobile .rng-quick .btn-ghost{ min-height:40px; padding:6px 4px !important; font-size:12.5px !important; }
+html.is-mobile .rng-tail{ width:100%; margin-left:0; flex-direction:column; align-items:stretch; gap:7px; }
+html.is-mobile .rng-tail .btn-main{ justify-content:center; }
+html.is-mobile #d-summary{ text-align:center; }
+
+/* — 목록: 핵심 4열 요약 표 (행 탭 → 상세 시트) — */
+html.is-mobile #l-search{ max-width:none !important; width:100%; }
+html.is-mobile #l-line, html.is-mobile #l-module{ flex:1 1 40%; width:auto !important; }
+html.is-mobile #tab-list .rtbl th, html.is-mobile #tab-list .rtbl td{ display:none; }
+html.is-mobile #tab-list .rtbl th.m-keep, html.is-mobile #tab-list .rtbl td.m-keep{ display:table-cell; padding:12px 5px; font-size:12.5px; line-height:1.45; vertical-align:middle; white-space:normal; word-break:keep-all; }
+html.is-mobile #tab-list .rtbl thead th.m-keep{ font-size:11px; color:#9AA0B4; font-weight:700; padding:8px 6px; }
+html.is-mobile #tab-list .rtbl td[colspan]{ display:table-cell; }
+html.is-mobile #tab-list tbody tr{ cursor:pointer; }
+html.is-mobile #tab-list .rtbl td.m-date{ font-size:11.5px; color:#64748b; white-space:nowrap; }
+html.is-mobile #tab-list .rtbl td.m-res, html.is-mobile #tab-list .rtbl th.m-res{ text-align:right; white-space:nowrap; }
+html.is-mobile #tab-list .rtbl td.m-res::after{ content:'›'; margin-left:5px; color:#C7CAD6; font-weight:400; font-size:14px; }
+html.is-mobile #tab-list .overflow-x-auto{ max-height:none !important; }
+html.is-mobile #tab-list .panel:has(.rtbl){ padding:0 !important; }
+
+/* — 입력 폼 — */
+html.is-mobile #tab-entry .grid{ gap:14px !important; }
+html.is-mobile .fsec{ padding-top:15px; }
+html.is-mobile .form-actions{ position:sticky; bottom:88px; z-index:5; background:rgba(255,255,255,.96); backdrop-filter:blur(6px); margin:14px -15px -14px; padding:10px 15px 12px; border-top:1px solid #EEF0F8; border-radius:0 0 15px 15px; }
+html.is-mobile .form-actions .btn-main{ flex:1 1 auto; justify-content:center; text-align:center; }
+
+/* — 하단 탭바 — */
+html.is-mobile #rail-tabs{ position:fixed; left:0; right:0; bottom:0; top:auto; width:100%; margin:0; z-index:50; border-radius:0; border:none; border-top:1px solid #E6E7F4; background:rgba(255,255,255,.97); backdrop-filter:blur(10px); box-shadow:0 -8px 24px -16px rgba(49,46,129,.35); padding:6px 10px calc(6px + env(safe-area-inset-bottom)); gap:4px; }
+html.is-mobile .rtab{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px; padding:7px 2px 6px; border-radius:11px; position:relative; }
+html.is-mobile .rtab-full{ display:none; }
+html.is-mobile .rtab-short{ display:inline; font-size:10.5px; font-weight:700; letter-spacing:-.01em; }
+html.is-mobile .rtab-ico{ width:21px; height:21px; }
+html.is-mobile .rtab:not(.active){ color:#9AA0B4; }
+html.is-mobile .rtab:not(.active):hover{ background:transparent; color:#9AA0B4; }
+html.is-mobile .rtab.active{ background:transparent; color:var(--rail-main); box-shadow:none; }
+html.is-mobile .rtab.active::before{ content:''; position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:22px; height:3px; border-radius:99px; background:var(--rail-main); }
+
+/* — 토스트: 탭바 위로 — */
+html.is-mobile #rail-toast{ bottom:100px !important; }
 </style>
 </head>
 <body>
@@ -385,7 +316,8 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
           전체 초기화
         </button>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <button id="flt-toggle" type="button" onclick="var g=document.querySelector('#tab-dash .flt-grid');var c=g.classList.toggle('m-collapsed');this.textContent=c?'상세 필터 펼치기 ▾':'상세 필터 접기 ▴';" class="mb-2.5">상세 필터 펼치기 ▾</button>
+      <div class="flt-grid m-collapsed grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <div>
           <label class="flt-label">노선</label>
           <select id="flt-line" class="fld flt-sel"><option value="">전체</option><option>분당선</option><option>경부선</option><option>안산선</option><option>경원선</option><option>경인선</option><option>일산선</option><option>중앙선</option><option>경의선</option><option>과천선</option></select>
@@ -411,21 +343,27 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
           <input id="flt-station" class="fld flt-sel" placeholder="역명 일부" autocomplete="off">
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap mt-3 pt-3" style="border-top:1px dashed #e3e2f3">
-        <span class="text-[12.5px] font-extrabold" style="color:#3730A3">기간</span>
-        <input id="d-from" type="date" class="fld" style="width:auto; padding:7px 10px">
-        <span class="text-slate-400 text-[12px]">~</span>
-        <input id="d-to" type="date" class="fld" style="width:auto; padding:7px 10px">
-        <button onclick="applyRange()" class="btn-main text-[12.5px] px-4 py-1.5 font-extrabold">확인</button>
-        <button onclick="thisMonth()" class="btn-ghost text-[12px] px-3 py-1.5">이번 달</button>
-        <button onclick="quickRange(30)" class="btn-ghost text-[12px] px-3 py-1.5">30일</button>
-        <button onclick="quickRange(90)" class="btn-ghost text-[12px] px-3 py-1.5">90일</button>
-        <button onclick="quickRange(0)" class="btn-ghost text-[12px] px-3 py-1.5">전체기간</button>
-        <span id="d-summary" class="text-[12.5px] text-slate-500 font-semibold md:ml-auto"></span>
-        <button onclick="downloadExcel('dash')" class="btn-main text-[12.5px] px-4 py-2 flex items-center gap-1.5">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          현재 조건 엑셀
-        </button>
+      <div class="flex flex-col gap-2.5 mt-3 pt-3" style="border-top:1px dashed #e3e2f3">
+        <div class="rng-main">
+          <span class="rng-label text-[12.5px] font-extrabold" style="color:#3730A3">기간</span>
+          <input id="d-from" type="date" class="fld" style="width:auto; padding:7px 10px">
+          <span class="rng-tilde text-slate-400 text-[12px]">~</span>
+          <input id="d-to" type="date" class="fld" style="width:auto; padding:7px 10px">
+          <button onclick="applyRange()" class="btn-main text-[12.5px] px-4 py-1.5 font-extrabold">확인</button>
+        </div>
+        <div class="rng-quick">
+          <button onclick="thisMonth()" class="btn-ghost text-[12px] px-3 py-1.5">이번 달</button>
+          <button onclick="quickRange(30)" class="btn-ghost text-[12px] px-3 py-1.5">30일</button>
+          <button onclick="quickRange(90)" class="btn-ghost text-[12px] px-3 py-1.5">90일</button>
+          <button onclick="quickRange(0)" class="btn-ghost text-[12px] px-3 py-1.5">전체기간</button>
+        </div>
+        <div class="rng-tail">
+          <span id="d-summary" class="text-[12.5px] text-slate-500 font-semibold"></span>
+          <button onclick="downloadExcel('dash')" class="btn-main text-[12.5px] px-4 py-2 flex items-center gap-1.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            현재 조건 엑셀
+          </button>
+        </div>
       </div>
       <div id="flt-active" class="flex flex-wrap gap-1.5 mt-2.5"></div>
     </div>
@@ -482,6 +420,7 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
     <div class="panel max-w-[1100px]">
       <div class="panel-head"><span class="panel-dot"></span>신규 장애 입력<span class="panel-sub">현장 처리 내역 등록</span></div>
       <div class="grid md:grid-cols-3 gap-x-5 gap-y-4">
+        <div class="fsec first"><b>접수 정보</b><span>언제 · 어디서</span></div>
         <div>
           <label class="fld-label req">접수일자</label>
           <input id="f-date" type="date" class="fld">
@@ -501,22 +440,23 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
           <label class="fld-label req">장비번호</label>
           <select id="f-device" class="fld"><option value="">선택</option></select>
         </div>
+        <div class="fsec"><b>장애 내용</b><span>무엇이 · 어떻게</span></div>
         <div>
           <label class="fld-label req">모듈명</label>
           <input id="f-module" list="module-list" class="fld" placeholder="모듈 선택/입력" autocomplete="off">
           <datalist id="module-list"></datalist>
         </div>
-
-        <div>
+        <div class="md:col-span-2">
           <label class="fld-label req">장애유형</label>
           <input id="f-ftype" list="ftype-list" class="fld" placeholder="유형 선택/입력" autocomplete="off">
           <datalist id="ftype-list"></datalist>
         </div>
-        <div class="md:col-span-2">
+        <div class="md:col-span-3">
           <label class="fld-label">장애내용</label>
           <textarea id="f-content" class="fld" placeholder="발생한 장애 증상을 입력하세요"></textarea>
         </div>
 
+        <div class="fsec"><b>처리 내역</b><span>조치 · 결과</span></div>
         <div>
           <label class="fld-label">처리일자</label>
           <input id="f-pdate" type="date" class="fld">
@@ -561,7 +501,7 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
 
       <div id="f-edit-banner" class="hidden mt-3 mb-1 text-[13px] font-bold rounded-lg px-3 py-2" style="background:#eef0fb;color:#3730A3;border:1px solid #c7d2fe">✏ 수정 모드입니다 — 기존 기록을 고치고 있습니다. 「수정 저장」을 누르면 해당 기록이 갱신됩니다. <button onclick="cancelEdit()" class="ml-1 underline">수정 취소</button></div>
       <div id="f-msg" class="text-[13px] font-semibold mt-4 min-h-[20px]"></div>
-      <div class="flex items-center gap-2.5 mt-1">
+      <div class="form-actions flex items-center gap-2.5 mt-1">
         <button id="f-save-btn" onclick="saveFault()" class="btn-main px-6 py-2.5 text-sm">저장하기</button>
         <button onclick="resetForm()" class="btn-ghost px-5 py-2.5 text-sm">초기화</button>
       </div>
@@ -572,15 +512,19 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
   <section id="tab-list" class="hidden">
     <div class="panel mb-4">
       <div class="flex flex-col gap-3">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-[13px] font-extrabold" style="color:#3730A3">기간</span>
-          <input id="l-from" type="date" class="fld" style="width:auto; padding:7px 10px">
-          <span class="text-slate-400 text-[12px]">~</span>
-          <input id="l-to" type="date" class="fld" style="width:auto; padding:7px 10px">
-          <button onclick="renderList()" class="btn-main text-[12.5px] px-4 py-1.5 font-extrabold">확인</button>
-          <button onclick="listQuick(30)" class="btn-ghost text-[12px] px-3 py-1.5">30일</button>
-          <button onclick="listQuick(90)" class="btn-ghost text-[12px] px-3 py-1.5">90일</button>
-          <button onclick="listQuick(0)" class="btn-ghost text-[12px] px-3 py-1.5">전체</button>
+        <div class="flex flex-col gap-2.5">
+          <div class="rng-main">
+            <span class="rng-label text-[13px] font-extrabold" style="color:#3730A3">기간</span>
+            <input id="l-from" type="date" class="fld" style="width:auto; padding:7px 10px">
+            <span class="rng-tilde text-slate-400 text-[12px]">~</span>
+            <input id="l-to" type="date" class="fld" style="width:auto; padding:7px 10px">
+            <button onclick="renderList()" class="btn-main text-[12.5px] px-4 py-1.5 font-extrabold">확인</button>
+          </div>
+          <div class="rng-quick q3">
+            <button onclick="listQuick(30)" class="btn-ghost text-[12px] px-3 py-1.5">30일</button>
+            <button onclick="listQuick(90)" class="btn-ghost text-[12px] px-3 py-1.5">90일</button>
+            <button onclick="listQuick(0)" class="btn-ghost text-[12px] px-3 py-1.5">전체</button>
+          </div>
         </div>
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div class="flex items-center gap-2 flex-wrap flex-1">
@@ -588,7 +532,7 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
             <select id="l-line" class="fld" style="width:auto" onchange="renderList()"><option value="">전체 노선</option><option value="분당선">분당선</option><option value="경부선">경부선</option><option value="안산선">안산선</option><option value="경원선">경원선</option><option value="경인선">경인선</option><option value="일산선">일산선</option><option value="중앙선">중앙선</option><option value="경의선">경의선</option><option value="과천선">과천선</option></select>
             <select id="l-module" class="fld" style="width:auto" onchange="renderList()"><option value="">전체 모듈</option></select>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="l-actions flex items-center gap-2">
             <span id="l-count" class="text-[12.5px] text-slate-500 font-semibold"></span>
             <button onclick="downloadExcel('list')" class="btn-main px-4 py-2.5 text-sm flex items-center gap-1.5">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -604,8 +548,8 @@ html.force-mobile header span.rounded-full{ font-size:9px !important; padding:1p
         <table class="rtbl">
           <thead>
             <tr>
-              <th>접수일자</th><th>노선</th><th>역명</th><th>장비</th><th>모듈</th><th>장애유형</th>
-              <th class="desk-only">장애내용</th><th>처리유형</th><th class="desk-only">처리내역</th><th>교체</th><th>결과</th><th class="desk-only">처리자</th><th class="desk-only">작성완료</th><th id="l-th-manage"></th>
+              <th class="m-keep m-date">접수일자</th><th>노선</th><th class="m-keep">역명</th><th>장비</th><th>모듈</th><th class="m-keep">장애유형</th>
+              <th class="desk-only">장애내용</th><th>처리유형</th><th class="desk-only">처리내역</th><th>교체</th><th class="m-keep m-res">결과</th><th class="desk-only">처리자</th><th class="desk-only">작성완료</th><th id="l-th-manage"></th>
             </tr>
           </thead>
           <tbody id="l-rows"></tbody>
@@ -961,6 +905,7 @@ DC파워", "동전처리장치
 회수함 관로", "에러발생", "KeyLock파손", "동전관로", "사용자 백라이트", "RF통신장애", "접지불량", "RF발매전원불량", "영수증출력"], "ptypes": ["이물질제거", "교체", "조치", "재연결", "세척", "조정", "알람삭제", "재부팅", "프로그램재배포"]};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+<script src="atec-auth.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -968,20 +913,10 @@ let STATIONS=[], FAULTS=[], META={modules:[],ftypes:[],ptypes:[]};
 let charts={};
 
 /* ===== session ===== */
+/* 화면 표시용 사용자 정보. 실제 접근 차단은 서버(RLS)가 한다 —
+   sessionStorage 를 위조해도 데이터 요청 자체가 거부된다. */
 let sess=null;
-try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
-if(!sess){ location.href='index.html'; }
-/* ===== permission guard: only admins or users with 'rail' permission ===== */
-(function checkRailPerm(){
-  if(!sess) return;
-  if(sess.role==='admin') return;   // 관리자는 모든 시스템 접근 가능
-  const perms = Array.isArray(sess.perms) ? sess.perms : [];
-  if(!perms.includes('rail')){
-    alert('한국철도공사 광역철도 시스템 접근 권한이 없습니다.\n관리자에게 권한 부여를 요청하세요.');
-    location.href='index.html';
-  }
-})();
-function railLogout(){ try{ sessionStorage.removeItem('atec_session'); }catch(e){} location.href='index.html'; }
+function railLogout(){ AtecAuth.logout(); location.href="index.html"; }
 function num(n){ return (n||0).toLocaleString('ko-KR'); }
 function lineClass(l){ const s=String(l); return ['1','2','3','4','5','6','7','8'].includes(s)?'ln'+s:'lnx'; }
 
@@ -992,7 +927,7 @@ const SB_TABLE='shared_data';
 const RAIL_KEY='railkr_faults';   // cloud key for user-entered fault records
 let USER_FAULTS=[];             // only the user-added records (synced to cloud)
 let CLOUD_OK=false;
-function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, extra||{}); }
+function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+(AtecAuth.token()||SB_KEY),'Content-Type':'application/json'}, extra||{}); }
 function cloudAvailable(){ return !!(SB_URL && SB_KEY && SB_URL.indexOf('http')===0); }
 const CLOUD_CHUNK=400000;
 async function cloudGetRow(key){
@@ -1176,7 +1111,7 @@ async function railNotify(rec){
   try{
     await fetch(SB_URL+'/functions/v1/rail-notify', {
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+      headers:sbHeaders(),
       body:JSON.stringify({ system:'한국철도공사 광역철도', listKey:'railkr_notify_emails', date:rec.date, line:rec.line, station:rec.station, device:rec.device, module:rec.module, ftype:rec.ftype, content:rec.content, result:rec.result, worker:rec.worker })
     });
   }catch(e){ console.warn('rail-notify skip', e); }
@@ -1416,7 +1351,7 @@ function drawLineChart(F){
   charts.line=new Chart($('#rch-line'),{type:'doughnut',
     data:{labels:order,datasets:[{data:order.map(k=>m[k]),backgroundColor:order.map(k=>LINE_COLORS[k]),borderWidth:3,borderColor:'#fff',hoverOffset:8,hoverBorderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'64%',
-      plugins:{legend:{position:'right',labels:{font:Object.assign({size:11.5},CHART_FONT),boxWidth:11,boxHeight:11,usePointStyle:true,pointStyle:'circle',padding:9,color:'#475569'}},
+      plugins:{legend:{position:(document.documentElement.classList.contains('is-mobile')?'bottom':'right'),labels:{font:Object.assign({size:11.5},CHART_FONT),boxWidth:11,boxHeight:11,usePointStyle:true,pointStyle:'circle',padding:9,color:'#475569'}},
         tooltip:Object.assign(tipStyle(),{callbacks:{label:c=>`${c.label}  ${num(c.parsed)}건 (${(c.parsed/total*100).toFixed(1)}%)`}})},
       animation:{animateRotate:true,duration:700}},
     plugins:[{id:'centerText',beforeDraw(ch){ const {ctx,chartArea}=ch; if(!chartArea) return; const cx=(chartArea.left+chartArea.right)/2, cy=(chartArea.top+chartArea.bottom)/2; ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font="800 24px 'Pretendard',sans-serif"; ctx.fillStyle='#3730A3'; ctx.fillText(num(total), cx, cy-6); ctx.font="600 11px 'Pretendard',sans-serif"; ctx.fillStyle='#94a3b8'; ctx.fillText('총 건수', cx, cy+14); ctx.restore(); }}]
@@ -1467,17 +1402,17 @@ function renderList(){
   $('#l-count').textContent=`${num(rows.length)}건${rangeTxt}`;
   const show=rows.slice(0,500);
   $('#l-rows').innerHTML = show.map(f=>`<tr>
-    <td class="whitespace-nowrap">${f.date||'-'}</td>
+    <td class="whitespace-nowrap m-keep m-date">${f.date||'-'}</td>
     <td><span class="chip ${lineClass(f.line)}">${f.line||'-'}</span></td>
-    <td class="font-semibold whitespace-nowrap">${f.station||'-'}</td>
+    <td class="font-semibold whitespace-nowrap m-keep">${f.station||'-'}</td>
     <td>${f.device||'-'}</td>
     <td class="whitespace-nowrap">${f.module||'-'}</td>
-    <td><span class="chip" style="background:#fde8ef;color:#9d174d">${f.ftype||'-'}</span></td>
+    <td class="m-keep"><span class="chip" style="background:#fde8ef;color:#9d174d">${f.ftype||'-'}</span></td>
     <td class="desk-only" style="max-width:220px">${f.content||'-'}</td>
     <td class="whitespace-nowrap">${f.ptype||'-'}</td>
     <td class="desk-only" style="max-width:220px">${f.pcontent||'-'}</td>
     <td>${f.replaced==='유'?'<span class="chip" style="background:#fef3c7;color:#92400e">유</span>':'무'}</td>
-    <td>${f.result==='완료'?'<span class="chip" style="background:#dcfce7;color:#166534">완료</span>':(f.result||'-')}</td>
+    <td class="m-keep m-res">${f.result==='완료'?'<span class="chip" style="background:#dcfce7;color:#166534">완료</span>':(f.result||'-')}</td>
     <td class="desk-only">${f.worker||'-'}</td>
     <td class="desk-only whitespace-nowrap text-[11.5px] text-slate-500">${f.created?`<span title="작성완료 시각">🕒 ${f.created}</span>`:'<span class="text-slate-300">(기존)</span>'}</td>
     <td class="whitespace-nowrap">${f._user?'<span class="chip" style="background:#eef0fb;color:#4F46E5">내 입력</span>':''}${isAdmin && f._user && f._id?` <button onclick="editFault('${f._id}')" title="수정" class="text-[11px] font-semibold text-indigo-500 border border-indigo-200 rounded-md px-2 py-1 hover:bg-indigo-50 hover:text-indigo-700 transition">✎ 수정</button>`:''}${isAdmin?` <button onclick="deleteFault('${f._id||''}',this)" title="삭제" class="text-[11px] font-semibold text-slate-400 border border-slate-200 rounded-md px-2 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">✕ 삭제</button>`:''}</td>
@@ -1563,41 +1498,25 @@ function goTab(t){
 }
 $$('.rtab').forEach(btn=>btn.addEventListener('click',()=>goTab(btn.dataset.rtab)));
 
-boot();
-</script>
-<script>
-/* 모바일 카드형 목록: 각 셀에 컬럼명(data-label) 부여 — 표시 전용, 기능 불변 */
-(function(){
-  function labelize(){
-    var tbl=document.querySelector('#tab-list table'); if(!tbl) return;
-    var ths=[].map.call(tbl.querySelectorAll('thead th'), function(th){ return th.textContent.trim(); });
-    [].forEach.call(tbl.querySelectorAll('tbody tr'), function(tr){
-      [].forEach.call(tr.children, function(td,i){ if(ths[i]) td.setAttribute('data-label', ths[i]); });
-    });
-  }
-  var box=document.getElementById('l-rows');
-  if(box){ try{ new MutationObserver(labelize).observe(box,{childList:true,subtree:true}); }catch(e){} }
-  if(document.readyState!=='loading') setTimeout(labelize,400); else document.addEventListener('DOMContentLoaded',function(){ setTimeout(labelize,400); });
-  setTimeout(labelize,1400);
-})();
+/* 진입 가드: 토큰과 권한을 서버에 확인한 뒤에만 화면을 띄운다 */
+AtecAuth.requireAuth("railkr").then(function(p){ sess=p; boot(); }).catch(function(){});
 </script>
 <script>
 /* 모바일 목록: 행 탭 → 상세 시트 (표시 전용, 기능 불변) */
 (function(){
-  function isMobile(){ return window.innerWidth<=767 || document.documentElement.classList.contains('force-mobile'); }
+  function isMobile(){ return document.documentElement.classList.contains('is-mobile'); }
   function ensure(){
     if(document.getElementById('m-detail')) return;
     var ov=document.createElement('div'); ov.id='m-detail';
-    ov.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:rgba(30,5,40,.45);align-items:flex-end;justify-content:center;';
-    ov.innerHTML='<div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;max-height:86vh;overflow:auto;padding:16px 18px 26px;box-shadow:0 -10px 40px rgba(0,0,0,.25);">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div id="m-detail-title" style="font-weight:800;color:#3730A3;font-size:15px;">상세 내역</div>'
-      +'<button type="button" onclick="closeDetail()" style="width:30px;height:30px;border:none;background:#F2F3F9;border-radius:8px;color:#6B7280;font-size:15px;cursor:pointer;">\u2715</button></div>'
-      +'<div id="m-detail-body"></div><div id="m-detail-actions" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"></div></div>';
+    ov.innerHTML='<div class="sheet"><div class="grab"></div>'
+      +'<div class="sheet-head"><div class="sheet-title" id="m-detail-title">상세 내역</div>'
+      +'<button type="button" class="sheet-close" onclick="closeDetail()">✕</button></div>'
+      +'<div id="m-detail-body"></div><div class="sheet-actions" id="m-detail-actions"></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click',function(e){ if(e.target===ov) closeDetail(); });
     ov.addEventListener('touchmove',function(e){ var card=ov.firstElementChild; if(card && !card.contains(e.target)) e.preventDefault(); },{passive:false});
   }
-  window.closeDetail=function(){ var m=document.getElementById('m-detail'); if(m) m.style.display='none'; document.documentElement.style.overflow=''; document.body.style.overflow=''; };
+  window.closeDetail=function(){ var m=document.getElementById('m-detail'); if(m) m.classList.remove('open'); document.documentElement.style.overflow=''; document.body.style.overflow=''; };
   function openDetail(tr){
     ensure();
     var tbl=tr.closest('table'); if(!tbl) return;
@@ -1607,17 +1526,16 @@ boot();
     var title=document.getElementById('m-detail-title'); title.textContent='상세 내역';
     [].forEach.call(tr.children,function(td,i){
       var label=ths[i]||'';
-      if(label==='관리'){ [].forEach.call(td.querySelectorAll('button,a'),function(b){ var c=b.cloneNode(true); c.style.flex='1 1 auto'; c.style.minHeight='40px'; actions.appendChild(c); }); return; }
+      if(label==='관리'){ [].forEach.call(td.querySelectorAll('button,a'),function(b){ actions.appendChild(b.cloneNode(true)); }); return; }
       var val=td.textContent.trim();
-      if(label==='역명' && val){ title.textContent=val+' · 상세'; }
+      if(label==='역명' && val){ title.textContent=val; }
       if(!val) return;
-      var row=document.createElement('div');
-      row.style.cssText='display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F2F3F9;font-size:13.5px;align-items:flex-start;';
-      var ls=document.createElement('span'); ls.style.cssText='color:#8A90A6;font-weight:700;font-size:12px;flex:0 0 38%;'; ls.textContent=label;
-      var vs=document.createElement('span'); vs.style.cssText='text-align:right;color:#26282F;flex:1;word-break:break-all;'; vs.textContent=val;
+      var row=document.createElement('div'); row.className='drow';
+      var ls=document.createElement('span'); ls.className='dl'; ls.textContent=label;
+      var vs=document.createElement('span'); vs.className='dv'; vs.textContent=val;
       row.appendChild(ls); row.appendChild(vs); body.appendChild(row);
     });
-    document.getElementById('m-detail').style.display='flex';
+    document.getElementById('m-detail').classList.add('open');
     document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
   }
   document.addEventListener('click',function(e){
