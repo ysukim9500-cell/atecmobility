@@ -54,7 +54,8 @@
           }).join('') +
         '</div>' +
       '</div>' +
-      '<div class="h-[320px] px-1 pb-1"><canvas id="ch-dim"></canvas></div>' +
+      '<div id="dim-chart" class="h-[320px] px-1 pb-1"><canvas id="ch-dim"></canvas></div>' +
+      '<div id="dim-list" class="px-1 pb-1"></div>' +
     '</div>' +
     '<div class="panel">' +
       '<div class="panel-head"><span class="panel-dot"></span>월별 장애 추이<span class="panel-sub">접수 건수</span></div>' +
@@ -98,12 +99,12 @@
     return Object.entries(m).sort(function (a, b) { return b[1] - a[1]; });
   }
 
-  function barList(entries, el) {
+  function barList(entries, el, limit) {
     var max = entries.length ? entries[0][1] : 1;
     var tot = entries.reduce(function (s, e) { return s + e[1]; }, 0) || 1;
-    document.getElementById(el).innerHTML = (entries.length ? entries : [['데이터 없음', 0]]).slice(0, 10).map(function (e, i) {
+    document.getElementById(el).innerHTML = (entries.length ? entries : [['데이터 없음', 0]]).slice(0, limit || 10).map(function (e, i) {
       return '<div class="barrow"><div class="rk">' + (i + 1) + '</div>' +
-        '<div class="nm">' + TJ.esc(e[0]) + '</div>' +
+        '<div class="nm" title="' + TJ.esc(e[0]) + '">' + TJ.esc(e[0]) + '</div>' +
         '<div class="bar"><i style="width:' + Math.max(3, e[1] / max * 100) + '%"></i></div>' +
         '<div class="vl">' + TJ.num(e[1]) + '</div>' +
         '<div class="pc">' + (e[1] / tot * 100).toFixed(0) + '%</div></div>';
@@ -154,13 +155,14 @@
     document.getElementById('dim-title').textContent = title;
 
     var go = function (entries) {
-      // 좁은 화면에서 12개를 넣으면 이름이 겹쳐 절반이 사라진다
-      var mob = TJ.isMobile();
-      var top = entries.slice(0, mob ? 7 : 12);
+      // 모바일에서 보이는 순위 목록 — 칸이 고정이라 줄이 어긋나지 않는다
+      barList(entries, 'dim-list', 12);
+
+      var top = entries.slice(0, 12);
       if (charts.dim) charts.dim.destroy();
       // 항목 수에 맞춰 차트 높이를 늘려 막대가 뭉개지지 않게 한다
-      var box = document.getElementById('ch-dim').parentNode;
-      if (box) box.style.height = Math.max(mob ? 230 : 320, top.length * (mob ? 30 : 26) + 40) + 'px';
+      var box = document.getElementById('dim-chart');
+      if (box) box.style.height = Math.max(320, top.length * 26 + 40) + 'px';
       charts.dim = new Chart(document.getElementById('ch-dim'), {
         type: 'bar',
         data: { labels: top.map(function (e) { return e[0]; }), datasets: [{ data: top.map(function (e) { return e[1]; }), backgroundColor: '#0D9488', borderRadius: 7, maxBarThickness: 26 }] },
@@ -178,12 +180,11 @@
               grid: { display: false },
               ticks: {
                 autoSkip: false,                       // 이름을 건너뛰지 않는다
-                font: { size: mob ? 11 : 12, weight: '600' }, color: '#475569',
+                font: { size: 12, weight: '600' }, color: '#475569',
                 callback: function (v) {               // 너무 길면 줄여서 겹침을 막는다
                   var s = this.getLabelForValue ? this.getLabelForValue(v) : top[v] && top[v][0];
                   s = String(s == null ? '' : s);
-                  var max = mob ? 9 : 16;
-                  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+                  return s.length > 16 ? s.slice(0, 15) + '…' : s;
                 }
               }
             }

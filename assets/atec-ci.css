@@ -1,0 +1,36 @@
+/* ============================================================================
+ *  ATEC mobility Corporate Identity — 표기 규칙을 한 곳에 모은다.
+ *
+ *  로고는 assets/atec-logo.png (가로형: ATEC + 에이텍모빌리티) 하나만 쓴다.
+ *  어두운 바탕에서는 .on-dark 를 붙여 흰색 한 가지로 반전한다. 별도 파일을
+ *  두지 않으므로 원본이 바뀌면 모든 화면이 함께 바뀐다.
+ *
+ *  전용색  레드 #D60051 · 그레이 #5A6771  (CI 원본 PNG 에서 그대로 뽑은 값)
+ * ========================================================================== */
+:root {
+  --atec-red: #D60051;
+  --atec-red-deep: #A00040;
+  --atec-gray: #5A6771;
+}
+
+.atec-mark {
+  display: block;
+  width: auto;
+  height: 21px;          /* 가로형 비율 11:1 → 폭 약 232px */
+  flex: 0 0 auto;
+}
+.atec-mark.lg { height: 26px; }
+
+/* 어두운 바탕: 두 가지 색을 그대로 얹으면 레드가 묻힌다 → 흰색 단색으로 */
+.atec-mark.on-dark { filter: brightness(0) invert(1); }
+
+/* 좁은 화면에서는 로고가 머리글 폭을 다 먹지 않도록 줄인다 */
+@media (max-width: 767px) {
+  .atec-mark { height: 16px; }
+  .atec-mark.lg { height: 21px; }
+}
+/* 화면 강제 전환(모바일로 보기 / 웹으로 보기)에도 같은 크기를 따르게 한다 */
+html.is-mobile .atec-mark, html.force-mobile .atec-mark { height: 16px; }
+html.is-mobile .atec-mark.lg, html.force-mobile .atec-mark.lg { height: 21px; }
+html.force-web .atec-mark { height: 21px; }
+html.force-web .atec-mark.lg { height: 26px; }

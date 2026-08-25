@@ -13,14 +13,15 @@
   }catch(e){}
 })();
 </script>
+<link rel="stylesheet" href="assets/atec-ci.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
-:root { --atec-wine:#7A0B3C; --atec-magenta:#C2185B; --atec-pink:#D81B60; --atec-rose:#EC407A; }
+:root { --atec-wine:#A00040; --atec-magenta:#D60051; --atec-pink:#D81B60; --atec-rose:#EC407A; }
 body { font-family:'Pretendard', sans-serif; }
 .chip{ display:inline-flex; align-items:center; border-radius:9999px; padding:1px 8px; font-size:11px; font-weight:600; }
 .launch-card{ transition:transform .15s, box-shadow .15s; }
-.launch-card:hover{ transform:translateY(-4px); box-shadow:0 18px 40px -16px rgba(122,11,60,.45); }
+.launch-card:hover{ transform:translateY(-4px); box-shadow:0 18px 40px -16px rgba(160,0,64,.45); }
 .mode-card.selected{ border-color:var(--atec-magenta); background:linear-gradient(135deg,#fff,#fce4ec); box-shadow:0 4px 12px -4px rgba(194,24,91,.3); }
 .mode-card.selected .text-slate-700{ color:var(--atec-wine); }
 /* === 모바일 (자동/강제) === */
@@ -57,7 +58,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:4px 8px !important
    ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
    톤 차분하게 · 카드 정렬/그림자 통일 · 터치영역 확대
    ============================================================ */
-:root{ --atec-magenta:#B0184E; --atec-pink:#C42B66; --atec-rose:#D45C86; }
+:root{ --atec-magenta:#D60051; --atec-pink:#C42B66; --atec-rose:#D45C86; }
 body{ background:#F7F4F6 !important; }
 #auth-overlay{ background:#F7F4F6 !important; }
 .launch-card{ box-shadow:0 1px 2px rgba(42,37,48,.04), 0 8px 22px -16px rgba(42,37,48,.16) !important; }
@@ -93,15 +94,15 @@ html:not(.force-web) .launch-card .text-\[11px\]{ font-size:11.5px !important; l
 
 /* ================= ATEC 리디자인 v3 · 새 비주얼 시스템 ================= */
 :root{
-  --ink:#26191F; --wine:#7A0B3C; --wine-deep:#56072C; --magenta:#B0184E;
+  --ink:#26191F; --wine:#A00040; --wine-deep:#6E002C; --magenta:#D60051;
   --paper:#F4F0EA; --surface:#ffffff; --line:#E8E0DA; --muted:#8A7F86; --soft:#FBF8F4;
 }
 body{ background:var(--paper) !important; color:var(--ink); }
 #auth-overlay{ background:var(--paper) !important; }
 .text-slate-800{ color:var(--ink) !important; }
-.text-slate-500, .text-slate-600{ color:#6F656C !important; }
+.text-slate-500, .text-slate-600{ color:#5A6771 !important; }
 .border-rose-100, .border-rose-200, .border-indigo-100, .border-sky-100, .border-amber-100{ border-color:var(--line) !important; }
-.text-\[\#C2185B\]{ color:var(--magenta) !important; }
+.text-\[\#D60051\]{ color:var(--magenta) !important; }
 
 .v3-eyebrow{ font-size:12px; font-weight:800; letter-spacing:.18em; color:var(--magenta); }
 .v3-title{ font-weight:800; letter-spacing:-.02em; color:var(--ink); }
@@ -112,7 +113,7 @@ body{ background:var(--paper) !important; color:var(--ink); }
 
 .hero3{ position:relative; overflow:hidden; background:var(--wine-deep); }
 .hero3 > img.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.92; }
-.hero3 > .scrim{ position:absolute; inset:0; background:linear-gradient(105deg, rgba(40,5,22,.95) 0%, rgba(86,7,44,.86) 46%, rgba(122,11,60,.52) 100%); }
+.hero3 > .scrim{ position:absolute; inset:0; background:linear-gradient(105deg, rgba(40,5,22,.95) 0%, rgba(86,7,44,.86) 46%, rgba(160,0,64,.52) 100%); }
 .hero3 > .grid3{ position:absolute; inset:0; opacity:.10; background-image:linear-gradient(rgba(255,255,255,.6) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.6) 1px,transparent 1px); background-size:34px 34px; }
 
 .launch3{ display:block; background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:22px;
@@ -145,20 +146,16 @@ img, video, canvas, table{ max-width:100%; }
 <!-- ===================== LANDING (로그아웃 상태) ===================== -->
 <div id="auth-overlay" class="hidden fixed inset-0 z-50 overflow-y-auto" style="background:#fbf7f9;">
   <!-- TOP NAV -->
-  <nav class="sticky top-0 z-30 backdrop-blur" style="background:rgba(251,247,249,.82);border-bottom:1px solid rgba(122,11,60,.08)">
+  <nav class="sticky top-0 z-30 backdrop-blur" style="background:rgba(251,247,249,.82);border-bottom:1px solid rgba(160,0,64,.08)">
     <div class="max-w-[1180px] mx-auto px-5 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <div class="leading-none">
-          <div class="text-[16px] font-extrabold tracking-tight text-[#7A0B3C]">ATEC <span class="text-[#C2185B]">Mobility</span></div>
-          <div class="text-[10.5px] text-slate-400 mt-0.5">통합 관제 포털</div>
-        </div>
+      <div class="flex items-center gap-3 min-w-0">
+        <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
+        <span class="hidden sm:block w-px h-4" style="background:#D8DDE1"></span>
+        <span class="hidden sm:block text-[11.5px] font-semibold" style="color:var(--atec-gray)">통합 관제 포털</span>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="showAuth('signup')" class="hidden sm:inline-flex text-[13px] font-bold text-[#7A0B3C] px-3.5 py-2 rounded-lg hover:bg-rose-50 transition">회원가입</button>
-        <button onclick="showAuth('login')" class="text-[13px] font-bold text-white px-4 py-2 rounded-lg transition hover:brightness-110 active:scale-95" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">로그인</button>
+        <button onclick="showAuth('signup')" class="hidden sm:inline-flex text-[13px] font-bold text-[#A00040] px-3.5 py-2 rounded-lg hover:bg-rose-50 transition">회원가입</button>
+        <button onclick="showAuth('login')" class="text-[13px] font-bold text-white px-4 py-2 rounded-lg transition hover:brightness-110 active:scale-95" style="background:linear-gradient(135deg,#A00040,#D60051)">로그인</button>
       </div>
     </div>
   </nav>
@@ -172,10 +169,10 @@ img, video, canvas, table{ max-width:100%; }
       <div>
         <div class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-6" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px)">
           <span class="w-1.5 h-1.5 rounded-full" style="background:#7CE0B0;box-shadow:0 0 8px #7CE0B0"></span>
-          <span class="text-[11.5px] font-bold" style="color:#FBE7EF">버스 단말기 · 철도 키오스크 통합 장애 관리</span>
+          <span class="text-[11.5px] font-bold" style="color:#FBE7EF">버스 단말기 · 철도 키오스크 · 버스터미널 통합 장애 관리</span>
         </div>
         <h1 class="font-extrabold tracking-tight" style="font-size:clamp(34px,6.4vw,58px);line-height:1.08">장애를 데이터로<br><span style="color:#F4B8D0">먼저 잡습니다</span></h1>
-        <p class="mt-6 max-w-xl" style="font-size:clamp(14px,2.1vw,18px);line-height:1.7;color:rgba(255,233,243,.9)">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 장애 이력을 한 곳에서 관리하는 ATEC Mobility 운영자 전용 포털입니다.</p>
+        <p class="mt-6 max-w-xl" style="font-size:clamp(14px,2.1vw,18px);line-height:1.7;color:rgba(255,233,243,.9)">현장 백업 로그를 자동 분석해 원인을 격리하고, 선제 점검 대상을 도출하며, 버스·철도·버스터미널의 장애와 자재 이력을 한 곳에서 관리하는 ATEC 에이텍모빌리티 운영자 전용 포털입니다.</p>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-9">
           <button onclick="showAuth('login')" class="font-bold rounded-2xl px-7 py-4 transition active:scale-[.98]" style="background:#fff;color:var(--wine);font-size:15px;box-shadow:0 18px 40px -16px rgba(0,0,0,.55)">로그인하고 시작하기</button>
           <a href="#systems" class="text-center font-bold rounded-2xl px-6 py-4 transition" style="border:1px solid rgba(255,255,255,.34);color:#fff;font-size:15px">시스템 둘러보기 ↓</a>
@@ -213,31 +210,36 @@ img, video, canvas, table{ max-width:100%; }
   <section id="systems" class="max-w-[1180px] mx-auto px-5 py-16 sm:py-20">
     <div class="text-center mb-10">
       <div class="v3-eyebrow mb-2">INTEGRATED SYSTEMS</div>
-      <h2 class="v3-title text-[26px] sm:text-[34px]">하나의 포털, 네 개의 운영 시스템</h2>
+      <h2 class="v3-title text-[26px] sm:text-[34px]">하나의 포털, 다섯 개의 운영 시스템</h2>
       <p class="text-[14px] text-slate-500 mt-3 max-w-2xl mx-auto">현장에서 발생하는 모든 장애와 운영 업무를 한 화면에서. 권한에 따라 필요한 시스템만 보입니다.</p>
     </div>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
       <div class="v3-card p-6">
-        <div class="sys-ico mb-4" style="background:#FBEDF3;border:1px solid #F2D9E5"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#B0184E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="sys-ico mb-4" style="background:#FBEDF3;border:1px solid #F2D9E5"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#D60051" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">버스 단말기 장애 관리</h3>
-        <p class="text-[13px] leading-relaxed" style="color:#6F656C">로그 백업 분석·선제 점검·차량 검색·이벤트 분석으로 통합/승하차 단말기 장애를 진단합니다.</p>
+        <p class="text-[13px] leading-relaxed" style="color:#5A6771">로그 백업 분석·선제 점검·차량 검색·이벤트 분석으로 통합/승하차 단말기 장애를 진단합니다.</p>
       </div>
       <div class="v3-card p-6">
         <div class="sys-ico mb-4" style="background:#ECEBFB;border:1px solid #DCDBF6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#3730A3" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#3730A3" stroke-width="1.8" stroke-linecap="round"/></svg></div>
         <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">교통카드 키오스크</h3>
-        <p class="text-[13px] leading-relaxed" style="color:#6F656C">역사·호선·모듈별 장애를 등록·집계하고 대시보드로 추이를 분석합니다.</p>
+        <p class="text-[13px] leading-relaxed" style="color:#5A6771">역사·호선·모듈별 장애를 등록·집계하고 대시보드로 추이를 분석합니다.</p>
       </div>
       <div class="v3-card p-6">
         <div class="sys-ico mb-4" style="background:#E6F2FB;border:1px solid #D2E7F6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="#0369A1" stroke-width="1.8"/><path d="M5 10h14M7 16l-2 4M17 16l2 4M9 20h6" stroke="#0369A1" stroke-width="1.8" stroke-linecap="round"/></svg></div>
         <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">한국철도공사 광역철도</h3>
-        <p class="text-[13px] leading-relaxed" style="color:#6F656C">신형 발매기 장애를 노선별로 관리하고 Teams 알림으로 담당자에게 즉시 전파합니다.</p>
+        <p class="text-[13px] leading-relaxed" style="color:#5A6771">신형 발매기 장애를 노선별로 관리하고 Teams 알림으로 담당자에게 즉시 전파합니다.</p>
+      </div>
+      <div class="v3-card p-6">
+        <div class="sys-ico mb-4" style="background:#E4F4F1;border:1px solid #CDE9E4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="11" rx="2.5" stroke="#0D9488" stroke-width="1.8"/><path d="M3 10h18" stroke="#0D9488" stroke-width="1.8"/><circle cx="7.5" cy="13" r="1.1" fill="#0D9488"/><circle cx="16.5" cy="13" r="1.1" fill="#0D9488"/><path d="M6 16v3M18 16v3" stroke="#0D9488" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">버스터미널 통전망</h3>
+        <p class="text-[13px] leading-relaxed" style="color:#5A6771">전국 버스터미널 발권 단말기의 장애 접수부터 자재 사용·수리 입고·장비 현황까지 한 흐름으로 관리합니다.</p>
       </div>
       <div class="v3-card p-6">
         <div class="sys-ico mb-4" style="background:#FBF1E0;border:1px solid #F4E4C6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 3h7l5 5v13H7z M14 3v5h5M9.5 13h5M9.5 16.5h5" stroke="#B45309" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3 class="text-[16px] font-extrabold mb-1.5" style="color:var(--ink)">전자 서식</h3>
-        <p class="text-[13px] leading-relaxed" style="color:#6F656C">대폐차 자재 지급확인서·설치 체크리스트를 전자서명하고 PDF로 보관합니다.</p>
+        <p class="text-[13px] leading-relaxed" style="color:#5A6771">대폐차 자재 지급확인서·설치 체크리스트를 전자서명하고 PDF로 보관합니다.</p>
       </div>
-      <div class="rounded-2xl p-6 text-white flex flex-col justify-center" style="background:linear-gradient(150deg,#7A0B3C,#C2185B)">
+      <div class="rounded-2xl p-6 text-white flex flex-col justify-center" style="background:linear-gradient(150deg,#A00040,#D60051)">
         <div class="text-[15px] font-extrabold mb-1.5">권한별 맞춤 화면</div>
         <p class="text-[13px] text-pink-100/90 leading-relaxed">관리자가 직원마다 보일 시스템을 켜고 끌 수 있어, 각자 자기 업무에 필요한 카드만 봅니다.</p>
       </div>
@@ -248,7 +250,7 @@ img, video, canvas, table{ max-width:100%; }
   <section class="border-y border-rose-100" style="background:linear-gradient(180deg,#fff,#fdf2f6)">
     <div class="max-w-[1180px] mx-auto px-5 py-16 sm:py-20">
       <div class="text-center mb-10">
-        <div class="text-[12px] font-extrabold tracking-widest text-[#C2185B] mb-2">WHY ATEC PORTAL</div>
+        <div class="text-[12px] font-extrabold tracking-widest text-[#D60051] mb-2">WHY ATEC PORTAL</div>
         <h2 class="text-[26px] sm:text-[32px] font-extrabold text-slate-800 tracking-tight">진단은 자동으로, 조치는 빠르게</h2>
       </div>
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -270,7 +272,7 @@ img, video, canvas, table{ max-width:100%; }
         <div class="bg-white rounded-2xl border border-rose-100 p-5">
           <div class="text-2xl mb-2">🔔</div>
           <h3 class="text-[15px] font-extrabold text-slate-800 mb-1">Teams·이메일 자동 알림</h3>
-          <p class="text-[12.5px] text-slate-500 leading-relaxed">철도 장애가 등록되면 담당 채널·수신자에게 즉시 알림이 전파됩니다.</p>
+          <p class="text-[12.5px] text-slate-500 leading-relaxed">철도·버스터미널 장애가 등록되면 담당 채널·수신자에게 즉시 알림이 전파됩니다.</p>
         </div>
       </div>
     </div>
@@ -279,22 +281,22 @@ img, video, canvas, table{ max-width:100%; }
   <!-- 작동 방식 3단계 -->
   <section class="max-w-[1180px] mx-auto px-5 py-16 sm:py-20">
     <div class="text-center mb-10">
-      <div class="text-[12px] font-extrabold tracking-widest text-[#C2185B] mb-2">HOW IT WORKS</div>
+      <div class="text-[12px] font-extrabold tracking-widest text-[#D60051] mb-2">HOW IT WORKS</div>
       <h2 class="text-[26px] sm:text-[32px] font-extrabold text-slate-800 tracking-tight">3단계로 끝나는 장애 관리</h2>
     </div>
     <div class="grid md:grid-cols-3 gap-6">
       <div class="relative bg-white rounded-2xl border border-rose-100 p-6">
-        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">1</div>
+        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#A00040,#D60051)">1</div>
         <h3 class="text-[16px] font-extrabold text-slate-800 mt-3 mb-1.5">백업·장애 등록</h3>
         <p class="text-[13px] text-slate-500 leading-relaxed">현장 백업을 올리거나 장애 내역을 등록합니다. 차량번호 뒷자리만으로도 검색됩니다.</p>
       </div>
       <div class="relative bg-white rounded-2xl border border-rose-100 p-6">
-        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">2</div>
+        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#A00040,#D60051)">2</div>
         <h3 class="text-[16px] font-extrabold text-slate-800 mt-3 mb-1.5">자동 분석·진단</h3>
         <p class="text-[13px] text-slate-500 leading-relaxed">엔진이 로그·이벤트·매뉴얼을 종합해 원인과 권장 현장 조치를 제시합니다.</p>
       </div>
       <div class="relative bg-white rounded-2xl border border-rose-100 p-6">
-        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">3</div>
+        <div class="absolute -top-4 left-6 w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-[15px]" style="background:linear-gradient(135deg,#A00040,#D60051)">3</div>
         <h3 class="text-[16px] font-extrabold text-slate-800 mt-3 mb-1.5">현장 조치·이력 관리</h3>
         <p class="text-[13px] text-slate-500 leading-relaxed">처리 내역을 기록하면 클라우드에 공유되고 재불량 추적까지 자동으로 이어집니다.</p>
       </div>
@@ -305,7 +307,7 @@ img, video, canvas, table{ max-width:100%; }
   <section class="border-t border-rose-100" style="background:#fff">
     <div class="max-w-[1180px] mx-auto px-5 py-16 sm:py-20 grid lg:grid-cols-2 gap-10 items-center">
       <div>
-        <div class="text-[12px] font-extrabold tracking-widest text-[#C2185B] mb-2">SECURITY</div>
+        <div class="text-[12px] font-extrabold tracking-widest text-[#D60051] mb-2">SECURITY</div>
         <h2 class="text-[24px] sm:text-[30px] font-extrabold text-slate-800 tracking-tight mb-4">계정 기반의 안전한 접근</h2>
         <ul class="space-y-3">
           <li class="flex gap-3 text-[14px] text-slate-600"><span class="text-emerald-500 font-bold">✓</span> 로그인한 사용자만 데이터에 접근하며, 권한에 따라 화면이 분리됩니다.</li>
@@ -313,11 +315,11 @@ img, video, canvas, table{ max-width:100%; }
           <li class="flex gap-3 text-[14px] text-slate-600"><span class="text-emerald-500 font-bold">✓</span> 계정·공유 데이터는 클라우드에 안전하게 동기화됩니다.</li>
         </ul>
       </div>
-      <div class="rounded-2xl p-8 text-white text-center" style="background:linear-gradient(150deg,#5E0930,#A8124F)">
+      <div class="rounded-2xl p-8 text-white text-center" style="background:linear-gradient(150deg,#6E002C,#A00040)">
         <h3 class="text-[20px] font-extrabold mb-2">지금 로그인하고 시작하세요</h3>
         <p class="text-[13px] text-pink-100/85 mb-5">계정이 있으면 바로, 없으면 가입 즉시 사용할 수 있습니다.</p>
         <div class="flex flex-wrap justify-center gap-3">
-          <button onclick="showAuth('login')" class="text-[14px] font-bold bg-white text-[#7A0B3C] px-6 py-3 rounded-xl shadow hover:-translate-y-0.5 transition">로그인</button>
+          <button onclick="showAuth('login')" class="text-[14px] font-bold bg-white text-[#A00040] px-6 py-3 rounded-xl shadow hover:-translate-y-0.5 transition">로그인</button>
           <button onclick="showAuth('signup')" class="text-[14px] font-bold text-white px-6 py-3 rounded-xl border border-white/40 hover:bg-white/10 transition">회원가입</button>
         </div>
       </div>
@@ -332,26 +334,24 @@ img, video, canvas, table{ max-width:100%; }
   <div class="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl p-6 sm:p-8" onclick="event.stopPropagation()">
     <button onclick="closeLoginModal()" class="absolute top-3.5 right-3.5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" title="닫기">✕</button>
     <div class="text-center mb-5">
-      <div class="inline-flex items-center gap-2">
-        <span class="text-xl font-extrabold text-[#7A0B3C]">ATEC <span class="text-[#C2185B]">Mobility</span></span>
-      </div>
-      <div class="text-[12px] text-slate-500 mt-0.5">통합 관제 포털</div>
+      <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark lg" style="margin:0 auto">
+      <div class="text-[12px] mt-2" style="color:var(--atec-gray)">통합 관제 포털</div>
     </div>
 
     <!-- LOGIN FORM -->
     <div id="login-form">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">로그인</div>
-      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="text-sm font-extrabold text-[#A00040] mb-3">로그인</div>
+      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')doLogin()">
       <!-- 모드 선택: 모바일 / 웹 (슬림) -->
       <div class="mb-3">
-        <div class="text-[11px] font-bold text-slate-500 mb-1.5">화면 모드 <span class="text-[#C2185B]">*</span></div>
+        <div class="text-[11px] font-bold text-slate-500 mb-1.5">화면 모드 <span class="text-[#D60051]">*</span></div>
         <div class="grid grid-cols-2 gap-2">
-          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="web">
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#D60051] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="web">
             <input type="radio" name="ui-mode" value="web" class="hidden" onchange="selectMode('web')">
             <span class="text-[15px]">🖥</span><span class="text-[13px] font-bold text-slate-700 whitespace-nowrap">웹</span>
           </label>
-          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#C2185B] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="mobile">
+          <label class="mode-card cursor-pointer border-2 border-rose-200 hover:border-[#D60051] rounded-lg py-2.5 flex items-center justify-center gap-1.5 transition" data-mode="mobile">
             <input type="radio" name="ui-mode" value="mobile" class="hidden" onchange="selectMode('mobile')">
             <span class="text-[15px]">📱</span><span class="text-[13px] font-bold text-slate-700 whitespace-nowrap">모바일</span>
           </label>
@@ -360,32 +360,32 @@ img, video, canvas, table{ max-width:100%; }
       <button onclick="doLogin()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">로그인</button>
       <div id="li-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="flex items-center justify-between mt-2">
-        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#C2185B] hover:underline">비밀번호 찾기</button>
-        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#C2185B] font-bold hover:underline">회원가입</button></div>
+        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#D60051] hover:underline">비밀번호 찾기</button>
+        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#D60051] font-bold hover:underline">회원가입</button></div>
       </div>
     </div>
 
     <!-- SIGNUP FORM -->
     <div id="signup-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">회원가입</div>
-      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]">
+      <div class="text-sm font-extrabold text-[#A00040] mb-3">회원가입</div>
+      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]">
       <button onclick="doSignup()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">가입하기</button>
       <div id="su-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="text-[11px] text-slate-400 text-center mt-1">가입 즉시 사용할 수 있습니다.</div>
-      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인</button></div>
     </div>
 
     <!-- PASSWORD RESET REQUEST FORM -->
     <div id="reset-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-1">비밀번호 찾기</div>
+      <div class="text-sm font-extrabold text-[#A00040] mb-1">비밀번호 찾기</div>
       <p class="text-[11px] text-slate-500 mb-3">가입한 이메일로 <b>재설정 요청</b>을 보냅니다. 관리자가 임시 비밀번호를 발급하면 로그인 후 변경할 수 있습니다.</p>
-      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')requestReset()">
+      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')requestReset()">
       <button onclick="requestReset()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">재설정 요청 보내기</button>
       <div id="rs-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
-      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인으로 돌아가기</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인으로 돌아가기</button></div>
     </div>
 
     <div id="first-admin-note" class="hidden text-[11px] text-center text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 mt-3"></div>
@@ -399,7 +399,7 @@ img, video, canvas, table{ max-width:100%; }
   <div class="absolute -right-16 -top-20 w-80 h-80 rounded-full" style="background:radial-gradient(circle, rgba(236,64,122,.45), transparent 70%)"></div>
   <div class="relative max-w-[1280px] mx-auto px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
     <div class="flex items-center gap-2">
-      <span class="text-lg sm:text-xl font-extrabold tracking-tight">ATEC <span class="font-semibold text-pink-200">Mobility</span></span>
+      <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark">
       <span class="inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5">통합 관제 포털</span>
     </div>
     <div id="user-badge" class="flex items-center flex-wrap gap-1.5 sm:gap-2 bg-white/12 border border-white/20 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs"></div>
@@ -409,16 +409,16 @@ img, video, canvas, table{ max-width:100%; }
 <div class="max-w-[1280px] mx-auto px-4 sm:px-5 py-6 sm:py-8">
   <div class="v3-eyebrow mb-1.5">SYSTEM LAUNCHER</div>
   <h1 class="v3-title text-[22px] sm:text-[26px] mb-1">시스템 선택</h1>
-  <p class="text-[13.5px] mb-6" style="color:#6F656C">사용할 관제 시스템을 선택하세요. 권한에 따라 필요한 카드만 표시됩니다.</p>
+  <p class="text-[13.5px] mb-6" style="color:#5A6771">사용할 관제 시스템을 선택하세요. 권한에 따라 필요한 카드만 표시됩니다.</p>
 
   <div id="launcher-grid" class="grid md:grid-cols-3 gap-4 sm:gap-5">
     <!-- 단말기 시스템 -->
     <a href="terminal.html" data-perm="terminal" style="order:1" class="launch3">
-      <div class="ico mb-4" style="background:linear-gradient(135deg,#7A0B3C,#B0184E)">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#A00040,#D60051)">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 7h8M8 11h8M8 15h5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
       <div class="text-[16px] font-extrabold" style="color:var(--wine)">단말기 장애 현장처리 판정 시스템</div>
-      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">차량번호 검색으로 과거 이력·재불량 위험·권장 조치를 확인하고, 선제 점검 대상과 이벤트 로그를 분석합니다.</p>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#5A6771">차량번호 검색으로 과거 이력·재불량 위험·권장 조치를 확인하고, 선제 점검 대상과 이벤트 로그를 분석합니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:var(--magenta)">들어가기
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -430,7 +430,7 @@ img, video, canvas, table{ max-width:100%; }
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
       <div class="text-[16px] font-extrabold" style="color:#B45309">자재 지급확인서 · 설치 체크리스트</div>
-      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">대폐차·증차·감차 자재 지급확인서와 기종별 설치 완료 체크리스트를 전자서식으로 작성·서명하고 PDF로 저장합니다.</p>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#5A6771">대폐차·증차·감차 자재 지급확인서와 기종별 설치 완료 체크리스트를 전자서식으로 작성·서명하고 PDF로 저장합니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#B45309">바로가기
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -442,7 +442,7 @@ img, video, canvas, table{ max-width:100%; }
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
       <div class="text-[16px] font-extrabold" style="color:#3730A3">교통카드키오스크 장애 관리 시스템</div>
-      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#5A6771">지하철 역사 교통카드 키오스크의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#6366F1">들어가기
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -454,7 +454,7 @@ img, video, canvas, table{ max-width:100%; }
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="13" rx="3" stroke="white" stroke-width="1.8"/><path d="M5 10h14" stroke="white" stroke-width="1.8"/><circle cx="8.5" cy="13" r="1.2" fill="white"/><circle cx="15.5" cy="13" r="1.2" fill="white"/><path d="M7 16l-2 4M17 16l2 4M9 20h6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
       <div class="text-[16px] font-extrabold" style="color:#0369A1">한국철도공사 광역철도 장애 관리 시스템</div>
-      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">한국철도공사 광역철도 신형 자동발매기의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#5A6771">한국철도공사 광역철도 신형 자동발매기의 장애를 입력·저장하고, 모듈·장애유형별 현황을 분석하며 엑셀로 내려받습니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#0EA5E9">들어가기
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -466,7 +466,7 @@ img, video, canvas, table{ max-width:100%; }
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="11" rx="2.5" stroke="white" stroke-width="1.8"/><path d="M3 10h18" stroke="white" stroke-width="1.8"/><circle cx="7.5" cy="13" r="1.1" fill="white"/><circle cx="16.5" cy="13" r="1.1" fill="white"/><path d="M6 16v3M18 16v3" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
       </div>
       <div class="text-[16px] font-extrabold" style="color:#0F5A54">통전망 운영관리 시스템</div>
-      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">버스터미널 통합전산망의 장애·자재 재고·장비 현황·수리 내역을 한 곳에서 관리하고, 부품 사용과 재고를 연동해 추적합니다.</p>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#5A6771">버스터미널 통합전산망의 장애·자재 재고·장비 현황·수리 내역을 한 곳에서 관리하고, 부품 사용과 재고를 연동해 추적합니다.</p>
       <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#0D9488">들어가기
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -790,13 +790,13 @@ function helpContentPortal(){
   return `
     <div class="space-y-3">
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">📌 처음 사용하시나요?</div>
+        <div class="font-extrabold text-[#A00040] text-sm mb-1">📌 처음 사용하시나요?</div>
         <p>1) 회원가입 → 2) 즉시 로그인 가능 (관리자 승인 불필요)</p>
         <p class="text-slate-500 text-[11px] mt-1">관리자(ysukim)는 자동 등록되어 즉시 로그인할 수 있습니다.</p>
       </div>
 
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🖥📱 화면 모드</div>
+        <div class="font-extrabold text-[#A00040] text-sm mb-1">🖥📱 화면 모드</div>
         <p>로그인할 때 <b>웹</b> 또는 <b>모바일</b> 중 하나를 반드시 선택합니다.</p>
         <ul class="list-disc pl-5 mt-1 text-[12px]">
           <li><b>웹 모드</b>: PC·태블릿 등 큰 화면 (정보 한눈에)</li>
@@ -806,7 +806,7 @@ function helpContentPortal(){
       </div>
 
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🏠 포털 시스템</div>
+        <div class="font-extrabold text-[#A00040] text-sm mb-1">🏠 포털 시스템</div>
         <ul class="list-disc pl-5 text-[12px]">
           <li><b>📟 단말기 시스템</b>: 장애접수 분석, 선제 점검 대상, 차량 검색, 이벤트 분석</li>
           <li><b>🚏 교통카드 키오스크 · 🚆 광역철도</b>: 역사·노선별 장애 등록·집계·분석 (권한 필요)</li>
@@ -814,7 +814,7 @@ function helpContentPortal(){
       </div>
 
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">🔒 보안</div>
+        <div class="font-extrabold text-[#A00040] text-sm mb-1">🔒 보안</div>
         <ul class="list-disc pl-5 text-[12px]">
           <li>브라우저 창을 닫으면 자동 로그아웃됩니다.</li>
           <li>같은 탭에서 시스템 간 이동(포털↔단말기↔센터)은 로그인 유지됩니다.</li>
@@ -823,7 +823,7 @@ function helpContentPortal(){
       </div>
 
       <div>
-        <div class="font-extrabold text-[#7A0B3C] text-sm mb-1">☁ 데이터 공유</div>
+        <div class="font-extrabold text-[#A00040] text-sm mb-1">☁ 데이터 공유</div>
         <p>관리자가 클라우드에 데이터를 게시하면 모든 사용자가 같은 데이터를 보게 됩니다.</p>
         <p class="text-slate-500 text-[11px] mt-1">계정 정보도 클라우드에 저장되어 어느 기기에서든 같은 계정으로 로그인됩니다.</p>
       </div>
@@ -874,7 +874,7 @@ async function renderAdmin(){
       <div class="space-y-2">${resetReqs.map(u=>`
         <div class="flex items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
           <div class="flex-1"><b class="text-slate-800">${u.name}</b> <span class="text-slate-400 text-[11px]">${u.username}</span> <span class="text-[10px] text-slate-400">· 요청 ${u.resetReqAt||''}</span></div>
-          <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#C2185B] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
+          <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#D60051] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
           <button onclick="dismissReset('${u.username}')" class="text-[11px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-2.5 py-1 transition">요청 무시</button>
         </div>`).join('')}</div>
     </div>`;
@@ -886,7 +886,7 @@ async function renderAdmin(){
     list = list.filter(u=>u.lastLogin).sort((a,b)=>(b.lastLogin||'').localeCompare(a.lastLogin||''));
     const noLogin = users.filter(u=>!u.lastLogin);
     list = list.slice(0,5);
-    $('#recent-th').innerHTML = '최근 접속일 ▼ <span class="text-[10px] text-[#C2185B]">(상위 5)</span>';
+    $('#recent-th').innerHTML = '최근 접속일 ▼ <span class="text-[10px] text-[#D60051]">(상위 5)</span>';
   } else {
     list = list.sort((a,b)=>(a.created||'').localeCompare(b.created||''));
     $('#recent-th').innerHTML = '최근 접속일 ⇅';
@@ -896,7 +896,7 @@ async function renderAdmin(){
     const roleBtn = u.role==='admin'
       ? `<button onclick="setRole('${u.username}','user')" ${me?'disabled':''} class="text-[11px] border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
       : `<button onclick="setRole('${u.username}','admin')" class="text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-0.5 hover:bg-amber-50">관리자로</button>`;
-    const rankBadge = RECENT_SORT ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#C2185B] text-white text-[10px] font-bold mr-1">${i+1}</span>` : '';
+    const rankBadge = RECENT_SORT ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#D60051] text-white text-[10px] font-bold mr-1">${i+1}</span>` : '';
     // 시스템 접근: 관리자는 전체 자동, 일반은 카드별 ON/OFF
     const isAdminRow = u.role==='admin';
     const uperms = effectivePerms(u);
@@ -907,7 +907,7 @@ async function renderAdmin(){
           return `<button onclick="togglePerm('${u.username}','${m.key}')" class="text-[10px] rounded px-1.5 py-0.5 border ${on?'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold':'bg-slate-50 border-slate-200 text-slate-400'}" title="${on?'클릭=숨김':'클릭=표시'}">${on?'✓ ':''}${m.label}</button>`;
         }).join('')+`</div>`;
     return `<tr class="border-b border-rose-50">
-      <td class="py-1.5 pr-2 font-mono font-bold text-[#C2185B]">${rankBadge}${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#D60051]">${rankBadge}${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
       <td class="py-1.5 pr-2 text-slate-700">${u.name}</td>
       <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#fef3c7;color:#b45309;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
       <td class="py-1.5 pr-2">${statusChip(u.status)}</td>
@@ -916,12 +916,12 @@ async function renderAdmin(){
       <td class="py-1.5 pr-2 text-[11px] ${u.lastLogin?'text-[#3730A3] font-semibold':'text-slate-300'}">${u.lastLogin?'🕒 '+u.lastLogin:'미접속'}</td>
       <td class="py-1.5 pr-2 text-right whitespace-nowrap">
         ${u.status==='pending'?`<button onclick="approveUser('${u.username}')" class="text-[11px] font-bold text-emerald-700 mr-1">승인</button>`:''}
-        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#C2185B] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
+        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#D60051] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
         ${roleBtn}
         <button onclick="deleteUser('${u.username}')" ${me?'disabled':''} class="text-[11px] text-red-600 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 ml-1 disabled:opacity-40">삭제</button>
       </td>
     </tr>`;
-  }).join('') + (RECENT_SORT ? `<tr><td colspan="8" class="py-2 text-center text-[11px] text-slate-400">최근 접속순 상위 ${list.length}명 표시 중 · <button onclick="toggleRecentSort()" class="text-[#C2185B] font-semibold underline">전체 보기</button></td></tr>` : '');
+  }).join('') + (RECENT_SORT ? `<tr><td colspan="8" class="py-2 text-center text-[11px] text-slate-400">최근 접속순 상위 ${list.length}명 표시 중 · <button onclick="toggleRecentSort()" class="text-[#D60051] font-semibold underline">전체 보기</button></td></tr>` : '');
   renderNotifyEmails();
 }
 let RECENT_SORT=false;
@@ -1026,14 +1026,14 @@ initAuth();
 <!-- ============ HELP MODAL ============ -->
 <div id="help-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,.65)">
   <div class="bg-white rounded-2xl shadow-2xl max-w-[760px] w-full max-h-[90vh] flex flex-col">
-    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#7A0B3C,#C2185B);color:#fff;border-radius:1rem 1rem 0 0">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#A00040,#D60051);color:#fff;border-radius:1rem 1rem 0 0">
       <div class="font-extrabold text-base">❓ 사용법 도움말</div>
       <button onclick="closeHelp()" class="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center text-sm">✕</button>
     </div>
     <div class="overflow-y-auto px-5 py-4 text-[13px] text-slate-700 leading-relaxed" id="help-body"></div>
     <div class="px-5 py-2.5 border-t border-rose-100 flex justify-between items-center text-[11px] text-slate-400">
       <span>ATEC Mobility 통합 관제 포털</span>
-      <a href="ATEC_사용자매뉴얼.docx" download class="text-[#C2185B] font-bold hover:underline">📄 전체 매뉴얼(.docx) 다운로드</a>
+      <a href="ATEC_사용자매뉴얼.docx" download class="text-[#D60051] font-bold hover:underline">📄 전체 매뉴얼(.docx) 다운로드</a>
     </div>
   </div>
 </div>

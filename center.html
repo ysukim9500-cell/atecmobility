@@ -13,14 +13,15 @@
       }catch(e){}
     })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="assets/atec-ci.css">
+<script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
-        :root { --atec-wine:#7A0B3C; --atec-magenta:#C2185B; --atec-pink:#D81B60; --atec-rose:#EC407A; }
+        :root { --atec-wine:#A00040; --atec-magenta:#D60051; --atec-pink:#D81B60; --atec-rose:#EC407A; }
         body { font-family: 'Pretendard', sans-serif; }
         .mapbox { height: 520px; border-radius: 12px; background: #eef1f5; }
         #company-list::-webkit-scrollbar { width: 6px; }
@@ -83,7 +84,9 @@
 (function(){
   var sess=null;
   try{ sess=JSON.parse(sessionStorage.getItem('atec_session')||'null'); }catch(e){}
-  if(!sess || !sess.username){ location.href='index.html'; }
+  // 로그인 방식을 바꾸면서 저장되는 이름이 username 에서 email 로 바뀌었다.
+  // 둘 중 하나라도 있으면 로그인한 것으로 본다(옛 세션도 그대로 통과).
+  if(!sess || !(sess.username || sess.email)){ location.href='index.html'; }
   else { window.__ME=sess; }
 })();
 function gotoPortal(){ location.href='index.html'; }
@@ -96,7 +99,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
         <div class="relative max-w-[1500px] mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
                 <div class="flex items-center gap-2 leading-none">
-                    <span class="text-xl font-extrabold tracking-tight">ATEC <span class="font-semibold text-pink-200">Mobility</span></span>
+                    <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark">
                     <span class="hidden sm:inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5 backdrop-blur-sm">수도권버스지원팀</span>
                 </div>
                 <h1 class="text-base md:text-lg font-bold mt-1.5 flex items-center gap-1.5">
@@ -109,7 +112,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
               <div id="center-user-badge" class="flex items-center flex-wrap gap-1.5 sm:gap-2 bg-white/12 backdrop-blur-sm border border-white/20 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs"></div>
               <div class="bg-white/12 backdrop-blur-sm border border-white/20 px-4 py-2.5 rounded-xl text-xs flex items-center gap-3 flex-wrap">
                 <span class="flex items-center gap-1.5"><svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 11l9-7 9 7M5 10v9h5v-5h4v5h5v-9" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 관리 센터</span>
-                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block ring-1 ring-white/40" style="background:#C2185B"></span> 시내버스</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block ring-1 ring-white/40" style="background:#D60051"></span> 시내버스</span>
                 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block ring-1 ring-white/40" style="background:#26A69A"></span> 마을버스</span>
                 <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block ring-1 ring-white/40" style="background:#F59E0B"></span> 공영차고지</span>
               </div>
@@ -131,39 +134,39 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
     <div class="max-w-[1500px] mx-auto px-4 sm:px-6 py-5 sm:py-6">
 
     <section class="mb-5">
-        <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C] mb-2.5">버스 종류별 운영 현황</h2>
+        <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-2.5">버스 종류별 운영 현황</h2>
         <div id="type-summary" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
     </section>
 
     <section class="mb-5 bg-white border border-rose-100 rounded-xl shadow-sm p-4">
         <div class="flex flex-col lg:flex-row gap-5">
             <div class="lg:w-[420px] shrink-0">
-                <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C] mb-3">자동 균형 배정 (가중치 조절)</h2>
+                <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-3">자동 균형 배정 (가중치 조절)</h2>
                 <div class="space-y-3">
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">운영 차량 수 균형</span><span id="wv-val" class="font-bold text-[#C2185B]">1.0</span></div>
+                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">운영 차량 수 균형</span><span id="wv-val" class="font-bold text-[#D60051]">1.0</span></div>
                         <input id="w-vehicles" type="range" min="0" max="3" step="0.1" value="1" class="w-full" oninput="onWeight()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">장애접수 건수 균형</span><span id="wc-val" class="font-bold text-[#C2185B]">1.0</span></div>
+                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">장애접수 건수 균형</span><span id="wc-val" class="font-bold text-[#D60051]">1.0</span></div>
                         <input id="w-complaints" type="range" min="0" max="3" step="0.1" value="1" class="w-full" oninput="onWeight()">
                     </div>
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">센터와의 거리 (가까운 센터 우선)</span><span id="wd-val" class="font-bold text-[#C2185B]">1.0</span></div>
+                        <div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600">센터와의 거리 (가까운 센터 우선)</span><span id="wd-val" class="font-bold text-[#D60051]">1.0</span></div>
                         <input id="w-distance" type="range" min="0" max="4" step="0.1" value="1" class="w-full" oninput="onWeight()">
                     </div>
                 </div>
                 <div class="flex gap-2 mt-4">
                     <button onclick="runOptimize()" class="flex-1 btn-atec text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-1.5"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 12.5h6L9 22l9-11h-6z" fill="white"/></svg>자동 균형 배정 실행 (B)</button>
-                    <button onclick="resetAssign()" class="bg-rose-50 hover:bg-rose-100 text-[#C2185B] text-xs font-semibold px-3 py-2 rounded-lg transition-colors">원복</button>
+                    <button onclick="resetAssign()" class="bg-rose-50 hover:bg-rose-100 text-[#D60051] text-xs font-semibold px-3 py-2 rounded-lg transition-colors">원복</button>
                     <button onclick="exportExcel()" class="bg-[#26A69A] hover:bg-[#1d8077] text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1"><svg class="ico" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>엑셀</button>
                 </div>
                 <p id="opt-status" class="text-[11px] text-slate-400 mt-2 h-4"></p>
             </div>
             <div class="flex-1 border-l border-rose-100 lg:pl-5">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-sm font-extrabold text-[#7A0B3C]">센터별 부하 균형도 <span class="text-[11px] font-normal text-slate-400">(A 원본 → B 변경)</span></h2>
-                    <div class="text-xs">균형 점수 <span class="ab-badge" style="background:#64748b">A</span> <span id="score-a" class="font-bold text-base text-slate-500">-</span> <span class="text-slate-300">→</span> <span class="ab-badge" style="background:#C2185B">B</span> <span id="score-b" class="font-bold text-lg text-[#C2185B]">-</span></div>
+                    <h2 class="text-sm font-extrabold text-[#A00040]">센터별 부하 균형도 <span class="text-[11px] font-normal text-slate-400">(A 원본 → B 변경)</span></h2>
+                    <div class="text-xs">균형 점수 <span class="ab-badge" style="background:#64748b">A</span> <span id="score-a" class="font-bold text-base text-slate-500">-</span> <span class="text-slate-300">→</span> <span class="ab-badge" style="background:#D60051">B</span> <span id="score-b" class="font-bold text-lg text-[#D60051]">-</span></div>
                 </div>
                 <div id="balance-bars" class="space-y-2"></div>
             </div>
@@ -200,7 +203,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
     <!-- A/B 비교 지도 -->
     <section class="mb-6">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 class="sec-title pl-3 text-base font-extrabold text-[#7A0B3C]">관제 노선도 — A(원본) / B(변경) 비교</h2>
+            <h2 class="sec-title pl-3 text-base font-extrabold text-[#A00040]">관제 노선도 — A(원본) / B(변경) 비교</h2>
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[11px] text-slate-400">지도: <b id="map-source-label" class="text-slate-600">VWorld(브이월드)</b></span>
                 <button onclick="setVworldKey()" class="btn-atec text-white text-[11px] font-semibold px-2.5 py-1 rounded">VWorld</button>
@@ -219,26 +222,26 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
             </div>
             <div class="bg-white p-3 rounded-xl border border-rose-200 shadow-sm">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="ab-badge" style="background:#C2185B">B · 변경 배정 (편집 가능)</span>
-                    <span id="mapb-stat" class="text-[11px] text-[#C2185B] font-semibold"></span>
+                    <span class="ab-badge" style="background:#D60051">B · 변경 배정 (편집 가능)</span>
+                    <span id="mapb-stat" class="text-[11px] text-[#D60051] font-semibold"></span>
                 </div>
                 <div id="map-b" class="mapbox z-10 border border-rose-200"></div>
             </div>
         </div>
         <p class="text-xs text-slate-500 mt-3 bg-rose-50/60 p-2.5 rounded border border-rose-100">
-            <b>안내</b>: <b style="color:#64748b">왼쪽 A</b>는 변경 전 원래 배정, <b style="color:#C2185B">오른쪽 B</b>는 현재(변경 후) 배정입니다. 색상은 <b style="color:#C2185B">시내</b>·<b style="color:#26A69A">마을</b>, 마커 크기는 장애접수, <b style="color:#B45309">주황 사각</b>은 공영차고지입니다. B에서 센터가 바뀐 운수사는 보라 테두리로 강조됩니다.
+            <b>안내</b>: <b style="color:#64748b">왼쪽 A</b>는 변경 전 원래 배정, <b style="color:#D60051">오른쪽 B</b>는 현재(변경 후) 배정입니다. 색상은 <b style="color:#D60051">시내</b>·<b style="color:#26A69A">마을</b>, 마커 크기는 장애접수, <b style="color:#B45309">주황 사각</b>은 공영차고지입니다. B에서 센터가 바뀐 운수사는 보라 테두리로 강조됩니다.
         </p>
     </section>
 
     <main class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-12 bg-white p-4 rounded-xl border border-rose-100 shadow-sm flex flex-col max-h-[560px]">
-            <h2 class="text-base font-extrabold text-[#7A0B3C] mb-2 flex items-center justify-between border-b border-rose-100 pb-2">
-                <span class="sec-title pl-3">수동 센터 배정 컨트롤러 (B 편집) <span id="list-count" class="text-[#C2185B]"></span></span>
-                <span class="text-xs text-[#C2185B] bg-rose-50 px-2 py-0.5 rounded-full font-semibold">실시간 동기화</span>
+            <h2 class="text-base font-extrabold text-[#A00040] mb-2 flex items-center justify-between border-b border-rose-100 pb-2">
+                <span class="sec-title pl-3">수동 센터 배정 컨트롤러 (B 편집) <span id="list-count" class="text-[#D60051]"></span></span>
+                <span class="text-xs text-[#D60051] bg-rose-50 px-2 py-0.5 rounded-full font-semibold">실시간 동기화</span>
             </h2>
             <div class="flex gap-2 mb-2">
-                <input id="search-box" type="text" placeholder="운수사명 검색..." class="flex-1 bg-rose-50/50 border border-rose-100 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C2185B]" oninput="renderList()">
-                <select id="sort-by" class="bg-rose-50/50 border border-rose-100 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C2185B]" onchange="renderList()">
+                <input id="search-box" type="text" placeholder="운수사명 검색..." class="flex-1 bg-rose-50/50 border border-rose-100 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#D60051]" oninput="renderList()">
+                <select id="sort-by" class="bg-rose-50/50 border border-rose-100 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#D60051]" onchange="renderList()">
                     <option value="complaints">장애접수순</option>
                     <option value="vehicles">차량수순</option>
                     <option value="distance">거리순</option>
@@ -252,7 +255,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
 
     <!-- 데이터 대시보드 (그래프) -->
     <section class="mt-6">
-        <h2 class="sec-title pl-3 text-base font-extrabold text-[#7A0B3C] mb-3">데이터 대시보드</h2>
+        <h2 class="sec-title pl-3 text-base font-extrabold text-[#A00040] mb-3">데이터 대시보드</h2>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-xl border border-rose-100 shadow-sm">
                 <h3 class="text-sm font-bold text-slate-700 mb-2">센터별 부하 — A(원본) vs B(변경)</h3>
@@ -278,26 +281,26 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
     <footer class="mt-8 border-t border-rose-100 bg-white">
         <div class="max-w-[1500px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
             <div class="flex items-center gap-2.5">
-                <span class="font-bold text-[#C2185B]">ATEC Mobility</span>
+                <span class="font-bold text-[#D60051]">ATEC Mobility</span>
                 <span class="text-rose-200">|</span>
                 <span>수도권버스지원팀 · 버스 인프라 관제 솔루션</span>
             </div>
             <div class="text-slate-400 text-center sm:text-right">
                 내부 검토용 · 운수사 위치는 주소(구/동·차고지) 기준 추정 좌표 (지도: OSM / VWorld)<br class="hidden sm:block">
-                데이터: 운수사 268개사 · 차량 9,066대 · 장애접수 8,278건 (26.1.1~5.21) &nbsp;|&nbsp; <span class="text-[#C2185B] font-semibold">정도 · 혁신 · 협업</span>
+                데이터: 운수사 268개사 · 차량 9,066대 · 장애접수 8,278건 (26.1.1~5.21) &nbsp;|&nbsp; <span class="text-[#D60051] font-semibold">정도 · 혁신 · 협업</span>
             </div>
         </div>
     </footer>
 
     <script>
         const centers = {
-            "강동센터": { name: "강동센터", lat: 37.6498, lng: 127.1228, address: "경기도 구리시 갈매순환로166번길 46", color: "#7A0B3C" },
-            "강서센터": { name: "강서센터", lat: 37.4970, lng: 126.8580, address: "구로구 구로동 49 금호어울림", color: "#C2185B" },
+            "강동센터": { name: "강동센터", lat: 37.6498, lng: 127.1228, address: "경기도 구리시 갈매순환로166번길 46", color: "#A00040" },
+            "강서센터": { name: "강서센터", lat: 37.4970, lng: 126.8580, address: "구로구 구로동 49 금호어울림", color: "#D60051" },
             "강남센터": { name: "강남센터", lat: 37.4112, lng: 127.1285, address: "성남 분당 장미로 42 야탑리더스빌딩", color: "#7C3AED" },
             "강북센터": { name: "강북센터", lat: 37.6543, lng: 126.8920, address: "고양 덕양구 통일로 140 삼송테크노밸리", color: "#1D4ED8" }
         };
         const CK = Object.keys(centers);
-        const TYPE_COLOR = { "시내버스": "#C2185B", "마을버스": "#26A69A" };
+        const TYPE_COLOR = { "시내버스": "#D60051", "마을버스": "#26A69A" };
         const DEPOTS = {
             "송파공영차고지": { lat: 37.47075, lng: 127.12902 },
             "양천공영차고지": { lat: 37.51445, lng: 126.83393 },
@@ -422,7 +425,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
         function scoreBy(asgn) { const L = loadsBy(asgn); return Math.max(0, Math.round(100 - (cv(CK.map(k => L[k].v)) + cv(CK.map(k => L[k].c))) / 2 * 250)); }
 
         function renderTypeSummary() {
-            const types = [{ key: '시내버스', color: '#C2185B' }, { key: '마을버스', color: '#26A69A' }];
+            const types = [{ key: '시내버스', color: '#D60051' }, { key: '마을버스', color: '#26A69A' }];
             let html = '';
             types.forEach(t => {
                 const list = companies.filter(c => c.type === t.key);
@@ -440,9 +443,9 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
             const ratio = (sv / tv * 100).toFixed(0);
             html += `<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-3.5">
                 <div class="text-[10px] text-slate-400 mb-1">차량 구성비 (시내 : 마을)</div>
-                <div class="flex h-4 rounded overflow-hidden mb-1.5"><div style="width:${ratio}%;background:#C2185B"></div><div style="width:${100-ratio}%;background:#26A69A"></div></div>
-                <div class="flex justify-between text-[11px]"><span style="color:#C2185B" class="font-bold">시내 ${ratio}%</span><span style="color:#26A69A" class="font-bold">마을 ${100-ratio}%</span></div></div>`;
-            html += `<div class="rounded-xl shadow-sm p-3.5 text-white" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
+                <div class="flex h-4 rounded overflow-hidden mb-1.5"><div style="width:${ratio}%;background:#D60051"></div><div style="width:${100-ratio}%;background:#26A69A"></div></div>
+                <div class="flex justify-between text-[11px]"><span style="color:#D60051" class="font-bold">시내 ${ratio}%</span><span style="color:#26A69A" class="font-bold">마을 ${100-ratio}%</span></div></div>`;
+            html += `<div class="rounded-xl shadow-sm p-3.5 text-white" style="background:linear-gradient(135deg,#A00040,#D60051)">
                 <div class="text-[10px] text-pink-100 mb-1">전체 합계</div>
                 <div class="text-xl font-extrabold">${tv.toLocaleString()}<span class="text-sm font-medium">대</span></div>
                 <div class="text-[11px] text-pink-100 mt-0.5">운수사 ${companies.length}개사 · 장애 ${companies.reduce((s,c)=>s+c.complaints,0).toLocaleString()}건</div></div>`;
@@ -486,7 +489,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                 const bar = (L, alpha) => {
                     const svW = L[k].v ? (L[k].sv / L[k].v * 100) : 0;
                     return `<div class="flex items-center gap-1.5">
-                        <div class="flex-1 bg-slate-100 rounded h-2.5 overflow-hidden" style="width:${L[k].v/maxV*100}%;opacity:${alpha}"><div class="h-2.5 flex"><div style="width:${svW}%;background:#C2185B"></div><div style="width:${100-svW}%;background:#26A69A"></div></div></div>
+                        <div class="flex-1 bg-slate-100 rounded h-2.5 overflow-hidden" style="width:${L[k].v/maxV*100}%;opacity:${alpha}"><div class="h-2.5 flex"><div style="width:${svW}%;background:#D60051"></div><div style="width:${100-svW}%;background:#26A69A"></div></div></div>
                         <span class="w-10 text-right font-semibold text-slate-600 text-[10px]">${L[k].v.toLocaleString()}</span>
                         <span class="w-10 text-right font-semibold text-rose-500 text-[10px]">${L[k].c.toLocaleString()}건</span>
                     </div>`;
@@ -499,7 +502,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                             <div class="flex items-center gap-1"><span class="ab-badge" style="background:${col};padding:0 5px">B</span>${bar(Lb,1)}</div>
                         </div>
                     </div></div>`;
-            }).join('') + `<div class="text-[10px] text-slate-400 pt-1 flex gap-3"><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block rounded-sm" style="background:#C2185B"></span>시내</span><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block rounded-sm" style="background:#26A69A"></span>마을</span><span class="text-slate-300">|</span><span>막대=차량수, 우측 숫자=차량/장애</span></div>`;
+            }).join('') + `<div class="text-[10px] text-slate-400 pt-1 flex gap-3"><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block rounded-sm" style="background:#D60051"></span>시내</span><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block rounded-sm" style="background:#26A69A"></span>마을</span><span class="text-slate-300">|</span><span>막대=차량수, 우측 숫자=차량/장애</span></div>`;
         }
 
         function renderTabs() {
@@ -511,7 +514,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                 return `<button onclick="setActiveCenter(${t.key === null ? 'null' : `'${t.key}'`})" class="text-xs font-semibold px-3 py-1.5 rounded-full border transition-all" style="${style}">${t.label}</button>`;
             }).join('');
             const tw = document.getElementById('type-tabs');
-            const ttabs = [{ key: null, label: '전체', color: '#64748b' }, { key: '시내버스', label: '시내', color: '#C2185B' }, { key: '마을버스', label: '마을', color: '#26A69A' }];
+            const ttabs = [{ key: null, label: '전체', color: '#64748b' }, { key: '시내버스', label: '시내', color: '#D60051' }, { key: '마을버스', label: '마을', color: '#26A69A' }];
             tw.innerHTML = ttabs.map(t => {
                 const on = activeType === t.key;
                 const style = on ? `background:${t.color};color:#fff;border-color:${t.color};` : `background:#fff;color:${t.color};border-color:${t.color}55;`;
@@ -537,7 +540,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                         <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">${centers[cName].address}</div>
                         <div class="text-base font-bold text-slate-800 mt-0.5 flex items-center justify-between"><span>${cName}</span><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${centers[cName].color}"></span></div>
                         <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-rose-50 text-xs">
-                            <div><span class="text-slate-400 block">관리 차량 (B)</span><span class="font-bold text-[#C2185B] text-sm">${Lb[cName].v.toLocaleString()}대</span> <span class="text-[10px]">${delta(dv)}</span></div>
+                            <div><span class="text-slate-400 block">관리 차량 (B)</span><span class="font-bold text-[#D60051] text-sm">${Lb[cName].v.toLocaleString()}대</span> <span class="text-[10px]">${delta(dv)}</span></div>
                             <div><span class="text-slate-400 block">장애 접수 (B)</span><span class="font-bold text-rose-500 text-sm">${Lb[cName].c.toLocaleString()}건</span> <span class="text-[10px]">${delta(dc)}</span></div>
                         </div>
                         <div class="text-[10px] text-slate-400 mt-1">운수사 A ${La[cName].n} → B ${Lb[cName].n}개</div>
@@ -628,7 +631,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                         return `<div class="border border-slate-100 rounded p-1.5">
                             <div class="flex items-center gap-1 mb-0.5"><span class="text-[9px] px-1 rounded font-bold text-white" style="background:${tc}">${co.type}</span><b class="text-[12px] text-slate-900">${co.name}</b>${co.moved ? '<span class="text-[9px] font-bold" style="color:#7C3AED">●변경</span>' : ''}</div>
                             <div class="text-[10px] text-slate-400 mb-1">차량 ${co.vehicles}대 · 장애 <b class="text-rose-500">${co.complaints}건</b> · A:<b>${co.origin.replace('센터','')}</b><br>거리 <b class="text-slate-600">${co.dist[co.center].toFixed(1)}km</b> · 소요 <b class="text-[#26A69A]">${fmtTime(co.time[co.center])}</b></div>
-                            <div class="flex items-center gap-1"><span class="text-[9px] font-bold text-[#C2185B] shrink-0">센터변경 ▶</span><select onchange="changeCompanyCenter(${co.id}, this.value, true)" class="flex-1 bg-rose-50 border border-rose-200 rounded px-1 py-0.5 text-[11px] font-semibold cursor-pointer">${opts}</select></div>
+                            <div class="flex items-center gap-1"><span class="text-[9px] font-bold text-[#D60051] shrink-0">센터변경 ▶</span><select onchange="changeCompanyCenter(${co.id}, this.value, true)" class="flex-1 bg-rose-50 border border-rose-200 rounded px-1 py-0.5 text-[11px] font-semibold cursor-pointer">${opts}</select></div>
                         </div>`;
                     } else {
                         return `<div class="border border-slate-100 rounded p-1.5">
@@ -854,7 +857,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
 
         // === 데이터 대시보드 차트 ===
         const charts = {};
-        const ATEC_COLORS = ['#7A0B3C', '#C2185B', '#7C3AED', '#1D4ED8'];
+        const ATEC_COLORS = ['#A00040', '#D60051', '#7C3AED', '#1D4ED8'];
         function renderCharts() {
             if (typeof Chart === 'undefined') return;
             const La = loadsBy('origin'), Lb = loadsBy('center');
@@ -866,7 +869,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                     labels: CK.map(k => k.replace('센터','')),
                     datasets: [
                         { label: 'A 원본 (장애)', data: CK.map(k => La[k].c), backgroundColor: '#cbd5e1' },
-                        { label: 'B 변경 (장애)', data: CK.map(k => Lb[k].c), backgroundColor: '#C2185B' }
+                        { label: 'B 변경 (장애)', data: CK.map(k => Lb[k].c), backgroundColor: '#D60051' }
                     ]
                 };
                 if (charts.center) { charts.center.data = data; charts.center.update(); }
@@ -877,7 +880,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
             if (c2 && !charts.type) {
                 const si = companies.filter(c => c.type === '시내버스').reduce((s, c) => s + c.vehicles, 0);
                 const ma = companies.filter(c => c.type === '마을버스').reduce((s, c) => s + c.vehicles, 0);
-                charts.type = new Chart(c2, { type: 'doughnut', data: { labels: ['시내버스', '마을버스'], datasets: [{ data: [si, ma], backgroundColor: ['#C2185B', '#26A69A'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+                charts.type = new Chart(c2, { type: 'doughnut', data: { labels: ['시내버스', '마을버스'], datasets: [{ data: [si, ma], backgroundColor: ['#D60051', '#26A69A'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
             }
             // 3) 장애접수 상위 15 (가로 막대)
             const c3 = document.getElementById('chart-top');
@@ -891,7 +894,7 @@ function atecLogout(){ AtecAuth.logout(); location.href='index.html'; }
                 const names = Object.keys(DEPOTS);
                 charts.depot = new Chart(c4, { type: 'bar', data: { labels: names.map(n => n.replace('공영차고지','')), datasets: [
                     { label: '차량수', data: names.map(n => companies.filter(c => c.depot === n).reduce((s, c) => s + c.vehicles, 0)), backgroundColor: '#1D4ED8' },
-                    { label: '장애접수', data: names.map(n => companies.filter(c => c.depot === n).reduce((s, c) => s + c.complaints, 0)), backgroundColor: '#C2185B' }
+                    { label: '장애접수', data: names.map(n => companies.filter(c => c.depot === n).reduce((s, c) => s + c.complaints, 0)), backgroundColor: '#D60051' }
                 ] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { size: 11 } } } } } });
             }
         }

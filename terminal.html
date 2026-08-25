@@ -14,12 +14,13 @@
   }catch(e){}
 })();
 </script>
+<link rel="stylesheet" href="assets/atec-ci.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
-:root { --atec-wine:#7A0B3C; --atec-magenta:#C2185B; --atec-pink:#D81B60; --atec-rose:#EC407A; }
+:root { --atec-wine:#A00040; --atec-magenta:#D60051; --atec-pink:#D81B60; --atec-rose:#EC407A; }
 body { font-family: 'Pretendard', sans-serif; }
 .atec-header { background: linear-gradient(110deg, var(--atec-wine) 0%, var(--atec-magenta) 55%, var(--atec-pink) 130%); }
 .atec-header .grid-overlay { background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px); background-size: 26px 26px; }
@@ -39,11 +40,11 @@ details > summary { list-style:none; cursor:pointer; } details > summary::-webki
 .searchbar:focus-within{box-shadow:0 0 0 3px rgba(194,24,91,.18); border-color:var(--atec-magenta);}
 .tab-btn{ color:#94a3b8; } .tab-btn:hover{ color:var(--atec-magenta); background:#fdf2f6; }
 .tab-btn.active{ background:linear-gradient(110deg,var(--atec-wine),var(--atec-magenta)); color:#fff; }
-.pf-btn{ border-color:#f1d6e0; color:#7A0B3C; background:#fff; } .pf-btn:hover{ background:#fdf2f6; }
+.pf-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; } .pf-btn:hover{ background:#fdf2f6; }
 .pf-btn.active{ background:var(--atec-magenta); color:#fff; border-color:var(--atec-magenta); }
-.df-btn{ border-color:#f1d6e0; color:#7A0B3C; background:#fff; } .df-btn:hover{ background:#fdf2f6; }
+.df-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; } .df-btn:hover{ background:#fdf2f6; }
 .df-btn.active{ background:var(--atec-wine); color:#fff; border-color:var(--atec-wine); }
-.scope-btn{ border-color:#f1d6e0; color:#7A0B3C; background:#fff; font-weight:700; padding:4px 12px; } .scope-btn:hover{ background:#fdf2f6; }
+.scope-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; font-weight:700; padding:4px 12px; } .scope-btn:hover{ background:#fdf2f6; }
 .scope-btn.active{ background:var(--atec-magenta); color:#fff; border-color:var(--atec-magenta); }
 .pcard{ transition:transform .15s, box-shadow .15s; } .pcard:hover{ transform:translateY(-1px); box-shadow:0 4px 14px rgba(194,24,91,.12); }
 .recv-chip{ transition:all .12s; cursor:pointer; } .recv-chip:hover{ filter:brightness(.97); }
@@ -51,23 +52,23 @@ details > summary { list-style:none; cursor:pointer; } details > summary::-webki
 
 /* Premium panels */
 .panel{ background:#fff; border:1px solid #f6e3ea; border-radius:18px; padding:22px 22px 18px;
-  box-shadow:0 1px 2px rgba(122,11,60,.04), 0 6px 20px -12px rgba(122,11,60,.18); position:relative; overflow:hidden; }
+  box-shadow:0 1px 2px rgba(160,0,64,.04), 0 6px 20px -12px rgba(160,0,64,.18); position:relative; overflow:hidden; }
 .panel::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px;
   background:linear-gradient(90deg,var(--atec-wine),var(--atec-magenta),var(--atec-rose)); opacity:.85; }
-.panel-head{ display:flex; align-items:center; gap:9px; font-size:15px; font-weight:800; color:#7A0B3C; margin-bottom:16px; letter-spacing:-.01em; }
+.panel-head{ display:flex; align-items:center; gap:9px; font-size:15px; font-weight:800; color:#A00040; margin-bottom:16px; letter-spacing:-.01em; }
 .panel-dot{ width:8px; height:8px; border-radius:2px; background:var(--atec-magenta); display:inline-block; transform:rotate(45deg); }
 .panel-sub{ font-size:12px; font-weight:600; color:#c89aae; margin-left:3px; }
 
 /* Channel selector tiles */
 .ctile{ position:relative; border-radius:14px; padding:12px 14px; cursor:pointer; border:1.5px solid #f1d6e0; background:#fff;
   transition:transform .14s, box-shadow .14s, border-color .14s; overflow:hidden; }
-.ctile:hover{ transform:translateY(-2px); box-shadow:0 8px 22px -10px rgba(122,11,60,.35); }
+.ctile:hover{ transform:translateY(-2px); box-shadow:0 8px 22px -10px rgba(160,0,64,.35); }
 .ctile .ct-name{ font-size:13px; font-weight:800; color:#475569; display:flex; align-items:center; gap:5px; }
 .ctile .ct-num{ font-size:27px; font-weight:800; line-height:1.0; margin-top:5px; letter-spacing:-.025em; }
 .ctile .ct-share{ font-size:11px; font-weight:700; color:#94a3b8; margin-top:2px; }
 .ctile .ct-bar{ height:4px; border-radius:99px; background:#f1d6e0; margin-top:8px; overflow:hidden; }
 .ctile .ct-bar>i{ display:block; height:100%; border-radius:99px; }
-.ctile.active{ border-color:transparent; color:#fff; box-shadow:0 10px 26px -8px rgba(122,11,60,.5); }
+.ctile.active{ border-color:transparent; color:#fff; box-shadow:0 10px 26px -8px rgba(160,0,64,.5); }
 .ctile.active .ct-name, .ctile.active .ct-num{ color:#fff; }
 .ctile.active .ct-share{ color:rgba(255,255,255,.85); }
 .ctile.active .ct-bar{ background:rgba(255,255,255,.3); }
@@ -76,7 +77,7 @@ details > summary { list-style:none; cursor:pointer; } details > summary::-webki
 
 /* KPI cards */
 .kpi{ position:relative; background:#fff; border:1px solid #f6e3ea; border-radius:18px; padding:20px 22px;
-  box-shadow:0 1px 2px rgba(122,11,60,.04), 0 6px 18px -14px rgba(122,11,60,.2); overflow:hidden; }
+  box-shadow:0 1px 2px rgba(160,0,64,.04), 0 6px 18px -14px rgba(160,0,64,.2); overflow:hidden; }
 .kpi .kpi-ico{ position:absolute; right:-4px; bottom:-6px; opacity:.06; }
 .kpi .kpi-label{ font-size:12.5px; font-weight:700; color:#94a3b8; }
 .kpi .kpi-val{ font-size:38px; font-weight:800; letter-spacing:-.035em; line-height:1.05; margin-top:4px; }
@@ -236,7 +237,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:3px 7px !important
 /* === 클라우드 로딩 오버레이 (ATEC CI) === */
 #cloud-loader{
   position:fixed; inset:0; z-index:9999;
-  background:linear-gradient(135deg, #7A0B3C 0%, #C2185B 55%, #D81B60 100%);
+  background:linear-gradient(135deg, #A00040 0%, #D60051 55%, #D81B60 100%);
   display:flex; align-items:center; justify-content:center;
   opacity:0; pointer-events:none; transition:opacity .4s ease;
 }
@@ -294,8 +295,8 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:3px 7px !important
   0%,100%{ transform:scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.3); }
   50%{ transform:scale(1.05); box-shadow: 0 0 0 18px rgba(255,255,255,0); }
 }
-.cl-logo .cl-atec{ font-weight:900; font-size:24px; letter-spacing:.5px; line-height:1; }
-.cl-logo .cl-mobility{ font-weight:600; font-size:13px; letter-spacing:.3px; opacity:.85; margin-top:4px; }
+/* 어두운 바탕 위 원 안이라 로고는 흰색 한 가지로 얹는다 */
+.cl-logo .cl-mark{ width:84px; height:auto; display:block; filter:brightness(0) invert(1); }
 .cl-logo .cl-bus{
   margin-top:8px; width:34px; height:34px;
   display:flex; align-items:center; justify-content:center;
@@ -384,8 +385,7 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:3px 7px !important
 @media (max-width:480px){
   .cl-logo-box{ width:150px; height:150px; margin-bottom:24px; }
   .cl-logo{ width:108px; height:108px; }
-  .cl-logo .cl-atec{ font-size:20px; }
-  .cl-logo .cl-mobility{ font-size:11px; }
+  .cl-logo .cl-mark{ width:70px; }
   .cl-title{ font-size:18px; }
   .cl-subtitle{ font-size:12px; margin-bottom:18px; }
   .cl-status{ font-size:12px; min-width:200px; padding:7px 14px; }
@@ -415,8 +415,8 @@ html.force-mobile .tab-badge{ position:absolute; top:3px; right:8px; margin:0 !i
 
 /* === 도움말 탭 === */
 .help-tab{ padding:6px 12px; font-size:12px; font-weight:700; color:#64748b; border-bottom:2px solid transparent; flex:0 0 auto; cursor:pointer; }
-.help-tab:hover{ color:#C2185B; }
-.help-tab.active{ color:#7A0B3C; border-bottom-color:#C2185B; }
+.help-tab:hover{ color:#D60051; }
+.help-tab.active{ color:#A00040; border-bottom-color:#D60051; }
 
 /* === 모바일 정렬 보정 (오와열) === */
 /* 차량 상세 상단 미니통계: 모바일에서 4칸을 가지런한 2×2 그리드로 */
@@ -453,7 +453,7 @@ html.force-mobile button{ min-height:40px; }
    ① 팔레트 톤 정리  ② 카드 정렬·여백 통일  ③ 모바일 하단 탭바
    ============================================================ */
 :root{
-  --atec-magenta:#B0184E;
+  --atec-magenta:#D60051;
   --atec-pink:#C42B66;
   --atec-rose:#D45C86;
   --atec-bg:#F7F4F6;
@@ -471,7 +471,7 @@ body{ background:var(--atec-bg) !important; }
 .rounded-xl{ border-radius:14px !important; }
 .searchbar, .border-rose-200{ border-color:#E6DCE2 !important; }
 .sec-title{ border-left-color:var(--atec-magenta) !important; }
-.tab-btn.active{ background:linear-gradient(115deg,#5E0930,#7A0B3C 60%,#9A1450) !important; }
+.tab-btn.active{ background:linear-gradient(115deg,#6E002C,#A00040 60%,#9A1450) !important; }
 
 /* 터치 영역 키우기 */
 @media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
@@ -584,7 +584,7 @@ img, video, canvas, table{ max-width:100%; }
 @media (max-width:767px){
   html:not(.force-web) .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   html:not(.force-web) .overflow-x-auto table, html:not(.force-web) .overflow-x-auto tbody, html:not(.force-web) .overflow-x-auto table tr, html:not(.force-web) .overflow-x-auto table td{ display:block !important; width:auto !important; }
-  html:not(.force-web) .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(122,11,60,.05); }
+  html:not(.force-web) .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(160,0,64,.05); }
   html:not(.force-web) .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
   html:not(.force-web) .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
   html:not(.force-web) .overflow-x-auto table td:empty{ display:none !important; }
@@ -592,7 +592,7 @@ img, video, canvas, table{ max-width:100%; }
 }
 html.force-mobile .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 html.force-mobile .overflow-x-auto table, html.force-mobile .overflow-x-auto tbody, html.force-mobile .overflow-x-auto table tr, html.force-mobile .overflow-x-auto table td{ display:block !important; width:auto !important; }
-html.force-mobile .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(122,11,60,.05); }
+html.force-mobile .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(160,0,64,.05); }
 html.force-mobile .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
 html.force-mobile .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
 html.force-mobile .overflow-x-auto table td:empty{ display:none !important; }
@@ -628,8 +628,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
       <div class="cl-ring"></div>
       <div class="cl-ring r2"></div>
       <div class="cl-logo">
-        <div class="cl-atec">ATEC</div>
-        <div class="cl-mobility">Mobility</div>
+        <img src="assets/atec-logo-stack.png" alt="ATEC 에이텍모빌리티" class="cl-mark">
         <div class="cl-bus" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M5 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M16 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2zM7 8h10" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -638,7 +637,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
       </div>
       <div class="cl-cloud-icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path d="M7 18a5 5 0 110-10 6 6 0 0111.7 1.5A4.5 4.5 0 0118 18H7z" fill="#C2185B"/>
+          <path d="M7 18a5 5 0 110-10 6 6 0 0111.7 1.5A4.5 4.5 0 0118 18H7z" fill="#D60051"/>
         </svg>
       </div>
     </div>
@@ -657,50 +656,48 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 </div>
 
 <!-- ===================== AUTH OVERLAY ===================== -->
-<div id="auth-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:linear-gradient(135deg, #7A0B3C, #C2185B 60%, #D81B60);">
+<div id="auth-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:linear-gradient(135deg, #A00040, #D60051 60%, #D81B60);">
   <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px);background-size:28px 28px;"></div>
   <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
     <div class="text-center mb-5">
-      <div class="inline-flex items-center gap-2 mb-1">
-        <span class="text-xl font-extrabold text-[#7A0B3C]">ATEC <span class="text-[#C2185B]">Mobility</span></span>
-      </div>
+      <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark lg" style="margin:0 auto 6px">
       <div class="text-[12px] text-slate-500">단말기 현장처리 판정 시스템</div>
     </div>
 
     <!-- LOGIN FORM -->
     <div id="login-form">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">로그인</div>
-      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="text-sm font-extrabold text-[#A00040] mb-3">로그인</div>
+      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')doLogin()">
       <button onclick="doLogin()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">로그인</button>
       <div id="li-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="flex items-center justify-between mt-2">
-        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#C2185B] hover:underline">비밀번호 찾기</button>
-        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#C2185B] font-bold hover:underline">회원가입</button></div>
+        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#D60051] hover:underline">비밀번호 찾기</button>
+        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#D60051] font-bold hover:underline">회원가입</button></div>
       </div>
     </div>
 
     <!-- SIGNUP FORM -->
     <div id="signup-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-3">회원가입</div>
-      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#C2185B]">
-      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]">
+      <div class="text-sm font-extrabold text-[#A00040] mb-3">회원가입</div>
+      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
+      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]">
       <button onclick="doSignup()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">가입하기</button>
       <div id="su-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="text-[11px] text-slate-400 text-center mt-1">가입 즉시 사용할 수 있습니다.</div>
-      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인</button></div>
     </div>
 
     <!-- PASSWORD RESET REQUEST FORM -->
     <div id="reset-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#7A0B3C] mb-1">비밀번호 찾기</div>
+      <div class="text-sm font-extrabold text-[#A00040] mb-1">비밀번호 찾기</div>
       <p class="text-[11px] text-slate-500 mb-3">가입한 이메일로 <b>재설정 요청</b>을 보냅니다. 관리자가 임시 비밀번호를 발급하면 로그인 후 변경할 수 있습니다.</p>
-      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter')requestReset()">
+      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')requestReset()">
       <button onclick="requestReset()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">재설정 요청 보내기</button>
       <div id="rs-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
-      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#C2185B] font-bold hover:underline">로그인으로 돌아가기</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인으로 돌아가기</button></div>
     </div>
 
     <div id="first-admin-note" class="hidden text-[11px] text-center text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 mt-3"></div>
@@ -716,7 +713,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <div class="relative max-w-[1600px] mx-auto px-4 sm:px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
     <div>
       <div class="flex items-center gap-2 leading-none">
-        <span class="text-lg sm:text-xl font-extrabold tracking-tight">ATEC <span class="font-semibold text-pink-200">Mobility</span></span>
+        <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark">
         <span class="hidden sm:inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5 backdrop-blur-sm">현장 유지보수 지원</span>
       </div>
       <h1 class="text-base md:text-lg font-bold mt-1.5 flex items-center gap-1.5">
@@ -741,7 +738,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <!-- SEARCH -->
   <section class="mb-5">
     <div class="searchbar bg-white border border-rose-200 rounded-xl shadow-sm flex items-center gap-2 px-4 py-2.5 transition">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#C2185B]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#D60051]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 검색 (뒷자리만 입력해도 OK)" class="flex-1 outline-none text-sm bg-transparent placeholder:text-slate-400">
       <button onclick="document.getElementById('q').value='';doSearch('')" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
     </div>
@@ -757,7 +754,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <button data-tab="preempt" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5 relative">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-full">선제 점검 대상</span><span class="tab-short">선제점검</span>
-      <span id="preempt-badge" class="tab-badge ml-0.5 text-[10px] bg-[#C2185B] text-white rounded-full px-1.5 py-0.5"></span>
+      <span id="preempt-badge" class="tab-badge ml-0.5 text-[10px] bg-[#D60051] text-white rounded-full px-1.5 py-0.5"></span>
     </button>
     <button data-tab="search" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -795,7 +792,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
   <!-- BACK BAR (shown on non-dashboard screens) -->
   <div id="back-bar" class="hidden mb-4">
-    <button onclick="setTab('dash')" class="flex items-center gap-1.5 text-[13px] font-bold text-[#7A0B3C] bg-white border border-rose-200 rounded-lg px-3.5 py-2 shadow-sm hover:bg-rose-50 hover:border-[#C2185B] transition">
+    <button onclick="setTab('dash')" class="flex items-center gap-1.5 text-[13px] font-bold text-[#A00040] bg-white border border-rose-200 rounded-lg px-3.5 py-2 shadow-sm hover:bg-rose-50 hover:border-[#D60051] transition">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       대시보드로 돌아가기
     </button>
@@ -806,7 +803,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- Large channel selector -->
     <div class="mb-3">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#7A0B3C]">접수구분 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040]">접수구분 선택</h2>
         <span class="text-[11px] text-slate-400">선택 시 선제점검·차량검색에도 함께 적용됩니다</span>
       </div>
       <div id="channel-tiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
@@ -815,25 +812,25 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- 센터 + 기종 나란히 + 기간 -->
     <div class="grid lg:grid-cols-2 gap-x-5 gap-y-3 mb-4">
       <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#7A0B3C] mb-2">센터 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">센터 선택</h2>
         <div id="center-tiles" class="grid grid-cols-3 md:grid-cols-5 gap-2.5"></div>
       </div>
       <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#7A0B3C] mb-2">단말기 기종 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">단말기 기종 선택</h2>
         <div id="term-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
       </div>
       <div class="lg:col-span-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#7A0B3C] mb-2">기간 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">기간 선택</h2>
         <div class="panel" style="padding:10px 14px">
           <div class="flex items-center gap-2 flex-wrap">
-            <input id="gf-from" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#C2185B]">
+            <input id="gf-from" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D60051]">
             <span class="text-slate-400 text-[12px]">~</span>
-            <input id="gf-to" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#C2185B]">
+            <input id="gf-to" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D60051]">
             <button onclick="applyDateFilter()" class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition" style="background:var(--atec-magenta)">조회</button>
             <span class="text-[11px] text-slate-400 ml-2">빠른 선택:</span>
-            <button onclick="quickDate(7)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#7A0B3C] hover:bg-rose-50 transition">최근 7일</button>
-            <button onclick="quickDate(30)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#7A0B3C] hover:bg-rose-50 transition">최근 30일</button>
-            <button onclick="quickDate(90)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#7A0B3C] hover:bg-rose-50 transition">최근 90일</button>
+            <button onclick="quickDate(7)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 7일</button>
+            <button onclick="quickDate(30)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 30일</button>
+            <button onclick="quickDate(90)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 90일</button>
             <button onclick="clearDateFilter()" class="qd-btn text-[11px] border border-slate-200 rounded-md px-2 py-0.5 text-slate-500 hover:bg-slate-50 transition">전체</button>
           </div>
         </div>
@@ -852,8 +849,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#C2185B]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
+          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#D60051]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
         </div>
         <div id="preempt-summary" class="flex gap-2 flex-wrap"></div>
       </div>
@@ -864,7 +861,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         <button data-pf="mid" class="pf-btn chip border transition">중간 (50-69)</button>
         <button data-pf="low" class="pf-btn chip border transition">낮음 (30-49)</button>
         <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer ml-2">
-          <input type="checkbox" id="pf-showexcluded" onchange="renderPreempt()" class="accent-[#C2185B]"> 제외 차량 보기 <span id="pf-exc-count" class="text-slate-400"></span>
+          <input type="checkbox" id="pf-showexcluded" onchange="renderPreempt()" class="accent-[#D60051]"> 제외 차량 보기 <span id="pf-exc-count" class="text-slate-400"></span>
         </label>
         <span class="text-[11px] text-slate-400 ml-auto">센터:</span>
         <select id="pf-center" onchange="renderPreempt()" class="text-[11px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체</option></select>
@@ -879,14 +876,14 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <!-- 단말기(S/N) 조회 -->
   <section id="sn" class="hidden">
     <div class="flex items-center justify-between mb-2">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">단말기(S/N) 조회 · 개체 이력 추적</h2>
+      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">단말기(S/N) 조회 · 개체 이력 추적</h2>
     </div>
     <p class="text-[12px] text-slate-500 mb-3 pl-3 max-w-2xl">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex gap-2">
         <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 입력 — 뒤 4자리만 쳐도 됩니다 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
-          class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#C2185B]">
-        <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">조회</button>
+          class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#D60051]">
+        <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">조회</button>
       </div>
       <div id="sn-result" class="mt-3"></div>
     </div>
@@ -898,7 +895,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">이벤트 분석</h2>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">이벤트 분석</h2>
           <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl">단말기 이벤트코드 사전과, 업로드한 이벤트 로그의 <b>이상/단절 이벤트</b>를 분석합니다. 다발 차량을 선제 점검에 활용하세요.</p>
         </div>
         <div id="ev-summary" class="flex gap-2 flex-wrap"></div>
@@ -917,8 +914,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- code dictionary -->
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <h3 class="text-xs font-extrabold text-[#7A0B3C]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
-        <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#C2185B]">
+        <h3 class="text-xs font-extrabold text-[#A00040]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
+        <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D60051]">
         <select id="ev-cat" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 분류</option></select>
         <select id="ev-sev" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 코드</option><option value="core">핵심만</option><option value="의심">이상만</option><option value="정상">정상만</option></select>
       </div>
@@ -940,12 +937,12 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C] flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
           <p class="text-[12px] text-slate-500 mt-1 pl-3">차량 이력·이벤트·맞춤 권장 데이터를 바탕으로 AI가 답변합니다. 진단 참고용이며 최종 판단은 기사님이 하세요.</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <span id="ai-key-status" class="text-[11px] font-bold text-slate-400">⏳ 키 확인 중…</span>
-          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#7A0B3C] hover:bg-[#5d0828] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">🔑 공용 키 등록/변경</button>
+          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#A00040] hover:bg-[#5d0828] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">🔑 공용 키 등록/변경</button>
           <button onclick="deletePublicAIKey()" id="ai-delete-key" data-admin class="text-[11px] border border-rose-300 text-rose-700 hover:bg-rose-50 rounded px-3 py-1.5 font-bold transition" style="display:none">🗑 공용 키 삭제</button>
           <button onclick="clearAIChat()" class="text-[11px] border border-slate-300 hover:bg-slate-50 rounded px-3 py-1.5 font-bold transition">🗑 대화 초기화</button>
         </div>
@@ -968,8 +965,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         </div>
       </div>
       <div class="border-t border-rose-100 p-3 flex gap-2">
-        <input id="ai-input" type="text" placeholder="예: 1234차량 어떻게 처리하지?" class="flex-1 border border-rose-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-[#C2185B]" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}">
-        <button onclick="sendAI()" id="ai-send-btn" class="bg-[#C2185B] hover:bg-[#a01049] text-white rounded-lg px-4 py-2 text-[13px] font-bold transition flex items-center gap-1.5">
+        <input id="ai-input" type="text" placeholder="예: 1234차량 어떻게 처리하지?" class="flex-1 border border-rose-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}">
+        <button onclick="sendAI()" id="ai-send-btn" class="bg-[#D60051] hover:bg-[#a01049] text-white rounded-lg px-4 py-2 text-[13px] font-bold transition flex items-center gap-1.5">
           전송 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
@@ -980,13 +977,13 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <!-- ADMIN: USER MANAGEMENT -->
   <section id="admin" class="hidden" data-admin>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">사용자 관리</h2>
+      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">사용자 관리</h2>
       <p class="text-[12px] text-slate-500 mt-1 pl-3">가입 신청 승인/거부, 권한(관리자/일반) 변경, 계정 삭제를 관리합니다.</p>
     </div>
     <div id="admin-pending" class="mb-4"></div>
     <div id="admin-resets" class="mb-4"></div>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-3">전체 사용자</h3>
+      <h3 class="text-xs font-extrabold text-[#A00040] mb-3">전체 사용자</h3>
       <div class="overflow-x-auto">
         <table class="w-full text-[12px]">
           <thead><tr class="text-slate-400 border-b border-rose-100 text-left">
@@ -1004,8 +1001,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <section class="mt-6" data-admin>
     <details class="bg-white border border-rose-100 rounded-xl shadow-sm">
       <summary class="px-4 py-3 flex items-center justify-between">
-        <span class="text-xs font-extrabold text-[#7A0B3C] flex items-center gap-1.5">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16" stroke="#C2185B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="text-xs font-extrabold text-[#A00040] flex items-center gap-1.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16" stroke="#D60051" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           데이터 갱신 (매일 업로드)
         </span>
         <span class="text-[11px] text-slate-400">▼ 펼치기</span>
@@ -1015,7 +1012,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         <div id="store-status" class="text-[11px] mb-3 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></div>
         <div class="grid md:grid-cols-2 gap-3">
           <div class="border border-dashed border-rose-300 rounded-lg p-3">
-            <div class="text-xs font-bold text-[#C2185B] mb-1">① 전체접수건 (.xls / .xlsx)</div>
+            <div class="text-xs font-bold text-[#D60051] mb-1">① 전체접수건 (.xls / .xlsx)</div>
             <div class="text-[11px] text-slate-500 mb-2">'단말기장애목록' 시트 · 누적 저장 + 차량별 이력·권장조치 재계산</div>
             <input id="rec-file" type="file" accept=".xls,.xlsx" onchange="stageFile('rec')" class="text-[11px] w-full mb-2">
             <div class="flex items-center gap-2">
@@ -1025,8 +1022,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
             <div id="rec-updated" class="text-[10px] text-emerald-700 mt-1.5"></div>
           </div>
           <div class="border border-dashed border-rose-300 rounded-lg p-3">
-            <div class="text-xs font-bold text-[#C2185B] mb-1">② 이벤트 로그 (TrcnStaList_*.csv)</div>
-            <div class="text-[11px] text-slate-500 mb-2">이상/단절 이벤트만 추출·날짜별 누적 저장 · 선제점검 참고 <b class="text-[#C2185B]">(여러 파일 동시 선택 가능)</b></div>
+            <div class="text-xs font-bold text-[#D60051] mb-1">② 이벤트 로그 (TrcnStaList_*.csv)</div>
+            <div class="text-[11px] text-slate-500 mb-2">이상/단절 이벤트만 추출·날짜별 누적 저장 · 선제점검 참고 <b class="text-[#D60051]">(여러 파일 동시 선택 가능)</b></div>
             <input id="ev-file" type="file" accept=".csv" multiple onchange="stageFile('ev')" class="text-[11px] w-full mb-2">
             <div class="flex items-center gap-2">
               <button id="ev-confirm" onclick="ingestEvents()" disabled class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed" style="background:var(--atec-magenta)">확인 (적용)</button>
@@ -1053,13 +1050,13 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
         <!-- DOWNLOAD -->
         <div class="mt-3 pt-3 border-t border-rose-50">
-          <div class="text-[11px] font-bold text-[#7A0B3C] mb-1.5">📥 데이터 다운로드 (백업/내보내기)</div>
+          <div class="text-[11px] font-bold text-[#A00040] mb-1.5">📥 데이터 다운로드 (백업/내보내기)</div>
           <div class="flex flex-wrap gap-2">
-            <button onclick="downloadData('rec_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#7A0B3C] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 CSV</button>
-            <button onclick="downloadData('rec_json')" class="text-[11px] font-semibold border border-rose-200 text-[#7A0B3C] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 JSON</button>
-            <button onclick="downloadData('ev_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#7A0B3C] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">이벤트 로그 CSV</button>
-            <button onclick="downloadData('preempt_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#7A0B3C] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">선제점검 목록 CSV</button>
-            <button onclick="downloadData('backup')" class="text-[11px] font-semibold border border-[#C2185B] text-[#C2185B] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">전체 백업 (JSON)</button>
+            <button onclick="downloadData('rec_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 CSV</button>
+            <button onclick="downloadData('rec_json')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 JSON</button>
+            <button onclick="downloadData('ev_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">이벤트 로그 CSV</button>
+            <button onclick="downloadData('preempt_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">선제점검 목록 CSV</button>
+            <button onclick="downloadData('backup')" class="text-[11px] font-semibold border border-[#D60051] text-[#D60051] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">전체 백업 (JSON)</button>
           </div>
         </div>
 
@@ -1705,7 +1702,7 @@ function HS(term){ const t=(term!==undefined)?term:GF.term; return (t && KB.hand
 function ER(term){ const t=(term!==undefined)?term:GF.term; return (t && KB.err_reco_by_term && KB.err_reco_by_term[t]) || KB.err_reco || {}; }
 let RECO_TERM='';  // 차량 상세에서 그 차량 기종 보관
 const CHANNELS=['전화접수','시스템접수','B/S처리','현장접수'];
-const CENTER_COLORS={'강북센터':'#C2185B','강동센터':'#7C3AED','강남센터':'#0891B2','강서센터':'#16A34A'};
+const CENTER_COLORS={'강북센터':'#D60051','강동센터':'#7C3AED','강남센터':'#0891B2','강서센터':'#16A34A'};
 function gfActive(){ return !!(GF.ch||GF.center||GF.term||GF.from||GF.to); }
 function matchItem(it){
   if(GF.ch && it.recv!==GF.ch) return false;
@@ -1817,8 +1814,8 @@ function renderChannelTiles(){
   const box=$('#channel-tiles'); if(!box) return;
   const {c,total}=channelCounts();
   const meta=[
-    {k:'', name:'전체', color:'#7A0B3C', n:total, ico:'▦'},
-    {k:'전화접수', name:'전화접수', color:'#C2185B', n:c['전화접수'], ico:'☎'},
+    {k:'', name:'전체', color:'#A00040', n:total, ico:'▦'},
+    {k:'전화접수', name:'전화접수', color:'#D60051', n:c['전화접수'], ico:'☎'},
     {k:'시스템접수', name:'시스템접수', color:'#0891B2', n:c['시스템접수'], ico:'⚙'},
     {k:'B/S처리', name:'B/S처리', color:'#7C3AED', n:c['B/S처리'], ico:'🛡'},
     {k:'현장접수', name:'현장접수', color:'#16A34A', n:c['현장접수'], ico:'📍'},
@@ -1842,7 +1839,7 @@ function renderCenterTiles(){
   const {c,total}=centerCounts();
   const order=['강북센터','강동센터','강남센터','강서센터'];
   const present=order.filter(k=>c[k]!=null); 
-  const meta=[{k:'',name:'전체',color:'#7A0B3C',n:total,ico:'▦'}].concat(present.map(k=>({k,name:k.replace('센터',''),color:CENTER_COLORS[k]||'#C2185B',n:c[k]||0,ico:'🏢'})));
+  const meta=[{k:'',name:'전체',color:'#A00040',n:total,ico:'▦'}].concat(present.map(k=>({k,name:k.replace('센터',''),color:CENTER_COLORS[k]||'#D60051',n:c[k]||0,ico:'🏢'})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.center;
     const share=total?Math.round(m.n/total*100):0;
@@ -1860,13 +1857,13 @@ function renderCenterTiles(){
 function renderTermTiles(){
   const box=$('#term-tiles'); if(!box) return;
   const {c,total}=termCounts();
-  const TERM_COLORS={'C-ITS통합단말기(B700)':'#C2185B','차세대통합단말기(B710)':'#7C3AED','통합단말기(B800)':'#0891B2'};
+  const TERM_COLORS={'C-ITS통합단말기(B700)':'#D60051','차세대통합단말기(B710)':'#7C3AED','통합단말기(B800)':'#0891B2'};
   const order=Object.keys(c).sort((a,b)=>{
     const PRI={'B800':0,'B700':1,'B710':2};
     const ra=PRI[termShort(a)]!=null?PRI[termShort(a)]:9, rb=PRI[termShort(b)]!=null?PRI[termShort(b)]:9;
     return ra-rb || c[b]-c[a];
   });
-  const meta=[{k:'',name:'전체',color:'#7A0B3C',n:total,ico:'▦'}].concat(order.map(k=>({k,name:termShort(k),color:TERM_COLORS[k]||'#C2185B',n:c[k]||0,ico:'📟'})));
+  const meta=[{k:'',name:'전체',color:'#A00040',n:total,ico:'▦'}].concat(order.map(k=>({k,name:termShort(k),color:TERM_COLORS[k]||'#D60051',n:c[k]||0,ico:'📟'})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.term;
     const share=total?Math.round(m.n/total*100):0;
@@ -1935,8 +1932,8 @@ function renderDash(){
     rate:'<path d="M3 17l5-5 4 3 8-8M21 7v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
   };
   const cards = [
-    ['총 접수', num(recordsN), '#C2185B', subTxt, ICONS.rec],
-    ['해당 차량', num(vehN), '#7A0B3C', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
+    ['총 접수', num(recordsN), '#D60051', subTxt, ICONS.rec],
+    ['해당 차량', num(vehN), '#A00040', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
     ['장애 유형', num(errEntries.length), '#D81B60', '분류된 오류 종류', ICONS.err],
   ];
   $('#stat-cards').innerHTML = cards.map(c=>`
@@ -1952,8 +1949,8 @@ function renderDash(){
   $('#top-err').innerHTML = errEntries.slice(0,10).map(([e,o])=>`
     <div class="flex items-center gap-2 mb-1.5">
       <div class="w-36 shrink-0 text-[11px] text-slate-700 truncate" title="${e}">${e}</div>
-      <div class="flex-1 gauge-track h-3.5"><div class="gauge-fill" style="width:${o.total/maxE*100}%;background:linear-gradient(90deg,#EC407A,#C2185B)"></div></div>
-      <div class="w-12 text-right text-[11px] font-bold text-[#C2185B]">${num(o.total)}</div>
+      <div class="flex-1 gauge-track h-3.5"><div class="gauge-fill" style="width:${o.total/maxE*100}%;background:linear-gradient(90deg,#EC407A,#D60051)"></div></div>
+      <div class="w-12 text-right text-[11px] font-bold text-[#D60051]">${num(o.total)}</div>
     </div>`).join('') || '<div class="text-[12px] text-slate-400 py-2">해당 조건의 데이터가 없습니다.</div>';
 
   // repeat risk — 선택 기종 기준(없으면 전체)
@@ -1970,8 +1967,8 @@ function renderDash(){
   // top vehicles — honoring full filter
   const vs=Object.entries(KB.vehicles).map(([v,o])=>[v,o.items.filter(matchItem).length]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,24);
   $('#top-veh').innerHTML = vs.map(([v,n])=>`
-    <button onclick="$('#q').value='${v}';doSearch('${v}')" class="chip bg-rose-50 border border-rose-200 text-[#7A0B3C] hover:bg-rose-100 transition">
-      ${v} <span class="text-[#C2185B]">${n}건</span></button>`).join('') || '<div class="text-[12px] text-slate-400">해당 차량 없음</div>';
+    <button onclick="$('#q').value='${v}';doSearch('${v}')" class="chip bg-rose-50 border border-rose-200 text-[#A00040] hover:bg-rose-100 transition">
+      ${v} <span class="text-[#D60051]">${n}건</span></button>`).join('') || '<div class="text-[12px] text-slate-400">해당 차량 없음</div>';
 
   renderCharts(view);
 }
@@ -1981,7 +1978,7 @@ function renderCharts(view){
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS={};
   if(typeof Chart==='undefined') return;
   Chart.defaults.font.family='Pretendard'; Chart.defaults.font.size=11;
-  const C={wine:'#7A0B3C',mag:'#C2185B',pink:'#D81B60',rose:'#EC407A',cyan:'#0891B2',purple:'#7C3AED',green:'#16A34A',amber:'#F59E0B'};
+  const C={wine:'#A00040',mag:'#D60051',pink:'#D81B60',rose:'#EC407A',cyan:'#0891B2',purple:'#7C3AED',green:'#16A34A',amber:'#F59E0B'};
 
   // monthly stacked by channel
   const mr = d.month_recv||{};
@@ -2276,7 +2273,7 @@ function buildSmartReco(p){
   if(mm){
     const m=mm.m;
     manualBlock = `<div class="mt-2 bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-lg px-3.5 py-2.5">
-      <div class="text-[12.5px] font-extrabold text-[#92400E] mb-2">📖 매뉴얼 절차 — <span class="text-[#7A0B3C]">${mm.key}</span></div>
+      <div class="text-[12.5px] font-extrabold text-[#92400E] mb-2">📖 매뉴얼 절차 — <span class="text-[#A00040]">${mm.key}</span></div>
       <div class="text-[12.5px] text-slate-700 mb-1.5"><b>원인:</b> ${m.cause}</div>
       <ol class="text-[12.5px] text-slate-700 leading-relaxed list-decimal pl-5 space-y-1 mb-2">
         ${m.steps.map(s=>`<li>${s}</li>`).join('')}
@@ -2327,7 +2324,7 @@ function renderPreempt(){
   const evChip = DAILY_AGG? miniStat('이벤트 반영','ON','#16A34A') : miniStat('이벤트','미반영','#94a3b8');
   const fchips = (GF.ch?miniStat('채널 기준',GF.ch,RECV_COLORS[GF.ch]||'#64748b'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),CENTER_COLORS[GF.center]||'#64748b'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#7C3AED'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#0891B2'):'');
   $('#preempt-summary').innerHTML =
-    fchips+evChip+miniStat('위험 차량', active.length+'대','#7A0B3C')+miniStat('센터별 상위', list.length+'대','#C2185B')+miniStat('높음',hi+'대','#B91C1C')+miniStat('제외',EXCLUDED.size+'대','#64748b');
+    fchips+evChip+miniStat('위험 차량', active.length+'대','#A00040')+miniStat('센터별 상위', list.length+'대','#D60051')+miniStat('높음',hi+'대','#B91C1C')+miniStat('제외',EXCLUDED.size+'대','#64748b');
 
   if(!list.length){ $('#preempt-list').innerHTML=`<div class="bg-white border border-rose-100 rounded-xl p-8 text-center text-sm text-slate-400">${showExcluded?'제외 처리된 차량이 없습니다.':'해당 조건의 선제 점검 대상이 없습니다.'}</div>`; return; }
   $('#preempt-list').innerHTML = list.map((p,i)=>{
@@ -2349,7 +2346,7 @@ function renderPreempt(){
             </div>
             ${excInfo?`<div class="text-[11px] text-slate-500 mt-1">사유: <b>${excInfo.reason}</b> <span class="text-slate-400">(${excInfo.at})</span></div>`:''}
           </div>
-          <button onclick="restoreVeh('${p.v}',event)" class="shrink-0 text-[11px] font-semibold text-[#C2185B] border border-rose-200 rounded-md px-2.5 py-1 hover:bg-rose-50 transition">복원</button>
+          <button onclick="restoreVeh('${p.v}',event)" class="shrink-0 text-[11px] font-semibold text-[#D60051] border border-rose-200 rounded-md px-2.5 py-1 hover:bg-rose-50 transition">복원</button>
         </div>
       </div>`;
     }
@@ -2362,14 +2359,14 @@ function renderPreempt(){
         </div>
         <div class="flex-1 min-w-0 cursor-pointer" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-lg font-extrabold text-[#7A0B3C]">${p.v}</span>
+            <span class="text-lg font-extrabold text-[#A00040]">${p.v}</span>
             <span class="text-[12px] text-slate-500">${p.op}</span>
-            ${p.center?`<span class="chip bg-rose-50 text-[#7A0B3C] border border-rose-200" style="font-size:11.5px">${p.center}</span>`:''}
+            ${p.center?`<span class="chip bg-rose-50 text-[#A00040] border border-rose-200" style="font-size:11.5px">${p.center}</span>`:''}
             <span class="text-[12px] text-slate-400 ml-auto">총 ${p.tot}건 · 최근30일 ${p.r30}건${p.ds<999?` · ${p.ds}일 전 처리`:''}</span>
           </div>
-          <div class="text-[13.5px] text-slate-600 mt-1.5">주 장애 <b class="text-[#C2185B]">${p.err||'-'}</b>${p.last_err?` · 최근 <span class="text-slate-700">${p.last_err}</span> → <span class="text-[#7A0B3C] font-semibold">${p.last_field||'-'}</span>`:''}</div>
+          <div class="text-[13.5px] text-slate-600 mt-1.5">주 장애 <b class="text-[#D60051]">${p.err||'-'}</b>${p.last_err?` · 최근 <span class="text-slate-700">${p.last_err}</span> → <span class="text-[#A00040] font-semibold">${p.last_field||'-'}</span>`:''}</div>
           <div class="flex flex-wrap gap-1.5 mt-2">
-            ${p.core>0?`<span class="chip" style="background:#fce4ec;color:#C2185B;font-weight:800;font-size:11.5px">핵심이벤트 ${p.core}건</span>`:''}
+            ${p.core>0?`<span class="chip" style="background:#fce4ec;color:#D60051;font-weight:800;font-size:11.5px">핵심이벤트 ${p.core}건</span>`:''}
             ${p.rs.slice(0,3).map(r=>`<span class="chip bg-amber-50 text-amber-800 border border-amber-200" style="font-size:11.5px">${r}</span>`).join('')}
           </div>
           ${buildSmartReco(p)}
@@ -2415,7 +2412,7 @@ function renderEvents(){
     const cats=[...new Set(codes.map(c=>E[c].cat).filter(Boolean))];
     catSel.innerHTML='<option value="">전체 분류</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
   }
-  let sum = miniStat('표시 범위', scopeLabel, EV_SCOPE==='core'?'#C2185B':'#7A0B3C')+miniStat('핵심 코드', coreN+'종','#B91C1C')+miniStat('이상 코드', susN+'종','#EA580C');
+  let sum = miniStat('표시 범위', scopeLabel, EV_SCOPE==='core'?'#D60051':'#A00040')+miniStat('핵심 코드', coreN+'종','#B91C1C')+miniStat('이상 코드', susN+'종','#EA580C');
   if(DAILY_AGG){
     // count logged (scope) events
     let scopeRows=0; for(const c in DAILY_AGG.codeCount){ if(isLogged(c)) scopeRows+=DAILY_AGG.codeCount[c]; }
@@ -2442,7 +2439,7 @@ function renderEvLog(){
     return {...v, scopeN:n};
   }).filter(v=>v.scopeN>0).sort((a,b)=>b.scopeN-a.scopeN).slice(0,40);
   box.innerHTML=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-    <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-1">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
+    <h3 class="text-xs font-extrabold text-[#A00040] mb-1">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
     <p class="text-[11px] text-slate-500 mb-3">${EV_SCOPE==='core'?'지정된 핵심 이상 이벤트(통신 끊김·모뎀·CSAM·GPS·CPU 등)':'통신 끊김·실패·오류·Reset 등 이상 이벤트'}가 많은 차량입니다. 장애 접수 전 선제 점검 후보로 활용하세요.</p>
     ${ranked.length? `<div class="space-y-1.5">${ranked.map((v,i)=>{
       const topCodes=Object.entries(v.codes).filter(([c])=>isLogged(c)).sort((a,b)=>b[1]-a[1]).slice(0,3)
@@ -2452,7 +2449,7 @@ function renderEvLog(){
         <span class="w-6 text-center text-[11px] font-bold text-slate-400">${i+1}</span>
         <span class="w-9 h-9 shrink-0 rounded-full grid place-items-center text-white text-[12px] font-extrabold" style="background:${v.scopeN>=10?'#B91C1C':v.scopeN>=5?'#EA580C':'#D97706'}">${v.scopeN}</span>
         <div class="flex-1 min-w-0">
-          <div class="text-[13px] font-bold text-[#7A0B3C]">${v.vnum||'차량ID '+v.vid} ${v.vnum?'':'<span class="text-[10px] text-slate-400 font-normal">(접수이력 없음)</span>'}</div>
+          <div class="text-[13px] font-bold text-[#A00040]">${v.vnum||'차량ID '+v.vid} ${v.vnum?'':'<span class="text-[10px] text-slate-400 font-normal">(접수이력 없음)</span>'}</div>
           <div class="text-[11px] text-slate-500 truncate">${topCodes||'-'}</div>
         </div>
         <span class="text-[11px] text-slate-400 shrink-0">전체 ${v.total}건</span>
@@ -2474,13 +2471,13 @@ function renderEvTable(){
   else rows.sort((a,b)=>{ const ca=a[1].core?0:1, cb=b[1].core?0:1; return ca-cb || a[0].localeCompare(b[0]); });
   $('#ev-table').innerHTML = rows.slice(0,250).map(([c,o])=>{
     const cnt=DAILY_AGG?(DAILY_AGG.codeCount[c]||0):'';
-    const coreChip = o.core?'<span class="chip" style="background:#fce4ec;color:#C2185B;font-weight:800">핵심</span> ':'';
+    const coreChip = o.core?'<span class="chip" style="background:#fce4ec;color:#D60051;font-weight:800">핵심</span> ':'';
     const sevChip=o.sev==='의심'?'<span class="chip" style="background:#fee2e2;color:#B91C1C">이상</span>':'<span class="chip" style="background:#dcfce7;color:#16A34A">정상</span>';
     return `<tr class="border-b border-rose-50 hover:bg-rose-50/50 ${o.core?'bg-rose-50/30':''}">
-      <td class="py-1.5 pr-2 font-mono font-bold text-[#C2185B]">${c}</td>
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#D60051]">${c}</td>
       <td class="py-1.5 pr-2 text-slate-700">${o.t||'-'}</td>
       <td class="py-1.5 pr-2 text-slate-500">${o.dev||o.d}</td>
-      <td class="py-1.5 pr-2"><span class="chip bg-rose-50 text-[#7A0B3C] border border-rose-200">${o.cat||'-'}</span></td>
+      <td class="py-1.5 pr-2"><span class="chip bg-rose-50 text-[#A00040] border border-rose-200">${o.cat||'-'}</span></td>
       <td class="py-1.5 pr-2 whitespace-nowrap">${coreChip}${sevChip}</td>
       <td class="py-1.5 pr-2 text-right font-bold ${cnt?'text-slate-700':'text-slate-300'}">${DAILY_AGG?num(cnt):'—'}</td>
     </tr>`;
@@ -2513,7 +2510,7 @@ function renderVehicleNoFault(vnum, m){
   <div class="space-y-4">
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-lg font-extrabold text-[#7A0B3C]">${escHtml(vnum)}</span>
+        <span class="text-lg font-extrabold text-[#A00040]">${escHtml(vnum)}</span>
         <span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">${escHtml(modelLabel)}</span>
         <span class="chip" style="background:#dcfce7;color:#16A34A;font-weight:700">장애 이력 없음</span>
       </div>
@@ -2527,15 +2524,15 @@ function renderVehicleNoFault(vnum, m){
 
     <!-- 로그백업 분석 (장애이력 없는 차량도 동일 제공) -->
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#7A0B3C] mb-1">📂 단말기 로그백업 분석</h3>
+      <h3 class="text-sm font-extrabold text-[#A00040] mb-1">📂 단말기 로그백업 분석</h3>
       <p class="text-[11px] text-slate-500 mb-2"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
       <div class="space-y-3">
         <div class="border border-rose-100 rounded-lg p-2.5" style="background:#fff5f8">
-          <div class="text-[12px] font-extrabold text-[#7A0B3C] mb-1">① 통합단말기 백업</div>
+          <div class="text-[12px] font-extrabold text-[#A00040] mb-1">① 통합단말기 백업</div>
           <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
           <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
         </div>
         <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#f5f4ff">
           <div class="text-[12px] font-extrabold text-[#3730A3] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
@@ -2545,19 +2542,19 @@ function renderVehicleNoFault(vnum, m){
           <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
         </div>
         <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">🔍 분석하기</button>
+        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">🔍 분석하기</button>
       </div>
       <div id="logbk-iso" class="mt-3"></div>
       <div id="logbk-result" class="mt-3"></div>
     </div>
     <div id="logbk-action" class="bg-white border border-rose-100 rounded-xl shadow-sm p-4" style="display:none"></div>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
+      <h3 class="text-xs font-extrabold text-[#A00040] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
       <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
     </div>
 
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#7A0B3C] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
+      <h3 class="text-sm font-extrabold text-[#A00040] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
       <div id="eta-box-nf">—</div>
     </div>
   </div>`;
@@ -2655,7 +2652,7 @@ async function loadDepotEta(plate, route, boxId){
     if(d.etaMin==null){
       head='<b class="text-slate-600">실시간 위치 확인 · 종점 소요시간 미제공</b>';
     } else {
-      head=`<b class="text-[#C2185B]">🚏 차고지(종점) 도착까지 약 ${d.etaMin}분</b>`
+      head=`<b class="text-[#D60051]">🚏 차고지(종점) 도착까지 약 ${d.etaMin}분</b>`
         + (d.atStop?' <span class="text-[11px] text-slate-500">· 정류소 정차중</span>':'')
         + (d.isLast?' <span class="chip bg-rose-100 text-rose-700">막차</span>':'');
     }
@@ -2696,7 +2693,7 @@ function renderVehicle(vnum, veh){
     const _smart=buildSmartReco(_p);
     if(_smart){
       smartBlock=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-        <h3 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C] mb-1">맞춤 권장 · 매뉴얼 절차</h3>
+        <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-1">맞춤 권장 · 매뉴얼 절차</h3>
         <p class="text-[11px] text-slate-500 mb-2 pl-3">이 차량의 이력·이벤트·매뉴얼을 종합한 권장</p>
         <div class="pl-3">${_smart}</div>
       </div>`;
@@ -2717,7 +2714,7 @@ function renderVehicle(vnum, veh){
       const E=EVENTS[g.code]; const core=isCore(g.code);
       return `<div class="flex items-center gap-2 py-1 border-b border-amber-100/60 last:border-0">
         <span class="font-mono font-bold text-[11px] shrink-0 w-12 text-[#B91C1C]">${g.code}</span>
-        ${core?'<span class="chip shrink-0" style="background:#fce4ec;color:#C2185B;font-weight:800">핵심</span>':''}
+        ${core?'<span class="chip shrink-0" style="background:#fce4ec;color:#D60051;font-weight:800">핵심</span>':''}
         <span class="text-[11px] text-slate-700 flex-1 min-w-0 truncate" title="${E?(E.t||''):''}">${E?(E.t||'(코드미상)'):'(코드미상)'}${E&&E.cat?` <span class="text-slate-400">· ${E.cat}</span>`:''}${E&&E.dev?` <span class="text-slate-300">· ${E.dev}</span>`:''}</span>
         <span class="text-[11px] font-bold text-amber-700 shrink-0">×${g.n}</span>
         <span class="text-[10px] text-slate-400 shrink-0 w-24 text-right">${g.first}${g.n>1?'~'+g.last:''}</span>
@@ -2743,17 +2740,17 @@ function renderVehicle(vnum, veh){
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-2xl font-extrabold text-[#7A0B3C]">${vnum}</span>
+            <span class="text-2xl font-extrabold text-[#A00040]">${vnum}</span>
             <span class="ab-badge" style="background:${risk.color}">${risk.label}</span>
           </div>
           <div class="text-xs text-slate-500 mt-1">${veh.op} · 차량ID ${veh.vid||'-'} · ${last.center||''}</div>
           <div class="text-xs text-slate-500">${last.route||''}</div>
         </div>
         <div class="vstat-row flex gap-2 flex-wrap">
-          ${miniStat('총 접수', items.length+'건','#C2185B')}
+          ${miniStat('총 접수', items.length+'건','#D60051')}
           ${miniStat('최근 90일', recent90+'건','#D81B60')}
           ${miniStat('증상 재현율', reproRate+'%', reproRate>40?'#B91C1C':'#16A34A')}
-          ${miniStat('단말기', short(last.term),'#7A0B3C')}
+          ${miniStat('단말기', short(last.term),'#A00040')}
         </div>
       </div>
       ${risk.note?`<div class="mt-3 text-[12px] rounded-lg px-3 py-2 ${risk.bg}">${risk.note}</div>`:''}
@@ -2770,16 +2767,16 @@ function renderVehicle(vnum, veh){
       <div class="lg:col-span-2 space-y-4">
         <!-- 로그백업 분석 -->
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C] mb-1">📂 단말기 로그백업 분석</h3>
+          <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-1">📂 단말기 로그백업 분석</h3>
           <p class="text-[11px] text-slate-500 mb-2 pl-3"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
           <div class="pl-3 space-y-3">
             <!-- ① 통합단말기 -->
             <div class="border border-rose-100 rounded-lg p-2.5" style="background:#fff5f8">
-              <div class="text-[12px] font-extrabold text-[#7A0B3C] mb-1">① 통합단말기 백업</div>
+              <div class="text-[12px] font-extrabold text-[#A00040] mb-1">① 통합단말기 백업</div>
               <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-              <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+              <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
               <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-              <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#C2185B]">
+              <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
             </div>
             <!-- ② 승하차단말기 -->
             <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#f5f4ff">
@@ -2790,7 +2787,7 @@ function renderVehicle(vnum, veh){
               <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
             </div>
             <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-            <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">🔍 분석하기</button>
+            <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">🔍 분석하기</button>
           </div>
           <div id="logbk-iso" class="mt-3 pl-3"></div>
           <div id="logbk-result" class="mt-3 pl-3"></div>
@@ -2801,7 +2798,7 @@ function renderVehicle(vnum, veh){
 
         <!-- 진단·처리 이력 / 재불량 추적 -->
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="text-xs font-extrabold text-[#7A0B3C] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
+          <h3 class="text-xs font-extrabold text-[#A00040] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
           <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
         </div>
       </div>
@@ -2810,7 +2807,7 @@ function renderVehicle(vnum, veh){
       <div class="lg:col-span-3">
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="sec-title pl-3 text-sm font-extrabold text-[#7A0B3C]">처리 이력 타임라인</h3>
+            <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">처리 이력 타임라인</h3>
             <span class="text-[11px] text-slate-400">최신순 · <span id="tl-count">${items.length}</span>건</span>
           </div>
           <div class="flex flex-wrap items-center gap-1.5 mb-3 pl-3">
@@ -2828,11 +2825,11 @@ function renderVehicle(vnum, veh){
   window.__tlItems = items;
   if(typeof loadLogHistory==='function'){ try{ loadLogHistory(vnum); }catch(e){} }
 }
-const RECV_COLORS={'전화접수':'#C2185B','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'};
+const RECV_COLORS={'전화접수':'#D60051','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'};
 function recvFilterChips(items){
   const counts={}; items.forEach(it=>{ if(it.recv) counts[it.recv]=(counts[it.recv]||0)+1; });
   const order=['전화접수','시스템접수','B/S처리','현장접수'];
-  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip border active" style="border-color:#C2185B;background:#C2185B;color:#fff">전체 ${items.length}</button>`;
+  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip border active" style="border-color:#D60051;background:#D60051;color:#fff">전체 ${items.length}</button>`;
   chips+=order.filter(r=>counts[r]).map(r=>{
     const c=RECV_COLORS[r];
     return `<button data-recv="${r}" onclick="filterTL('${r}')" class="recv-chip chip border" style="border-color:${c}66;color:${c}">${r} ${counts[r]}</button>`;
@@ -2858,7 +2855,7 @@ function filterTL(recv){
   document.querySelectorAll('.recv-chip').forEach(b=>{
     const on = b.dataset.recv===recv;
     b.classList.toggle('active', on);
-    const c = b.dataset.recv? RECV_COLORS[b.dataset.recv] : '#C2185B';
+    const c = b.dataset.recv? RECV_COLORS[b.dataset.recv] : '#D60051';
     if(on){ b.style.background=c; b.style.color='#fff'; b.style.borderColor=c; }
     else { b.style.background='#fff'; b.style.color=c; b.style.borderColor=c+'66'; }
   });
@@ -2886,7 +2883,7 @@ function renderReco(err, vehFields){
 function recoRow(i, name, rate, n){
   const col = rate==null? '#94a3b8' : rateColor(rate);
   return `<div class="flex items-center gap-2.5">
-    <span class="w-5 h-5 shrink-0 rounded-full text-white text-[11px] font-bold grid place-items-center" style="background:${i===0?'#C2185B':'#D8839f'}">${i+1}</span>
+    <span class="w-5 h-5 shrink-0 rounded-full text-white text-[11px] font-bold grid place-items-center" style="background:${i===0?'#D60051':'#D8839f'}">${i+1}</span>
     <div class="flex-1">
       <div class="text-[13px] font-semibold text-slate-800">${name}</div>
       <div class="flex items-center gap-2 mt-0.5">
@@ -2899,25 +2896,25 @@ function recoRow(i, name, rate, n){
 
 function renderTL(it){
   const repColor = it.repro==='재현'?'#B91C1C':'#64748b';
-  const recvChip = {'전화접수':'#C2185B','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'}[it.recv]||'#94a3b8';
+  const recvChip = {'전화접수':'#D60051','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'}[it.recv]||'#94a3b8';
   const worker = it.worker? `<span class="chip inline-flex items-center gap-1" style="background:#eef2ff;color:#4338ca"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${it.worker}</span>`:'';
   const inquiry = it.inquiry? `<div class="mt-1.5">
     <div class="text-[10px] font-bold text-slate-400 mb-0.5">문의내용</div>
     <div class="text-[11px] text-slate-500 leading-relaxed bg-slate-50 rounded p-2 whitespace-pre-line">${escHtml(it.inquiry)}</div>
   </div>`:'';
   const memo = it.memo? `<div class="mt-1.5">
-    <div class="text-[10px] font-bold text-[#C2185B] mb-0.5 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>처리내용</div>
+    <div class="text-[10px] font-bold text-[#D60051] mb-0.5 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>처리내용</div>
     <div class="text-[11px] text-slate-700 leading-relaxed bg-rose-50/60 border border-rose-100 rounded p-2 whitespace-pre-line">${highlightMemo(it.memo)}</div>
   </div>`:'';
   return `<div class="relative">
-    <span class="absolute -left-7 top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#C2185B]"></span>
+    <span class="absolute -left-7 top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#D60051]"></span>
     <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
       <span class="font-bold text-slate-700">${it.date}</span>
       <span class="chip" style="background:${recvChip}1a;color:${recvChip}">${it.recv||'-'}</span>
       ${it.repro?`<span class="chip" style="background:${repColor}1a;color:${repColor}">${it.repro}</span>`:''}
       ${worker}
     </div>
-    <div class="text-[13px] font-semibold text-slate-800 mt-1">${it.err||'(유형미상)'} ${it.field?`<span class="text-slate-400 font-normal">→</span> <span class="text-[#7A0B3C]">${it.field}</span>`:''}</div>
+    <div class="text-[13px] font-semibold text-slate-800 mt-1">${it.err||'(유형미상)'} ${it.field?`<span class="text-slate-400 font-normal">→</span> <span class="text-[#A00040]">${it.field}</span>`:''}</div>
     ${inquiry}
     ${memo}
   </div>`;
@@ -3317,7 +3314,7 @@ async function renderAdmin(){
         <div class="space-y-2">${resetReqs.map(u=>`
           <div class="flex items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
             <div class="flex-1"><b class="text-slate-800">${u.name}</b> <span class="text-slate-400 text-[11px]">${u.username}</span> <span class="text-[10px] text-slate-400">· 요청 ${u.resetReqAt||''}</span></div>
-            <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#C2185B] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
+            <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#D60051] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
             <button onclick="dismissReset('${u.username}')" class="text-[11px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-2.5 py-1 transition">요청 무시</button>
           </div>`).join('')}</div>
       </div>`;
@@ -3331,14 +3328,14 @@ async function renderAdmin(){
       ? `<button onclick="setRole('${u.username}','user')" ${me?'disabled':''} class="text-[11px] border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
       : `<button onclick="setRole('${u.username}','admin')" class="text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-0.5 hover:bg-amber-50">관리자로</button>`;
     return `<tr class="border-b border-rose-50">
-      <td class="py-1.5 pr-2 font-mono font-bold text-[#C2185B]">${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#D60051]">${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
       <td class="py-1.5 pr-2 text-slate-700">${u.name}</td>
       <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#fef3c7;color:#b45309;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
       <td class="py-1.5 pr-2">${statusChip(u.status)}</td>
       <td class="py-1.5 pr-2 text-slate-400 text-[11px]">${u.created||'-'}</td>
       <td class="py-1.5 pr-2 text-right whitespace-nowrap">
         ${u.status==='pending'?`<button onclick="approveUser('${u.username}')" class="text-[11px] font-bold text-emerald-700 mr-1">승인</button>`:''}
-        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#C2185B] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
+        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#D60051] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
         ${roleBtn}
         <button onclick="deleteUser('${u.username}')" ${me?'disabled':''} class="text-[11px] text-red-600 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 ml-1 disabled:opacity-40">삭제</button>
       </td>
@@ -3583,7 +3580,7 @@ function renderAISuggestions(){
     '재불량 위험이 높은 차량 알려줘',
     '동전처리장치 장애 처리 절차는?',
   ];
-  box.innerHTML = sugs.map(s=>`<button onclick="$('#ai-input').value='${s.replace(/'/g,"\\'")}'; $('#ai-input').focus();" class="text-[11.5px] bg-rose-50 hover:bg-rose-100 text-[#7A0B3C] border border-rose-200 rounded-full px-3 py-1.5 font-semibold transition">${s}</button>`).join('');
+  box.innerHTML = sugs.map(s=>`<button onclick="$('#ai-input').value='${s.replace(/'/g,"\\'")}'; $('#ai-input').focus();" class="text-[11.5px] bg-rose-50 hover:bg-rose-100 text-[#A00040] border border-rose-200 rounded-full px-3 py-1.5 font-semibold transition">${s}</button>`).join('');
 }
 
 function clearAIChat(){
@@ -3613,7 +3610,7 @@ function appendAIMsg(role, content){
   if(AI_MSGS.length===1){ box.innerHTML=''; }
   const isUser=role==='user';
   const html = `<div class="flex ${isUser?'justify-end':'justify-start'}">
-    <div class="ai-bubble ${isUser?'bg-[#7A0B3C] text-white':'bg-rose-50 text-slate-800 border border-rose-100'} rounded-xl px-3.5 py-2.5 max-w-[85%] text-[13px] leading-relaxed break-words">
+    <div class="ai-bubble ${isUser?'bg-[#A00040] text-white':'bg-rose-50 text-slate-800 border border-rose-100'} rounded-xl px-3.5 py-2.5 max-w-[85%] text-[13px] leading-relaxed break-words">
       <div class="text-[10px] opacity-70 mb-1 font-bold">${isUser?'🙋 나':'🤖 AI'}</div>
       <div>${mdLite(content)}</div>
     </div>
@@ -3931,7 +3928,7 @@ const HELP_CONTENT = {
     <div class="space-y-3">
       <p>이 시스템은 단말기 장애 데이터를 분석하여 <b>선제적 점검과 현장 처리</b>를 지원합니다.</p>
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#7A0B3C] mb-1.5">화면 구성 (5개 탭)</div>
+        <div class="font-extrabold text-[#A00040] mb-1.5">화면 구성 (5개 탭)</div>
         <ul class="list-disc pl-5 space-y-1 text-[12.5px]">
           <li><b>📊 대시보드</b>: 전체 장애 현황 — KPI, 차트, 채널·센터·기종 필터</li>
           <li><b>⚠ 선제 점검 대상</b>: 위험도 TOP 10 차량 + 맞춤 권장 + 매뉴얼 절차</li>
@@ -3953,7 +3950,7 @@ const HELP_CONTENT = {
     </div>`,
   dash: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">대시보드 필터 사용법</div>
+      <div class="font-extrabold text-[#A00040] text-sm">대시보드 필터 사용법</div>
       <p>화면 상단의 타일을 클릭하면 해당 조건만 필터링됩니다. 여러 개를 조합할 수 있습니다.</p>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>접수구분</b>: 전화접수 / 시스템접수 / B/S처리 / 현장접수</li>
@@ -3968,7 +3965,7 @@ const HELP_CONTENT = {
     </div>`,
   preempt: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">선제 점검 대상 보는 법</div>
+      <div class="font-extrabold text-[#A00040] text-sm">선제 점검 대상 보는 법</div>
       <p>위험도 점수 기준 상위 10대 차량을 보여줍니다. 대시보드 필터가 자동 적용됩니다.</p>
       <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
         <div class="font-extrabold text-[#0E7490] mb-1">🔧 이 차량 맞춤 권장 (청록색)</div>
@@ -3996,13 +3993,13 @@ const HELP_CONTENT = {
     </div>`,
   search: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">차량 검색 사용법</div>
+      <div class="font-extrabold text-[#A00040] text-sm">차량 검색 사용법</div>
       <ol class="list-decimal pl-5 text-[12.5px] space-y-1">
         <li>차량번호 입력란에 번호를 입력합니다 (일부만 입력해도 자동완성).</li>
         <li>자동완성 목록에서 선택하거나 전체 번호 입력 후 Enter.</li>
         <li>검색 결과 화면 확인.</li>
       </ol>
-      <div class="font-extrabold text-[#7A0B3C] text-sm mt-2">결과 화면 구성</div>
+      <div class="font-extrabold text-[#A00040] text-sm mt-2">결과 화면 구성</div>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>기본정보</b>: 운수사·기종·노선·위험도 등급</li>
         <li><b>당일 이벤트 힌트</b>: 그 차량의 이상 신호 코드 (있는 경우)</li>
@@ -4017,7 +4014,7 @@ const HELP_CONTENT = {
     </div>`,
   events: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">이벤트 분석 화면</div>
+      <div class="font-extrabold text-[#A00040] text-sm">이벤트 분석 화면</div>
       <p>차세대 마을버스 이벤트 로그(TrcnStaList_*.csv)의 분석 결과를 보여줍니다.</p>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>이벤트 코드별 발생 건수</b>: 어떤 코드가 가장 많이 발생했는지</li>
@@ -4029,7 +4026,7 @@ const HELP_CONTENT = {
     </div>`,
   ai: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm flex items-center gap-2">🤖 AI 챗봇 (BETA)
+      <div class="font-extrabold text-[#A00040] text-sm flex items-center gap-2">🤖 AI 챗봇 (BETA)
         <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span>
       </div>
       <p>단말기 시스템의 데이터(차량 이력·이벤트·맞춤 권장)를 바탕으로 <b>AI가 한국어로 답변</b>하는 챗봇입니다. Google Gemini 2.5 Flash 모델을 무료 등급으로 사용합니다.</p>
@@ -4037,7 +4034,7 @@ const HELP_CONTENT = {
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <div class="font-extrabold text-[#1D4ED8] mb-1.5">사용 준비 (관리자가 한 번만)</div>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5">
-          <li>관리자가 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[#C2185B] underline">aistudio.google.com/apikey</a>에서 Gemini API 키 발급 (무료, 결제 등록 불필요)</li>
+          <li>관리자가 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[#D60051] underline">aistudio.google.com/apikey</a>에서 Gemini API 키 발급 (무료, 결제 등록 불필요)</li>
           <li>단말기 시스템 → AI 챗봇 탭 → "🔑 공용 키 등록/변경" 클릭</li>
           <li>키 붙여넣기 → 확인 → 클라우드에 저장</li>
           <li><b>이후 모든 로그인 직원이 자동으로 사용 가능</b> — 개별 키 발급 불필요</li>
@@ -4045,7 +4042,7 @@ const HELP_CONTENT = {
       </div>
 
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#7A0B3C] mb-1.5">질문하는 법</div>
+        <div class="font-extrabold text-[#A00040] mb-1.5">질문하는 법</div>
         <ul class="list-disc pl-5 text-[12px] space-y-0.5">
           <li>화면 아래 입력창에 한국어로 자유롭게 질문</li>
           <li>또는 화면 중간의 분홍색 "빠른 질문" 버튼 클릭 — 자동으로 입력창에 채워짐</li>
@@ -4078,10 +4075,10 @@ const HELP_CONTENT = {
     </div>`,
   admin: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">관리자 전용 기능</div>
+      <div class="font-extrabold text-[#A00040] text-sm">관리자 전용 기능</div>
       <p class="text-[12px]">관리자(ysukim)로 로그인했을 때만 보이는 기능입니다.</p>
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#C2185B] mb-1">📂 데이터 업로드</div>
+        <div class="font-extrabold text-[#D60051] mb-1">📂 데이터 업로드</div>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5">
           <li>대시보드 상단 "데이터 갱신" 영역 열기</li>
           <li>① 장애접수 (.xls) 파일 선택 → "확인 (적용)"</li>
@@ -4120,7 +4117,7 @@ const HELP_CONTENT = {
     </div>`,
   faq: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#7A0B3C] text-sm">자주 묻는 질문</div>
+      <div class="font-extrabold text-[#A00040] text-sm">자주 묻는 질문</div>
       ${[
         ['데이터가 안 보입니다.','관리자가 아직 클라우드에 게시하지 않았을 수 있습니다. 관리자에게 문의하세요.'],
         ['선제 점검 뱃지 숫자가 자꾸 바뀝니다.','대시보드 필터(채널·센터·기종·기간)에 맞춰 실시간으로 변합니다. 필터를 다 해제하면 전체 수가 보입니다.'],
@@ -4135,8 +4132,8 @@ const HELP_CONTENT = {
         ['(AI) 답변이 이상합니다.','AI가 가끔 환각을 일으킵니다. 항상 데이터를 직접 확인하세요.'],
         ['최근 접속일은 어떻게 보나요?','관리자 사용자 관리 화면에서 가입일 옆에 표시. "최근 접속일" 클릭하면 최근순 상위 5명만 보입니다.'],
       ].map(([q,a])=>`
-        <div class="border-l-4 border-[#C2185B] pl-3 py-1">
-          <div class="font-bold text-[#7A0B3C] text-[12.5px]">Q. ${q}</div>
+        <div class="border-l-4 border-[#D60051] pl-3 py-1">
+          <div class="font-bold text-[#A00040] text-[12.5px]">Q. ${q}</div>
           <div class="text-[12px] text-slate-600 mt-0.5">A. ${a}</div>
         </div>`).join('')}
     </div>`,
@@ -4163,7 +4160,7 @@ initAuth();
 <!-- ============ HELP MODAL ============ -->
 <div id="help-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,.65)">
   <div class="bg-white rounded-2xl shadow-2xl max-w-[820px] w-full max-h-[90vh] flex flex-col">
-    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#7A0B3C,#C2185B);color:#fff;border-radius:1rem 1rem 0 0">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#A00040,#D60051);color:#fff;border-radius:1rem 1rem 0 0">
       <div class="font-extrabold text-base">❓ 단말기 시스템 사용법</div>
       <button onclick="closeHelp()" class="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center text-sm">✕</button>
     </div>
@@ -4180,7 +4177,7 @@ initAuth();
     <div class="overflow-y-auto px-5 py-4 text-[13px] text-slate-700 leading-relaxed" id="help-body"></div>
     <div class="px-5 py-2.5 border-t border-rose-100 flex justify-between items-center text-[11px] text-slate-400">
       <span>ATEC Mobility · 단말기 시스템</span>
-      <a href="ATEC_매뉴얼_버스.docx" download class="text-[#C2185B] font-bold hover:underline">📄 버스 매뉴얼(.docx) 다운로드</a>
+      <a href="ATEC_매뉴얼_버스.docx" download class="text-[#D60051] font-bold hover:underline">📄 버스 매뉴얼(.docx) 다운로드</a>
     </div>
   </div>
 </div>

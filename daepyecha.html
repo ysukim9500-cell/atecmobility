@@ -8,8 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="stylesheet" href="assets/atec-ci.css">
 <style>
-  :root{ --wine:#7A0B3C; --mag:#C2185B; --ink:#1f2733; }
+  :root{ --wine:#A00040; --mag:#D60051; --ink:#1f2733; }
   *{ box-sizing:border-box; }
   body{ margin:0; background:#f6eef2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif; }
   .wrap{ max-width:920px; margin:0 auto; padding:0 16px 60px; }
@@ -26,7 +27,7 @@
     .qact{ display:grid; grid-template-columns:1fr 1fr; }
     .qact .btn-main{ grid-column:1 / -1; }
   }
-  .topbar{ background:linear-gradient(120deg,#5e0a2e,#7A0B3C 45%,#C2185B); color:#fff; }
+  .topbar{ background:linear-gradient(120deg,#5e0a2e,#A00040 45%,#D60051); color:#fff; }
   .topbar-in{ max-width:920px; margin:0 auto; padding:18px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .brand{ display:flex; align-items:center; gap:11px; }
   .brand .logo{ width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,.16); display:grid; place-items:center; }
@@ -34,21 +35,21 @@
   .brand p{ font-size:11.5px; margin:2px 0 0; color:#f6c9da; }
   .back{ color:#fff; font-size:12.5px; font-weight:700; text-decoration:none; opacity:.92; }
   .back:hover{ opacity:1; }
-  .tabs{ display:flex; gap:4px; background:#fff; border:1px solid #efd6e1; border-radius:13px; padding:5px; margin:20px 0 18px; box-shadow:0 8px 22px -16px rgba(122,11,60,.35); }
+  .tabs{ display:flex; gap:4px; background:#fff; border:1px solid #efd6e1; border-radius:13px; padding:5px; margin:20px 0 18px; box-shadow:0 8px 22px -16px rgba(160,0,64,.35); }
   .tab{ flex:1; text-align:center; padding:10px; border-radius:9px; font-weight:800; font-size:14px; color:#9a7384; cursor:pointer; border:none; background:none; }
-  .tab.on{ background:linear-gradient(135deg,#7A0B3C,#C2185B); color:#fff; box-shadow:0 6px 14px -6px rgba(194,24,91,.5); }
-  .card{ background:#fff; border:1px solid #efd6e1; border-radius:16px; box-shadow:0 10px 30px -22px rgba(122,11,60,.4); padding:22px; }
+  .tab.on{ background:linear-gradient(135deg,#A00040,#D60051); color:#fff; box-shadow:0 6px 14px -6px rgba(194,24,91,.5); }
+  .card{ background:#fff; border:1px solid #efd6e1; border-radius:16px; box-shadow:0 10px 30px -22px rgba(160,0,64,.4); padding:22px; }
   .sec-ttl{ font-size:12.5px; font-weight:800; color:var(--wine); display:flex; align-items:center; gap:7px; margin:0 0 12px; }
-  .sec-ttl::before{ content:""; width:4px; height:15px; border-radius:3px; background:linear-gradient(#7A0B3C,#C2185B); }
+  .sec-ttl::before{ content:""; width:4px; height:15px; border-radius:3px; background:linear-gradient(#A00040,#D60051); }
   .lbl{ font-size:11.5px; font-weight:700; color:#86566b; margin-bottom:4px; display:block; }
   .inp{ width:100%; border:1px solid #e3c8d4; border-radius:10px; padding:9px 11px; font-size:14px; background:#fff; transition:.12s; }
   .inp:focus{ outline:none; border-color:var(--mag); box-shadow:0 0 0 3px rgba(194,24,91,.13); }
   select.inp{ appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23C2185B' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; padding-right:30px; }
   .btn{ border-radius:11px; font-weight:800; font-size:13.5px; padding:10px 16px; cursor:pointer; border:none; }
-  .btn-main{ background:linear-gradient(135deg,#7A0B3C,#C2185B); color:#fff; box-shadow:0 8px 18px -8px rgba(194,24,91,.55); }
+  .btn-main{ background:linear-gradient(135deg,#A00040,#D60051); color:#fff; box-shadow:0 8px 18px -8px rgba(194,24,91,.55); }
   .btn-main:disabled{ opacity:.55; }
-  .btn-out{ background:#fff; border:1.5px solid #C2185B; color:#C2185B; }
-  .btn-soft{ background:#f7e7ef; color:#7A0B3C; }
+  .btn-out{ background:#fff; border:1.5px solid #D60051; color:#D60051; }
+  .btn-soft{ background:#f7e7ef; color:#A00040; }
   .btn-soft:hover{ background:#f1d6e3; }
   /* 자재 항목 카드 */
   .mat-item{ border:1px solid #eedbe6; border-radius:12px; padding:11px 12px; margin-bottom:9px; background:#fffafc; }
@@ -66,37 +67,37 @@
   .hide{ display:none !important; }
   #print-area{ position:fixed; left:-99999px; top:0; width:794px; background:#fff; padding:30px 34px; color:#15202b; font-family:'Noto Sans KR',sans-serif; }
   .doc-page{ width:794px; height:1123px; background:#fff; box-sizing:border-box; display:flex; overflow:hidden; }
-  .doc-frame{ flex:1; margin:16px; border:1.6px solid #7A0B3C; padding:28px 32px 22px; display:flex; flex-direction:column; }
+  .doc-frame{ flex:1; margin:16px; border:1.6px solid #A00040; padding:28px 32px 22px; display:flex; flex-direction:column; }
   .doc-confirm{ text-align:center; font-size:12.5px; color:#3a3a3a; padding-top:26px; }
   .doc-date{ text-align:center; font-size:13.5px; font-weight:700; letter-spacing:3px; margin:9px 0 16px; color:#222; }
   .doc-sign{ display:flex; gap:20px; }
   .doc-sign .b{ flex:1; border:1px solid #9a9a9a; border-radius:6px; padding:10px 14px; min-height:108px; position:relative; }
-  .doc-sign .role{ font-size:11.5px; font-weight:800; color:#7A0B3C; }
+  .doc-sign .role{ font-size:11.5px; font-weight:800; color:#A00040; }
   .doc-sign .nm{ display:block; font-size:13.5px; margin-top:4px; }
   .doc-sign .seal{ color:#b07; font-size:11px; }
   .doc-sign img{ position:absolute; right:18px; bottom:10px; height:62px; }
-  #pa-head{ display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2.5px solid #7A0B3C; padding-bottom:10px; margin-bottom:4px; }
+  #pa-head{ display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2.5px solid #A00040; padding-bottom:10px; margin-bottom:4px; }
   #pa-head .t{ font-size:25px; font-weight:800; letter-spacing:7px; color:#111; }
-  #pa-head .s{ font-size:11px; color:#7A0B3C; font-weight:700; margin-top:3px; letter-spacing:1px; }
+  #pa-head .s{ font-size:11px; color:#A00040; font-weight:700; margin-top:3px; letter-spacing:1px; }
   #pa-head .co{ text-align:right; font-size:10.5px; color:#666; line-height:1.5; }
-  #pa-head .co b{ color:#7A0B3C; font-size:13px; letter-spacing:1px; }
+  #pa-head .co b{ color:#A00040; font-size:13px; letter-spacing:1px; }
   .pa-meta{ width:100%; border-collapse:collapse; margin:12px 0 6px; }
   .pa-meta td{ border:1px solid #b9b9b9; padding:6px 9px; font-size:12px; }
   .pa-meta .k{ background:#f2e6ec; font-weight:700; width:92px; color:#5e1334; }
   .pa-cols{ display:flex; gap:14px; align-items:flex-start; }
   .pa-cols > div{ flex:1; }
   table.pa-items{ width:100%; border-collapse:collapse; }
-  table.pa-items th{ background:#7A0B3C; color:#fff; font-size:10.5px; padding:5px 6px; border:1px solid #7A0B3C; }
+  table.pa-items th{ background:#A00040; color:#fff; font-size:10.5px; padding:5px 6px; border:1px solid #A00040; }
   table.pa-items td{ border:1px solid #cfcfcf; padding:4px 6px; font-size:10.5px; }
   table.pa-items tr:nth-child(even) td{ background:#faf3f7; }
   .pa-sign{ display:flex; gap:18px; margin-top:16px; }
   .pa-sign .b{ flex:1; border:1px solid #b9b9b9; border-radius:7px; padding:9px 12px; min-height:96px; }
-  .pa-sign .st{ font-size:11px; font-weight:700; color:#7A0B3C; }
+  .pa-sign .st{ font-size:11px; font-weight:700; color:#A00040; }
   .pa-sign .nm{ font-size:12.5px; margin-top:2px; }
   .pa-sign img{ height:58px; margin-top:4px; }
   .pa-foot{ text-align:right; font-size:9px; color:#9a9a9a; margin-top:12px; }
   table.pa-list{ width:100%; border-collapse:collapse; margin-top:10px; }
-  table.pa-list th{ background:#7A0B3C; color:#fff; font-size:10px; padding:5px 6px; border:1px solid #7A0B3C; }
+  table.pa-list th{ background:#A00040; color:#fff; font-size:10px; padding:5px 6px; border:1px solid #A00040; }
   table.pa-list td{ border:1px solid #cfcfcf; padding:4px 6px; font-size:10px; }
   table.pa-list tr:nth-child(even) td{ background:#faf3f7; }
 </style>
@@ -106,7 +107,8 @@
 <div class="topbar"><div class="topbar-in">
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 4h7l4 4v12a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><path d="M13 4v5h5M9 13h6M9 16h4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg></div>
-    <div><h1>대폐차 자재 지급확인서</h1><p>ATEC Mobility · 증차 · 대폐차 · 감차 전자 서식</p></div>
+    <div><h1>대폐차 자재 지급확인서</h1>
+      <p style="display:flex;align-items:center;gap:6px"><img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark" style="height:12px"> · 증차 · 대폐차 · 감차 전자 서식</p></div>
   </div>
   <a href="index.html" class="back">← 포털</a>
 </div></div>
@@ -215,7 +217,7 @@ var MATERIALS = {
 var CUSTOM = '__기타__';
 var CAT_HINT = { '대폐차':'폐차 후 같은 번호로 신차가 나옵니다. 차량번호 1개만 입력하세요.', '증차':'신규 증차 차량입니다. 신규 차량번호를 입력하세요.', '감차':'감차(폐차)되는 차량입니다. 폐차 차량번호를 입력하세요.' };
 var CAT_LABEL = { '대폐차':'차량번호', '증차':'신규 차량번호', '감차':'폐차 차량번호' };
-var CAT_COLOR = { '대폐차':'background:#f3e6ec;color:#7A0B3C', '증차':'background:#e3f0fb;color:#1d4ed8', '감차':'background:#fdeaea;color:#b91c1c' };
+var CAT_COLOR = { '대폐차':'background:#f3e6ec;color:#A00040', '증차':'background:#e3f0fb;color:#1d4ed8', '감차':'background:#fdeaea;color:#b91c1c' };
 var SIG = {};
 function el(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -320,11 +322,11 @@ function buildPrint(d){
   pa.innerHTML =
     '<div class="doc-page"><div class="doc-frame">'+
       '<div id="pa-head"><div><div class="t">자 재 지 급 확 인 서</div><div class="s">'+esc(d.category||'대폐차')+' · 단말기 자재 지급 내역</div></div>'+
-        '<div class="co"><b>ATEC MOBILITY</b><br>전자 지급확인 서식</div></div>'+
+        '<div class="co"><img src="'+FC.LOGO+'" alt="ATEC 에이텍모빌리티" style="height:15px;width:auto;display:inline-block;margin-bottom:4px"><br>전자 지급확인 서식</div></div>'+
       '<table class="pa-meta"><tr><td class="k">구분</td><td>'+esc(d.category||'-')+'</td><td class="k">센터</td><td>'+esc(d.center||'-')+'</td><td class="k">운수사</td><td>'+esc(d.operator||'-')+'</td></tr>'+
       '<tr><td class="k">차량번호</td><td>'+esc(d.vehicle||'-')+'</td><td class="k">기종</td><td>'+esc(d.model||'-')+'</td><td class="k">품목 수</td><td>'+n+'개</td></tr></table>'+
       '<div style="margin-top:10px">'+body+'</div>'+
-      (d.memo?'<div style="margin-top:8px;font-size:11px"><b style="color:#7A0B3C">메모</b> · '+esc(d.memo)+'</div>':'')+
+      (d.memo?'<div style="margin-top:8px;font-size:11px"><b style="color:#A00040">메모</b> · '+esc(d.memo)+'</div>':'')+
       '<div class="doc-confirm">위와 같이 단말기 설치 자재를 정히 <b>지급·수령</b>하였음을 확인합니다.</div>'+
       '<div class="doc-date">'+koDate(d.date)+'</div>'+
       '<div class="doc-sign"><div class="b"><span class="role">지급자 (ATEC)</span><span class="nm">'+esc(d.issuer||'')+' <span class="seal">(인)</span></span>'+(iSig?'<img src="'+iSig+'">':'')+'</div>'+
@@ -401,9 +403,9 @@ function runQuery(){
       var cat=r.category||'대폐차';
       var chip='<span class="cat-chip" style="'+(CAT_COLOR[cat]||CAT_COLOR['대폐차'])+'">'+esc(cat)+'</span>';
       var del=FC.isAdmin()?'<button onclick="delRec(\''+r.id+'\',\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#dc2626;background:none;border:none;cursor:pointer;font-size:12px;margin-left:8px">삭제</button>':'';
-      return '<div class="res-row"><div>'+chip+' <b style="color:#7A0B3C">'+esc(r.vehicle_no||'-')+'</b> <span style="color:#bba">· '+esc(r.center||'')+' · '+esc(r.model||'')+' · '+cnt+'개</span>'+
+      return '<div class="res-row"><div>'+chip+' <b style="color:#A00040">'+esc(r.vehicle_no||'-')+'</b> <span style="color:#bba">· '+esc(r.center||'')+' · '+esc(r.model||'')+' · '+cnt+'개</span>'+
         '<div style="font-size:11px;color:#bba">'+dt+' · '+esc(r.operator||'')+' · '+esc(r.created_by||'')+'</div></div>'+
-        '<div style="white-space:nowrap"><button onclick="openPdf(\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#C2185B;background:none;border:none;cursor:pointer;font-weight:700;font-size:12.5px">PDF</button>'+del+'</div></div>';
+        '<div style="white-space:nowrap"><button onclick="openPdf(\''+encodeURIComponent(r.pdf_path||'')+'\')" style="color:#D60051;background:none;border:none;cursor:pointer;font-weight:700;font-size:12.5px">PDF</button>'+del+'</div></div>';
     }).join('');
   }).catch(function(e){ box.textContent='조회 오류: '+e.message; });
 }

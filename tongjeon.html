@@ -17,6 +17,7 @@
   if(mq.addEventListener) mq.addEventListener('change', sync); else if(mq.addListener) mq.addListener(sync);
 })();
 </script>
+<link rel="stylesheet" href="assets/atec-ci.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -95,6 +96,7 @@ textarea.fld{ resize:vertical; min-height:62px; line-height:1.5; }
 .rtbl tbody tr:hover{ background:#f6fbfb; }
 
 /* 막대 목록 */
+#dim-list{ display:none; }                       /* 넓은 화면에서는 차트만 */
 .barrow{ display:flex; align-items:center; gap:10px; padding:5px 0; }
 .barrow .rk{ font-size:12px; font-weight:700; color:#b6d4d0; width:18px; text-align:right; }
 .barrow .nm{ font-size:12.5px; color:#475569; font-weight:600; width:34%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -163,9 +165,16 @@ html.is-mobile .h-\[320px\]{ height:230px !important; }
 html.is-mobile .h-\[260px\]{ height:200px !important; }
 
 /* 기준 전환 버튼줄 */
-html.is-mobile #tj-dim{ width:100%; flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-html.is-mobile #tj-dim::-webkit-scrollbar{ display:none; }
-html.is-mobile .dim-btn{ flex:0 0 auto; min-height:36px; }
+/* 기준 버튼 9개 — 옆으로 밀면 마지막 글자가 잘려 보인다. 3칸 격자로 한 번에 보여준다 */
+html.is-mobile #tj-dim{ width:100%; display:grid !important; grid-template-columns:repeat(3,1fr); gap:5px; }
+html.is-mobile .dim-btn{ width:100%; min-height:36px; padding-left:2px !important; padding-right:2px !important; }
+/* 가로 막대 차트는 좁은 화면에서 이름 길이가 제각각이라 줄이 어긋난다 → 순위 목록으로 바꾼다 */
+html.is-mobile #dim-chart{ display:none !important; }
+html.is-mobile #dim-list{ display:block; }
+html.is-mobile .barrow{ gap:8px; padding:6px 0; }
+html.is-mobile .barrow .nm{ width:36%; font-size:12px; }
+html.is-mobile .barrow .vl{ width:42px; font-size:12.5px; }
+html.is-mobile .barrow .pc{ width:32px; }
 
 /* 필터 */
 html.is-mobile .flt-toggle{ display:inline-flex !important; align-items:center; gap:5px; font-size:12px; font-weight:700;
@@ -226,7 +235,7 @@ html.is-mobile #tj-toast{ bottom:100px !important; }
   <div class="tj-wrap relative max-w-[1600px] mx-auto px-4 sm:px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
     <div>
       <div class="flex items-center gap-2">
-        <span class="text-lg sm:text-xl font-extrabold tracking-tight">ATEC <span class="font-semibold text-teal-200">Mobility</span></span>
+        <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark">
         <span class="inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5">버스터미널 통전망</span>
       </div>
       <h1 class="text-base sm:text-lg font-extrabold mt-1.5 flex items-center gap-2">

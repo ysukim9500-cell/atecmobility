@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>관리자 콘솔 · ATEC Mobility</title>
+<link rel="stylesheet" href="assets/atec-ci.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   *{ word-break:keep-all; -webkit-tap-highlight-color:transparent; }
@@ -25,18 +26,22 @@
 <div id="guard" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6" style="background:#fdf2f6">
   <div class="bg-white rounded-2xl shadow-xl border border-rose-100 max-w-sm w-full p-6 text-center">
     <div class="text-4xl mb-2">🔒</div>
-    <div class="text-base font-extrabold text-[#7A0B3C] mb-1">관리자 전용 화면</div>
+    <div class="text-base font-extrabold text-[#A00040] mb-1">관리자 전용 화면</div>
     <p id="guard-msg" class="text-[13px] text-slate-500 leading-relaxed mb-4">관리자 권한이 필요합니다.</p>
-    <a href="index.html" class="inline-block bg-[#C2185B] text-white font-bold rounded-xl px-5 py-2.5 text-sm hover:opacity-90">메인으로 돌아가기</a>
+    <a href="index.html" class="inline-block bg-[#D60051] text-white font-bold rounded-xl px-5 py-2.5 text-sm hover:opacity-90">메인으로 돌아가기</a>
   </div>
 </div>
 
 <!-- 헤더 -->
-<header class="sticky top-0 z-30 text-white px-3 py-2.5 sm:px-5 sm:py-3 flex items-center gap-2 shadow" style="background:linear-gradient(135deg,#7A0B3C,#C2185B)">
+<header class="sticky top-0 z-30 text-white px-3 py-2.5 sm:px-5 sm:py-3 flex items-center gap-2 shadow" style="background:linear-gradient(135deg,#A00040,#D60051)">
   <a href="index.html" class="tapbtn shrink-0 bg-white/15 hover:bg-white/30 rounded-lg px-2.5 py-1.5 text-[12px] font-bold flex items-center gap-1" title="메인으로">← 메인</a>
   <div class="flex-1 min-w-0">
-    <div class="text-[15px] sm:text-base font-extrabold leading-tight">⚙ 관리자 콘솔</div>
-    <div class="text-[11px] opacity-80 truncate" id="hdr-sub">ATEC Mobility · 장애 관리 시스템</div>
+    <div class="flex items-center gap-2 leading-tight">
+      <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark" style="height:13px">
+      <span class="text-[15px] sm:text-base font-extrabold">관리자 콘솔</span>
+    </div>
+    <!-- 로그인하면 이름·권한으로 바뀐다 -->
+    <div class="text-[11px] opacity-80 truncate" id="hdr-sub">장애 관리 시스템</div>
   </div>
   <button onclick="logout()" class="tapbtn shrink-0 bg-white/15 hover:bg-white/30 rounded-lg px-2.5 py-1.5 text-[12px] font-bold">로그아웃</button>
 </header>
@@ -57,7 +62,7 @@
 
     <!-- 교통카드키오스크 -->
     <div class="rounded-lg border border-slate-200 p-3 mb-3">
-      <div class="text-[13px] font-extrabold text-[#7A0B3C] mb-2">🚏 교통카드키오스크</div>
+      <div class="text-[13px] font-extrabold text-[#A00040] mb-2">🚏 교통카드키오스크</div>
       <div class="flex gap-2 mb-2">
         <input id="in-rail" type="email" inputmode="email" placeholder="alarm@example.com"
           class="flex-1 min-w-0 text-[14px] border border-slate-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-400"
@@ -95,7 +100,7 @@
   <!-- 사용자 관리 안내 -->
   <section class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
     <div class="flex items-center justify-between mb-2">
-      <h2 class="text-sm font-extrabold text-[#7A0B3C]">👥 사용자 관리</h2>
+      <h2 class="text-sm font-extrabold text-[#A00040]">👥 사용자 관리</h2>
       <span id="user-count" class="text-[11px] text-slate-400"></span>
     </div>
     <div class="text-[11px] text-slate-500 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed mb-3">
@@ -309,7 +314,7 @@ async function renderUsers(){
     <div class="space-y-2">${resets.map(u=>`
       <div class="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
         <div class="flex-1 min-w-0 text-[13px]"><b class="text-slate-800">${esc(u.name)}</b> <span class="text-slate-400 text-[11px] break-all">${esc(u.username)}</span></div>
-        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-white bg-[#C2185B] hover:opacity-90 rounded-md px-3 py-1.5">임시 비밀번호 발급</button>
+        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-white bg-[#D60051] hover:opacity-90 rounded-md px-3 py-1.5">임시 비밀번호 발급</button>
         <button onclick="dismissReset('${esc(u.username)}')" class="tapbtn text-[12px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-3 py-1.5">무시</button>
       </div>`).join('')}</div></section>` : '';
 
@@ -332,7 +337,7 @@ async function renderUsers(){
     return `<div class="border border-rose-100 rounded-xl p-3 bg-white">
       <div class="flex items-start gap-2 mb-2">
         <div class="flex-1 min-w-0">
-          <div class="font-bold text-[#C2185B] text-[14px] break-all">${esc(u.username)}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}</div>
+          <div class="font-bold text-[#D60051] text-[14px] break-all">${esc(u.username)}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}</div>
           <div class="text-[13px] text-slate-700">${esc(u.name)} ${roleChip} ${statusChip(u.status)}
             ${u.resetReq?'<span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}
             ${u.tempPw?'<span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</div>
@@ -345,7 +350,7 @@ async function renderUsers(){
       </div>
       <div class="flex flex-wrap gap-1.5 pt-1 border-t border-rose-50">
         ${u.status==='pending'?`<button onclick="approveUser('${esc(u.username)}')" class="tapbtn text-[12px] font-bold text-emerald-700 border border-emerald-200 rounded-md px-3 py-1.5 hover:bg-emerald-50">승인</button>`:''}
-        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] border border-rose-200 text-[#C2185B] rounded-md px-3 py-1.5 hover:bg-rose-50">PW재설정</button>
+        <button onclick="issueTempPw('${esc(u.username)}')" class="tapbtn text-[12px] border border-rose-200 text-[#D60051] rounded-md px-3 py-1.5 hover:bg-rose-50">PW재설정</button>
         ${roleBtn}
         <button onclick="deleteUser('${esc(u.username)}')" ${me?'disabled':''} class="tapbtn text-[12px] text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50 disabled:opacity-40 ml-auto">삭제</button>
       </div>
