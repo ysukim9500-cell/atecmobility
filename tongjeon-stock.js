@@ -107,7 +107,7 @@
   }
 
   /* ══════════════ 수리 ══════════════ */
-  var repBuilt = false, RF = { status: '' }, repRows = [];
+  var repBuilt = false, RF = { status: '' }, repRows = [], busy = false;
 
   function repShell() {
     return '' +
@@ -136,9 +136,9 @@
   }
 
   function loadRepairs() {
-    var q = 'tj_repairs?select=id,received_date,terminal_id,part_id,part_name_raw,symptom,status,done_date,note,org_id&order=received_date.desc,id.desc&limit=1000';
+    var q = 'tj_repairs?select=id,received_date,terminal_id,part_id,part_name_raw,terminal_name_raw,symptom,status,done_date,note,org_id&order=received_date.desc,id.desc';
     if (RF.status) q += '&status=eq.' + encodeURIComponent(RF.status);
-    return Promise.all([TJ.select(q), TJ.master.parts(), TJ.master.terminals()]).then(function (r) {
+    return Promise.all([TJ.selectAll(q), TJ.master.parts(), TJ.master.terminals()]).then(function (r) {
       repRows = r[0];
       var pmap = TJ.indexBy(r[1], 'id'), tmap = TJ.indexBy(r[2], 'id');
       document.getElementById('r-count').textContent = TJ.num(repRows.length) + '건';
@@ -147,7 +147,7 @@
         return '<tr onclick="TJStock.repDetail(' + x.id + ')">' +
           '<td class="m-keep m-date whitespace-nowrap">' + TJ.esc(x.received_date || '-') + '</td>' +
           '<td class="m-keep font-semibold">' + TJ.esc(p ? p.name : (x.part_name_raw || '-')) + '</td>' +
-          '<td class="desk-only">' + TJ.esc(t ? t.name : '-') + '</td>' +
+          '<td class="desk-only">' + TJ.esc(t ? t.name : (x.terminal_name_raw || '-')) + '</td>' +
           '<td class="desk-only">' + TJ.esc(x.symptom || '-') + '</td>' +
           '<td class="desk-only whitespace-nowrap">' + TJ.esc(x.done_date || '-') + '</td>' +
           '<td class="m-keep m-tail">' + TJ.statusChip(x.status) + '</td></tr>';
@@ -193,17 +193,19 @@
       });
     },
     saveIn: function () {
+      if (busy) return;
       var org = document.getElementById('in-org').value, part = document.getElementById('in-part').value;
       var qty = parseInt(document.getElementById('in-qty').value, 10);
       if (!org || !part || !qty || qty < 1) return TJ.toast('거점·품목·수량을 확인하세요.', false);
+      busy = true;
       TJ.insert('tj_stock_moves', [{
         org_id: parseInt(org, 10), part_id: parseInt(part, 10), state: document.getElementById('in-state').value,
         qty: qty, reason: '입고', note: document.getElementById('in-note').value.trim() || null,
         by_user: (TJ.me() || {}).email || ''
       }]).then(function () {
-        TJ.closeSheet(); TJ.toast('입고 등록되었습니다');
+        busy = false; TJ.closeSheet(); TJ.toast('입고 등록되었습니다');
         loadStock().then(paintStock);
-      }).catch(function (e) { TJ.toast(e.message, false); });
+      }).catch(function (e) { busy = false; TJ.toast(e.message, false); });
     },
 
     /* 재고 이력 */
@@ -216,7 +218,7 @@
               (m.qty > 0 ? '+' : '') + m.qty + '</b>' + (m.note ? '<br><span style="font-size:11.5px;color:#94a3b8">' + TJ.esc(m.note) + '</span>' : '') + '</span></div>';
           }).join('') : '<div class="text-[13px] text-slate-400 py-4">이력이 없습니다.</div>';
           TJ.openSheet('재고 이력', body, '<button class="btn-ghost px-4 py-2" onclick="TJ.closeSheet()">닫기</button>');
-        });
+        }).catch(function (e) { TJ.toast(e.message || '이력을 불러오지 못했습니다.', false); });
     },
 
     /* 수리 입고 */
@@ -234,8 +236,10 @@
       });
     },
     saveRepair: function () {
+      if (busy) return;
       var part = document.getElementById('rp-part').value;
       if (!part) return TJ.toast('품목을 선택하세요.', false);
+      busy = true;
       TJ.insert('tj_repairs', [{
         received_date: document.getElementById('rp-date').value || null,
         part_id: parseInt(part, 10),
@@ -243,8 +247,8 @@
         org_id: document.getElementById('rp-org').value ? parseInt(document.getElementById('rp-org').value, 10) : null,
         symptom: document.getElementById('rp-symptom').value.trim() || null,
         status: '진행중'
-      }]).then(function () { TJ.closeSheet(); TJ.toast('수리 입고 등록'); loadRepairs(); })
-        .catch(function (e) { TJ.toast(e.message, false); });
+      }]).then(function () { busy = false; TJ.closeSheet(); TJ.toast('수리 입고 등록'); loadRepairs(); })
+        .catch(function (e) { busy = false; TJ.toast(e.message, false); });
     },
 
     /* 수리 상세·완료 */
@@ -256,7 +260,8 @@
         var body = TJ.detailRows([
           ['상태', TJ.statusChip(x.status), true], ['입고일', x.received_date],
           ['품목', p ? p.name : x.part_name_raw], ['터미널', t ? t.name : ''],
-          ['거점', o ? o.name : ''], ['증상', x.symptom], ['완료일', x.done_date], ['비고', x.note]
+          ['거점', o ? o.name : ''], ['증상', x.symptom], ['완료일', x.done_date],
+          ['원본 터미널 표기', t ? '' : x.terminal_name_raw], ['비고', x.note]
         ]);
         var acts = '';
         if (x.status === '진행중' || x.status === '외주') {
@@ -269,21 +274,24 @@
     },
     /** 완료 = 불량 −1, 양품 +1 / 폐기 = 불량 −1 */
     finishRepair: function (id, how) {
+      if (busy) return;
       var x = repRows.find(function (r) { return r.id === id; });
       if (!x) return;
       if (!x.org_id || !x.part_id) {
         return TJ.toast('거점·품목이 없어 재고에 반영할 수 없습니다. 먼저 수정해 주세요.', false);
       }
-      TJ.update('tj_repairs', 'id=eq.' + id, { status: how, done_date: TJ.today() })
-        .then(function () {
-          var moves = [{ org_id: x.org_id, part_id: x.part_id, state: '불량', qty: -1,
-            reason: how === '완료' ? '수리완료' : '폐기', ref_repair_id: id, by_user: (TJ.me() || {}).email || '' }];
-          if (how === '완료') moves.push({ org_id: x.org_id, part_id: x.part_id, state: '양품', qty: 1,
-            reason: '수리완료', ref_repair_id: id, by_user: (TJ.me() || {}).email || '' });
-          return TJ.insert('tj_stock_moves', moves);
-        })
-        .then(function () { TJ.closeSheet(); TJ.toast(how + ' 처리했습니다'); loadRepairs(); })
-        .catch(function (e) { TJ.toast(e.message, false); });
+      if (x.status === '완료' || x.status === '폐기') return TJ.toast('이미 처리된 건입니다.', false);
+      busy = true;
+      var me = (TJ.me() || {}).email || '';
+      var moves = [{ org_id: x.org_id, part_id: x.part_id, state: '불량', qty: -1,
+        reason: how === '완료' ? '수리완료' : '폐기', ref_repair_id: id, by_user: me }];
+      if (how === '완료') moves.push({ org_id: x.org_id, part_id: x.part_id, state: '양품', qty: 1,
+        reason: '수리완료', ref_repair_id: id, by_user: me });
+      // 재고를 먼저 기록한다. 상태만 바뀌고 재고가 안 잡히는 상황을 피하기 위함이다.
+      TJ.insert('tj_stock_moves', moves)
+        .then(function () { return TJ.update('tj_repairs', 'id=eq.' + id, { status: how, done_date: TJ.today() }); })
+        .then(function () { busy = false; TJ.closeSheet(); TJ.toast(how + ' 처리했습니다'); loadRepairs(); })
+        .catch(function (e) { busy = false; TJ.toast(e.message, false); });
     }
   };
 

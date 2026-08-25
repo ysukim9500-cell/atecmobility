@@ -9,7 +9,7 @@
 
   var PAGE = 100;
   var F = { from: '', to: '', status: '', region: '', terminal: '', q: '' };
-  var rows = [], total = 0, offset = 0, built = false, editing = null, partLines = [];
+  var rows = [], total = 0, offset = 0, built = false, editing = null, partLines = [], ORIGINAL_PARTS = [], busy = false;
 
   /* ── 목록 ──────────────────────────────────────────────────────────── */
   function shell() {
@@ -29,7 +29,7 @@
         '<div><label class="flt-label">종료일</label><input id="f-to" type="date" class="fld"></div>' +
       '</div>' +
       '<div class="flex items-center gap-2 flex-wrap">' +
-        '<input id="f-q" class="fld" style="max-width:280px" placeholder="🔍 터미널·내용·조치 검색">' +
+        '<input id="f-q" class="fld" style="max-width:280px" placeholder="🔍 터미널·접수구분·내용·조치 검색">' +
         '<button class="btn-main text-[12.5px] px-4 py-2 font-extrabold" onclick="TJFaults.search()">검색</button>' +
         '<button class="btn-ghost text-[12px] px-3 py-2" onclick="TJFaults.reset()">초기화</button>' +
         '<span id="f-count" class="text-[12.5px] text-slate-500 font-semibold md:ml-auto"></span>' +
@@ -56,6 +56,7 @@
       var regions = [...new Set(ts.map(function (t) { return t.region; }).filter(Boolean))].sort();
       document.getElementById('f-region').innerHTML = '<option value="">전체</option>' +
         regions.map(function (r) { return '<option>' + TJ.esc(r) + '</option>'; }).join('');
+      document.getElementById('f-region').value = F.region;   // 옵션이 생긴 뒤에 복원한다
     });
     document.getElementById('f-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') api.search(); });
   }
@@ -69,8 +70,16 @@
     if (F.to) q += '&received_date=lte.' + F.to;
     if (F.terminalIds && F.terminalIds.length) q += '&terminal_id=in.(' + F.terminalIds.join(',') + ')';
     if (F.q) {
-      var v = encodeURIComponent('*' + F.q + '*');
-      q += '&or=(request_content.ilike.' + v + ',action_content.ilike.' + v + ',fault_type.ilike.' + v + ',note.ilike.' + v + ')';
+      // 값에 괄호·쉼표·별표가 있으면 필터 문법이 깨진다 → 큰따옴표로 감싼다
+      var safe = '"*' + F.q.replace(/["\\]/g, '') + '*"';
+      var v = encodeURIComponent(safe);
+      var ors = ['request_content.ilike.' + v, 'action_content.ilike.' + v,
+                 'fault_type.ilike.' + v, 'intake_category.ilike.' + v, 'note.ilike.' + v];
+      // 터미널명으로도 찾을 수 있게 한다(안내 문구와 실제 동작을 맞춘다)
+      if (F.searchTerminalIds && F.searchTerminalIds.length) {
+        ors.push('terminal_id.in.(' + F.searchTerminalIds.join(',') + ')');
+      }
+      q += '&or=(' + ors.join(',') + ')';
     }
     if (!forCount) q += '&order=received_date.desc,id.desc';
     return q;
@@ -79,6 +88,10 @@
   /** 지역·터미널 필터는 마스터에서 id 목록으로 바꿔 서버에 넘긴다 */
   function resolveTerminalFilter() {
     return TJ.master.terminals().then(function (ts) {
+      // 검색어와 이름이 겹치는 터미널 (검색 대상에 터미널명을 포함시키기 위함)
+      F.searchTerminalIds = F.q
+        ? ts.filter(function (t) { return String(t.name).indexOf(F.q) >= 0; }).map(function (t) { return t.id; }).slice(0, 300)
+        : null;
       if (!F.region && !F.terminal) { F.terminalIds = null; return; }
       var list = ts.filter(function (t) {
         if (F.region && t.region !== F.region) return false;
@@ -93,7 +106,10 @@
     return resolveTerminalFilter().then(function () {
       return Promise.all([
         TJ.count(buildQuery(true)),
-        TJ.api(buildQuery(false), { headers: { 'Range': offset + '-' + (offset + PAGE - 1) } }).then(function (r) { return r.json(); })
+        TJ.api(buildQuery(false), { headers: { 'Range': offset + '-' + (offset + PAGE - 1) } }).then(function (r) {
+          if (!r.ok) return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
+          return r.json();
+        })
       ]);
     }).then(function (res) {
       total = res[0];
@@ -214,23 +230,36 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
       fillDatalists();
       if (id) {
-        TJ.select('tj_fault_parts?select=part_id,qty,org_id&fault_id=eq.' + id).then(function (fps) {
-          partLines = fps.map(function (x) { return { part_id: x.part_id, qty: x.qty, org_id: x.org_id, existing: true }; });
+        TJ.select('tj_fault_parts?select=id,part_id,qty,org_id,recover&fault_id=eq.' + id).then(function (fps) {
+          partLines = fps.map(function (x) {
+            return { row_id: x.id, part_id: x.part_id, qty: x.qty, org_id: x.org_id, recover: !!x.recover, existing: true };
+          });
+          ORIGINAL_PARTS = partLines.map(function (l) { return JSON.parse(JSON.stringify(l)); });
           paintParts(ps, os);
+        }).catch(function (e) {
+          // 기존 자재를 못 읽은 채로 저장하면 이력이 어긋난다 → 폼을 닫는다
+          console.error(e);
+          TJ.toast('기존 사용자재를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', false);
+          api.render();
         });
       } else paintParts(ps, os);
     });
   }
 
+  /* 입력 도우미 목록 — 최근 1,000건에서 쓰이는 값을 모은다.
+     (전량을 받을 필요는 없고, 최근 자료면 실제 어휘가 거의 다 들어온다) */
   function fillDatalists() {
-    var cols = [['intake_category', 'dl-intake'], ['fault_type', 'dl-ftype'], ['handle_category', 'dl-hcat'], ['handle_method', 'dl-hmethod']];
-    cols.forEach(function (c) {
-      TJ.select('tj_faults?select=' + c[0] + '&' + c[0] + '=not.is.null&limit=3000').then(function (rs) {
-        var set = [...new Set(rs.map(function (r) { return r[c[0]]; }).filter(Boolean))].sort();
-        var dl = document.getElementById(c[1]);
-        if (dl) dl.innerHTML = set.map(function (s) { return '<option value="' + TJ.esc(s) + '">'; }).join('');
+    var cols = [['intake_category', 'dl-intake'], ['fault_type', 'dl-ftype'],
+                ['handle_category', 'dl-hcat'], ['handle_method', 'dl-hmethod']];
+    TJ.select('tj_faults?select=' + cols.map(function (c) { return c[0]; }).join(',') +
+              '&order=received_date.desc&limit=1000')
+      .then(function (rs) {
+        cols.forEach(function (c) {
+          var set = [...new Set(rs.map(function (r) { return r[c[0]]; }).filter(Boolean))].sort();
+          var dl = document.getElementById(c[1]);
+          if (dl) dl.innerHTML = set.map(function (v) { return '<option value="' + TJ.esc(v) + '">'; }).join('');
+        });
       }).catch(function () {});
-    });
   }
 
   function paintParts(ps, os) {
@@ -257,6 +286,7 @@
 
   /* ── 저장 ──────────────────────────────────────────────────────────── */
   function save() {
+    if (busy) return;                       // 두 번 눌러 중복 저장되는 것을 막는다
     var msg = document.getElementById('x-msg');
     var set = function (t, ok) { msg.textContent = t; msg.style.color = ok ? '#16A34A' : '#B91C1C'; };
     var val = function (id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; };
@@ -284,6 +314,13 @@
     };
 
     set('저장 중…', true);
+    busy = true;
+    var saveBtn = document.querySelector('.form-actions .btn-main');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = '.6'; }
+    var done = function () {
+      busy = false;
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ''; }
+    };
     var p;
     if (editing) {
       payload.updated_at = new Date().toISOString();
@@ -296,40 +333,66 @@
 
     p.then(function (saved) { return syncParts(saved.id); })
       .then(function () {
+        done();
         TJ.toast(editing ? '수정되었습니다' : '저장되었습니다');
-        editing = null;
+        editing = null; ORIGINAL_PARTS = [];
         api.render();
       })
-      .catch(function (e) { console.error(e); set(e.message || '저장에 실패했습니다.'); });
+      .catch(function (e) { done(); console.error(e); set(e.message || '저장에 실패했습니다.'); });
   }
 
-  /** 자재 연결과 재고 이력을 함께 기록한다 */
+  /** 자재 연결과 재고 이력을 함께 기록한다.
+   *
+   *  수정일 때가 까다롭다. 예전에는 기존 줄을 지우고 전부 다시 넣으면서
+   *  재고 이력도 한 벌 더 쌓아, 저장을 누를 때마다 재고가 줄었다.
+   *  이제는 **바뀐 것만** 계산해서, 빠진 만큼은 되돌리고 늘어난 만큼만 새로 뺀다.
+   */
   function syncParts(faultId) {
-    var fresh = partLines.filter(function (l) { return !l.existing; });
-    if (!partLines.length && !editing) return Promise.resolve();
+    var me = (TJ.me() || {}).email || '';
+    var key = function (l) { return [l.part_id, l.org_id, l.recover ? 1 : 0].join('|'); };
 
+    // 지금 화면의 줄과, 열었을 때의 줄을 각각 (품목|거점|회수) 단위로 합산
+    var now = {}, before = {};
+    partLines.forEach(function (l) {
+      var k = key(l);
+      now[k] = (now[k] || 0) + parseInt(l.qty || 1, 10);
+    });
+    (editing ? ORIGINAL_PARTS : []).forEach(function (l) {
+      var k = key(l);
+      before[k] = (before[k] || 0) + parseInt(l.qty || 1, 10);
+    });
+
+    var moves = [];
+    Object.keys(now).concat(Object.keys(before)).filter(function (k, i, a) { return a.indexOf(k) === i; })
+      .forEach(function (k) {
+        var diff = (now[k] || 0) - (before[k] || 0);
+        if (!diff) return;
+        var p = k.split('|');
+        var partId = parseInt(p[0], 10), orgId = parseInt(p[1], 10), recover = p[2] === '1';
+        // 늘어났으면 그만큼 더 빼고, 줄었으면 그만큼 되돌린다
+        moves.push({ org_id: orgId, part_id: partId, state: '양품', qty: -diff,
+          reason: diff > 0 ? '사용' : '조정', ref_fault_id: faultId, by_user: me,
+          note: diff > 0 ? null: '장애 수정으로 사용 취소' });
+        if (recover) {
+          moves.push({ org_id: orgId, part_id: partId, state: '불량', qty: diff,
+            reason: diff > 0 ? '회수' : '조정', ref_fault_id: faultId, by_user: me,
+            note: diff > 0 ? null : '장애 수정으로 회수 취소' });
+        }
+      });
+
+    // 연결 줄은 통째로 다시 쓴다(수량·회수 여부가 바뀔 수 있으므로)
     var chain = Promise.resolve();
-    if (editing) {
-      // 수정 시에는 기존 연결을 지우고 다시 넣는다(이력은 남긴다)
-      chain = TJ.remove('tj_fault_parts', 'fault_id=eq.' + faultId).catch(function () {});
-      fresh = partLines;
-    }
-    if (!fresh.length) return chain;
-
+    if (editing) chain = TJ.remove('tj_fault_parts', 'fault_id=eq.' + faultId);
     return chain.then(function () {
-      return TJ.insert('tj_fault_parts', fresh.map(function (l) {
-        return { fault_id: faultId, part_id: parseInt(l.part_id, 10), qty: parseInt(l.qty || 1, 10), org_id: parseInt(l.org_id, 10) };
+      if (!partLines.length) return null;
+      return TJ.insert('tj_fault_parts', partLines.map(function (l) {
+        return { fault_id: faultId, part_id: parseInt(l.part_id, 10), qty: parseInt(l.qty || 1, 10),
+                 org_id: parseInt(l.org_id, 10), recover: !!l.recover };
       }));
     }).then(function () {
-      var moves = [];
-      fresh.forEach(function (l) {
-        var q = parseInt(l.qty || 1, 10);
-        moves.push({ org_id: parseInt(l.org_id, 10), part_id: parseInt(l.part_id, 10), state: '양품', qty: -q,
-          reason: '사용', ref_fault_id: faultId, by_user: (TJ.me() || {}).email || '' });
-        if (l.recover) moves.push({ org_id: parseInt(l.org_id, 10), part_id: parseInt(l.part_id, 10), state: '불량', qty: q,
-          reason: '회수', ref_fault_id: faultId, by_user: (TJ.me() || {}).email || '' });
-      });
       return moves.length ? TJ.insert('tj_stock_moves', moves) : null;
+    }).then(function () {
+      ORIGINAL_PARTS = partLines.map(function (l) { return JSON.parse(JSON.stringify(l)); });
     });
   }
 
@@ -354,10 +417,10 @@
       F.to = document.getElementById('f-to').value;
       F.q = document.getElementById('f-q').value.trim();
       offset = 0;
-      load(false);
+      load(false).catch(function (e) { console.error(e); TJ.toast('검색에 실패했습니다. 검색어를 줄여 보세요.', false); });
     },
     reset: function () { F = { from: '', to: '', status: '', region: '', terminal: '', q: '' }; api.render(); },
-    more: function () { offset += PAGE; load(true); },
+    more: function () { offset += PAGE; load(true).catch(function (e) { console.error(e); TJ.toast('추가로 불러오지 못했습니다.', false); }); },
     detail: detail,
     openForm: openForm,
     addPart: function () {
@@ -372,13 +435,26 @@
     save: save,
     quickDone: function (id) {
       TJ.update('tj_faults', 'id=eq.' + id, { status: '완료', action_date: TJ.today(), updated_at: new Date().toISOString() })
-        .then(function () { TJ.closeSheet(); TJ.toast('완료 처리했습니다'); load(false); })
+        .then(function () { TJ.closeSheet(); TJ.toast('완료 처리했습니다'); offset = 0; load(false); })
         .catch(function (e) { TJ.toast(e.message, false); });
     },
     del: function (id) {
-      if (!confirm('이 장애 기록을 삭제할까요? 되돌릴 수 없습니다.')) return;
-      TJ.remove('tj_faults', 'id=eq.' + id)
-        .then(function () { TJ.closeSheet(); TJ.toast('삭제되었습니다'); load(false); })
+      if (!confirm('이 장애 기록을 삭제할까요?\n사용한 자재가 있으면 재고를 되돌립니다. 이 작업은 취소할 수 없습니다.')) return;
+      var me = (TJ.me() || {}).email || '';
+      // 먼저 사용 자재를 되돌린 뒤 삭제한다 (삭제하면 연결이 사라져 되돌릴 수 없다)
+      TJ.select('tj_fault_parts?select=part_id,qty,org_id,recover&fault_id=eq.' + id)
+        .then(function (fps) {
+          var moves = [];
+          fps.forEach(function (x) {
+            moves.push({ org_id: x.org_id, part_id: x.part_id, state: '양품', qty: x.qty,
+              reason: '조정', by_user: me, note: '장애 삭제로 사용 취소' });
+            if (x.recover) moves.push({ org_id: x.org_id, part_id: x.part_id, state: '불량', qty: -x.qty,
+              reason: '조정', by_user: me, note: '장애 삭제로 회수 취소' });
+          });
+          return moves.length ? TJ.insert('tj_stock_moves', moves) : null;
+        })
+        .then(function () { return TJ.remove('tj_faults', 'id=eq.' + id); })
+        .then(function () { TJ.closeSheet(); TJ.toast('삭제되었습니다'); offset = 0; load(false); })
         .catch(function (e) { TJ.toast(e.message, false); });
     }
   };

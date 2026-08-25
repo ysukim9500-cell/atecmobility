@@ -164,12 +164,15 @@
       kinds: kinds,
       note: document.getElementById('tm-note').value.trim() || null
     };
+    // 새 이름은 언제나 별칭으로도 남긴다. 이름을 바꿔도 옛 표기로 계속 찾을 수 있게 하고,
+    // 중복 경고가 새 이름까지 알아보게 하기 위함이다.
+    var addAlias = function (tid) {
+      return TJ.insert('tj_terminal_aliases', [{ terminal_id: tid, alias: name, norm: normKey(name) }])
+        .catch(function () { /* 이미 있으면 그대로 둔다 */ });
+    };
     var p = id
-      ? TJ.update('tj_terminals', 'id=eq.' + id, payload)
-      : TJ.insert('tj_terminals', [payload]).then(function (r) {
-          // 새 터미널은 이름 자체를 별칭으로도 등록해 이후 검색·이관이 걸리게 한다
-          return TJ.insert('tj_terminal_aliases', [{ terminal_id: r[0].id, alias: name, norm: normKey(name) }]).catch(function () {});
-        });
+      ? TJ.update('tj_terminals', 'id=eq.' + id, payload).then(function () { return addAlias(id); })
+      : TJ.insert('tj_terminals', [payload]).then(function (r) { return addAlias(r[0].id); });
     p.then(function () {
       TJ.closeSheet(); TJ.toast(id ? '수정되었습니다' : '터미널이 추가되었습니다');
       TJ.clearCache('terminals'); aliasMap = null;
@@ -219,6 +222,8 @@
       }).then(function () {
         document.getElementById('e-terminal').addEventListener('change', function () { showEquip(this.value); });
       }).catch(function (e) { console.error(e); TJ.toast('장비 현황을 불러오지 못했습니다.', false); });
+    } else if (!document.getElementById('e-terminal')) {
+      el.innerHTML = eShell();
     }
   }
 
@@ -243,7 +248,7 @@
       box.innerHTML =
         tbl('구축·운영 장비', eq, [['항목', 'category'], ['수량', 'qty'], ['설치시기', 'installed_at']]) +
         tbl('보유 예비품', sp, [['품목', 'part_name'], ['수량', 'qty'], ['확인일', 'checked_at']]);
-    });
+    }).catch(function (e) { TJ.toast(e.message || '장비 정보를 불러오지 못했습니다.', false); });
   }
 
   window.TJMaster = {

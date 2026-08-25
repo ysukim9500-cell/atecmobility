@@ -75,9 +75,13 @@
     return q;
   }
 
-  function load() {
-    return TJ.selectAll(query()).then(function (rows) {
-      DATA = rows; PARTAGG = null;
+  /* 같은 기간을 다시 볼 때 5,889건을 또 내려받지 않도록 마지막 조회를 기억한다 */
+  var lastKey = null;
+  function load(force) {
+    var key = query();
+    if (!force && lastKey === key && DATA) return Promise.resolve(DATA);
+    return TJ.selectAll(key).then(function (rows) {
+      DATA = rows; PARTAGG = null; lastKey = key;
       return rows;
     });
   }

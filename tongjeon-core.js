@@ -16,7 +16,7 @@ window.TJ = (function () {
   /** 조회 → 배열. 실패하면 빈 배열과 함께 토스트 */
   function select(path) {
     return api(path).then(function (r) {
-      if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t.slice(0, 160)); });
+      if (!r.ok) return r.text().then(function (t) { throw new Error(msgOf(r.status, t)); });
       return r.json();
     });
   }
@@ -28,7 +28,9 @@ window.TJ = (function () {
         if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t.slice(0, 160)); });
         return r.json().then(function (rows) {
           out = out.concat(rows);
-          if (rows.length < size) return out;
+          // 총 건수가 정확히 페이지 크기의 배수면 빈 응답이 한 번 더 온다.
+          // 0건도 종료 조건에 넣어야 범위 초과(416)로 실패하지 않는다.
+          if (!rows.length || rows.length < size) return out;
           return step(from + size);
         });
       });
@@ -39,9 +41,12 @@ window.TJ = (function () {
   /** 전체 건수만 (Range 0-0 + count=exact) */
   function count(path) {
     return api(path, { headers: { 'Prefer': 'count=exact', 'Range': '0-0' } }).then(function (r) {
+      // 실패를 0건으로 보여주면 "자료가 없다"고 오해하게 된다 → 오류로 알린다
+      if (!r.ok && r.status !== 206) throw new Error('건수 조회 실패 (' + r.status + ')');
       var cr = r.headers.get('content-range') || '';
       var m = cr.match(/\/(\d+)$/);
-      return m ? parseInt(m[1], 10) : 0;
+      if (!m) throw new Error('건수를 확인하지 못했습니다.');
+      return parseInt(m[1], 10);
     });
   }
   function insert(table, rows, extra) {
