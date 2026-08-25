@@ -47,6 +47,8 @@
   <div id="box-pending"></div>
   <!-- 비밀번호 재설정 요청 -->
   <div id="box-resets"></div>
+  <!-- 아직 새 로그인으로 전환하지 않은 계정 -->
+  <div id="box-migrate"></div>
 
   <!-- 철도 장애 알림 이메일 (시스템별 분리) -->
   <section class="bg-white border border-indigo-100 rounded-xl shadow-sm p-4">
@@ -216,7 +218,36 @@ async function boot(){
   await renderEmails('railkr_notify_emails');
   await renderEmails('tongjeon_notify_emails');
   await renderUsers();
+  await renderPendingMigration();
 }
+
+/* 아직 새 로그인으로 전환하지 않은 계정 — 전환이 끝나면 이 목록이 비고,
+   그때 구 계정표를 정리하면 된다. 비밀번호는 서버에서 내보내지 않는다. */
+async function renderPendingMigration(){
+  const box=$('#box-migrate'); if(!box) return;
+  let list=[];
+  try{
+    const r=await AtecAuth.authFetch(SB_URL+'/rest/v1/rpc/pending_migration_users',{method:'POST',body:'{}'});
+    if(r.ok) list=await r.json();
+  }catch(e){ /* 조회 실패 시 조용히 숨긴다 */ }
+  if(!Array.isArray(list) || !list.length){ box.innerHTML=''; return; }
+  box.innerHTML = `<section class="bg-white border border-amber-200 rounded-xl shadow-sm p-4">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-sm font-extrabold text-[#B45309]">🔄 아직 전환하지 않은 계정</h2>
+      <span class="text-[11px] text-slate-400">${list.length}명</span>
+    </div>
+    <p class="text-[12px] text-slate-500 leading-relaxed mb-3">
+      기존 이메일·비밀번호로 로그인하면 안내에 따라 한 번만 비밀번호를 다시 정하면 됩니다.
+      이 목록이 비면 옛 계정 자료를 정리해도 됩니다.
+    </p>
+    <div class="flex flex-wrap gap-1.5">${list.map(u=>`
+      <span class="inline-flex items-center gap-1.5 text-[12px] bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1">
+        ${esc(u.name||'-')}<span class="text-amber-500">·</span><span class="font-mono">${esc(u.email)}</span>
+        ${u.role==='admin'?'<span class="chip bg-amber-200 text-amber-900">관리자</span>':''}
+      </span>`).join('')}</div>
+  </section>`;
+}
+
 function blockGuard(msg){ $('#guard-msg').textContent=msg; $('#guard').classList.remove('hidden'); }
 function logout(){ AtecAuth.logout(); location.href='index.html'; }
 
