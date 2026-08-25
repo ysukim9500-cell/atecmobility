@@ -76,6 +76,18 @@
       </div>
       <div id="list-railkr" class="flex flex-wrap gap-1.5"></div>
     </div>
+
+    <!-- 통전망 운영관리 -->
+    <div class="rounded-lg border border-slate-200 p-3">
+      <div class="text-[13px] font-extrabold text-[#0F5A54] mb-2">🚌 통전망 운영관리</div>
+      <div class="flex gap-2 mb-2">
+        <input id="in-tongjeon" type="email" inputmode="email" placeholder="alarm@example.com"
+          class="flex-1 min-w-0 text-[14px] border border-slate-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addEmail('tongjeon_notify_emails');}">
+        <button onclick="addEmail('tongjeon_notify_emails')" class="tapbtn shrink-0 text-[14px] font-bold bg-teal-600 text-white rounded-lg px-4 hover:bg-teal-700">추가</button>
+      </div>
+      <div id="list-tongjeon" class="flex flex-wrap gap-1.5"></div>
+    </div>
   </section>
 
   <!-- 사용자 관리 안내 -->
@@ -85,7 +97,7 @@
       <span id="user-count" class="text-[11px] text-slate-400"></span>
     </div>
     <div class="text-[11px] text-slate-500 bg-indigo-50/60 border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed mb-3">
-      🗂️ <b class="text-[#3730A3]">시스템 접근(메인 카드)</b>: 각 직원 카드에서 <b>단말기 · 자재서식 · 센터배정 · 교통카드 · 한국철도</b> 버튼을 눌러 보일 카드를 켜고(<b>초록</b>)/끌(<b>회색</b>) 수 있습니다. 신규 가입자는 <b>단말기만</b> 보입니다. 관리자는 자동으로 전체 사용.
+      🗂️ <b class="text-[#3730A3]">시스템 접근(메인 카드)</b>: 각 직원 카드에서 <b>단말기 · 자재서식 · 센터배정 · 교통카드 · 한국철도 · 통전망</b> 버튼을 눌러 보일 카드를 켜고(<b>초록</b>)/끌(<b>회색</b>) 수 있습니다. 신규 가입자는 <b>단말기만</b> 보입니다. 관리자는 자동으로 전체 사용.
     </div>
     <div id="user-cards" class="space-y-2.5"></div>
   </section>
@@ -202,14 +214,15 @@ async function boot(){
   $('#app').classList.remove('hidden');
   await renderEmails('rail_notify_emails');
   await renderEmails('railkr_notify_emails');
+  await renderEmails('tongjeon_notify_emails');
   await renderUsers();
 }
 function blockGuard(msg){ $('#guard-msg').textContent=msg; $('#guard').classList.remove('hidden'); }
 function logout(){ AtecAuth.logout(); location.href='index.html'; }
 
 /* ===== 이메일 수신자 (시스템별) ===== */
-const EMAIL_INPUTS={ 'rail_notify_emails':'#in-rail', 'railkr_notify_emails':'#in-railkr' };
-const EMAIL_LISTS ={ 'rail_notify_emails':'#list-rail', 'railkr_notify_emails':'#list-railkr' };
+const EMAIL_INPUTS={ 'rail_notify_emails':'#in-rail', 'railkr_notify_emails':'#in-railkr', 'tongjeon_notify_emails':'#in-tongjeon' };
+const EMAIL_LISTS ={ 'rail_notify_emails':'#list-rail', 'railkr_notify_emails':'#list-railkr', 'tongjeon_notify_emails':'#list-tongjeon' };
 const CACHE={};
 async function loadEmails(key, force){
   if(CACHE[key] && !force) return CACHE[key];

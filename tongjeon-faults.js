@@ -331,7 +331,12 @@
       p = TJ.insert('tj_faults', [payload]).then(function (r) { return r[0]; });
     }
 
-    p.then(function (saved) { return syncParts(saved.id); })
+    var isNew = !editing;
+    p.then(function (saved) {
+      return syncParts(saved.id).then(function () {
+        if (isNew) notifyNew(saved.id, payload);   // 기다리지 않는다
+      });
+    })
       .then(function () {
         done();
         TJ.toast(editing ? '수정되었습니다' : '저장되었습니다');
@@ -339,6 +344,45 @@
         api.render();
       })
       .catch(function (e) { done(); console.error(e); set(e.message || '저장에 실패했습니다.'); });
+  }
+
+  /** Teams·메일 알림 — 새로 등록할 때만 보낸다.
+   *  실패해도 저장은 이미 끝났으므로 사용자를 막지 않는다.
+   *  (수정할 때마다 알리면 채널이 시끄러워져 아무도 안 보게 된다) */
+  function notifyNew(faultId, payload) {
+    return Promise.all([TJ.master.terminals(), TJ.master.orgs()]).then(function (m) {
+      var t = TJ.indexBy(m[0], 'id')[payload.terminal_id] || {};
+      var o = TJ.indexBy(m[1], 'id')[payload.org_id] || {};
+      var parts = partLines.map(function (l) { return l.part_id; });
+      return TJ.master.parts().then(function (ps) {
+        var pmap = TJ.indexBy(ps, 'id');
+        var used = parts.map(function (id) { return (pmap[id] || {}).name; }).filter(Boolean).join(', ');
+        var rows = [
+          ['접수일자', payload.received_date],
+          ['지역', t.region || '-'],
+          ['터미널', t.name || '-'],
+          ['장비', [payload.equip_type1, payload.equip_class, payload.equip_no].filter(Boolean).join(' / ') || '-'],
+          ['접수구분', payload.intake_category || '-'],
+          ['장애유형', payload.fault_type || '-'],
+          ['요청내용', payload.request_content || '-'],
+          ['상태', payload.status],
+          ['접수자', payload.receiver || '-'],
+          ['소속', o.name || '-']
+        ];
+        if (used) rows.push(['사용자재', used]);
+        return fetch(AtecAuth.SB_URL + '/functions/v1/rail-notify', {
+          method: 'POST',
+          headers: { apikey: AtecAuth.SB_KEY, Authorization: 'Bearer ' + AtecAuth.SB_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: '통전망',
+            listKey: 'tongjeon_notify_emails',
+            title: '[통전망] 장애 등록 — ' + (t.name || '') + ' ' + (payload.intake_category || ''),
+            link: location.origin + location.pathname,
+            rows: rows
+          })
+        });
+      });
+    }).catch(function (e) { console.warn('알림 전송 건너뜀', e); });
   }
 
   /** 자재 연결과 재고 이력을 함께 기록한다.
