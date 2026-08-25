@@ -97,8 +97,28 @@
   }
 
   /* ---------- 프로필 ---------- */
+
+  /** 토큰에 실린 내 사용자 id(sub)를 읽는다.
+   *  서명 검증은 서버가 하므로 여기서는 내용만 꺼내 쓴다. */
+  function myUserId() {
+    var t = get(K_AT);
+    if (!t) return null;
+    try {
+      var b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      var json = decodeURIComponent(atob(b).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(json).sub || null;
+    } catch (e) { return null; }
+  }
+
+  /** 내 프로필을 가져온다.
+   *  반드시 내 id 로 걸러야 한다 — 관리자는 모든 계정이 보이기 때문에
+   *  조건 없이 첫 줄을 가져오면 남의 이름·권한이 잡힌다. */
   function loadProfile() {
-    return authFetch(SB_URL + '/rest/v1/profiles?select=id,email,name,role,status,perms,must_change_pw&limit=1')
+    var uid = myUserId();
+    if (!uid) return Promise.resolve(null);
+    return authFetch(SB_URL + '/rest/v1/profiles?select=id,email,name,role,status,perms,must_change_pw&id=eq.' + uid)
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (rows) {
         var p = rows && rows[0];
@@ -258,6 +278,7 @@
     logout: logout,
     me: me,
     loadProfile: loadProfile,
+    myUserId: myUserId,
     isAdmin: isAdmin,
     hasPerm: hasPerm,
     requireAuth: requireAuth,
