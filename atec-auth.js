@@ -29,7 +29,7 @@
   var K_RT = 'atec_rt';        // refresh token
   var K_ME = 'atec_session';   // 화면 표시용 사용자 정보(신뢰 대상 아님)
 
-  var ALL_PERMS = ['terminal', 'forms', 'center', 'rail', 'railkr'];
+  var ALL_PERMS = ['terminal', 'forms', 'center', 'rail', 'railkr', 'tongjeon'];
 
   /* ---------- 저장소 (탭을 닫으면 로그아웃되는 기존 동작 유지) ---------- */
   function get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }

@@ -459,6 +459,18 @@ img, video, canvas, table{ max-width:100%; }
         <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </a>
+
+    <!-- 통전망 운영관리 시스템 (권한 필요) -->
+    <a href="tongjeon.html" id="launch-tongjeon" data-perm="tongjeon" class="launch3" style="display:none;order:5">
+      <div class="ico mb-4" style="background:linear-gradient(135deg,#0F5A54,#14B8A6)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="11" rx="2.5" stroke="white" stroke-width="1.8"/><path d="M3 10h18" stroke="white" stroke-width="1.8"/><circle cx="7.5" cy="13" r="1.1" fill="white"/><circle cx="16.5" cy="13" r="1.1" fill="white"/><path d="M6 16v3M18 16v3" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div class="text-[16px] font-extrabold" style="color:#0F5A54">통전망 운영관리 시스템</div>
+      <p class="text-[12.5px] mt-2 leading-relaxed" style="color:#6F656C">버스터미널 통합전산망의 장애·자재 재고·장비 현황·수리 내역을 한 곳에서 관리하고, 부품 사용과 재고를 연동해 추적합니다.</p>
+      <div class="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold" style="color:#0D9488">들어가기
+        <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
   </div>
 
   <!-- 관리자 콘솔은 별도 페이지(admin.html)로 분리되었습니다. 상단 '⚙ 관리자' 버튼으로 진입합니다. -->
@@ -735,6 +747,7 @@ const PERM_MODULES=[
   {key:'center',   label:'센터배정'},
   {key:'rail',     label:'교통카드'},
   {key:'railkr',   label:'한국철도'},
+  {key:'tongjeon', label:'통전망'},
 ];
 const ALL_PERMS=PERM_MODULES.map(m=>m.key);
 /* 사용자의 유효 권한 (관리자=전체 / 레거시 사용자=기존엔 단말기·자재·센터가 항상 보였으므로 기본 부여) */
