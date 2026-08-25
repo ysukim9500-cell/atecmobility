@@ -154,16 +154,40 @@
     document.getElementById('dim-title').textContent = title;
 
     var go = function (entries) {
-      var top = entries.slice(0, 12);
+      // 좁은 화면에서 12개를 넣으면 이름이 겹쳐 절반이 사라진다
+      var mob = TJ.isMobile();
+      var top = entries.slice(0, mob ? 7 : 12);
       if (charts.dim) charts.dim.destroy();
+      // 항목 수에 맞춰 차트 높이를 늘려 막대가 뭉개지지 않게 한다
+      var box = document.getElementById('ch-dim').parentNode;
+      if (box) box.style.height = Math.max(mob ? 230 : 320, top.length * (mob ? 30 : 26) + 40) + 'px';
       charts.dim = new Chart(document.getElementById('ch-dim'), {
         type: 'bar',
         data: { labels: top.map(function (e) { return e[0]; }), datasets: [{ data: top.map(function (e) { return e[1]; }), backgroundColor: '#0D9488', borderRadius: 7, maxBarThickness: 26 }] },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 28 } },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return TJ.num(c.parsed.x) + '건'; } } } },
-          scales: { x: { beginAtZero: true, grid: { color: '#eef6f5' }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
-                    y: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, color: '#475569' } } }
+          plugins: {
+            legend: { display: false },
+            // 이름을 줄여 보여주므로, 손을 대면 전체 이름이 보이게 한다
+            tooltip: { callbacks: { title: function (i) { return top[i[0].dataIndex][0]; },
+                                    label: function (c) { return TJ.num(c.parsed.x) + '건'; } } }
+          },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#eef6f5' }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
+            y: {
+              grid: { display: false },
+              ticks: {
+                autoSkip: false,                       // 이름을 건너뛰지 않는다
+                font: { size: mob ? 11 : 12, weight: '600' }, color: '#475569',
+                callback: function (v) {               // 너무 길면 줄여서 겹침을 막는다
+                  var s = this.getLabelForValue ? this.getLabelForValue(v) : top[v] && top[v][0];
+                  s = String(s == null ? '' : s);
+                  var max = mob ? 9 : 16;
+                  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+                }
+              }
+            }
+          }
         }
       });
     };

@@ -123,13 +123,14 @@
         '<button class="btn-main text-[12.5px] px-4 py-2 font-extrabold" onclick="TJStock.applyRep()">적용</button>' +
         '<span id="r-count" class="text-[12.5px] text-slate-500 font-semibold md:ml-auto"></span>' +
       '</div>' +
+      '<div id="r-hint" class="text-[12px] text-slate-400 mt-2"></div>' +
     '</div>' +
     '<div class="m-list"><div class="panel" style="padding:0;overflow:hidden">' +
       '<div class="overflow-x-auto" style="max-height:620px;overflow-y:auto">' +
         '<table class="rtbl"><thead><tr>' +
           '<th class="m-keep m-date">입고일</th><th class="m-keep">품목</th>' +
-          '<th class="desk-only">터미널</th><th class="desk-only">증상</th>' +
-          '<th class="desk-only">완료일</th><th class="m-keep m-tail">상태</th>' +
+          '<th class="desk-only">출처</th><th class="desk-only">증상</th>' +
+          '<th class="m-keep m-tail">상태</th>' +
         '</tr></thead><tbody id="r-rows"></tbody></table>' +
       '</div>' +
     '</div></div>';
@@ -138,20 +139,31 @@
   function loadRepairs() {
     var q = 'tj_repairs?select=id,received_date,terminal_id,part_id,part_name_raw,terminal_name_raw,symptom,status,done_date,note,org_id&order=received_date.desc,id.desc';
     if (RF.status) q += '&status=eq.' + encodeURIComponent(RF.status);
-    return Promise.all([TJ.selectAll(q), TJ.master.parts(), TJ.master.terminals()]).then(function (r) {
+    return Promise.all([TJ.selectAll(q), TJ.master.parts(), TJ.master.terminals(), TJ.master.orgs()]).then(function (r) {
       repRows = r[0];
       var pmap = TJ.indexBy(r[1], 'id'), tmap = TJ.indexBy(r[2], 'id');
       document.getElementById('r-count').textContent = TJ.num(repRows.length) + '건';
+      var omap = TJ.indexBy(r[3] || [], 'id');
       document.getElementById('r-rows').innerHTML = repRows.length ? repRows.map(function (x) {
-        var p = pmap[x.part_id], t = tmap[x.terminal_id];
+        var p = pmap[x.part_id], t = tmap[x.terminal_id], o = omap[x.org_id];
+        // 터미널이 이어졌으면 그 이름, 아니면 원본 표기, 그것도 없으면 거점
+        var src = t ? t.name : (x.terminal_name_raw || (o ? o.name : ''));
         return '<tr onclick="TJStock.repDetail(' + x.id + ')">' +
           '<td class="m-keep m-date whitespace-nowrap">' + TJ.esc(x.received_date || '-') + '</td>' +
           '<td class="m-keep font-semibold">' + TJ.esc(p ? p.name : (x.part_name_raw || '-')) + '</td>' +
-          '<td class="desk-only">' + TJ.esc(t ? t.name : (x.terminal_name_raw || '-')) + '</td>' +
+          '<td class="desk-only">' + TJ.esc(src || '-') + '</td>' +
           '<td class="desk-only">' + TJ.esc(x.symptom || '-') + '</td>' +
-          '<td class="desk-only whitespace-nowrap">' + TJ.esc(x.done_date || '-') + '</td>' +
           '<td class="m-keep m-tail">' + TJ.statusChip(x.status) + '</td></tr>';
-      }).join('') : '<tr><td colspan="6" class="text-center text-slate-400 py-8">수리 내역이 없습니다.</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="text-center text-slate-400 py-8">수리 내역이 없습니다.</td></tr>';
+
+      // 옮겨온 기록에는 완료일이 없다 — 빈 표로 오해하지 않도록 알려준다
+      var noDone = repRows.filter(function (x) { return x.status === '완료' && !x.done_date; }).length;
+      var hint = document.getElementById('r-hint');
+      if (hint) {
+        hint.textContent = noDone
+          ? '옮겨온 기록 ' + TJ.num(noDone) + '건은 완료일이 없습니다. 원본 엑셀에 완료일 항목이 없었습니다. 앞으로 이 화면에서 완료 처리하면 날짜가 남습니다.'
+          : '';
+      }
     });
   }
 
