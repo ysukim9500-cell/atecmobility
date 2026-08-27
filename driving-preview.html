@@ -193,6 +193,19 @@ tr.flag-s td{background:#FAF7FE} tr.flag-s:hover td{background:#F4EEFC}
 .rolebar{background:#FCF2F6;border:1px solid #F0D8E3;border-radius:9px;padding:9px 13px;margin-bottom:14px;
   font-size:12px;font-weight:600;color:var(--wine-deep)}
 .rolebar b{font-weight:800}
+.done-banner{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(100deg,#0F7B4F,#12A268);color:#fff;border-radius:12px;
+  padding:15px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(15,123,79,.18);
+}
+.done-banner .ic{font-size:26px;line-height:1}
+.done-banner .tx{flex:1;min-width:220px}
+.done-banner .t1{font-weight:800;font-size:15px;letter-spacing:-.02em}
+.done-banner .t2{font-size:12.5px;opacity:.92;margin-top:2px}
+.done-banner .btn{background:#fff;border-color:#fff;color:#0B5D3B;font-weight:800}
+.done-banner .btn:hover{background:#EAF7F0}
+.done-banner .btn.gh{background:transparent;border-color:rgba(255,255,255,.55);color:#fff}
+.done-banner .btn.gh:hover{background:rgba(255,255,255,.14)}
 footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 </style>
 </head>
@@ -947,6 +960,16 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <h2 class="pg">내 현황</h2>
   <p class="pgsub">홍길동 · 운영팀 대리 · 12가 3456 · 2026년 8월</p>
 
+  <div class="done-banner">
+    <span class="ic">✓</span>
+    <span class="tx">
+      <span class="t1">6월분 결재가 모두 끝났습니다</span>
+      <span class="t2">최OO 대표이사 06.27 승인 · 결재란에 다섯 분 이름과 날짜가 채워졌습니다</span>
+    </span>
+    <button class="btn gh">문서 보기</button>
+    <button class="btn">출력하기</button>
+  </div>
+
   <div class="kpis" style="margin-bottom:13px">
     <div class="kpi"><div class="k">이번 달 내 운행</div><div class="v">42<small>건</small></div></div>
     <div class="kpi"><div class="k">내 주행거리</div><div class="v">1,240<small>km</small></div></div>
@@ -980,7 +1003,8 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
           <li><span class="pill warn">결재 중</span><span class="nm">7월분</span>
               <span class="ds">이OO 실장 검토 중 (3/5단계)</span><span class="vl">311,400원</span></li>
           <li><span class="pill ok">완료</span><span class="nm">6월분</span>
-              <span class="ds">06.28 지급 완료</span><span class="vl">289,700원</span></li>
+              <span class="ds">06.28 지급 완료</span><span class="vl">289,700원</span>
+              <button class="btn sm pri">출력</button></li>
         </ul>
       </div>
       <div class="card">
@@ -1287,6 +1311,41 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
           <li><span class="pill mute">대기</span><span class="nm">최OO</span><span class="ds">대표이사</span></li>
         </ul>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>결재가 끝난 문서 <span class="tag">누르면 바로 나옵니다</span></h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>기간</th><th>결재 완료</th><th class="num">운행</th><th class="num">금액</th><th>결재란</th><th>문서</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>2026년 6월</td><td>06.27 최OO 대표이사</td>
+            <td class="num">37건</td><td class="num" style="font-weight:800">289,700</td>
+            <td style="font-size:11.5px;color:var(--muted)">홍길동·김OO·이OO·박OO·최OO</td>
+            <td><button class="btn sm pri">운행일지 출력</button>
+                <button class="btn sm">증빙 PDF</button></td>
+          </tr>
+          <tr>
+            <td>2026년 5월</td><td>05.27 최OO 대표이사</td>
+            <td class="num">41건</td><td class="num" style="font-weight:800">302,150</td>
+            <td style="font-size:11.5px;color:var(--muted)">홍길동·김OO·이OO·박OO·최OO</td>
+            <td><button class="btn sm pri">운행일지 출력</button>
+                <button class="btn sm">증빙 PDF</button></td>
+          </tr>
+          <tr style="opacity:.55">
+            <td>2026년 7월</td><td><span class="pill info">결재 진행 중</span></td>
+            <td class="num">39건</td><td class="num">311,400</td>
+            <td style="font-size:11.5px;color:var(--muted)">3단계 / 5단계</td>
+            <td><button class="btn sm" disabled style="cursor:not-allowed">결재 후 출력</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note ok" style="margin-top:12px">
+      <b>결재가 끝나는 순간 문서가 만들어져 보관됩니다.</b> 그래서 [출력] 을 누르면 기다림 없이 바로 나오고,
+      나중에 원본 데이터가 바뀌어도 <b>결재하신 그 문서 그대로</b> 남습니다.
     </div>
   </div>
 </section>
