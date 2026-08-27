@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>차량 운행일지 · 마감/결재 — 화면 시안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#26191F; --wine:#A00040; --wine-deep:#6E002C; --magenta:#D60051;
+  --paper:#F4F0EA; --surface:#ffffff; --line:#E8E0DA; --muted:#8A7F86; --soft:#FBF8F4;
+  --ok:#0F7B4F; --ok-bg:#E7F5EE; --warn:#B45309; --warn-bg:#FDF3E3;
+  --bad:#C0182B; --bad-bg:#FCEBEC; --info:#1D4ED8; --info-bg:#EAF0FE;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+  background:var(--paper); color:var(--ink); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+
+/* ─── 시안 배너 ─── */
+.demo-flag{
+  background:linear-gradient(90deg,var(--wine-deep),var(--magenta));
+  color:#fff; text-align:center; padding:7px 14px; font-size:12.5px; font-weight:600;
+  letter-spacing:.01em;
+}
+.demo-flag b{font-weight:800}
+
+/* ─── 헤더 ─── */
+header.top{
+  background:var(--surface); border-bottom:1px solid var(--line);
+  padding:12px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  position:sticky; top:0; z-index:50;
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; letter-spacing:-.02em}
+.brand .mark{
+  width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--wine),var(--magenta)); color:#fff; font-size:14px;
+}
+.brand .sub{font-weight:600;font-size:12.5px;color:var(--muted);border-left:1px solid var(--line);padding-left:10px}
+.top .spacer{flex:1}
+.who{font-size:12.5px;color:var(--muted)}
+.who b{color:var(--ink)}
+
+/* ─── 탭 ─── */
+nav.tabs{
+  background:var(--surface); border-bottom:1px solid var(--line);
+  display:flex; gap:2px; padding:0 20px; overflow-x:auto; position:sticky; top:55px; z-index:49;
+}
+nav.tabs button{
+  appearance:none; border:0; background:none; font:inherit; font-weight:600; color:var(--muted);
+  padding:12px 15px; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap;
+}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button[aria-selected="true"]{color:var(--wine); border-bottom-color:var(--wine)}
+nav.tabs .n{
+  display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; border-radius:9px;
+  background:var(--bad); color:#fff; font-size:10.5px; font-weight:800; line-height:17px; text-align:center;
+}
+
+main{padding:20px; max-width:1400px; margin:0 auto}
+section[hidden]{display:none}
+h2.pg{font-size:19px; font-weight:800; margin:0 0 3px; letter-spacing:-.02em}
+p.pgsub{margin:0 0 18px; color:var(--muted); font-size:13px}
+
+/* ─── 카드 ─── */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
+.card + .card{margin-top:14px}
+.card h3{margin:0 0 12px; font-size:14.5px; font-weight:800; display:flex; align-items:center; gap:8px}
+.card h3 .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.grid{display:grid; gap:14px}
+@media(min-width:900px){ .grid.c2{grid-template-columns:1fr 1fr} .grid.c3{grid-template-columns:repeat(3,1fr)} }
+
+/* ─── 마감 체크리스트 ─── */
+.chk{list-style:none;margin:0;padding:0}
+.chk li{
+  display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);
+  cursor:pointer;
+}
+.chk li:last-child{border-bottom:0}
+.chk li:hover{background:var(--soft)}
+.chk .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.chk .dot.g{background:var(--ok)} .chk .dot.r{background:var(--bad)}
+.chk .nm{font-weight:600; flex:none; width:88px}
+.chk .ds{color:var(--muted); font-size:12.5px; flex:1}
+.chk .vl{font-weight:800; font-variant-numeric:tabular-nums}
+.chk .vl.g{color:var(--ok)} .chk .vl.r{color:var(--bad)}
+.chk .go{color:var(--muted); font-size:12px}
+
+/* ─── 통계 숫자 ─── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{
+  border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--soft);
+  cursor:pointer;
+}
+.stat:hover{border-color:var(--wine)}
+.stat .k{font-size:12px;color:var(--muted);font-weight:600}
+.stat .v{font-size:22px;font-weight:800;letter-spacing:-.03em;margin-top:3px;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:13px;font-weight:700;color:var(--muted);margin-left:2px}
+.stat.alert .v{color:var(--bad)}
+
+/* ─── 버튼 ─── */
+.btn{
+  appearance:none; font:inherit; font-weight:700; font-size:13px; cursor:pointer;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  padding:8px 14px; border-radius:8px;
+}
+.btn:hover{background:var(--soft)}
+.btn.pri{background:var(--wine); border-color:var(--wine); color:#fff}
+.btn.pri:hover{background:var(--wine-deep)}
+.btn.pri[disabled]{background:#D9CFD4;border-color:#D9CFD4;color:#fff;cursor:not-allowed}
+.btn.sm{padding:5px 10px; font-size:12px; border-radius:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.end{justify-content:flex-end}
+
+/* ─── 업로드 ─── */
+.drop{
+  border:2px dashed #D9CBD2; border-radius:12px; padding:26px 18px; text-align:center;
+  background:var(--soft); cursor:pointer;
+}
+.drop:hover{border-color:var(--magenta); background:#FDF6F9}
+.drop .ic{font-size:26px}
+.drop .t{font-weight:800; margin-top:7px}
+.drop .s{color:var(--muted); font-size:12.5px; margin-top:3px}
+
+/* ─── 표 ─── */
+.tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; min-width:920px; font-size:13px}
+th,td{padding:9px 11px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+th{background:var(--soft); font-weight:700; font-size:12px; color:var(--muted); position:sticky; top:0}
+tbody tr:hover{background:#FDFAFB; cursor:pointer}
+tbody tr:last-child td{border-bottom:0}
+td.num{text-align:right; font-variant-numeric:tabular-nums}
+tr.flag td{background:#FEF7F7}
+tr.flag:hover td{background:#FDEFF0}
+
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:700;line-height:1.55}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.info{background:var(--info-bg);color:var(--info)}
+.pill.mute{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+
+/* ─── 필터 탭 ─── */
+.ftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ftabs button{
+  appearance:none;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);
+  padding:6px 12px;border-radius:20px;
+}
+.ftabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.ftabs button .c{opacity:.65;margin-left:5px;font-weight:600}
+
+/* ─── 대조 결과 ─── */
+.cmp{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.cmp .hd{
+  display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--soft);
+  border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.cmp .hd .ttl{font-weight:800}
+.cmp .hd .spacer{flex:1}
+.cmp .bd{padding:12px 14px}
+.money{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.money .box{border:1px solid var(--line);border-radius:8px;padding:8px 13px;min-width:118px;background:var(--surface)}
+.money .box .k{font-size:11.5px;color:var(--muted);font-weight:600}
+.money .box .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.money .box.old .v{color:var(--muted);text-decoration:line-through}
+.money .box.new{border-color:var(--ok)}
+.money .box.new .v{color:var(--ok)}
+.money .arr{color:var(--muted);font-size:17px;font-weight:800}
+.money .diff{font-weight:800;color:var(--bad);font-size:13px}
+.lines{list-style:none;margin:0;padding:0;font-size:12.5px}
+.lines li{display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);color:var(--muted)}
+.lines li:last-child{border-bottom:0}
+.lines .tm{font-variant-numeric:tabular-nums;width:104px;flex:none}
+.lines .am{font-variant-numeric:tabular-nums;width:66px;flex:none;text-align:right;color:var(--ink);font-weight:700}
+.lines .of{flex:1;color:var(--ink)}
+
+/* ─── 결재선 ─── */
+.line-set{display:grid;gap:10px}
+.step-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.step-row .no{
+  width:26px;height:26px;border-radius:50%;background:var(--soft);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:11.5px;font-weight:800;color:var(--muted);flex:none
+}
+select.pick{
+  font:inherit;font-size:13px;font-weight:600;padding:7px 11px;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface);color:var(--ink);min-width:190px;
+}
+label.remember{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-top:4px;cursor:pointer}
+label.remember input{width:15px;height:15px;accent-color:var(--wine)}
+
+.flow{list-style:none;margin:0;padding:0}
+.flow li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:center}
+.flow li:last-child{border-bottom:0}
+.flow .mk{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none}
+.flow .mk.done{background:var(--ok-bg);color:var(--ok)}
+.flow .mk.now{background:var(--info-bg);color:var(--info)}
+.flow .mk.wait{background:var(--soft);color:#C6BAC1;border:1px solid var(--line)}
+.flow .nm{font-weight:700;width:150px;flex:none}
+.flow .st{flex:1;color:var(--muted);font-size:12.5px}
+.flow li.now .nm{color:var(--info)}
+
+.note{
+  background:var(--info-bg);border:1px solid #C7D7FB;color:#1E3A8A;border-radius:9px;
+  padding:11px 14px;font-size:12.5px;line-height:1.6;
+}
+.note b{font-weight:800}
+.note.warn{background:var(--warn-bg);border-color:#F0DCB8;color:#7C4A0B}
+
+footer{padding:26px 20px 40px;text-align:center;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="demo-flag">
+  <b>화면 시안</b> · 실제 데이터가 아니라 예시입니다. 아직 서버에 연결되어 있지 않고, 버튼을 눌러도 저장되지 않습니다.
+</div>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark">A</span>
+    <span>ATEC Mobility</span>
+    <span class="sub">차량 운행일지 · 마감/결재</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="who">2026년 8월 마감 · <b>관리자</b></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button aria-selected="true" data-t="close">마감 현황</button>
+  <button aria-selected="false" data-t="logs">운행일지</button>
+  <button aria-selected="false" data-t="toll">하이패스 대조<span class="n">2</span></button>
+  <button aria-selected="false" data-t="appr">결재</button>
+</nav>
+
+<main>
+
+<!-- ══════════════ ① 마감 현황 ══════════════ -->
+<section id="close">
+  <h2 class="pg">2026년 8월 마감</h2>
+  <p class="pgsub">2026.08.01 ~ 2026.08.31 · 아래 다섯 가지가 모두 초록이어야 결재를 올릴 수 있습니다.</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>마감 점검 <span class="tag">5개 항목</span></h3>
+      <ul class="chk">
+        <li><span class="dot g"></span><span class="nm">운행일지</span>
+            <span class="ds">필수 항목이 빈 운행</span><span class="vl g">0건</span><span class="go">›</span></li>
+        <li><span class="dot r"></span><span class="nm">통행료</span>
+            <span class="ds">금액이 확정되지 않은 운행</span><span class="vl r">37건</span><span class="go">›</span></li>
+        <li><span class="dot r"></span><span class="nm">영수증</span>
+            <span class="ds">비용은 있는데 증빙이 없음</span><span class="vl r">6건</span><span class="go">›</span></li>
+        <li><span class="dot g"></span><span class="nm">주차</span>
+            <span class="ds">입력 금액과 영수증 금액 대조</span><span class="vl g">일치</span><span class="go">›</span></li>
+        <li><span class="dot r"></span><span class="nm">계기판</span>
+            <span class="ds">앞 운행 종료값 ≠ 다음 시작값</span><span class="vl r">2건</span><span class="go">›</span></li>
+      </ul>
+      <div class="row end" style="margin-top:14px">
+        <button class="btn pri" disabled>승인요청 — 빨간 항목 3개를 먼저 처리하세요</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>이번 달 요약</h3>
+        <div class="stats">
+          <div class="stat"><div class="k">운행</div><div class="v">312<small>건</small></div></div>
+          <div class="stat"><div class="k">주행거리</div><div class="v">5,847<small>km</small></div></div>
+          <div class="stat"><div class="k">유류비</div><div class="v">1,024<small>천원</small></div></div>
+          <div class="stat alert"><div class="k">통행료 미확정</div><div class="v">37<small>건</small></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>하이패스 영수증 올리기</h3>
+        <div class="drop">
+          <div class="ic">📄</div>
+          <div class="t">PDF를 여기에 끌어놓으세요</div>
+          <div class="s">하이패스 홈페이지에서 받은 영수증 파일 · 여러 개 한 번에 가능</div>
+        </div>
+        <div class="note" style="margin-top:12px">
+          <b>이렇게 동작합니다.</b> 영수증에 찍힌 <b>통과 시각</b>과 <b>카드 뒷자리</b>를 읽어,
+          그 시각에 운행 중이던 차량의 운행에 자동으로 붙입니다.
+          한 운행에 여러 번 지나갔으면 합산합니다. <b>자동으로 덮어쓰지 않고</b> 사람이 확인한 뒤 반영합니다.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ ② 운행일지 ══════════════ -->
+<section id="logs" hidden>
+  <h2 class="pg">운행일지</h2>
+  <p class="pgsub">표에서 바로 고칠 수 있습니다. 고친 기록은 <b>수정된 기록</b> 탭에 따로 모여 누가 언제 무엇을 바꿨는지 남습니다.</p>
+
+  <div class="ftabs">
+    <button aria-pressed="true">전체<span class="c">312</span></button>
+    <button aria-pressed="false">통행료 미확정<span class="c">37</span></button>
+    <button aria-pressed="false">증빙 누락<span class="c">6</span></button>
+    <button aria-pressed="false">수정된 기록<span class="c">14</span></button>
+    <button aria-pressed="false">이상 의심<span class="c">2</span></button>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th>운행일자</th><th>목적</th><th>차량</th><th>기사</th>
+          <th style="text-align:right">거리</th><th>운행시간</th><th>도착지</th>
+          <th style="text-align:right">계기판</th><th style="text-align:right">통행료</th>
+          <th style="text-align:right">주차</th><th>증빙</th><th>특이사항</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>08.18(화)</td><td>일반업무</td><td>12가 3456</td><td>홍길동</td>
+          <td class="num">83km</td><td>16:57~18:18</td><td>경기 성남시 분당구</td>
+          <td class="num">127,066</td>
+          <td class="num"><span class="pill ok">800원</span></td>
+          <td class="num">—</td><td><span class="pill ok">있음</span></td>
+          <td><span class="pill info">하이패스 확정</span></td>
+        </tr>
+        <tr class="flag">
+          <td>08.17(월)</td><td>일반업무</td><td>12가 3456</td><td>홍길동</td>
+          <td class="num">47km</td><td>09:12~10:30</td><td>서울 강남구 역삼동</td>
+          <td class="num">126,983</td>
+          <td class="num"><span class="pill bad">미확정</span></td>
+          <td class="num">3,000</td><td><span class="pill bad">없음</span></td>
+          <td><span class="pill bad">주차 영수증 누락</span></td>
+        </tr>
+        <tr>
+          <td>08.14(금)</td><td>출퇴근</td><td>34나 5678</td><td>김철수</td>
+          <td class="num">18km</td><td>18:40~19:05</td><td>경기 용인시 수지구</td>
+          <td class="num">88,412</td>
+          <td class="num"><span class="pill mute">0원</span></td>
+          <td class="num">—</td><td><span class="pill mute">해당없음</span></td>
+          <td>—</td>
+        </tr>
+        <tr class="flag">
+          <td>08.13(목)</td><td>일반업무</td><td>34나 5678</td><td>김철수</td>
+          <td class="num">112km</td><td>09:06~10:22</td><td>인천 연수구 송도동</td>
+          <td class="num">88,394</td>
+          <td class="num"><span class="pill ok">1,000원</span></td>
+          <td class="num">—</td><td><span class="pill ok">있음</span></td>
+          <td><span class="pill warn">계기판 불연속 · 앞 운행 종료 88,390</span></td>
+        </tr>
+        <tr>
+          <td>08.12(수)</td><td>일반업무</td><td>56다 7890</td><td>이영희</td>
+          <td class="num">64km</td><td>13:20~14:35</td><td>경기 화성시 동탄</td>
+          <td class="num">45,120</td>
+          <td class="num"><span class="pill ok">2,200원</span></td>
+          <td class="num">2,000</td><td><span class="pill ok">있음</span></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>08.11(화)</td><td>비업무용</td><td>56다 7890</td><td>이영희</td>
+          <td class="num">9km</td><td>19:40~19:58</td><td>경기 수원시 영통구</td>
+          <td class="num">45,056</td>
+          <td class="num"><span class="pill mute">0원</span></td>
+          <td class="num">—</td><td><span class="pill mute">해당없음</span></td>
+          <td><span class="pill mute">개인 사용</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn" style="margin-top:14px">
+    <b>앱에서는 못 고치게 잠급니다.</b> 운행 시각과 거리는 앱에서 수정 불가로 두고, 수정은 이 화면에서만 합니다.
+    그러면 "앱에서 고친 값"과 "웹에서 고친 값"이 서로 부딪히는 일이 아예 생기지 않습니다.
+  </div>
+</section>
+
+<!-- ══════════════ ③ 하이패스 대조 ══════════════ -->
+<section id="toll" hidden>
+  <h2 class="pg">하이패스 대조 결과</h2>
+  <p class="pgsub">report.pdf · 영수증 28건을 읽어 운행에 붙였습니다. 아래 두 건은 <b>지금 값과 다릅니다.</b></p>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="stats">
+      <div class="stat"><div class="k">읽은 영수증</div><div class="v">28<small>건</small></div></div>
+      <div class="stat"><div class="k">운행에 배분</div><div class="v">19<small>건</small></div></div>
+      <div class="stat"><div class="k">지금 값과 일치</div><div class="v">7<small>건</small></div></div>
+      <div class="stat alert"><div class="k">지금 값과 다름</div><div class="v">2<small>건</small></div></div>
+      <div class="stat"><div class="k">미확정→확정</div><div class="v">4<small>건</small></div></div>
+      <div class="stat alert"><div class="k">붙일 운행 없음</div><div class="v">9<small>건</small></div></div>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div class="hd">
+      <span class="pill bad">다름</span>
+      <span class="ttl">07.31 (목) 20:31 ~ 21:45 · 12가 3456 · 홍길동</span>
+      <span class="spacer"></span>
+      <button class="btn sm">그대로 두기</button>
+      <button class="btn sm pri">영수증 금액으로 고치기</button>
+    </div>
+    <div class="bd">
+      <div class="money">
+        <div class="box old"><div class="k">지금 값</div><div class="v">2,900원</div></div>
+        <span class="arr">→</span>
+        <div class="box new"><div class="k">영수증 합계</div><div class="v">950원</div></div>
+        <span class="diff">1,950원 더 많게 잡혀 있었습니다</span>
+      </div>
+      <ul class="lines">
+        <li><span class="tm">07-31 20:49</span><span class="am">500원</span><span class="of">한국도로공사 판교영업소</span></li>
+        <li><span class="tm">07-31 20:55</span><span class="am">0원</span><span class="of">한국도로공사 청계영업소</span></li>
+        <li><span class="tm">07-31 21:13</span><span class="am">450원</span><span class="of">한국도로공사 시흥영업소</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div class="hd">
+      <span class="pill bad">다름</span>
+      <span class="ttl">08.18 (화) 16:57 ~ 18:18 · 12가 3456 · 홍길동</span>
+      <span class="spacer"></span>
+      <button class="btn sm">그대로 두기</button>
+      <button class="btn sm pri">영수증 금액으로 고치기</button>
+    </div>
+    <div class="bd">
+      <div class="money">
+        <div class="box old"><div class="k">지금 값 <span style="font-weight:400">(경로 계산)</span></div><div class="v">1,000원</div></div>
+        <span class="arr">→</span>
+        <div class="box new"><div class="k">영수증 금액</div><div class="v">800원</div></div>
+        <span class="diff">200원 더 많게 잡혀 있었습니다</span>
+      </div>
+      <ul class="lines">
+        <li><span class="tm">08-18 18:04</span><span class="am">800원</span><span class="of">한국도로공사 판교영업소</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div class="hd">
+      <span class="pill warn">붙일 운행 없음 · 9건</span>
+      <span class="ttl">통행 기록은 있는데 그 시각에 운행일지가 없습니다</span>
+      <span class="spacer"></span>
+      <button class="btn sm">운행 만들어 붙이기</button>
+      <button class="btn sm">다른 차량 카드로 표시</button>
+    </div>
+    <div class="bd">
+      <ul class="lines">
+        <li><span class="tm">07-06 23:29</span><span class="am">1,000원</span><span class="of">한국도로공사 청계영업소</span></li>
+        <li><span class="tm">07-06 23:47</span><span class="am">900원</span><span class="of">한국도로공사 시흥영업소</span></li>
+        <li><span class="tm">07-11 20:09</span><span class="am">2,200원</span><span class="of">한국도로공사 서울영업소 (입구 기흥)</span></li>
+        <li><span class="tm">07-14 12:25</span><span class="am">1,000원</span><span class="of">한국도로공사 대왕판교영업소</span></li>
+        <li style="color:var(--muted)"><span class="tm">…</span><span class="am"></span><span class="of">그 외 5건</span></li>
+      </ul>
+      <div class="note" style="margin-top:12px">
+        기사가 운행일지를 안 썼거나, 이 카드가 다른 차량 것일 수 있습니다.
+        <b>카드 뒷자리와 차량을 한 번 연결해 두면</b> 다음 달부터는 이런 일이 줄어듭니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="row end" style="margin-top:14px">
+    <button class="btn">나중에</button>
+    <button class="btn pri">확인한 내용 반영하기</button>
+  </div>
+</section>
+
+<!-- ══════════════ ④ 결재 ══════════════ -->
+<section id="appr" hidden>
+  <h2 class="pg">결재</h2>
+  <p class="pgsub">회사 운행일지 서식의 결재란(담당·팀장·실장·사업부장·대표이사)을 그대로 전자화했습니다.</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>결재선 <span class="tag">처음 한 번만 정하면 됩니다</span></h3>
+      <div class="line-set">
+        <div class="step-row"><span class="no">1</span>
+          <select class="pick"><option>담당 — 본인</option></select></div>
+        <div class="step-row"><span class="no">2</span>
+          <select class="pick">
+            <option>팀장 — 이름을 고르세요</option>
+            <option selected>김OO 팀장 (운영팀)</option>
+            <option>박OO 팀장 (지원팀)</option>
+          </select></div>
+        <div class="step-row"><span class="no">3</span>
+          <select class="pick">
+            <option>실장 — 이름을 고르세요</option>
+            <option selected>이OO 실장</option>
+          </select></div>
+        <div class="step-row"><span class="no">4</span>
+          <select class="pick">
+            <option>사업부장 — 이름을 고르세요</option>
+            <option selected>박OO 사업부장</option>
+          </select></div>
+        <div class="step-row"><span class="no">5</span>
+          <select class="pick">
+            <option>대표이사 — 이름을 고르세요</option>
+            <option selected>최OO 대표이사</option>
+          </select></div>
+      </div>
+      <label class="remember"><input type="checkbox" checked>
+        <span>다음 달부터 이 결재선을 그대로 씁니다</span></label>
+      <div class="note" style="margin-top:12px">
+        한 번 저장해 두면 다음 달에는 <b>이 화면이 안 뜨고</b> 저장된 결재선으로 바로 올라갑니다.
+        사람이 바뀌었을 때만 <b>[바꾸기]</b>를 누르면 됩니다.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>진행 상황 <span class="tag">2026년 7월분 · 예시</span></h3>
+      <ul class="flow">
+        <li><span class="mk done">✓</span><span class="nm">홍길동 담당</span>
+            <span class="st">08.01 09:02 상신</span></li>
+        <li><span class="mk done">✓</span><span class="nm">김OO 팀장</span>
+            <span class="st">08.01 14:20 승인</span></li>
+        <li class="now"><span class="mk now">●</span><span class="nm">이OO 실장</span>
+            <span class="st">검토 중 — 여기서 멈춰 있습니다</span></li>
+        <li><span class="mk wait">·</span><span class="nm">박OO 사업부장</span><span class="st">대기</span></li>
+        <li><span class="mk wait">·</span><span class="nm">최OO 대표이사</span><span class="st">대기</span></li>
+      </ul>
+      <div class="note warn" style="margin-top:12px">
+        누가 <b>반려</b>하면 의견과 함께 제출자에게 돌아가고, 고쳐서 다시 올리면 <b>1차부터</b> 다시 돕니다.
+        전원 승인되면 그 달은 <b>잠기고</b>, 결재란에 이름과 날짜가 채워진 엑셀이 나옵니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>결재 완료 시 나오는 문서</h3>
+    <div class="row">
+      <button class="btn">운행일지 엑셀 (결재란 채워짐)</button>
+      <button class="btn">증빙 모음 PDF</button>
+      <button class="btn">유류비 정산 내역</button>
+      <span style="flex:1"></span>
+      <span class="pill mute">편집 잠금 비밀번호 설정 가능</span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>ATEC Mobility · 차량 운행일지 마감/결재 화면 시안 · 서버 미연결</footer>
+
+<script>
+(function(){
+  var tabs = document.getElementById('tabs');
+  var ids = ['close','logs','toll','appr'];
+  tabs.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-t]'); if(!b) return;
+    [].forEach.call(tabs.querySelectorAll('button'), function(x){
+      x.setAttribute('aria-selected', String(x === b));
+    });
+    ids.forEach(function(id){
+      document.getElementById(id).hidden = (id !== b.dataset.t);
+    });
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  // 필터 탭 — 시안이라 표시만 바뀐다
+  [].forEach.call(document.querySelectorAll('.ftabs'), function(g){
+    g.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      [].forEach.call(g.querySelectorAll('button'), function(x){
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
