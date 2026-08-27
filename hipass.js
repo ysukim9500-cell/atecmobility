@@ -214,6 +214,19 @@
     return groups;
   }
 
+  /** 사람이 직접 정한 통행료인가. 서버의 보호 트리거(old_by_person)와 같은 기준을 쓴다. */
+  var PERSON_SOURCES = ['미입력', 'legacy-client-compat', '하이패스 영수증', '웹 직접 입력'];
+  function bySource(src) {
+    var s = String(src || '');
+    if (!s) return 'none';
+    if (s.indexOf('기사 ') === 0 || s.indexOf('사용자 입력') === 0) return 'person';
+    if (PERSON_SOURCES.indexOf(s) >= 0) return 'person';
+    if (s === '자동계산 실패' || s === '영업소 요금표' || s === '요금소 미통과(실주행 GPS)') return 'machine';
+    if (s.indexOf('카카오 길찾기') === 0) return 'machine';
+    if (s === 'legacy migration') return 'person';   // 이관된 사람 입력값
+    return 'unknown';
+  }
+
   /** 그룹의 차량이 정해진 상태에서 실제 배분을 계산한다(차량을 바꾸면 다시 부른다). */
   function assign(g, trips) {
     var mine = g.plate ? trips.filter(function (t) { return t.plate_no === g.plate; }) : [];
@@ -222,6 +235,7 @@
       var hit = null;
       for (var i = 0; i < mine.length; i++) {
         var t = mine[i];
+        // 통과시각이 [출발, 도착] 안이면 그 운행이다. 수기 입력 운행도 시각이 있으면 똑같이 잡힌다.
         if (t.end_time && t.start_time <= r.at && r.at <= t.end_time) { hit = t; break; }
       }
       if (!hit) { unmatched.push(r); return; }
@@ -232,15 +246,31 @@
 
     g.matched = Array.from(per.values()).map(function (e) {
       var cur = e.trip.toll_cost;
-      var unset = e.trip.toll_status === 'UNKNOWN' || e.trip.toll_status === 'PENDING' || cur == null;
-      e.kind = unset ? 'new' : (Number(cur) === e.sum ? 'same' : 'diff');
-      e.diff = unset ? null : e.sum - Number(cur);
-      e.pick = e.kind !== 'same';           // 같은 값은 굳이 다시 쓸 필요가 없다
+      var st = e.trip.toll_status;
+      var unset = st === 'UNKNOWN' || st === 'PENDING' || cur == null;
+      var who = bySource(e.trip.toll_source);
+
+      if (unset) {
+        e.kind = 'new';                 // 미확정 → 확정. 잃을 게 없다.
+        e.diff = null; e.pick = true;
+      } else if (Number(cur) === e.sum) {
+        e.kind = 'same';                // 값이 같다. 굳이 다시 쓸 필요가 없다.
+        e.diff = 0; e.pick = false;
+      } else if (who === 'person') {
+        // ★ 사람이 직접 정한 값이다. 영수증이 더 정확하더라도 **기본으로 덮지 않는다** —
+        //   관리자가 눈으로 보고 직접 고르게 한다.
+        e.kind = 'diff-person';
+        e.diff = e.sum - Number(cur); e.pick = false;
+      } else {
+        e.kind = 'diff';                // 자동계산과 다르다. 영수증이 실제 청구액이므로 기본 선택.
+        e.diff = e.sum - Number(cur); e.pick = true;
+      }
+      e.who = who;
       return e;
     }).sort(function (a, b) { return a.trip.start_time - b.trip.start_time; });
     g.unmatched = unmatched;
     return g;
   }
 
-  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign };
+  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource };
 })(window);
