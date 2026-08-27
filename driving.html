@@ -559,7 +559,28 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   });
 
   /* ═══════════ 하이패스 ═══════════ */
-  var GROUPS = [], BATCH = '';
+  var GROUPS = [], BATCH = '', HP_TRIPS = [];
+
+  /** 영수증 기간을 덮는 운행을 전부 받아온다(페이지 단위로 이어서). */
+  function fetchTripsRange(lo, hi) {
+    var cols = 'id,username,plate_no,start_time,end_time,toll_cost,toll_status,toll_source';
+    var acc = [];
+    function page(off) {
+      return apiRetry('/rest/v1/trips?select=' + cols +
+        '&deleted_at=is.null&start_time=gte.' + lo + '&start_time=lte.' + hi +
+        '&order=start_time.asc&offset=' + off + '&limit=1000')
+        .then(function (r) {
+          if (!r.ok) throw new Error('운행을 불러오지 못했습니다 (' + r.status + ')');
+          return r.json();
+        })
+        .then(function (rows) {
+          acc = acc.concat(rows || []);
+          if ((rows || []).length < 1000 || off > 9000) return acc;
+          return page(off + 1000);
+        });
+    }
+    return page(0);
+  }
 
   function bindDrop() {
     var d = $('drop'), i = $('pdf');
@@ -585,14 +606,25 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       var recs = [].concat.apply([], lists);
       BATCH = names.join(', ');
       if (!recs.length) throw new Error('영수증을 하나도 찾지 못했습니다.');
-      GROUPS = Hipass.match(recs, ALL);
-      renderHipass();
+      // 화면에 걸린 마감분과 상관없이, **영수증이 덮는 기간**의 운행을 따로 받아 맞춘다.
+      // (7월 영수증을 올렸는데 화면이 9월 마감분이라 하나도 안 붙는 일이 없게)
+      var lo = Math.min.apply(null, recs.map(function (r) { return r.at; })) - 864e5;
+      var hi = Math.max.apply(null, recs.map(function (r) { return r.at; })) + 864e5;
+      return fetchTripsRange(lo, hi).then(function (trips) {
+        HP_TRIPS = trips;
+        GROUPS = Hipass.match(recs, trips);
+        renderHipass(lo, hi, trips.length);
+      });
     }).catch(function (e) {
       $('hpResult').innerHTML = '<div class="res bad">' + esc(e.message || '읽지 못했습니다') + '</div>';
     }).then(function () { $('hpBusy').style.display = 'none'; });
   }
 
-  function renderHipass() {
+  function renderHipass(lo, hi, nTrips) {
+    if (lo) {
+      $('hpSub').innerHTML = '영수증 기간 <b>' + md(lo + 864e5) + ' ~ ' + md(hi - 864e5) +
+        '</b> 의 운행 ' + nTrips + '건과 대조했습니다 · 화면 위 마감분 선택과 무관하게 맞춥니다';
+    }
     var read = 0, hit = 0, same = 0, diff = 0, neu = 0, missN = 0;
     GROUPS.forEach(function (g) {
       read += g.records.length; missN += g.unmatched.length;
@@ -677,7 +709,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       sel.addEventListener('change', function () {
         var g = GROUPS[+sel.dataset.plate];
         g.plate = sel.value;
-        Hipass.assign(g, ALL);
+        Hipass.assign(g, HP_TRIPS.length ? HP_TRIPS : ALL);
         renderHipass();
       });
     });
