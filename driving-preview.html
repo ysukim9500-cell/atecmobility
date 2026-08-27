@@ -180,6 +180,18 @@ tr.flag-s td{background:#FAF7FE} tr.flag-s:hover td{background:#F4EEFC}
 .drop:hover{border-color:var(--magenta);background:#FDF6F9}
 .drop .t{font-weight:800;margin-top:6px} .drop .s{color:var(--muted);font-size:12px;margin-top:3px}
 
+.roleswitch{display:flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);
+  border-radius:9px;padding:3px 4px 3px 10px}
+.roleswitch .lb{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
+.roleswitch button{appearance:none;font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;
+  background:none;color:var(--muted);padding:4px 9px;border-radius:6px;display:flex;align-items:center;gap:5px}
+.roleswitch button em{font-style:normal;font-size:10px;font-weight:600;opacity:.6}
+.roleswitch button:hover{background:#fff;color:var(--ink)}
+.roleswitch button.on{background:var(--wine);border-color:var(--wine);color:#fff}
+.roleswitch button.on em{opacity:.75}
+.rolebar{background:#FCF2F6;border:1px solid #F0D8E3;border-radius:9px;padding:9px 13px;margin-bottom:14px;
+  font-size:12px;font-weight:600;color:var(--wine-deep)}
+.rolebar b{font-weight:800}
 footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 </style>
 </head>
@@ -192,31 +204,57 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     <span class="sub">차량 운행일지 관리</span></div>
   <div class="sp"></div>
   <div class="syncchip" title="앱과 웹이 서로 맞춰진 시각"><span class="d"></span>동기화 2분 전 · 대기 3건</div>
-  <div class="who">2026년 8월 · <b>관리자</b></div>
+  <div class="roleswitch" id="roleswitch">
+    <span class="lb">이 화면으로 보기</span>
+    <button data-r="driver">기사<em>54명</em></button>
+    <button data-r="approver">결재자<em>5명</em></button>
+    <button data-r="admin" class="on">관리자<em>3명</em></button>
+  </div>
 </header>
 
 <div class="wrap">
 <aside id="nav">
-  <div class="grp">현황</div>
-  <a class="on" data-p="dash"><span class="ic">▦</span>대시보드</a>
-  <a data-p="sync"><span class="ic">⇄</span>동기화 상태<span class="b">3</span></a>
+  <!-- 기사 -->
+  <div class="grp" data-r="driver">내 운행</div>
+  <a data-r="driver" data-p="dDash"><span class="ic">▦</span>내 현황</a>
+  <a data-r="driver" data-p="dLogs"><span class="ic">☰</span>내 운행일지</a>
+  <a data-r="driver" data-p="dEvid"><span class="ic">▤</span>내 증빙 올리기<span class="b">2</span></a>
+  <a data-r="driver" data-p="dToll"><span class="ic">₩</span>내 통행료<span class="b">5</span></a>
+  <div class="grp" data-r="driver">나</div>
+  <a data-r="driver" data-p="dSafety"><span class="ic">◈</span>내 안전운전</a>
+  <a data-r="driver" data-p="dEdu"><span class="ic">▷</span>안전교육<span class="b">1</span></a>
+  <a data-r="driver" data-p="dSettle"><span class="ic">⛽</span>내 정산 내역</a>
+  <a data-r="driver" data-p="dAppr"><span class="ic">✓</span>제출·결재 현황</a>
+  <div class="grp" data-r="driver">설정</div>
+  <a data-r="driver" data-p="dProfile"><span class="ic">☺</span>프로필·차량</a>
 
-  <div class="grp">운행</div>
-  <a data-p="logs"><span class="ic">☰</span>운행일지</a>
-  <a data-p="detail"><span class="ic">◉</span>운행 상세·지도</a>
-  <a data-p="toll"><span class="ic">₩</span>통행료<span class="b">37</span></a>
-  <a data-p="evid"><span class="ic">▤</span>증빙·영수증<span class="b">6</span></a>
+  <!-- 결재자 -->
+  <div class="grp" data-r="approver">결재</div>
+  <a data-r="approver" data-p="aInbox"><span class="ic">✓</span>결재함<span class="b">3</span></a>
+  <a data-r="approver" data-p="aDept"><span class="ic">▦</span>우리 부서 현황</a>
+  <div class="grp" data-r="approver">내 운행</div>
+  <a data-r="approver" data-p="dDash"><span class="ic">☰</span>내 현황</a>
+  <a data-r="approver" data-p="dLogs"><span class="ic">☰</span>내 운행일지</a>
+  <a data-r="approver" data-p="dSettle"><span class="ic">⛽</span>내 정산 내역</a>
 
-  <div class="grp">사람·차량</div>
-  <a data-p="safety"><span class="ic">◈</span>안전운전</a>
-  <a data-p="edu"><span class="ic">▷</span>안전교육<span class="b">4</span></a>
-  <a data-p="staff"><span class="ic">☺</span>기사·권한</a>
-  <a data-p="cars"><span class="ic">▭</span>차량</a>
-
-  <div class="grp">마감</div>
-  <a data-p="settle"><span class="ic">⛽</span>정산·유류단가</a>
-  <a data-p="appr"><span class="ic">✓</span>결재<span class="b g">1</span></a>
-  <a data-p="out"><span class="ic">⤓</span>출력·리포트</a>
+  <!-- 관리자 -->
+  <div class="grp" data-r="admin">현황</div>
+  <a data-r="admin" data-p="dash"><span class="ic">▦</span>대시보드</a>
+  <a data-r="admin" data-p="sync"><span class="ic">⇄</span>동기화 상태<span class="b">3</span></a>
+  <div class="grp" data-r="admin">운행</div>
+  <a data-r="admin" data-p="logs"><span class="ic">☰</span>운행일지</a>
+  <a data-r="admin" data-p="detail"><span class="ic">◉</span>운행 상세·지도</a>
+  <a data-r="admin" data-p="toll"><span class="ic">₩</span>통행료<span class="b">37</span></a>
+  <a data-r="admin" data-p="evid"><span class="ic">▤</span>증빙·영수증<span class="b">6</span></a>
+  <div class="grp" data-r="admin">사람·차량</div>
+  <a data-r="admin" data-p="safety"><span class="ic">◈</span>안전운전</a>
+  <a data-r="admin" data-p="edu"><span class="ic">▷</span>안전교육<span class="b">4</span></a>
+  <a data-r="admin" data-p="staff"><span class="ic">☺</span>기사·권한</a>
+  <a data-r="admin" data-p="cars"><span class="ic">▭</span>차량</a>
+  <div class="grp" data-r="admin">마감</div>
+  <a data-r="admin" data-p="settle"><span class="ic">⛽</span>정산·유류단가</a>
+  <a data-r="admin" data-p="appr"><span class="ic">✓</span>결재<span class="b g">1</span></a>
+  <a data-r="admin" data-p="out"><span class="ic">⤓</span>출력·리포트</a>
 </aside>
 
 <main>
@@ -901,6 +939,483 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
+
+<!-- ══════ 기사: 내 현황 ══════ -->
+<section id="dDash" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 운행만 보이고, 남의 기록은 보이지 않습니다.</div>
+  <h2 class="pg">내 현황</h2>
+  <p class="pgsub">홍길동 · 운영팀 대리 · 12가 3456 · 2026년 8월</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">이번 달 내 운행</div><div class="v">42<small>건</small></div></div>
+    <div class="kpi"><div class="k">내 주행거리</div><div class="v">1,240<small>km</small></div></div>
+    <div class="kpi"><div class="k">내 안전점수</div><div class="v">94<small>점</small></div><div class="d up">전체 평균 84</div></div>
+    <div class="kpi"><div class="k">이번 달 예상 정산</div><div class="v">327,900<small>원</small></div></div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>내가 할 일 <span class="tag">마감 D-3</span><span class="sp"></span><span class="pill warn">3건</span></h3>
+      <ul class="lst">
+        <li><span class="pill bad">해야 함</span><span class="nm">통행료</span>
+            <span class="ds">금액을 못 정한 운행</span><span class="vl">5건</span></li>
+        <li><span class="pill bad">해야 함</span><span class="nm">영수증</span>
+            <span class="ds">주차비 넣었는데 사진 없음</span><span class="vl">2건</span></li>
+        <li><span class="pill warn">해야 함</span><span class="nm">안전교육</span>
+            <span class="ds">8월 회차 · 진도 45%</span><span class="vl">미완료</span></li>
+        <li><span class="pill ok">끝남</span><span class="nm">계기판</span>
+            <span class="ds">빠진 날 없음</span><span class="vl">정상</span></li>
+      </ul>
+      <div class="note warn" style="margin-top:11px">
+        이 세 가지를 끝내야 <b>제출</b>할 수 있습니다. 하나씩 누르면 바로 그 화면으로 갑니다.
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>내 제출 상태</h3>
+        <ul class="lst">
+          <li><span class="pill info">작성 중</span><span class="nm">8월분</span>
+              <span class="ds">08.01 ~ 08.31 · 42건</span><span class="vl">327,900원</span></li>
+          <li><span class="pill warn">결재 중</span><span class="nm">7월분</span>
+              <span class="ds">이OO 실장 검토 중 (3/5단계)</span><span class="vl">311,400원</span></li>
+          <li><span class="pill ok">완료</span><span class="nm">6월분</span>
+              <span class="ds">06.28 지급 완료</span><span class="vl">289,700원</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>알림</h3>
+        <ul class="lst">
+          <li><span class="pill warn">D-3</span><span class="ds">8월 안전교육을 아직 다 안 보셨습니다</span></li>
+          <li><span class="pill info">알림</span><span class="ds">08.17 주차비 2,500원 영수증이 없습니다</span></li>
+          <li><span class="pill mute">안내</span><span class="ds">12가 3456 보험 갱신 D-12</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 기사: 내 운행일지 ══════ -->
+<section id="dLogs" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 운행만 보입니다.</div>
+  <h2 class="pg">내 운행일지</h2>
+  <p class="pgsub">42건 · 폰에서 하나씩 고치는 것보다 여기서 한 번에 정리하는 게 훨씬 빠릅니다</p>
+
+  <div class="row" style="margin-bottom:11px">
+    <input class="f" value="2026.08.01 ~ 2026.08.31" style="width:190px">
+    <span style="flex:1"></span>
+    <button class="btn sm">운행 추가</button>
+    <button class="btn sm">내 엑셀 받기</button>
+  </div>
+
+  <div class="chips">
+    <button aria-pressed="true">전체<span class="c">42</span></button>
+    <button aria-pressed="false">통행료 미확정<span class="c">5</span></button>
+    <button aria-pressed="false">증빙 누락<span class="c">2</span></button>
+    <button aria-pressed="false">내가 고친 것<span class="c">3</span></button>
+  </div>
+
+  <div class="tblwrap">
+    <table class="wide">
+      <thead><tr>
+        <th>운행일자</th><th>목적</th><th class="num">거리</th><th>시간</th><th>출발 → 도착</th>
+        <th>방문처</th><th class="num">계기판</th><th class="num">통행료</th><th class="num">주차</th>
+        <th>증빙</th><th>상태</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>08.18(화)</td><td>일반업무</td><td class="num">83km</td><td>16:57~18:18</td>
+          <td>본사 → 분당</td><td>OO전자 분당사업장</td><td class="num">127,066</td>
+          <td class="num"><span class="pill ok">800</span></td><td class="num">—</td>
+          <td><span class="pill ok">있음</span></td><td><span class="pill mute">정상</span></td>
+        </tr>
+        <tr class="flag-r">
+          <td>08.17(월)</td><td>일반업무</td><td class="num">47km</td><td>09:12~10:30</td>
+          <td>본사 → 역삼</td><td><input class="f" placeholder="방문처를 넣어주세요" style="width:150px"></td>
+          <td class="num">126,983</td>
+          <td class="num"><input class="f" placeholder="통행료" style="width:78px"></td>
+          <td class="num">2,500</td>
+          <td><span class="pill bad">사진 필요</span></td><td><span class="pill bad">할 일 2</span></td>
+        </tr>
+        <tr>
+          <td>08.15(금)</td><td>일반업무</td><td class="num">128km</td><td>08:30~11:12</td>
+          <td>본사 → 천안</td><td>OO물산 천안공장</td><td class="num">45,248</td>
+          <td class="num"><span class="pill ok">4,400</span></td><td class="num">3,000</td>
+          <td><span class="pill ok">있음</span></td><td><span class="pill mute">정상</span></td>
+        </tr>
+        <tr class="flag-r">
+          <td>08.14(금)</td><td><select class="f" style="min-width:105px"><option>목적을 골라주세요</option><option>일반업무</option><option>출퇴근</option><option>비업무용</option></select></td>
+          <td class="num">18km</td><td>18:40~19:05</td>
+          <td>본사 → 자택</td><td>—</td><td class="num">88,412</td>
+          <td class="num"><span class="pill mute">0</span></td><td class="num">—</td>
+          <td><span class="pill mute">해당없음</span></td><td><span class="pill bad">할 일 1</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note" style="margin-top:12px">
+    <b>여기서 고친 건 앱에도 바로 반영됩니다.</b> 반대로 앱에서 고친 것도 이 화면에 올라옵니다.
+  </div>
+</section>
+
+<!-- ══════ 기사: 내 증빙 ══════ -->
+<section id="dEvid" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <h2 class="pg">내 증빙 올리기</h2>
+  <p class="pgsub">폰으로 못 찍었으면 여기서 넣으세요 · 금액은 자동으로 읽습니다</p>
+
+  <div class="grid c2" style="margin-bottom:13px">
+    <div class="card">
+      <h3>영수증 올리기</h3>
+      <div class="drop"><div style="font-size:24px">🖨️</div>
+        <div class="t">사진이나 스캔 파일을 끌어놓으세요</div>
+        <div class="s">여러 장 한 번에 · 금액과 날짜를 자동으로 읽습니다</div></div>
+      <div class="note ok" style="margin-top:11px">
+        모아둔 종이 영수증을 스캐너에 한 번에 밀어 넣고 올리면 끝입니다.
+        어느 운행에 붙일지는 <b>날짜를 보고 자동으로 골라</b> 드립니다.
+      </div>
+    </div>
+    <div class="card">
+      <h3>지금 빠진 것 <span class="tag">2건</span></h3>
+      <ul class="lst">
+        <li><span class="pill bad">필요</span><span class="nm">08.17</span>
+            <span class="ds">주차비 2,500원 · 역삼 방문</span>
+            <button class="btn sm">사진 올리기</button></li>
+        <li><span class="pill bad">필요</span><span class="nm">08.09</span>
+            <span class="ds">주유 70,000원</span>
+            <button class="btn sm">사진 올리기</button></li>
+      </ul>
+      <div style="margin-top:13px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:5px">
+          <span>내 증빙 첨부율</span><span>91%</span></div>
+        <div class="bar"><i class="g" style="width:91%"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>내가 올린 영수증 <span class="tag">8월 · 21장</span></h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>날짜</th><th>구분</th><th class="num">내가 적은 금액</th><th class="num">사진에서 읽은 금액</th><th>사진</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td>08.18</td><td>주유</td><td class="num">70,000</td><td class="num">70,000</td><td><span class="pill mute">보기</span></td><td><span class="pill ok">확인됨</span></td></tr>
+          <tr class="flag-r"><td>08.15</td><td>주차</td><td class="num">3,000</td><td class="num" style="color:var(--bad);font-weight:800">2,500</td><td><span class="pill mute">보기</span></td><td><span class="pill bad">금액이 다릅니다</span></td></tr>
+          <tr><td>08.12</td><td>통행료</td><td class="num">2,200</td><td class="num">2,200</td><td><span class="pill mute">보기</span></td><td><span class="pill ok">확인됨</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 기사: 내 통행료 ══════ -->
+<section id="dToll" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <h2 class="pg">내 통행료</h2>
+  <p class="pgsub">금액을 못 정한 운행 5건 · 셋 중 하나를 고르면 됩니다</p>
+
+  <div class="card">
+    <h3>08.17(월) 09:12~10:30 · 본사 → 역삼 <span class="sp"></span><span class="pill bad">1 / 5</span></h3>
+    <div class="grid c3">
+      <div class="card" style="border-color:var(--wine);cursor:pointer">
+        <div style="font-size:11.5px;color:var(--muted);font-weight:700">지난 운행 기록으로</div>
+        <div style="font-size:22px;font-weight:800;margin:3px 0">1,900<span style="font-size:13px">원</span></div>
+        <div style="font-size:11.5px;color:var(--muted)">같은 구간을 8번 다녔고 그때마다 이 금액이었습니다</div>
+      </div>
+      <div class="card" style="cursor:pointer">
+        <div style="font-size:11.5px;color:var(--muted);font-weight:700">경로 계산으로</div>
+        <div style="font-size:22px;font-weight:800;margin:3px 0">2,100<span style="font-size:13px">원</span></div>
+        <div style="font-size:11.5px;color:var(--muted)">GPS 경로를 지도에 대보고 계산한 금액</div>
+      </div>
+      <div class="card" style="cursor:pointer">
+        <div style="font-size:11.5px;color:var(--muted);font-weight:700">직접 넣기 / 모름</div>
+        <div class="row" style="margin:6px 0"><input class="f" placeholder="금액" style="width:92px"><button class="btn sm">모름</button></div>
+        <div style="font-size:11.5px;color:var(--muted)">영수증이 있으면 그 금액을 넣어주세요</div>
+      </div>
+    </div>
+    <div class="row end" style="margin-top:11px"><button class="btn sm">건너뛰기</button><button class="btn sm pri">이걸로 확정하고 다음</button></div>
+  </div>
+
+  <div class="note ok">
+    <b>고르실수록 정확해집니다.</b> 기사님이 고른 값이 다음번 추천의 기준이 됩니다.
+    한 번 정한 금액은 <b>자동 계산이 함부로 덮어쓰지 않습니다.</b>
+  </div>
+</section>
+
+<!-- ══════ 기사: 내 안전운전 ══════ -->
+<section id="dSafety" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 점수만 보이고, 남과 이름으로 비교되지 않습니다.</div>
+  <h2 class="pg">내 안전운전</h2>
+  <p class="pgsub">홍길동 · 2026년 8월</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">내 점수</div><div class="v" style="color:var(--ok)">94<small>점</small></div><div class="d up">지난달 +2</div></div>
+    <div class="kpi"><div class="k">전체 평균</div><div class="v">84<small>점</small></div><div class="d up">평균보다 10점 높음</div></div>
+    <div class="kpi"><div class="k">과속</div><div class="v">1<small>회</small></div></div>
+    <div class="kpi"><div class="k">급가속·급감속</div><div class="v">4<small>회</small></div></div>
+    <div class="kpi"><div class="k">최고속도</div><div class="v">104<small>km/h</small></div></div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>내 점수 추이</h3>
+      <div class="mini">
+        <i style="height:62%"></i><i style="height:68%"></i><i style="height:71%"></i><i style="height:66%"></i>
+        <i style="height:78%"></i><i style="height:82%"></i><i class="hi" style="height:94%"></i>
+      </div>
+      <div style="color:var(--muted);font-size:11.5px;margin-top:6px">2월 → 8월 · 꾸준히 좋아지고 있습니다</div>
+    </div>
+    <div class="card">
+      <h3>이번 달 지적된 곳</h3>
+      <ul class="lst">
+        <li><span class="pill warn">과속</span><span class="nm">08.18</span><span class="ds">경부고속도로 판교 부근 · 104km/h</span></li>
+        <li><span class="pill warn">급감속</span><span class="nm">08.15</span><span class="ds">천안 IC 진입로</span></li>
+      </ul>
+      <div class="note" style="margin-top:11px">
+        같은 지점에서 여러 기사가 반복해서 걸리면 <b>도로 문제</b>로 보고 점수에 덜 반영합니다.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 기사: 안전교육 ══════ -->
+<section id="dEdu" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <h2 class="pg">안전교육</h2>
+  <p class="pgsub">8월 회차 · 마감 D-3 · 끝까지 보셔야 이수 처리됩니다</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>8월 안전교육 <span class="tag">12분 40초</span><span class="sp"></span><span class="pill warn">진행 중</span></h3>
+      <div class="mapbox" style="height:180px">▶ 여름철 안전운전</div>
+      <div style="margin-top:11px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:5px">
+          <span>진도</span><span>45% · 5분 42초 / 12분 40초</span></div>
+        <div class="bar"><i class="w" style="width:45%"></i></div>
+      </div>
+      <div class="row end" style="margin-top:11px"><button class="btn pri">이어서 보기</button></div>
+      <div class="note warn" style="margin-top:11px">
+        PC 큰 화면으로 보셔도 되고, 앱에서 이어 보셔도 됩니다. <b>진도는 양쪽이 같이 올라갑니다.</b>
+      </div>
+    </div>
+    <div class="card">
+      <h3>지난 회차</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>회차</th><th>제목</th><th>이수일</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>7월</td><td>스쿨존 주의사항</td><td>07.12</td><td><span class="pill ok">이수</span></td></tr>
+            <tr><td>6월</td><td>장마철 빗길 운전</td><td>06.09</td><td><span class="pill ok">이수</span></td></tr>
+            <tr><td>5월</td><td>졸음운전 예방</td><td>05.21</td><td><span class="pill ok">이수</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 기사: 내 정산 ══════ -->
+<section id="dSettle" hidden>
+  <div class="rolebar">지금 <b>본인 정산 내역</b>입니다 — 남의 금액은 보이지 않습니다.</div>
+  <h2 class="pg">내 정산 내역</h2>
+  <p class="pgsub">홍길동 · 2026년 8월 (작성 중)</p>
+
+  <div class="card" style="margin-bottom:13px">
+    <h3>이번 달 계산 <span class="tag">임시 · 마감 전</span></h3>
+    <div class="tblwrap">
+      <table>
+        <tbody>
+          <tr><th style="width:170px">운행거리</th><td class="num" style="width:130px">1,240 km</td><td style="color:var(--muted)">업무용 운행만 계산합니다</td></tr>
+          <tr><th>유류비</th><td class="num">217,000 원</td><td style="color:var(--muted)">1,240km × 3분기 고시단가</td></tr>
+          <tr><th>통행료</th><td class="num">12,400 원</td><td style="color:var(--muted)">확정된 금액만 · 미확정 5건 제외</td></tr>
+          <tr><th>주차비</th><td class="num">8,500 원</td><td style="color:var(--muted)">영수증 있는 것만</td></tr>
+          <tr><th>기본지급액</th><td class="num">90,000 원</td><td style="color:var(--muted)">1,000~1,499km 구간</td></tr>
+          <tr style="background:var(--soft)"><th><b>합계</b></th><td class="num"><b>327,900 원</b></td><td style="color:var(--bad);font-weight:700">미확정 5건을 정리하면 더 늘어납니다</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>지난 정산</h3>
+    <ul class="lst">
+      <li><span class="pill warn">결재중</span><span class="nm">7월분</span><span class="ds">이OO 실장 검토 중</span><span class="vl">311,400원</span></li>
+      <li><span class="pill ok">지급완료</span><span class="nm">6월분</span><span class="ds">06.28 지급</span><span class="vl">289,700원</span></li>
+      <li><span class="pill ok">지급완료</span><span class="nm">5월분</span><span class="ds">05.28 지급</span><span class="vl">302,150원</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════ 기사: 제출·결재 현황 ══════ -->
+<section id="dAppr" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <h2 class="pg">제출 · 결재 현황</h2>
+  <p class="pgsub">할 일을 다 끝내면 제출 버튼이 열립니다</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>8월분 제출 준비 <span class="sp"></span><span class="pill warn">3건 남음</span></h3>
+      <ul class="lst">
+        <li><span class="pill ok">완료</span><span class="nm">운행일지</span><span class="ds">42건 · 빈 항목 없음</span></li>
+        <li><span class="pill bad">미완</span><span class="nm">통행료</span><span class="ds">금액 미확정</span><span class="vl">5건</span></li>
+        <li><span class="pill bad">미완</span><span class="nm">영수증</span><span class="ds">사진 없음</span><span class="vl">2건</span></li>
+        <li><span class="pill ok">완료</span><span class="nm">계기판</span><span class="ds">빠진 날 없음</span></li>
+        <li><span class="pill warn">미완</span><span class="nm">안전교육</span><span class="ds">진도 45%</span></li>
+      </ul>
+      <div class="row end" style="margin-top:12px">
+        <button class="btn pri" disabled>제출 — 3건을 먼저 처리하세요</button>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>결재선 <span class="tag">저장돼 있습니다</span></h3>
+        <div style="font-size:12.5px;font-weight:600;line-height:2">
+          담당 <b>홍길동</b> → 팀장 <b>김OO</b> → 실장 <b>이OO</b> → 사업부장 <b>박OO</b> → 대표이사 <b>최OO</b>
+        </div>
+        <div class="row end" style="margin-top:9px"><button class="btn sm">바꾸기</button></div>
+        <div class="note" style="margin-top:11px">
+          지난달에 정해두신 결재선입니다. <b>그대로 두시면 됩니다.</b> 사람이 바뀌었을 때만 바꾸세요.
+        </div>
+      </div>
+      <div class="card">
+        <h3>7월분 진행 상황</h3>
+        <ul class="lst">
+          <li><span class="pill ok">승인</span><span class="nm">홍길동</span><span class="ds">담당 · 08.01 09:02 상신</span></li>
+          <li><span class="pill ok">승인</span><span class="nm">김OO</span><span class="ds">팀장 · 08.01 14:20</span></li>
+          <li><span class="pill info">검토중</span><span class="nm">이OO</span><span class="ds">실장 · 6일째</span></li>
+          <li><span class="pill mute">대기</span><span class="nm">박OO</span><span class="ds">사업부장</span></li>
+          <li><span class="pill mute">대기</span><span class="nm">최OO</span><span class="ds">대표이사</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 기사: 프로필 ══════ -->
+<section id="dProfile" hidden>
+  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <h2 class="pg">프로필 · 차량</h2>
+  <p class="pgsub">앱의 프로필 설정과 같은 내용입니다</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>내 정보</h3>
+      <div class="tblwrap">
+        <table>
+          <tbody>
+            <tr><th style="width:110px">이름</th><td><input class="f" value="홍길동"></td></tr>
+            <tr><th>아이디</th><td>hong <span class="pill mute">변경 불가</span></td></tr>
+            <tr><th>부서</th><td>운영팀 <span class="pill mute">관리자만 변경</span></td></tr>
+            <tr><th>직책</th><td>대리 <span class="pill mute">관리자만 변경</span></td></tr>
+            <tr><th>연락처</th><td><input class="f" value="010-****-1234"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="row end" style="margin-top:11px"><button class="btn sm">비밀번호 변경</button><button class="btn sm pri">저장</button></div>
+    </div>
+    <div class="card">
+      <h3>내 차량</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>차량번호</th><th>차종</th><th class="num">누적거리</th><th>기본</th></tr></thead>
+          <tbody>
+            <tr><td>12가 3456</td><td>아반떼</td><td class="num">127,066</td><td><span class="pill ok">기본</span></td></tr>
+            <tr><td>34나 5678</td><td>K5</td><td class="num">88,412</td><td><button class="btn sm">기본으로</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note" style="margin-top:11px">
+        <b>앱에만 있는 기능</b> — 블루투스 자동기록, 앱 업데이트, 백업·복원은 폰에서만 됩니다.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 결재자: 결재함 ══════ -->
+<section id="aInbox" hidden>
+  <div class="rolebar">지금 <b>결재자</b> 화면입니다 — 팀장·실장·사업부장·대표이사가 봅니다. 관리자 권한과는 별개입니다.</div>
+  <h2 class="pg">결재함</h2>
+  <p class="pgsub">이OO 실장 · 내 차례인 문서 3건</p>
+
+  <div class="chips">
+    <button aria-pressed="true">내 차례<span class="c">3</span></button>
+    <button aria-pressed="false">내가 승인함<span class="c">18</span></button>
+    <button aria-pressed="false">내가 반려함<span class="c">2</span></button>
+    <button aria-pressed="false">전체 진행중<span class="c">7</span></button>
+  </div>
+
+  <div class="tblwrap" style="margin-bottom:13px">
+    <table class="wide">
+      <thead><tr><th>제출자</th><th>부서·직책</th><th>기간</th><th class="num">운행</th><th class="num">거리</th><th class="num">금액</th><th>앞 단계</th><th>대기</th><th>처리</th></tr></thead>
+      <tbody>
+        <tr><td>홍길동</td><td>운영팀 대리</td><td>2026.07</td><td class="num">39건</td><td class="num">1,180km</td><td class="num" style="font-weight:800">311,400</td>
+            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill warn">6일</span></td>
+            <td><button class="btn sm">열어보기</button></td></tr>
+        <tr><td>김철수</td><td>운영팀 과장</td><td>2026.07</td><td class="num">35건</td><td class="num">920km</td><td class="num" style="font-weight:800">243,800</td>
+            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill mute">2일</span></td>
+            <td><button class="btn sm">열어보기</button></td></tr>
+        <tr><td>이영희</td><td>지원팀 차장</td><td>2026.07</td><td class="num">31건</td><td class="num">1,440km</td><td class="num" style="font-weight:800">389,200</td>
+            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill mute">1일</span></td>
+            <td><button class="btn sm">열어보기</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>홍길동 · 2026년 7월분 <span class="tag">열어본 상태</span><span class="sp"></span>
+      <button class="btn sm">반려</button><button class="btn sm pri">승인</button></h3>
+    <div class="kpis" style="margin-bottom:12px">
+      <div class="kpi"><div class="k">운행</div><div class="v">39<small>건</small></div></div>
+      <div class="kpi"><div class="k">거리</div><div class="v">1,180<small>km</small></div></div>
+      <div class="kpi"><div class="k">유류비</div><div class="v">206,500<small>원</small></div></div>
+      <div class="kpi"><div class="k">통행료</div><div class="v">11,900<small>원</small></div></div>
+      <div class="kpi"><div class="k">주차</div><div class="v">3,000<small>원</small></div></div>
+      <div class="kpi"><div class="k">합계</div><div class="v">311,400<small>원</small></div></div>
+    </div>
+    <div class="note ok">
+      <b>자동 점검 결과 이상 없음</b> — 증빙 전부 첨부 · 통행료 전부 확정(하이패스 영수증 대조 완료) ·
+      계기판 연속 · 개인 사용 운행에 비용 청구 없음.
+    </div>
+    <div class="row" style="margin-top:11px">
+      <span class="pill mute">운행 39건 보기</span>
+      <span class="pill mute">영수증 14장 보기</span>
+      <span class="pill mute">엑셀 미리보기</span>
+    </div>
+    <div class="note warn" style="margin-top:11px">
+      승인하면 다음 단계(<b>박OO 사업부장</b>)로 넘어갑니다. 반려하면 의견과 함께 홍길동님에게 돌아갑니다.
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 결재자: 부서 현황 ══════ -->
+<section id="aDept" hidden>
+  <div class="rolebar">지금 <b>결재자</b> 화면입니다 — <b>본인 부서</b>만 보입니다. 전사 데이터는 관리자만 봅니다.</div>
+  <h2 class="pg">우리 부서 현황</h2>
+  <p class="pgsub">운영팀 · 18명 · 2026년 8월</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">부서 운행</div><div class="v">142<small>건</small></div></div>
+    <div class="kpi"><div class="k">부서 거리</div><div class="v">2,640<small>km</small></div></div>
+    <div class="kpi"><div class="k">부서 비용</div><div class="v">521<small>천원</small></div></div>
+    <div class="kpi alert"><div class="k">제출 안 한 사람</div><div class="v">4<small>명</small></div></div>
+    <div class="kpi"><div class="k">부서 평균 안전점수</div><div class="v">86<small>점</small></div></div>
+  </div>
+
+  <div class="card">
+    <h3>팀원별 진행</h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>이름</th><th>직책</th><th class="num">운행</th><th class="num">거리</th><th class="num">예상 정산</th><th>마감 준비</th><th>제출</th><th class="num">안전점수</th></tr></thead>
+        <tbody>
+          <tr><td>홍길동</td><td>대리</td><td class="num">42</td><td class="num">1,240km</td><td class="num">327,900</td><td><span class="pill warn">3건 남음</span></td><td><span class="pill mute">미제출</span></td><td class="num" style="color:var(--ok)">94</td></tr>
+          <tr><td>김철수</td><td>과장</td><td class="num">38</td><td class="num">980km</td><td class="num">250,700</td><td><span class="pill ok">준비됨</span></td><td><span class="pill info">제출함</span></td><td class="num">86</td></tr>
+          <tr class="flag-r"><td>정OO</td><td>사원</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td><span class="pill bad">기록 없음</span></td><td><span class="pill mute">미제출</span></td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="row end" style="margin-top:11px"><button class="btn sm">미제출자에게 알림</button></div>
+  </div>
+</section>
+
 </main>
 </div>
 
@@ -909,23 +1424,52 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 <script>
 (function(){
   var nav = document.getElementById('nav');
-  var pages = ['dash','sync','logs','detail','toll','evid','safety','edu','staff','cars','settle','appr','out'];
-  nav.addEventListener('click', function(e){
-    var a = e.target.closest('a[data-p]'); if(!a) return;
-    [].forEach.call(nav.querySelectorAll('a[data-p]'), function(x){ x.classList.toggle('on', x===a); });
-    pages.forEach(function(id){
-      var el = document.getElementById(id); if(el) el.hidden = (id !== a.dataset.p);
+  var rs  = document.getElementById('roleswitch');
+  var main = document.querySelector('main');
+
+  function allPages(){
+    return [].map.call(main.querySelectorAll('section[id]'), function(s){ return s.id; });
+  }
+  function show(id){
+    allPages().forEach(function(p){
+      var el = document.getElementById(p); if (el) el.hidden = (p !== id);
     });
-    window.scrollTo({top:0,behavior:'smooth'});
+    [].forEach.call(nav.querySelectorAll('a[data-p]'), function(x){
+      x.classList.toggle('on', x.dataset.p === id && !x.hidden);
+    });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function setRole(r){
+    [].forEach.call(rs.querySelectorAll('button'), function(b){
+      b.classList.toggle('on', b.dataset.r === r);
+    });
+    // 사이드바를 역할에 맞게 보이고 감춘다
+    [].forEach.call(nav.querySelectorAll('[data-r]'), function(x){
+      x.hidden = (x.dataset.r !== r);
+    });
+    // 화면 안의 역할 안내 문구도 맞춘다
+    var first = nav.querySelector('a[data-p]:not([hidden])');
+    if (first) show(first.dataset.p);
+  }
+
+  nav.addEventListener('click', function(e){
+    var a = e.target.closest('a[data-p]'); if (!a) return;
+    show(a.dataset.p);
+  });
+  rs.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-r]'); if (!b) return;
+    setRole(b.dataset.r);
   });
   [].forEach.call(document.querySelectorAll('.chips'), function(g){
     g.addEventListener('click', function(e){
-      var b = e.target.closest('button'); if(!b) return;
+      var b = e.target.closest('button'); if (!b) return;
       [].forEach.call(g.querySelectorAll('button'), function(x){
-        x.setAttribute('aria-pressed', String(x===b));
+        x.setAttribute('aria-pressed', String(x === b));
       });
     });
   });
+
+  setRole('driver');   // 95% 가 기사다 — 기사 화면부터 보여준다
 })();
 </script>
 </body>
