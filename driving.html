@@ -378,6 +378,22 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
   /* ── 로그인 후 ── */
   var ALL = [];
+  /** 저장된 프로필은 로그인 시점의 사본이다. 권한이 바뀌었을 수 있으니 들어올 때마다
+   *  서버에서 다시 읽어 맞춘다(로그아웃/재로그인 없이 반영되게). */
+  function syncProfile() {
+    return apiRetry('/rest/v1/profiles?select=perms,status,name&limit=1')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rows) {
+        var p = rows && rows[0]; if (!p) return;
+        var m = me(); if (!m) return;
+        m.perms = Array.isArray(p.perms) ? p.perms : [];
+        m.is_admin = m.perms.indexOf('driving_admin') >= 0;
+        if (p.name) m.name = p.name;
+        ss(K_ME, JSON.stringify(m));
+      })
+      .catch(function () { /* 못 읽으면 저장된 값을 그대로 쓴다 */ });
+  }
+
   function enter() {
     var m = me(); if (!m) return;
     $('login').style.display = 'none';
@@ -404,7 +420,17 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     sel.addEventListener('change', load);
     $('fVeh').addEventListener('change', render);
     $('fState').addEventListener('change', render);
-    load();
+    // 서버 권한을 먼저 맞추고 화면을 그린다 — 관리자가 됐는데 새로고침만으로 반영되게.
+    syncProfile().then(function () {
+      var mm = me() || m;
+      $('thWho').style.display = mm.is_admin ? '' : 'none';
+      $('pgTitle').textContent = mm.is_admin ? '운행일지 (전체)' : '내 운행일지';
+      $('whoMeta').textContent = [mm.position, mm.dept].filter(Boolean).join(' · ') +
+        (mm.is_admin ? ' · 관리자' : '');
+      $('tabHipass').style.display = mm.is_admin ? '' : 'none';
+      if (mm.is_admin) bindDrop();
+      load();
+    });
   }
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g,
