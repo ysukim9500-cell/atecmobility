@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ATEC Driving — 운행일지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1B1518; --ink-2:#4A4045; --muted:#8C8188; --faint:#B6ACB1;
+  --wine:#A00040; --wine-2:#7A0031; --wine-tint:#FBF0F4;
+  --paper:#FAF8F7; --surface:#FFFFFF; --line:#EDE7E4; --line-2:#F5F1EF;
+  --ok:#137A52; --warn:#A65B10; --bad:#B3182C; --info:#2A54C6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+  background:var(--paper);color:var(--ink);font-size:13.5px;line-height:1.55;
+  -webkit-font-smoothing:antialiased}
+svg{display:block}
+.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;
+   stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ── 로그인 ── */
+#login{min-height:100%;display:grid;place-items:center;padding:24px}
+.lbox{width:100%;max-width:352px}
+.lbrand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;
+  letter-spacing:-.03em;margin-bottom:6px}
+.lbrand .mk{font-size:21px;line-height:1}
+.lsub{color:var(--muted);font-size:12.5px;margin-bottom:26px}
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.fld input{width:100%;font:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line);
+  border-radius:9px;background:var(--surface);color:var(--ink)}
+.fld input:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
+.fld input::placeholder{color:var(--faint)}
+#loginBtn{width:100%;font:inherit;font-size:14px;font-weight:700;cursor:pointer;border:0;
+  background:var(--wine);color:#fff;padding:12px;border-radius:9px;margin-top:6px}
+#loginBtn:hover{background:var(--wine-2)}
+#loginBtn[disabled]{background:#D6CBD1;cursor:not-allowed}
+.lmsg{margin-top:13px;font-size:12.5px;border-left:2px solid var(--bad);
+  padding:3px 0 3px 12px;color:var(--bad);display:none}
+.lmsg.show{display:block}
+.lnote{margin-top:22px;font-size:12px;color:var(--muted);border-left:2px solid var(--line);
+  padding:3px 0 3px 12px;line-height:1.7}
+.lnote b{color:var(--ink-2);font-weight:600}
+
+/* ── 앱 ── */
+#app{display:none;min-height:100%;flex-direction:column}
+header.top{background:var(--surface);border-bottom:1px solid var(--line);padding:0 20px;
+  height:54px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14.5px;letter-spacing:-.015em}
+.brand .mk{font-size:16px;line-height:1}
+.brand .sub{font-weight:500;font-size:12.5px;color:var(--muted);
+  border-left:1px solid var(--line);padding-left:11px}
+.top .sp{flex:1}
+.who{font-size:12px;color:var(--muted);text-align:right;line-height:1.35}
+.who b{color:var(--ink);font-weight:600;display:block;font-size:12.5px}
+.btn{font:inherit;font-weight:600;font-size:12.5px;cursor:pointer;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:7px}
+.btn:hover{background:var(--line-2)}
+main{flex:1;padding:24px 26px 60px;max-width:1320px;width:100%;margin:0 auto}
+h2.pg{font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:-.03em}
+p.pgsub{margin:0 0 20px;color:var(--muted);font-size:12.5px}
+p.pgsub b{color:var(--ink-2);font-weight:600}
+
+.kpis{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;margin-bottom:18px}
+.kpi{flex:1 1 148px;padding:15px 18px;position:relative}
+.kpi+.kpi::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:1px;background:var(--line)}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:500}
+.kpi .v{font-size:24px;font-weight:700;letter-spacing:-.045em;margin-top:4px;
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
+.kpi.alert .v{color:var(--bad)}
+
+.bar-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+select.f,input.f{font:inherit;font-size:12.5px;font-weight:500;padding:6px 10px;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+select.f:focus,input.f:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
+
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:860px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
+th{font-weight:500;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:var(--surface)}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#FCFAFA}
+tbody td:first-child{font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;
+  color:var(--ink-2);white-space:nowrap}
+.pill::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--faint);flex:none}
+.pill.ok::before{background:var(--ok)} .pill.ok{color:var(--ok)}
+.pill.warn::before{background:var(--warn)} .pill.warn{color:var(--warn)}
+.pill.bad::before{background:var(--bad)} .pill.bad{color:var(--bad)}
+.pill.mute{color:var(--muted)}
+
+.state{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px}
+.state b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px;font-size:14px}
+.note{border-left:2px solid var(--line);padding:3px 0 3px 13px;font-size:12.5px;
+  line-height:1.65;color:var(--ink-2);margin-top:16px}
+.note b{font-weight:600;color:var(--ink)}
+.note.warn{border-left-color:var(--warn)}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ══════════ 로그인 ══════════ -->
+<div id="login">
+  <div class="lbox">
+    <div class="lbrand"><span class="mk">🚗</span>ATEC Driving</div>
+    <div class="lsub">운행일지 · PC 관리 화면</div>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="fld">
+        <label for="u">아이디</label>
+        <input id="u" name="username" type="text" autocomplete="username"
+               placeholder="앱에서 쓰시는 아이디" required autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="fld">
+        <label for="p">비밀번호</label>
+        <input id="p" name="password" type="password" autocomplete="current-password"
+               placeholder="앱 비밀번호 그대로" required>
+      </div>
+      <button id="loginBtn" type="submit">로그인</button>
+    </form>
+
+    <div class="lmsg" id="lmsg"></div>
+
+    <div class="lnote">
+      <b>앱에서 쓰시던 아이디와 비밀번호</b>를 그대로 넣으시면 됩니다.
+      따로 가입하실 필요 없습니다 — 처음 로그인하실 때 계정이 자동으로 만들어집니다.
+      비밀번호를 잊으셨으면 관리자에게 초기화를 요청해 주세요.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 로그인 후 ══════════ -->
+<div id="app">
+  <header class="top">
+    <div class="brand"><span class="mk">🚗</span>ATEC Driving
+      <span class="sub">운행일지</span></div>
+    <div class="sp"></div>
+    <div class="who"><b id="whoName">—</b><span id="whoMeta"></span></div>
+    <button class="btn" id="logoutBtn">로그아웃</button>
+  </header>
+
+  <main>
+    <h2 class="pg" id="pgTitle">운행일지</h2>
+    <p class="pgsub" id="pgSub">불러오는 중…</p>
+
+    <div class="kpis" id="kpis" style="display:none">
+      <div class="kpi"><div class="k">운행</div><div class="v" id="kTrips">—</div></div>
+      <div class="kpi"><div class="k">주행거리</div><div class="v" id="kDist">—</div></div>
+      <div class="kpi alert"><div class="k">통행료 미확정</div><div class="v" id="kToll">—</div></div>
+      <div class="kpi"><div class="k">통행료 합계</div><div class="v" id="kTollSum">—</div></div>
+      <div class="kpi"><div class="k">주차비 합계</div><div class="v" id="kPark">—</div></div>
+    </div>
+
+    <div class="bar-row" id="filters" style="display:none">
+      <select class="f" id="fCycle"></select>
+      <select class="f" id="fVeh"><option value="">전체 차량</option></select>
+      <select class="f" id="fState">
+        <option value="">전체</option>
+        <option value="unknown">통행료 미확정</option>
+        <option value="manual">직접 확정한 것</option>
+        <option value="weekend">주말·야간</option>
+      </select>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;color:var(--muted)" id="rowCount"></span>
+    </div>
+
+    <div class="tblwrap" id="tblwrap" style="display:none">
+      <table>
+        <thead><tr>
+          <th>운행일자</th><th>목적</th><th>차량</th><th id="thWho">오너드라이버</th>
+          <th class="num">거리</th><th>시간</th><th>출발 → 도착</th><th>방문처</th>
+          <th class="num">계기판</th><th class="num">통행료</th><th class="num">주차</th><th>통행료 근거</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="state" id="state"><b>불러오는 중…</b>잠시만 기다려 주세요</div>
+
+    <div class="note warn" id="readonlyNote" style="display:none">
+      <b>지금은 조회만 됩니다.</b> 수정·증빙 올리기·마감·결재는 다음 단계에서 열립니다.
+      화면 구성은 <a href="driving-preview.html" style="color:inherit">시안</a>에서 미리 보실 수 있습니다.
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var SB = 'https://eiyksjcqntenmetmhmij.supabase.co';
+  // publishable(anon) 키 — 공개되어도 되는 값이다. 실제 권한은 로그인 토큰과 RLS 가 정한다.
+  var KEY = 'sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
+  var K_AT = 'drv_at', K_RT = 'drv_rt', K_ME = 'drv_me';
+
+  function ss(k, v) { try { return v === undefined ? sessionStorage.getItem(k)
+    : (v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v)); } catch (e) { return null; } }
+  function me() { try { return JSON.parse(ss(K_ME) || 'null'); } catch (e) { return null; } }
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ── 마감주기: 전월 21일 00:00 ~ 당월 21일 00:00 (KST, 끝 배타) ── */
+  var KST = 9 * 3600e3;
+  function cycleOf(label) {   // label: {y, m}  m 은 '마감분' 이름(1~12)
+    var s = Date.UTC(label.y, label.m - 1, 21, 0, 0, 0) - KST;
+    var e = Date.UTC(label.y, label.m, 21, 0, 0, 0) - KST;
+    return { start: s, end: e };
+  }
+  function cycleName(l) {
+    var a = new Date(cycleOf(l).start + KST), b = new Date(cycleOf(l).end + KST - 1);
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return l.y + '년 ' + l.m + '월 마감분 · ' +
+      p(a.getUTCMonth() + 1) + '.' + p(a.getUTCDate()) + ' ~ ' + p(b.getUTCMonth() + 1) + '.' + p(b.getUTCDate());
+  }
+  function currentCycle() {   // 21일이 지났으면 이번 달, 20일까지는 전달이 '진행 중'
+    var k = new Date(Date.now() + KST);
+    var y = k.getUTCFullYear(), m = k.getUTCMonth() + 1;
+    if (k.getUTCDate() < 21) { m -= 1; if (m === 0) { m = 12; y -= 1; } }
+    return { y: y, m: m };
+  }
+
+  /* ── 요청 ── */
+  function api(path, opt) {
+    opt = opt || {};
+    var h = Object.assign({ apikey: KEY, 'Content-Type': 'application/json' }, opt.headers || {});
+    var t = ss(K_AT);
+    h.Authorization = 'Bearer ' + (t || KEY);
+    return fetch(SB + path, Object.assign({}, opt, { headers: h }));
+  }
+  function refresh() {
+    var rt = ss(K_RT); if (!rt) return Promise.resolve(false);
+    return fetch(SB + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: rt })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (!j || !j.access_token) return false;
+        ss(K_AT, j.access_token); if (j.refresh_token) ss(K_RT, j.refresh_token); return true; })
+      .catch(function () { return false; });
+  }
+  /** 401 이면 토큰을 한 번 갱신하고 다시 시도한다. */
+  function apiRetry(path, opt) {
+    return api(path, opt).then(function (r) {
+      if (r.status !== 401) return r;
+      return refresh().then(function (ok) { return ok ? api(path, opt) : r; });
+    });
+  }
+
+  /* ── 로그인 ── */
+  function showMsg(t) { var m = $('lmsg'); m.textContent = t; m.classList.add('show'); }
+  $('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var b = $('loginBtn'), u = $('u').value.trim(), p = $('p').value;
+    if (!u || !p) return;
+    $('lmsg').classList.remove('show');
+    b.disabled = true; b.innerHTML = '<span class="spin"></span> 확인 중…';
+    fetch(SB + '/functions/v1/driving-auth', {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        b.disabled = false; b.textContent = '로그인';
+        if (!res.ok || !res.j || !res.j.ok) { showMsg((res.j && res.j.error) || '로그인에 실패했습니다'); return; }
+        ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token);
+        ss(K_ME, JSON.stringify(res.j.profile));
+        $('p').value = '';
+        enter();
+      })
+      .catch(function () {
+        b.disabled = false; b.textContent = '로그인';
+        showMsg('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      });
+  });
+
+  $('logoutBtn').addEventListener('click', function () {
+    ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
+    $('app').style.display = 'none'; $('login').style.display = 'grid';
+  });
+
+  /* ── 로그인 후 ── */
+  var ALL = [];
+  function enter() {
+    var m = me(); if (!m) return;
+    $('login').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('whoName').textContent = m.name || m.username;
+    $('whoMeta').textContent = [m.position, m.dept].filter(Boolean).join(' · ') +
+      (m.is_admin ? ' · 관리자' : '');
+    $('thWho').style.display = m.is_admin ? '' : 'none';
+    $('pgTitle').textContent = m.is_admin ? '운행일지 (전체)' : '내 운행일지';
+
+    // 최근 6개 마감분
+    var sel = $('fCycle'); sel.innerHTML = '';
+    var c = currentCycle();
+    for (var i = 0; i < 6; i++) {
+      var y = c.y, mm = c.m - i;
+      while (mm <= 0) { mm += 12; y -= 1; }
+      var o = document.createElement('option');
+      o.value = y + '-' + mm; o.textContent = cycleName({ y: y, m: mm });
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', load);
+    $('fVeh').addEventListener('change', render);
+    $('fState').addEventListener('change', render);
+    load();
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g,
+    function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function won(n) { return n == null ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function hhmm(ms) { var d = new Date(ms + KST);
+    return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); }
+  function md(ms) { var d = new Date(ms + KST); var w = '일월화수목금토'[d.getUTCDay()];
+    return String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + String(d.getUTCDate()).padStart(2, '0') + '(' + w + ')'; }
+
+  function load() {
+    $('state').style.display = 'block';
+    $('state').innerHTML = '<b>불러오는 중…</b>잠시만 기다려 주세요';
+    $('tblwrap').style.display = 'none'; $('kpis').style.display = 'none'; $('filters').style.display = 'none';
+
+    var v = $('fCycle').value.split('-');
+    var cyc = cycleOf({ y: +v[0], m: +v[1] });
+    var cols = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
+      'start_address,end_address,visit_place,start_odometer,end_odometer,' +
+      'toll_cost,toll_status,toll_source,parking_cost';
+    var q = '/rest/v1/trips?select=' + cols +
+      '&start_time=gte.' + cyc.start + '&start_time=lt.' + cyc.end +
+      '&order=start_time.desc&limit=2000';
+
+    apiRetry(q).then(function (r) {
+      if (r.status === 401) throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.');
+      if (!r.ok) throw new Error('불러오지 못했습니다 (' + r.status + ')');
+      return r.json();
+    }).then(function (rows) {
+      ALL = rows || [];
+      var m = me();
+      $('pgSub').innerHTML = '<b>' + esc($('fCycle').selectedOptions[0].textContent) + '</b>' +
+        (m.is_admin ? ' · 전체' : ' · 본인 운행만');
+      // 차량 목록
+      var vs = {}; ALL.forEach(function (t) { if (t.plate_no) vs[t.plate_no] = 1; });
+      var sv = $('fVeh'); sv.innerHTML = '<option value="">전체 차량 (' + Object.keys(vs).length + ')</option>';
+      Object.keys(vs).sort().forEach(function (p) {
+        var o = document.createElement('option'); o.value = p; o.textContent = p; sv.appendChild(o);
+      });
+      render();
+    }).catch(function (e) {
+      $('state').innerHTML = '<b>' + esc(e.message) + '</b>' +
+        '문제가 계속되면 관리자에게 알려 주세요.';
+    });
+  }
+
+  function render() {
+    var m = me();
+    var veh = $('fVeh').value, st = $('fState').value;
+    var list = ALL.filter(function (t) {
+      if (veh && t.plate_no !== veh) return false;
+      if (st === 'unknown' && !(t.toll_status === 'UNKNOWN' || t.toll_status === 'PENDING')) return false;
+      if (st === 'manual' && t.toll_status !== 'MANUAL') return false;
+      if (st === 'weekend') {
+        var d = new Date(t.start_time + KST), h = d.getUTCHours(), w = d.getUTCDay();
+        if (!(w === 0 || w === 6 || h >= 22 || h < 6)) return false;
+      }
+      return true;
+    });
+
+    if (!ALL.length) {
+      $('state').style.display = 'block';
+      $('state').innerHTML = '<b>이 마감분에 운행 기록이 없습니다</b>다른 기간을 골라 보세요';
+      $('kpis').style.display = 'none';
+      $('filters').style.display = 'flex';
+      $('tblwrap').style.display = 'none';
+      return;
+    }
+
+    var dist = 0, tollSum = 0, park = 0, unk = 0;
+    ALL.forEach(function (t) {
+      dist += Number(t.distance_km || 0);
+      if (t.toll_cost != null) tollSum += Number(t.toll_cost);
+      if (t.parking_cost != null) park += Number(t.parking_cost);
+      if (t.toll_status === 'UNKNOWN' || t.toll_status === 'PENDING') unk++;
+    });
+    $('kTrips').innerHTML = ALL.length + '<small>건</small>';
+    $('kDist').innerHTML = Math.round(dist).toLocaleString('ko-KR') + '<small>km</small>';
+    $('kToll').innerHTML = unk + '<small>건</small>';
+    $('kTollSum').innerHTML = won(tollSum) + '<small>원</small>';
+    $('kPark').innerHTML = won(park) + '<small>원</small>';
+
+    var showWho = !!m.is_admin;
+    var html = list.map(function (t) {
+      var tollTxt, tollCls;
+      if (t.toll_status === 'UNKNOWN' || t.toll_status === 'PENDING') { tollTxt = '미확정'; tollCls = 'bad'; }
+      else if (t.toll_cost === 0) { tollTxt = '0'; tollCls = 'mute'; }
+      else { tollTxt = won(t.toll_cost); tollCls = 'ok'; }
+      var route = [t.start_address, t.end_address].filter(Boolean).join(' → ') || '—';
+      return '<tr>' +
+        '<td>' + md(t.start_time) + '</td>' +
+        '<td>' + esc(t.purpose || '—') + '</td>' +
+        '<td>' + esc(t.plate_no || '—') + '</td>' +
+        (showWho ? '<td>' + esc(t.username || '') + '</td>' : '') +
+        '<td class="num">' + (t.distance_km == null ? '—' : Math.round(t.distance_km) + 'km') + '</td>' +
+        '<td>' + hhmm(t.start_time) + '~' + (t.end_time ? hhmm(t.end_time) : '') + '</td>' +
+        '<td>' + esc(route) + '</td>' +
+        '<td>' + esc(t.visit_place || '—') + '</td>' +
+        '<td class="num">' + (t.end_odometer == null ? '—' : Number(t.end_odometer).toLocaleString('ko-KR')) + '</td>' +
+        '<td class="num"><span class="pill ' + tollCls + '">' + tollTxt + '</span></td>' +
+        '<td class="num">' + (t.parking_cost ? won(t.parking_cost) : '—') + '</td>' +
+        '<td style="color:var(--muted);font-size:11.5px">' + esc(t.toll_source || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    // 관리자가 아닐 때는 오너드라이버 열을 헤더에서도 뺀다
+    $('thWho').style.display = showWho ? '' : 'none';
+    $('rows').innerHTML = html;
+    $('rowCount').textContent = list.length === ALL.length
+      ? ALL.length + '건' : list.length + ' / ' + ALL.length + '건';
+    $('state').style.display = 'none';
+    $('kpis').style.display = 'flex';
+    $('filters').style.display = 'flex';
+    $('tblwrap').style.display = 'block';
+    $('readonlyNote').style.display = 'block';
+  }
+
+  // 새로고침해도 세션이 남아 있으면 바로 들어간다
+  if (ss(K_AT) && me()) enter();
+})();
+</script>
+</body>
+</html>
