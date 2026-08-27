@@ -265,6 +265,33 @@ tr.flag-s td:not(:first-child){box-shadow:none}
 .banwrap{display:grid;gap:20px}
 @media(min-width:980px){.banwrap{grid-template-columns:266px 1fr;align-items:start}}
 
+/* ── 진행 현황 스트립 ── */
+.livehd{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.livehd .t{font-size:13px;font-weight:700}
+.livehd .n{font-size:11.5px;color:var(--muted)}
+.livehd .sp{flex:1}
+.cyc{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface);overflow:hidden;margin-bottom:16px}
+.cyc .r{display:grid;grid-template-columns:118px 132px 1fr 128px 190px 84px;
+  align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line-2)}
+.cyc .r:last-child{border-bottom:0}
+.cyc .r.now{background:var(--wine-tint)}
+.cyc .nm{font-weight:600;font-size:12.5px}
+.cyc .rg{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cyc .stg{font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px}
+.cyc .stg .no{color:var(--faint);font-weight:500}
+.cyc .dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none}
+.cyc .r.now .dot{background:var(--wine);animation:pulse 2s ease-in-out infinite}
+.cyc .r.done .dot{background:var(--ok)}
+.cyc .r.wait .dot{background:var(--info)}
+.cyc .meta{font-size:11.5px;color:var(--muted);text-align:right}
+.cyc .act{text-align:right}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
+@media(max-width:1100px){
+  .cyc .r{grid-template-columns:100px 1fr;row-gap:6px}
+  .cyc .rg,.cyc .meta{text-align:left}
+}
+
 /* ── 프로세스 도식 ── */
 .flowwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;
   background:var(--surface);padding:6px}
@@ -1594,32 +1621,85 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 <!-- ══════ 전체 흐름 ══════ -->
 <section id="flow" hidden>
   <h2 class="pg">전체 흐름</h2>
-  <p class="pgsub">한 마감주기(전월 21일 ~ 당월 20일)가 어떻게 돌아가는지</p>
+  <p class="pgsub">한 마감주기(전월 21일 ~ 당월 20일)가 어떻게 돌아가는지 · <b>지금 진행 중인 것은 색으로 표시</b></p>
+
+  <div class="livehd">
+    <span class="t">지금 돌아가는 마감분</span>
+    <span class="n">마감분은 하나가 아니라 넷이 동시에 서로 다른 단계에 있습니다</span>
+    <span class="sp"></span>
+    <span class="n">2026.08.27 기준</span>
+  </div>
+
+  <div class="cyc">
+    <div class="r wait">
+      <span class="nm">9월 마감분</span>
+      <span class="rg">08.21 ~ 09.20</span>
+      <span class="stg"><span class="dot"></span><span class="no">①</span> 운행 기록 중</span>
+      <span><span class="bar"><i style="width:23%"></i></span></span>
+      <span class="meta">마감까지 D-24 · 지금까지 68건</span>
+      <span class="act"></span>
+    </div>
+    <div class="r now">
+      <span class="nm">8월 마감분</span>
+      <span class="rg">07.21 ~ 08.20</span>
+      <span class="stg"><span class="dot"></span><span class="no">②</span> 마감 보완 중</span>
+      <span><span class="bar"><i class="w" style="width:58%"></i></span></span>
+      <span class="meta">통행료 37 · 증빙 6 · 계기판 2 남음</span>
+      <span class="act"><button class="btn sm pri">이어서</button></span>
+    </div>
+    <div class="r">
+      <span class="nm">7월 마감분</span>
+      <span class="rg">06.21 ~ 07.20</span>
+      <span class="stg"><span class="dot" style="background:var(--info)"></span><span class="no">④</span> 결재 3 / 5단계</span>
+      <span><span class="bar"><i style="width:78%;background:var(--info)"></i></span></span>
+      <span class="meta">이OO 실장에서 6일째 멈춤</span>
+      <span class="act"><button class="btn sm">독촉</button></span>
+    </div>
+    <div class="r done">
+      <span class="nm">6월 마감분</span>
+      <span class="rg">05.21 ~ 06.20</span>
+      <span class="stg"><span class="dot"></span><span class="no">⑤</span> 완료 · 잠김</span>
+      <span><span class="bar"><i class="g" style="width:100%"></i></span></span>
+      <span class="meta">06.27 최OO 대표이사 승인</span>
+      <span class="act"><button class="btn sm">출력</button></span>
+    </div>
+  </div>
 
   <div class="flowwrap" style="margin-bottom:16px">
-    <svg viewBox="0 0 1180 470" role="img" aria-label="운행부터 출력까지의 업무 흐름">
+    <svg viewBox="0 0 1180 486" role="img" aria-label="운행부터 출력까지의 업무 흐름과 현재 진행 단계">
       <defs>
         <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0 0 L10 5 L0 10 z" fill="#B6ACB1"/>
-        </marker>
+          <path d="M0 0 L10 5 L0 10 z" fill="#B6ACB1"/></marker>
         <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0 0 L10 5 L0 10 z" fill="#B3182C"/>
-        </marker>
+          <path d="M0 0 L10 5 L0 10 z" fill="#B3182C"/></marker>
       </defs>
       <style>
         .ln{font:500 11px Pretendard,sans-serif;fill:#8C8188;letter-spacing:.06em}
         .ph{font:700 11px Pretendard,sans-serif;fill:#B6ACB1;letter-spacing:.1em}
+        .ph.on{fill:#A00040}
         .bx{fill:#fff;stroke:#EDE7E4;rx:9}
+        .bx.on{stroke:#A00040;stroke-width:1.4}
         .tt{font:600 12.5px Pretendard,sans-serif;fill:#1B1518}
         .st{font:400 10.5px Pretendard,sans-serif;fill:#8C8188}
+        .cy{font:600 9.5px Pretendard,sans-serif;fill:#A00040;letter-spacing:.02em}
+        .cy.i{fill:#2A54C6} .cy.g{fill:#137A52} .cy.w{fill:#8C8188}
         .ed{stroke:#D9D0CC;stroke-width:1.4;fill:none;marker-end:url(#ar)}
+        .ed.on{stroke:#A00040;stroke-width:1.7}
         .edb{stroke:#B3182C;stroke-width:1.4;fill:none;marker-end:url(#arb);stroke-dasharray:4 3}
         .lane{stroke:#F5F1EF;stroke-width:1}
+        .col{fill:#FBF0F4}
+        .pd{fill:#A00040;animation:pl 2s ease-in-out infinite}
+        .pd.i{fill:#2A54C6} .pd.g{fill:#137A52} .pd.w{fill:#8C8188;animation:none}
+        @keyframes pl{0%,100%{opacity:1}50%{opacity:.3}}
+        @media (prefers-reduced-motion: reduce){ .pd{animation:none} }
       </style>
+
+      <!-- 진행 중 단계 열 강조 (② 마감 보완) -->
+      <rect class="col" x="240" y="36" width="242" height="416" rx="6"/>
 
       <!-- 단계 머리글 -->
       <text class="ph" x="118" y="26" text-anchor="middle">① 운행</text>
-      <text class="ph" x="360" y="26" text-anchor="middle">② 마감 보완</text>
+      <text class="ph on" x="360" y="26" text-anchor="middle">② 마감 보완</text>
       <text class="ph" x="600" y="26" text-anchor="middle">③ 점검·제출</text>
       <text class="ph" x="838" y="26" text-anchor="middle">④ 결재</text>
       <text class="ph" x="1072" y="26" text-anchor="middle">⑤ 완료</text>
@@ -1628,78 +1708,95 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
       <line class="lane" x1="720" y1="36" x2="720" y2="452"/>
       <line class="lane" x1="958" y1="36" x2="958" y2="452"/>
 
-      <!-- 레인 이름 -->
-      <text class="ln" x="14" y="86">오너드라이버</text>
-      <text class="ln" x="14" y="206">관리자</text>
-      <text class="ln" x="14" y="316">결재자</text>
-      <text class="ln" x="14" y="416">시스템</text>
-      <line class="lane" x1="0" y1="150" x2="1180" y2="150"/>
-      <line class="lane" x1="0" y1="262" x2="1180" y2="262"/>
-      <line class="lane" x1="0" y1="360" x2="1180" y2="360"/>
+      <!-- 레인 -->
+      <text class="ln" x="14" y="90">오너드라이버</text>
+      <text class="ln" x="14" y="210">관리자</text>
+      <text class="ln" x="14" y="320">결재자</text>
+      <text class="ln" x="14" y="420">시스템</text>
+      <line class="lane" x1="0" y1="154" x2="1180" y2="154"/>
+      <line class="lane" x1="0" y1="266" x2="1180" y2="266"/>
+      <line class="lane" x1="0" y1="364" x2="1180" y2="364"/>
 
-      <!-- ① 오너드라이버: 운행 -->
-      <rect class="bx" x="26" y="98" width="196" height="42"/>
-      <rect x="26" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
-      <text class="tt" x="42" y="117">앱이 운행을 자동 기록</text>
-      <text class="st" x="42" y="132">경로 · 거리 · 계기판 · 안전운전</text>
+      <!-- ① 운행 (9월분 진행 중) -->
+      <rect class="bx on" x="26" y="100" width="196" height="46"/>
+      <rect x="26" y="100" width="3" height="46" fill="#A00040" rx="1.5"/>
+      <circle class="pd w" cx="210" cy="112" r="3.4"/>
+      <text class="tt" x="42" y="119">앱이 운행을 자동 기록</text>
+      <text class="st" x="42" y="134">경로 · 거리 · 계기판 · 안전운전</text>
+      <text class="cy w" x="26" y="160">▸ 9월 마감분 68건 기록 중</text>
 
-      <!-- ② 오너드라이버: 정리 -->
-      <rect class="bx" x="252" y="98" width="212" height="42"/>
-      <rect x="252" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
-      <text class="tt" x="268" y="117">웹에서 내 운행 정리</text>
-      <text class="st" x="268" y="132">통행료 고르기 · 영수증 스캔 올리기</text>
+      <!-- ② 오너드라이버 정리 (8월분) -->
+      <rect class="bx on" x="252" y="100" width="212" height="46"/>
+      <rect x="252" y="100" width="3" height="46" fill="#A00040" rx="1.5"/>
+      <circle class="pd" cx="452" cy="112" r="3.4"/>
+      <text class="tt" x="268" y="119">웹에서 내 운행 정리</text>
+      <text class="st" x="268" y="134">통행료 고르기 · 영수증 스캔 올리기</text>
+      <text class="cy" x="252" y="160">▸ 8월 마감분 · 통행료 37 · 증빙 6 남음</text>
 
-      <!-- ② 관리자: 하이패스 -->
-      <rect class="bx" x="252" y="176" width="212" height="42"/>
-      <rect x="252" y="176" width="3" height="42" fill="#2A54C6" rx="1.5"/>
-      <text class="tt" x="268" y="195">하이패스 영수증 올리기</text>
-      <text class="st" x="268" y="210">PDF → 실제 청구액으로 자동 배분</text>
+      <!-- ② 관리자 하이패스 -->
+      <rect class="bx on" x="252" y="180" width="212" height="46"/>
+      <rect x="252" y="180" width="3" height="46" fill="#2A54C6" rx="1.5"/>
+      <circle class="pd i" cx="452" cy="192" r="3.4"/>
+      <text class="tt" x="268" y="199">하이패스 영수증 올리기</text>
+      <text class="st" x="268" y="214">PDF → 실제 청구액으로 자동 배분</text>
+      <text class="cy i" x="252" y="240">▸ 확인 필요 2건 · 미배분 9건</text>
 
-      <!-- ③ 시스템: 자동 점검 -->
-      <rect class="bx" x="496" y="382" width="208" height="52"/>
-      <rect x="496" y="382" width="3" height="52" fill="#8C8188" rx="1.5"/>
-      <text class="tt" x="512" y="401">자동 점검 5가지</text>
-      <text class="st" x="512" y="415">운행일지 · 통행료 · 영수증</text>
-      <text class="st" x="512" y="428">주차 · 계기판 연속성</text>
+      <!-- ③ 시스템 자동 점검 -->
+      <rect class="bx" x="496" y="386" width="208" height="52"/>
+      <rect x="496" y="386" width="3" height="52" fill="#8C8188" rx="1.5"/>
+      <text class="tt" x="512" y="405">자동 점검 5가지</text>
+      <text class="st" x="512" y="419">운행일지 · 통행료 · 영수증</text>
+      <text class="st" x="512" y="432">주차 · 계기판 연속성</text>
 
-      <!-- ③ 오너드라이버: 제출 -->
-      <rect class="bx" x="496" y="98" width="208" height="42"/>
-      <rect x="496" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
-      <text class="tt" x="512" y="117">제출</text>
-      <text class="st" x="512" y="132">다섯 항목이 전부 통과해야 열립니다</text>
+      <!-- ③ 제출 (아직 잠김) -->
+      <rect class="bx" x="496" y="100" width="208" height="46" stroke-dasharray="4 3"/>
+      <rect x="496" y="100" width="3" height="46" fill="#D9D0CC" rx="1.5"/>
+      <text class="tt" x="512" y="119" fill="#8C8188">제출</text>
+      <text class="st" x="512" y="134">다섯 항목이 전부 통과해야 열립니다</text>
+      <text class="cy w" x="496" y="160">▸ 3건 남아 아직 잠김</text>
 
-      <!-- ④ 결재자 -->
-      <rect class="bx" x="736" y="282" width="206" height="66"/>
-      <rect x="736" y="282" width="3" height="66" fill="#137A52" rx="1.5"/>
-      <text class="tt" x="752" y="301">순서대로 결재</text>
-      <text class="st" x="752" y="316">담당 → 팀장 → 실장</text>
-      <text class="st" x="752" y="329">→ 사업부장 → 대표이사</text>
-      <text class="st" x="752" y="342" fill="#B3182C">반려하면 1차부터 다시</text>
+      <!-- ④ 결재 (7월분) -->
+      <rect class="bx on" x="736" y="286" width="206" height="66" stroke="#2A54C6"/>
+      <rect x="736" y="286" width="3" height="66" fill="#137A52" rx="1.5"/>
+      <circle class="pd i" cx="930" cy="298" r="3.4"/>
+      <text class="tt" x="752" y="305">순서대로 결재</text>
+      <text class="st" x="752" y="320">담당 → 팀장 → 실장</text>
+      <text class="st" x="752" y="333">→ 사업부장 → 대표이사</text>
+      <text class="st" x="752" y="346" fill="#B3182C">반려하면 1차부터 다시</text>
+      <text class="cy i" x="736" y="366">▸ 7월 마감분 3/5단계 · 6일째</text>
 
-      <!-- ⑤ 시스템: 문서 생성 -->
-      <rect class="bx" x="974" y="382" width="192" height="52"/>
-      <rect x="974" y="382" width="3" height="52" fill="#8C8188" rx="1.5"/>
-      <text class="tt" x="990" y="401">문서 생성·보관</text>
-      <text class="st" x="990" y="415">결재란이 채워진 엑셀</text>
-      <text class="st" x="990" y="428">이후 그 달은 잠깁니다</text>
+      <!-- ⑤ 문서 생성 -->
+      <rect class="bx" x="974" y="386" width="192" height="52"/>
+      <rect x="974" y="386" width="3" height="52" fill="#8C8188" rx="1.5"/>
+      <text class="tt" x="990" y="405">문서 생성·보관</text>
+      <text class="st" x="990" y="419">결재란이 채워진 엑셀</text>
+      <text class="st" x="990" y="432">이후 그 달은 잠깁니다</text>
 
-      <!-- ⑤ 오너드라이버: 출력 -->
-      <rect class="bx" x="974" y="98" width="192" height="42"/>
-      <rect x="974" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
-      <text class="tt" x="990" y="117">출력하기</text>
-      <text class="st" x="990" y="132">배너 → 한 번에 내려받기</text>
+      <!-- ⑤ 출력 (6월분 완료) -->
+      <rect class="bx on" x="974" y="100" width="192" height="46" stroke="#137A52"/>
+      <rect x="974" y="100" width="3" height="46" fill="#137A52" rx="1.5"/>
+      <circle class="pd g" cx="1154" cy="112" r="3.4"/>
+      <text class="tt" x="990" y="119">출력하기</text>
+      <text class="st" x="990" y="134">배너 → 한 번에 내려받기</text>
+      <text class="cy g" x="974" y="160">▸ 6월 마감분 출력 가능</text>
 
       <!-- 화살표 -->
-      <path class="ed" d="M222 119 H246"/>
-      <path class="ed" d="M464 119 H490"/>
-      <path class="ed" d="M464 197 C480 197 486 160 496 138"/>
-      <path class="ed" d="M600 140 V376"/>
-      <path class="ed" d="M704 408 C726 408 730 360 738 330"/>
-      <path class="ed" d="M942 315 C960 315 966 360 1000 376"/>
-      <path class="ed" d="M1070 382 V146"/>
-      <path class="edb" d="M840 348 C840 400 660 400 604 148"/>
-      <text class="st" x="676" y="404" fill="#B3182C" text-anchor="end">반려</text>
+      <path class="ed on" d="M222 121 H246"/>
+      <path class="ed" d="M464 121 H490"/>
+      <path class="ed on" d="M464 201 C480 201 486 164 496 142"/>
+      <path class="ed" d="M600 146 V380"/>
+      <path class="ed" d="M704 412 C726 412 730 364 738 334"/>
+      <path class="ed" d="M942 319 C960 319 966 364 1000 380"/>
+      <path class="ed" d="M1070 386 V150"/>
+      <path class="edb" d="M840 352 C840 404 660 404 604 152"/>
+      <text class="st" x="676" y="408" fill="#B3182C" text-anchor="end">반려</text>
     </svg>
+  </div>
+
+  <div class="note" style="margin-bottom:16px">
+    <b>색이 들어간 상자가 지금 움직이는 곳입니다.</b>
+    ② 마감 보완이 이번 주의 본 작업이고, ④ 결재는 지난 마감분이 실장님 앞에서 멈춰 있습니다.
+    ③ 제출은 점선 — 남은 3건을 처리해야 열립니다.
   </div>
 
   <div class="grid c2">
@@ -1717,38 +1814,23 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
     </div>
 
     <div class="card">
-      <h3>기간이 어떻게 잡히나</h3>
+      <h3>단계별로 누가 무엇을 하나</h3>
       <div class="tblwrap">
         <table>
-          <thead><tr><th>이름</th><th>실제 기간</th><th>무슨 일</th></tr></thead>
+          <thead><tr><th>단계</th><th>오너드라이버</th><th>관리자</th><th>결재자</th></tr></thead>
           <tbody>
-            <tr><td>9월 마감분</td><td>08.21 ~ 09.20</td><td><span class="pill mute">운행 중</span></td></tr>
-            <tr><td>8월 마감분</td><td>07.21 ~ 08.20</td><td><span class="pill warn">마감 보완 중</span></td></tr>
-            <tr><td>7월 마감분</td><td>06.21 ~ 07.20</td><td><span class="pill info">결재 3/5단계</span></td></tr>
-            <tr><td>6월 마감분</td><td>05.21 ~ 06.20</td><td><span class="pill ok">완료 · 출력 가능</span></td></tr>
+            <tr><td>① 운행</td><td>앱이 자동 기록</td><td>—</td><td>—</td></tr>
+            <tr><td>② 마감 보완</td><td>통행료 · 영수증</td><td>하이패스 · 수정</td><td>—</td></tr>
+            <tr><td>③ 점검·제출</td><td><b>제출</b></td><td>미제출자 독촉</td><td>—</td></tr>
+            <tr><td>④ 결재</td><td>반려 시 재상신</td><td>현황 관리</td><td><b>승인 / 반려</b></td></tr>
+            <tr><td>⑤ 완료</td><td><b>출력</b></td><td>리포트 발행</td><td>—</td></tr>
           </tbody>
         </table>
       </div>
       <div class="note" style="margin-top:12px">
-        달력 월이 아니라 <b>전월 21일 00:00 ~ 당월 21일 00:00</b>(끝은 포함하지 않음)입니다.
-        안전교육 회차와 유류 분기도 같은 21일 기준으로 끊깁니다.
+        시스템은 매 단계에서 자동으로 움직입니다 — 안전운전 계산, 영수증 금액 인식,
+        하이패스 배분, 자동 점검, 문서 생성, 배너 알림, 마감분 잠금.
       </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>단계별로 누가 무엇을 하나</h3>
-    <div class="tblwrap">
-      <table class="wide">
-        <thead><tr><th>단계</th><th>언제</th><th>오너드라이버</th><th>관리자</th><th>결재자</th><th>시스템</th></tr></thead>
-        <tbody>
-          <tr><td>① 운행</td><td>매일</td><td>앱이 자동 기록</td><td>—</td><td>—</td><td>경로·안전운전 계산</td></tr>
-          <tr><td>② 마감 보완</td><td>21일 이후</td><td>통행료 고르기<br>영수증 올리기</td><td>하이패스 PDF 업로드<br>이상 항목 수정</td><td>—</td><td>영수증 금액 인식<br>하이패스 자동 배분</td></tr>
-          <tr><td>③ 점검·제출</td><td>보완 끝나면</td><td><b>제출</b></td><td>부서 미제출자 독촉</td><td>—</td><td>5가지 자동 점검</td></tr>
-          <tr><td>④ 결재</td><td>제출 직후</td><td>반려 시 수정·재상신</td><td>진행 현황 관리</td><td><b>순서대로 승인/반려</b></td><td>다음 단계로 전달</td></tr>
-          <tr><td>⑤ 완료</td><td>최종 승인</td><td><b>출력하기</b></td><td>월간 리포트 발행</td><td>—</td><td>문서 생성·보관<br>배너 알림 · 마감분 잠금</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </section>
