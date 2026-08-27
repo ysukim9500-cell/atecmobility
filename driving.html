@@ -106,6 +106,56 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   line-height:1.65;color:var(--ink-2);margin-top:16px}
 .note b{font-weight:600;color:var(--ink)}
 .note.warn{border-left-color:var(--warn)}
+/* ── 탭 ── */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.tabs button{font:inherit;font-size:13px;font-weight:500;cursor:pointer;border:0;background:none;
+  color:var(--muted);padding:8px 14px 10px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--wine);border-bottom-color:var(--wine);font-weight:600}
+.tabs .b{margin-left:6px;font-size:11px;color:var(--bad);font-variant-numeric:tabular-nums}
+
+/* ── 업로드 ── */
+.drop{border:1px dashed #DFD5D9;border-radius:10px;padding:30px 18px;text-align:center;
+  background:var(--surface);cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--wine);background:var(--wine-tint)}
+.drop .t{font-weight:600;font-size:13.5px}
+.drop .s{color:var(--muted);font-size:12px;margin-top:4px}
+.drop input{display:none}
+
+/* ── 카드 ── */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
+.card h3{margin:0 0 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:9px}
+.card h3 .tag{font-size:11px;font-weight:500;color:var(--muted)}
+.card h3 .sp{flex:1}
+
+/* ── 대조 항목 ── */
+.grp{border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.grp .gh{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:12px 16px;
+  background:var(--line-2);border-bottom:1px solid var(--line)}
+.grp .gh .t{font-weight:700;font-size:13px}
+.grp .gh .sp{flex:1}
+.item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line-2)}
+.item:last-child{border-bottom:0}
+.item.diff{box-shadow:inset 2px 0 0 var(--bad)}
+.item.new{box-shadow:inset 2px 0 0 var(--info)}
+.item.same{opacity:.62}
+.item input[type=checkbox]{width:15px;height:15px;accent-color:var(--wine);margin-top:3px;flex:none}
+.item .body{flex:1;min-width:0}
+.item .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+.item .hd .d{font-weight:600;font-size:12.5px}
+.item .money{display:flex;align-items:center;gap:9px;font-variant-numeric:tabular-nums;font-size:12.5px}
+.item .money .old{color:var(--muted);text-decoration:line-through}
+.item .money .new{font-weight:700;color:var(--ok)}
+.item .money .dl{font-weight:600;color:var(--bad)}
+.item .lines{font-size:11.5px;color:var(--muted);line-height:1.75;margin-top:3px}
+.item .lines span{margin-right:12px;white-space:nowrap}
+.applybar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 0 0}
+.btn.pri{background:var(--wine);border-color:var(--wine);color:#fff}
+.btn.pri:hover{background:var(--wine-2)}
+.btn.pri[disabled]{background:#D6CBD1;border-color:#D6CBD1;cursor:not-allowed}
+.btn.sm{padding:4px 10px;font-size:11.5px}
+.res{border-left:2px solid var(--ok);padding:4px 0 4px 13px;font-size:12.5px;color:var(--ink-2);margin-top:14px}
+.res.bad{border-left-color:var(--bad);color:var(--bad)}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);
   border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -154,6 +204,12 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   </header>
 
   <main>
+    <div class="tabs" id="tabs">
+      <button data-t="trips" aria-selected="true">운행일지</button>
+      <button data-t="hipass" aria-selected="false" id="tabHipass" style="display:none">하이패스 대조</button>
+    </div>
+
+    <div id="viewTrips">
     <h2 class="pg" id="pgTitle">운행일지</h2>
     <p class="pgsub" id="pgSub">불러오는 중…</p>
 
@@ -191,6 +247,36 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
     <div class="state" id="state"><b>불러오는 중…</b>잠시만 기다려 주세요</div>
 
+    </div><!-- /viewTrips -->
+
+    <div id="viewHipass" style="display:none">
+      <h2 class="pg">하이패스 대조</h2>
+      <p class="pgsub" id="hpSub">하이패스에서 받은 영수증 PDF 를 올리면 <b>실제 청구액</b>으로 맞춥니다</p>
+
+      <label class="drop" id="drop">
+        <input type="file" id="pdf" accept="application/pdf,.pdf" multiple>
+        <div class="t">PDF 를 여기에 끌어놓거나 눌러서 고르세요</div>
+        <div class="s">파일은 <b>브라우저 안에서만</b> 읽습니다 — 서버로 올리지 않습니다</div>
+      </label>
+
+      <div id="hpBusy" style="display:none;margin-top:16px;color:var(--muted);font-size:12.5px">
+        <span class="spin" style="border-color:rgba(160,0,64,.25);border-top-color:var(--wine)"></span>
+        읽는 중…
+      </div>
+
+      <div class="kpis" id="hpKpis" style="display:none;margin-top:16px">
+        <div class="kpi"><div class="k">읽은 영수증</div><div class="v" id="hRead">—</div></div>
+        <div class="kpi"><div class="k">운행에 배분</div><div class="v" id="hHit">—</div></div>
+        <div class="kpi"><div class="k">지금 값과 같음</div><div class="v" id="hSame">—</div></div>
+        <div class="kpi alert"><div class="k">지금 값과 다름</div><div class="v" id="hDiff">—</div></div>
+        <div class="kpi"><div class="k">미확정 → 확정</div><div class="v" id="hNew">—</div></div>
+        <div class="kpi alert"><div class="k">붙일 운행 없음</div><div class="v" id="hMiss">—</div></div>
+      </div>
+
+      <div id="hpGroups" style="margin-top:16px"></div>
+      <div id="hpResult"></div>
+    </div>
+
     <div class="note warn" id="readonlyNote" style="display:none">
       <b>지금은 조회만 됩니다.</b> 수정·증빙 올리기·마감·결재는 다음 단계에서 열립니다.
       화면 구성은 <a href="driving-preview.html" style="color:inherit">시안</a>에서 미리 보실 수 있습니다.
@@ -198,6 +284,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   </main>
 </div>
 
+<script src="hipass.js"></script>
 <script>
 (function () {
   'use strict';
@@ -300,6 +387,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       (m.is_admin ? ' · 관리자' : '');
     $('thWho').style.display = m.is_admin ? '' : 'none';
     $('pgTitle').textContent = m.is_admin ? '운행일지 (전체)' : '내 운행일지';
+    // 하이패스 반영은 관리자만 — 서버(toll-apply)도 같은 기준으로 막는다.
+    $('tabHipass').style.display = m.is_admin ? '' : 'none';
+    if (m.is_admin) bindDrop();
 
     // 최근 6개 마감분
     var sel = $('fCycle'); sel.innerHTML = '';
@@ -430,6 +520,207 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     $('filters').style.display = 'flex';
     $('tblwrap').style.display = 'block';
     $('readonlyNote').style.display = 'block';
+  }
+
+  /* ═══════════ 탭 ═══════════ */
+  $('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-t]'); if (!b) return;
+    Array.prototype.forEach.call($('tabs').querySelectorAll('button'), function (x) {
+      x.setAttribute('aria-selected', String(x === b));
+    });
+    $('viewTrips').style.display = b.dataset.t === 'trips' ? 'block' : 'none';
+    $('viewHipass').style.display = b.dataset.t === 'hipass' ? 'block' : 'none';
+  });
+
+  /* ═══════════ 하이패스 ═══════════ */
+  var GROUPS = [], BATCH = '';
+
+  function bindDrop() {
+    var d = $('drop'), i = $('pdf');
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      d.addEventListener(ev, function (e) { e.preventDefault(); d.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      d.addEventListener(ev, function (e) { e.preventDefault(); d.classList.remove('over'); });
+    });
+    d.addEventListener('drop', function (e) { handleFiles(e.dataTransfer.files); });
+    i.addEventListener('change', function () { handleFiles(i.files); i.value = ''; });
+  }
+
+  function handleFiles(files) {
+    if (!files || !files.length) return;
+    $('hpBusy').style.display = 'block';
+    $('hpResult').innerHTML = '';
+    var names = [];
+    Promise.all(Array.prototype.map.call(files, function (f) {
+      names.push(f.name);
+      return f.arrayBuffer().then(function (b) { return Hipass.parsePdf(b); });
+    })).then(function (lists) {
+      var recs = [].concat.apply([], lists);
+      BATCH = names.join(', ');
+      if (!recs.length) throw new Error('영수증을 하나도 찾지 못했습니다.');
+      GROUPS = Hipass.match(recs, ALL);
+      renderHipass();
+    }).catch(function (e) {
+      $('hpResult').innerHTML = '<div class="res bad">' + esc(e.message || '읽지 못했습니다') + '</div>';
+    }).then(function () { $('hpBusy').style.display = 'none'; });
+  }
+
+  function renderHipass() {
+    var read = 0, hit = 0, same = 0, diff = 0, neu = 0, missN = 0;
+    GROUPS.forEach(function (g) {
+      read += g.records.length; missN += g.unmatched.length;
+      g.matched.forEach(function (e) {
+        hit += e.lines.length;
+        if (e.kind === 'same') same++; else if (e.kind === 'diff') diff++; else neu++;
+      });
+    });
+    $('hRead').innerHTML = read + '<small>건</small>';
+    $('hHit').innerHTML = hit + '<small>건</small>';
+    $('hSame').innerHTML = same + '<small>건</small>';
+    $('hDiff').innerHTML = diff + '<small>건</small>';
+    $('hNew').innerHTML = neu + '<small>건</small>';
+    $('hMiss').innerHTML = missN + '<small>건</small>';
+    $('hpKpis').style.display = 'flex';
+
+    var html = GROUPS.map(function (g, gi) {
+      var opts = g.candidates.map(function (p) {
+        return '<option value="' + esc(p) + '"' + (p === g.plate ? ' selected' : '') + '>' + esc(p) + '</option>';
+      }).join('');
+      var voteTxt = g.vote.length
+        ? g.vote.slice(0, 2).map(function (v) { return esc(v.plate) + ' ' + v.n + '표'; }).join(' · ')
+        : '맞는 운행이 없습니다';
+
+      var items = g.matched.map(function (e, ii) {
+        var money = e.kind === 'new'
+          ? '<span class="new">' + won(e.sum) + '원</span><span class="pill mute">지금은 미확정</span>'
+          : e.kind === 'same'
+            ? '<span>' + won(e.sum) + '원</span><span class="pill ok">지금 값과 같음</span>'
+            : '<span class="old">' + won(e.trip.toll_cost) + '</span>→<span class="new">' + won(e.sum) +
+              '원</span><span class="dl">' + (e.diff > 0 ? '+' : '') + won(e.diff) + '</span>';
+        var lines = e.lines.map(function (r) {
+          return '<span>' + esc(r.atText.slice(5)) + ' · ' + won(r.amount) + '원 · ' + esc(r.office) + '</span>';
+        }).join('');
+        return '<label class="item ' + e.kind + '">' +
+          '<input type="checkbox" data-g="' + gi + '" data-i="' + ii + '"' + (e.pick ? ' checked' : '') + '>' +
+          '<span class="body">' +
+            '<span class="hd"><span class="d">' + md(e.trip.start_time) + ' ' + hhmm(e.trip.start_time) +
+              '~' + (e.trip.end_time ? hhmm(e.trip.end_time) : '') + '</span>' +
+              '<span class="money">' + money + '</span></span>' +
+            '<span class="lines">' + lines + '</span>' +
+          '</span></label>';
+      }).join('');
+
+      var miss = g.unmatched.length
+        ? '<div class="item"><span class="body"><span class="hd">' +
+          '<span class="d" style="color:var(--warn)">붙일 운행이 없는 영수증 ' + g.unmatched.length + '건</span>' +
+          '<span class="pill warn">일지 누락이거나 다른 차량 카드</span></span>' +
+          '<span class="lines">' + g.unmatched.slice(0, 8).map(function (r) {
+            return '<span>' + esc(r.atText.slice(5)) + ' · ' + won(r.amount) + '원 · ' + esc(r.office) + '</span>';
+          }).join('') + (g.unmatched.length > 8 ? '<span>외 ' + (g.unmatched.length - 8) + '건</span>' : '') +
+          '</span></span></div>'
+        : '';
+
+      return '<div class="grp">' +
+        '<div class="gh"><span class="t">카드 ****' + esc(g.card4) + '</span>' +
+          '<span class="pill mute">' + g.records.length + '건</span>' +
+          '<span style="font-size:12px;color:var(--muted)">' + voteTxt + '</span>' +
+          '<span class="sp"></span>' +
+          '<span style="font-size:12px;color:var(--muted)">차량</span>' +
+          '<select class="f" data-plate="' + gi + '">' + opts + '</select>' +
+        '</div>' + (items || '<div class="item"><span class="body" style="color:var(--muted);font-size:12.5px">이 차량으로는 맞는 운행이 없습니다. 위에서 차량을 바꿔 보세요.</span></div>') + miss +
+      '</div>';
+    }).join('');
+
+    $('hpGroups').innerHTML = html + (GROUPS.length ? applyBar() : '');
+    bindHipassEvents();
+  }
+
+  function applyBar() {
+    return '<div class="applybar">' +
+      '<button class="btn sm" id="hpAll">전부 선택</button>' +
+      '<button class="btn sm" id="hpNone">전부 해제</button>' +
+      '<span style="flex:1"></span>' +
+      '<span id="hpCount" style="font-size:12px;color:var(--muted)"></span>' +
+      '<button class="btn pri" id="hpApply">선택한 것 반영</button>' +
+      '</div>';
+  }
+
+  function bindHipassEvents() {
+    Array.prototype.forEach.call($('hpGroups').querySelectorAll('select[data-plate]'), function (sel) {
+      sel.addEventListener('change', function () {
+        var g = GROUPS[+sel.dataset.plate];
+        g.plate = sel.value;
+        Hipass.assign(g, ALL);
+        renderHipass();
+      });
+    });
+    $('hpGroups').addEventListener('change', function (e) {
+      var c = e.target.closest('input[type=checkbox]'); if (!c) return;
+      GROUPS[+c.dataset.g].matched[+c.dataset.i].pick = c.checked;
+      updateCount();
+    });
+    var all = $('hpAll'), none = $('hpNone'), ap = $('hpApply');
+    if (all) all.addEventListener('click', function () { setAll(true); });
+    if (none) none.addEventListener('click', function () { setAll(false); });
+    if (ap) ap.addEventListener('click', apply);
+    updateCount();
+  }
+  function setAll(v) {
+    GROUPS.forEach(function (g) { g.matched.forEach(function (e) { e.pick = v; }); });
+    Array.prototype.forEach.call($('hpGroups').querySelectorAll('input[type=checkbox]'),
+      function (c) { c.checked = v; });
+    updateCount();
+  }
+  function picked() {
+    var out = [];
+    GROUPS.forEach(function (g) {
+      g.matched.forEach(function (e) {
+        if (!e.pick) return;
+        out.push({
+          id: e.trip.id, amount: e.sum,
+          note: '카드 ****' + g.card4 + ' · ' + g.plate,
+          lines: e.lines.map(function (r) {
+            return { at: r.atText, amount: r.amount, office: r.office, entry: r.entryOffice };
+          })
+        });
+      });
+    });
+    return out;
+  }
+  function updateCount() {
+    var n = picked().length, c = $('hpCount'), b = $('hpApply');
+    if (c) c.textContent = n ? n + '건 선택됨' : '선택된 것이 없습니다';
+    if (b) b.disabled = !n;
+  }
+
+  function apply() {
+    var items = picked(); if (!items.length) return;
+    var b = $('hpApply');
+    b.disabled = true; b.innerHTML = '<span class="spin"></span> 반영 중…';
+    apiRetry('/functions/v1/toll-apply', {
+      method: 'POST', body: JSON.stringify({ items: items, batch: BATCH })
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        b.disabled = false; b.textContent = '선택한 것 반영';
+        if (!res.ok || !res.j || !res.j.ok) {
+          $('hpResult').innerHTML = '<div class="res bad">' +
+            esc((res.j && res.j.error) || '반영에 실패했습니다') + '</div>';
+          return;
+        }
+        var msg = res.j.applied + '건을 반영했습니다.';
+        if (res.j.skipped && res.j.skipped.length) msg += ' 건너뛴 것 ' + res.j.skipped.length + '건.';
+        if (res.j.warning) msg += ' ⚠ ' + res.j.warning;
+        $('hpResult').innerHTML = '<div class="res' + (res.j.warning ? ' bad' : '') + '">' + esc(msg) +
+          ' 목록을 다시 불러옵니다.</div>';
+        GROUPS = [];
+        $('hpGroups').innerHTML = ''; $('hpKpis').style.display = 'none';
+        load();
+      })
+      .catch(function () {
+        b.disabled = false; b.textContent = '선택한 것 반영';
+        $('hpResult').innerHTML = '<div class="res bad">서버에 연결하지 못했습니다.</div>';
+      });
   }
 
   // 새로고침해도 세션이 남아 있으면 바로 들어간다
