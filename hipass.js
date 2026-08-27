@@ -12,16 +12,39 @@
 (function (global) {
   'use strict';
 
-  /* ── zlib inflate: 브라우저 기본 DecompressionStream 을 쓴다 ── */
-  async function inflate(u8) {
-    for (var fmt of ['deflate', 'deflate-raw']) {
+  /* ── zlib inflate ──────────────────────────────────────────────────────────
+   *  브라우저 기본 DecompressionStream 을 쓴다. 다만 이건 Node 의 zlib 과 달리
+   *  **압축 데이터 뒤에 한 바이트라도 더 있으면 통째로 거부**한다.
+   *  PDF 는 endstream 앞에 개행을 넣으므로 그대로 넣으면 전부 실패한다.
+   *    ① 끝의 개행·공백을 떼고
+   *    ② 그래도 잡동사니가 걸리면, 오류 전까지 받아낸 조각을 살려 쓴다
+   *  ────────────────────────────────────────────────────────────────────────── */
+  async function tryInflate(data, fmt) {
+    try {
+      var ds = new DecompressionStream(fmt);
+      var rd = new Blob([data]).stream().pipeThrough(ds).getReader();
+      var parts = [], total = 0;
       try {
-        var ds = new DecompressionStream(fmt);
-        var st = new Blob([u8]).stream().pipeThrough(ds);
-        return new Uint8Array(await new Response(st).arrayBuffer());
-      } catch (e) { /* 다음 형식으로 */ }
-    }
-    return null;
+        for (;;) {
+          var r = await rd.read();
+          if (r.done) break;
+          parts.push(r.value); total += r.value.length;
+        }
+      } catch (e) { /* 뒤에 잡동사니 — 여기까지 받은 건 쓴다 */ }
+      if (!total) return null;
+      var out = new Uint8Array(total), off = 0;
+      parts.forEach(function (p) { out.set(p, off); off += p.length; });
+      return out;
+    } catch (e) { return null; }
+  }
+  async function inflate(u8) {
+    var e = u8.length;
+    while (e > 0 && (u8[e - 1] === 10 || u8[e - 1] === 13 || u8[e - 1] === 32)) e--;
+    var data = u8.subarray(0, e);
+    var got = await tryInflate(data, 'deflate');
+    if (got && got.length) return got;
+    got = await tryInflate(data, 'deflate-raw');
+    return (got && got.length) ? got : null;
   }
 
   function latin1(u8) {
