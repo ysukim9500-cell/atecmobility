@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>차량 운행일지 관리 — 화면 시안</title>
+<title>ATEC Driving — 운행일지 관리 화면 시안</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -39,8 +39,7 @@ header.top{background:var(--surface);border-bottom:1px solid var(--line);
   padding:0 20px;height:54px;display:flex;align-items:center;gap:16px;
   position:sticky;top:0;z-index:60}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14.5px;letter-spacing:-.015em}
-.brand .mark{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;
-  background:var(--wine);color:#fff;font-size:11px;font-weight:800;letter-spacing:0}
+.brand .mark{font-size:16px;line-height:1;filter:saturate(.92)}
 .brand .sub{font-weight:500;font-size:12.5px;color:var(--muted);
   border-left:1px solid var(--line);padding-left:11px;margin-left:1px}
 .top .sp{flex:1}
@@ -265,6 +264,34 @@ tr.flag-s td:not(:first-child){box-shadow:none}
 .banwrap{display:grid;gap:20px}
 @media(min-width:980px){.banwrap{grid-template-columns:266px 1fr;align-items:start}}
 
+/* ── 결재선 ── */
+.chain{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:2px 0 4px}
+.chain .st{display:flex;align-items:center;gap:9px;padding:10px 14px 10px 0;position:relative}
+.chain .st+.st{padding-left:24px}
+.chain .st+.st::before{content:'';position:absolute;left:6px;top:50%;width:9px;height:9px;
+  border-right:1.4px solid var(--faint);border-top:1.4px solid var(--faint);
+  transform:translateY(-50%) rotate(45deg)}
+.chain .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-size:11px;font-weight:700;background:var(--line-2);color:var(--muted)}
+.chain .st.me .av{background:var(--wine);color:#fff}
+.chain .st.ok .av{background:rgba(19,122,82,.11);color:var(--ok)}
+.chain .st.now .av{background:rgba(42,84,198,.11);color:var(--info);
+  box-shadow:0 0 0 3px rgba(42,84,198,.13)}
+.chain .tx .p{font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.05em}
+.chain .tx .n{font-size:12.5px;font-weight:600;line-height:1.35}
+.chain .tx .m{font-size:11px;color:var(--muted)}
+.chain .st.now .tx .n{color:var(--info)}
+.chain .st.ok .tx .n{color:var(--ok)}
+.rulebox{display:grid;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.rulebox .rr{display:grid;grid-template-columns:110px 1fr 62px;gap:12px;align-items:center;
+  padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.rulebox .rr:last-child{border-bottom:0}
+.rulebox .rr.hit{background:var(--wine-tint)}
+.rulebox .rr .who{font-weight:600}
+.rulebox .rr .to{color:var(--muted)}
+.rulebox .rr .cnt{text-align:right;color:var(--faint);font-size:11.5px;font-variant-numeric:tabular-nums}
+.rulebox .rr.hit .cnt{color:var(--wine);font-weight:600}
+
 /* ── 진행 현황 스트립 ── */
 .livehd{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
 .livehd .t{font-size:13px;font-weight:700}
@@ -306,8 +333,8 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 <div class="flag"><b>화면 시안</b> · 예시 데이터입니다. 서버에 연결되어 있지 않고, 눌러도 저장되지 않습니다.</div>
 
 <header class="top">
-  <div class="brand"><span class="mark">A</span><span>ATEC Mobility</span>
-    <span class="sub">차량 운행일지 관리</span></div>
+  <div class="brand"><span class="mark">🚗</span><span>ATEC Driving</span>
+    <span class="sub">운행일지 관리</span></div>
   <div class="sp"></div>
   <div class="syncchip" title="앱과 웹이 서로 맞춰진 시각"><span class="d"></span>동기화 2분 전 · 대기 3건</div>
   <div class="roleswitch" id="roleswitch">
@@ -403,13 +430,12 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 
     <div>
       <div class="card">
-        <h3>결재 진행<span class="sp"></span><span class="pill info">7월 마감분(06.21~07.20) 검토 중</span></h3>
+        <h3>결재 진행<span class="sp"></span><span class="pill info">7월 마감분 06.21~07.20</span></h3>
         <ul class="lst">
-          <li><span class="pill ok">승인</span><span class="nm">담당</span><span class="ds">홍길동 · 07.21 09:02 상신</span></li>
-          <li><span class="pill ok">승인</span><span class="nm">팀장</span><span class="ds">김OO · 07.21 14:20</span></li>
-          <li><span class="pill info">검토중</span><span class="nm">실장</span><span class="ds">이OO · 6일째 대기</span></li>
-          <li><span class="pill mute">대기</span><span class="nm">사업부장</span><span class="ds">박OO</span></li>
-          <li><span class="pill mute">대기</span><span class="nm">대표이사</span><span class="ds">최OO</span></li>
+          <li><span class="pill warn">지연</span><span class="nm">홍길동</span><span class="ds">사원 · 팀장 단계에서 6일째</span><span class="vl">2/3</span></li>
+          <li><span class="pill info">진행</span><span class="nm">김철수</span><span class="ds">책임 · 센터장 검토 중</span><span class="vl">1/3</span></li>
+          <li><span class="pill info">진행</span><span class="nm">이영희</span><span class="ds">센터장 · 팀장 검토 중</span><span class="vl">1/2</span></li>
+          <li><span class="pill ok">완료</span><span class="nm">최OO</span><span class="ds">팀장 · 사업부장 승인</span><span class="vl">1/1</span></li>
         </ul>
       </div>
       <div class="card">
@@ -979,46 +1005,127 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 <!-- ═══════════ 결재 ═══════════ -->
 <section id="appr" hidden>
   <h2 class="pg">결재</h2>
-  <p class="pgsub">회사 서식의 결재란(담당·팀장·실장·사업부장·대표이사)을 그대로 전자화</p>
+  <p class="pgsub">결재선은 <b>직급으로 자동 산출</b>됩니다 — 본인 위쪽 직급만, 사업부장에서 종결</p>
 
-  <div class="grid c2">
+  <div class="grid c2" style="margin-bottom:14px">
     <div class="card">
-      <h3>결재선 <span class="tag">처음 한 번만</span></h3>
-      <div style="display:grid;gap:9px">
-        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">1</span>
-          <select class="f" style="min-width:210px"><option>담당 — 본인</option></select></div>
-        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">2</span>
-          <select class="f" style="min-width:210px"><option selected>김OO 팀장 (운영팀)</option><option>박OO 팀장 (지원팀)</option></select></div>
-        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">3</span>
-          <select class="f" style="min-width:210px"><option selected>이OO 실장</option></select></div>
-        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">4</span>
-          <select class="f" style="min-width:210px"><option selected>박OO 사업부장</option></select></div>
-        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">5</span>
-          <select class="f" style="min-width:210px"><option selected>최OO 대표이사</option></select></div>
+      <h3>결재선 규칙 <span class="tag">사람이 아니라 직급으로</span></h3>
+      <div class="rulebox">
+        <div class="rr hit"><span class="who">사원 · 선임 · 책임 · 수석 · 팀원</span>
+          <span class="to">센터장 → 팀장 → 사업부장</span><span class="cnt">3단계</span></div>
+        <div class="rr"><span class="who">센터장</span>
+          <span class="to">팀장 → 사업부장</span><span class="cnt">2단계</span></div>
+        <div class="rr"><span class="who">팀장</span>
+          <span class="to">사업부장</span><span class="cnt">1단계</span></div>
+        <div class="rr"><span class="who">사업부장</span>
+          <span class="to">본인이 최종 — 결재 없이 확정</span><span class="cnt">0단계</span></div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin-top:11px;cursor:pointer">
-        <input type="checkbox" checked style="width:15px;height:15px;accent-color:var(--wine)">
-        다음 달부터 이 결재선을 그대로 씁니다</label>
-      <div class="note" style="margin-top:11px">
-        한 번 저장하면 다음 달에는 <b>이 화면이 안 뜨고</b> 저장된 결재선으로 바로 올라갑니다.
-        사람이 바뀌었을 때만 고치면 됩니다.
+      <div class="note" style="margin-top:12px">
+        인사이동이 있으면 <code>app_users</code> 의 <b>직급만 고치면</b> 결재선이 알아서 따라옵니다.
+        결재선을 사람 이름으로 저장해 두지 않기 때문입니다.
       </div>
     </div>
 
     <div class="card">
-      <h3>진행 상황 <span class="tag">7월 마감분 · 06.21~07.20</span></h3>
-      <ul class="lst">
-        <li><span class="pill ok">승인</span><span class="nm">홍길동</span><span class="ds">담당 · 07.21 09:02 상신</span></li>
-        <li><span class="pill ok">승인</span><span class="nm">김OO</span><span class="ds">팀장 · 07.21 14:20</span></li>
-        <li><span class="pill info">검토중</span><span class="nm">이OO</span><span class="ds">실장 · 6일째 대기</span></li>
-        <li><span class="pill mute">대기</span><span class="nm">박OO</span><span class="ds">사업부장</span></li>
-        <li><span class="pill mute">대기</span><span class="nm">최OO</span><span class="ds">대표이사</span></li>
-      </ul>
-      <div class="note warn" style="margin-top:11px">
-        반려하면 의견과 함께 제출자에게 돌아가고, 고쳐서 다시 올리면 <b>1차부터</b> 다시 돕니다.
-        전원 승인되면 그 달은 <b>잠기고</b> 앱에서도 수정할 수 없게 됩니다.
+      <h3>결재 계층에 등록된 사람 <span class="tag">지금 서버 기준</span></h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>직급</th><th>부서</th><th class="num">인원</th><th>권한</th></tr></thead>
+          <tbody>
+            <tr><td>사업부장</td><td>고객지원사업부</td><td class="num">1</td><td><span class="pill ok">관리자</span></td></tr>
+            <tr><td>팀장</td><td>광역교통지원팀</td><td class="num">1</td><td><span class="pill ok">관리자</span></td></tr>
+            <tr class="flag-r"><td>센터장</td><td>수도권버스지원팀</td><td class="num">1</td><td><span class="pill bad">관리자 아님</span></td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="row end" style="margin-top:11px"><button class="btn sm">독촉 알림</button></div>
+      <div class="note warn" style="margin-top:12px">
+        <b>확인이 필요합니다.</b> 센터장이 관리자로 안 잡혀 있고,
+        <b>용인공장(11명) · 리페어팀(1명)에는 센터장도 팀장도 없습니다.</b>
+        그 부서 사람은 누구에게 올려야 하는지 정해야 결재선이 끊기지 않습니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <h3>진행 중인 결재 <span class="tag">7월 마감분 · 06.21~07.20</span><span class="sp"></span>
+      <button class="btn sm">지연 건 독촉</button></h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>제출자</th><th>직급·부서</th><th>결재선</th><th>지금 단계</th><th class="num">경과</th><th class="num">금액</th><th>처리</th></tr></thead>
+        <tbody>
+          <tr class="flag-r">
+            <td>홍길동</td><td>사원 · 수도권버스지원팀</td>
+            <td style="font-size:11.5px;color:var(--muted)">센터장 → <b style="color:var(--info)">팀장</b> → 사업부장</td>
+            <td><span class="pill info">2 / 3 · 이OO 팀장</span></td>
+            <td class="num" style="color:var(--bad);font-weight:600">6일</td>
+            <td class="num">311,400</td>
+            <td><button class="btn sm">독촉</button></td>
+          </tr>
+          <tr>
+            <td>김철수</td><td>책임 · 광역교통지원팀</td>
+            <td style="font-size:11.5px;color:var(--muted)"><b style="color:var(--info)">센터장</b> → 팀장 → 사업부장</td>
+            <td><span class="pill info">1 / 3 · 김OO 센터장</span></td>
+            <td class="num">2일</td>
+            <td class="num">243,800</td>
+            <td><button class="btn sm">보기</button></td>
+          </tr>
+          <tr>
+            <td>이영희</td><td>센터장 · 수도권버스지원팀</td>
+            <td style="font-size:11.5px;color:var(--muted)"><b style="color:var(--info)">팀장</b> → 사업부장</td>
+            <td><span class="pill info">1 / 2 · 이OO 팀장</span></td>
+            <td class="num">1일</td>
+            <td class="num">389,200</td>
+            <td><button class="btn sm">보기</button></td>
+          </tr>
+          <tr>
+            <td>최OO</td><td>팀장 · 광역교통지원팀</td>
+            <td style="font-size:11.5px;color:var(--muted)"><b style="color:var(--ok)">사업부장</b></td>
+            <td><span class="pill ok">1 / 1 · 완료</span></td>
+            <td class="num">—</td>
+            <td class="num">198,300</td>
+            <td><button class="btn sm">문서</button></td>
+          </tr>
+          <tr>
+            <td>박OO</td><td>사업부장 · 고객지원사업부</td>
+            <td style="font-size:11.5px;color:var(--muted)">—</td>
+            <td><span class="pill ok">결재 없이 확정</span></td>
+            <td class="num">—</td>
+            <td class="num">142,600</td>
+            <td><button class="btn sm">문서</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn" style="margin-top:12px">
+      반려하면 의견과 함께 제출자에게 돌아가고, 고쳐서 다시 올리면 <b>1차부터</b> 다시 돕니다.
+      마지막 단계까지 승인되면 그 마감분은 <b>잠기고</b> 앱에서도 웹에서도 수정할 수 없습니다.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>미제출 현황 <span class="tag">8월 마감분 · 07.21~08.20</span></h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>부서</th><th class="num">인원</th><th class="num">제출</th><th class="num">미제출</th><th>진척</th><th>막힌 이유</th><th>처리</th></tr></thead>
+        <tbody>
+          <tr><td>광역교통지원팀</td><td class="num">21</td><td class="num">18</td><td class="num">3</td>
+            <td style="width:130px"><span class="bar"><i class="g" style="width:86%"></i></span></td>
+            <td style="color:var(--muted);font-size:11.5px">통행료 미확정 2 · 증빙 1</td>
+            <td><button class="btn sm">알림</button></td></tr>
+          <tr class="flag-r"><td>수도권버스지원팀</td><td class="num">23</td><td class="num">14</td><td class="num">9</td>
+            <td><span class="bar"><i class="w" style="width:61%"></i></span></td>
+            <td style="color:var(--muted);font-size:11.5px">통행료 미확정 28 · 증빙 4</td>
+            <td><button class="btn sm">알림</button></td></tr>
+          <tr class="flag-r"><td>용인공장</td><td class="num">11</td><td class="num">0</td><td class="num">11</td>
+            <td><span class="bar"><i style="width:0%"></i></span></td>
+            <td style="color:var(--bad);font-size:11.5px">결재선 없음 — 센터장·팀장 미지정</td>
+            <td><button class="btn sm pri">결재선 지정</button></td></tr>
+          <tr class="flag-r"><td>리페어팀</td><td class="num">1</td><td class="num">0</td><td class="num">1</td>
+            <td><span class="bar"><i style="width:0%"></i></span></td>
+            <td style="color:var(--bad);font-size:11.5px">결재선 없음 — 센터장·팀장 미지정</td>
+            <td><button class="btn sm pri">결재선 지정</button></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -1065,7 +1172,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
     <svg class="i" viewBox="0 0 24 24"><path d="M20 6.5L9.2 17.3 4 12.1"/></svg>
     <span class="tx">
       <span class="t1">6월 마감분(05.21~06.20) 결재가 모두 끝났습니다</span>
-      <span class="t2">최OO 대표이사 06.27 승인 · 결재란에 다섯 분 이름과 날짜가 채워졌습니다</span>
+      <span class="t2">박OO 사업부장 06.27 최종 승인 · 결재란에 이름과 날짜가 채워졌습니다</span>
     </span>
     <button class="btn gh">문서 보기</button>
     <button class="btn">출력하기</button>
@@ -1102,7 +1209,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
           <li><span class="pill info">작성 중</span><span class="nm">8월 마감분</span>
               <span class="ds">07.21 ~ 08.20 · 42건</span><span class="vl">327,900원</span></li>
           <li><span class="pill warn">결재 중</span><span class="nm">7월 마감분</span>
-              <span class="ds">06.21~07.20 · 이OO 실장 검토 중 (3/5단계)</span><span class="vl">311,400원</span></li>
+              <span class="ds">06.21~07.20 · 이OO 팀장 검토 중 (2/3단계)</span><span class="vl">311,400원</span></li>
           <li><span class="pill ok">완료</span><span class="nm">6월 마감분</span>
               <span class="ds">05.21~06.20 · 06.28 지급 완료</span><span class="vl">289,700원</span>
               <button class="btn sm pri">출력</button></li>
@@ -1364,7 +1471,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
   <div class="card">
     <h3>지난 정산</h3>
     <ul class="lst">
-      <li><span class="pill warn">결재중</span><span class="nm">7월 마감분</span><span class="ds">06.21~07.20 · 이OO 실장 검토 중</span><span class="vl">311,400원</span></li>
+      <li><span class="pill warn">결재중</span><span class="nm">7월 마감분</span><span class="ds">06.21~07.20 · 이OO 팀장 검토 중 (2/3)</span><span class="vl">311,400원</span></li>
       <li><span class="pill ok">지급완료</span><span class="nm">6월 마감분</span><span class="ds">05.21~06.20 · 06.28 지급</span><span class="vl">289,700원</span></li>
       <li><span class="pill ok">지급완료</span><span class="nm">5월 마감분</span><span class="ds">04.21~05.20 · 05.28 지급</span><span class="vl">302,150원</span></li>
     </ul>
@@ -1393,39 +1500,71 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
     </div>
     <div>
       <div class="card">
-        <h3>결재선 <span class="tag">저장돼 있습니다</span></h3>
-        <div style="font-size:12.5px;font-weight:600;line-height:2">
-          담당 <b>홍길동</b> → 팀장 <b>김OO</b> → 실장 <b>이OO</b> → 사업부장 <b>박OO</b> → 대표이사 <b>최OO</b>
+        <h3>내 결재선 <span class="tag">직급에 따라 자동으로 정해집니다</span></h3>
+        <div class="chain">
+          <div class="st me"><span class="av">본인</span>
+            <span class="tx"><span class="p">사원 · 수도권버스지원팀</span><span class="n">홍길동</span></span></div>
+          <div class="st"><span class="av">1</span>
+            <span class="tx"><span class="p">센터장</span><span class="n">김OO</span></span></div>
+          <div class="st"><span class="av">2</span>
+            <span class="tx"><span class="p">팀장</span><span class="n">이OO</span></span></div>
+          <div class="st"><span class="av">3</span>
+            <span class="tx"><span class="p">사업부장</span><span class="n">박OO</span><span class="m">여기서 종결</span></span></div>
         </div>
-        <div class="row end" style="margin-top:9px"><button class="btn sm">바꾸기</button></div>
-        <div class="note" style="margin-top:11px">
-          지난달에 정해두신 결재선입니다. <b>그대로 두시면 됩니다.</b> 사람이 바뀌었을 때만 바꾸세요.
+        <div class="note" style="margin-top:12px">
+          직급이 <b>사원</b>이라 위 세 단계를 거칩니다. 고르실 것이 없습니다 —
+          <b>바뀌면 자동으로 따라갑니다.</b> 같은 직급이 여럿이면 그때만 물어봅니다.
         </div>
+        <div class="row end" style="margin-top:10px"><button class="btn sm">한 명 더 넣기</button></div>
       </div>
       <div class="card">
         <h3>7월 마감분(06.21~07.20) 진행 상황</h3>
-        <ul class="lst">
-          <li><span class="pill ok">승인</span><span class="nm">홍길동</span><span class="ds">담당 · 07.21 09:02 상신</span></li>
-          <li><span class="pill ok">승인</span><span class="nm">김OO</span><span class="ds">팀장 · 07.21 14:20</span></li>
-          <li><span class="pill info">검토중</span><span class="nm">이OO</span><span class="ds">실장 · 6일째</span></li>
-          <li><span class="pill mute">대기</span><span class="nm">박OO</span><span class="ds">사업부장</span></li>
-          <li><span class="pill mute">대기</span><span class="nm">최OO</span><span class="ds">대표이사</span></li>
-        </ul>
+        <div class="chain">
+          <div class="st ok"><span class="av">✓</span>
+            <span class="tx"><span class="p">본인 · 사원</span><span class="n">홍길동</span><span class="m">07.21 09:02 상신</span></span></div>
+          <div class="st ok"><span class="av">✓</span>
+            <span class="tx"><span class="p">센터장</span><span class="n">김OO</span><span class="m">07.21 14:20 승인</span></span></div>
+          <div class="st now"><span class="av">2</span>
+            <span class="tx"><span class="p">팀장</span><span class="n">이OO</span><span class="m">6일째 검토 중</span></span></div>
+          <div class="st"><span class="av">3</span>
+            <span class="tx"><span class="p">사업부장</span><span class="n">박OO</span><span class="m">대기</span></span></div>
+        </div>
       </div>
     </div>
   </div>
 
 
   <div class="card">
+    <h3>결재선은 이렇게 정해집니다 <span class="tag">직급 계층 · 사업부장에서 종결</span></h3>
+    <div class="rulebox">
+      <div class="rr hit"><span class="who">사원 · 선임 · 책임 · 수석 · 팀원</span>
+        <span class="to">센터장 → 팀장 → 사업부장</span><span class="cnt">3단계</span></div>
+      <div class="rr"><span class="who">센터장</span>
+        <span class="to">팀장 → 사업부장</span><span class="cnt">2단계</span></div>
+      <div class="rr"><span class="who">팀장</span>
+        <span class="to">사업부장</span><span class="cnt">1단계</span></div>
+      <div class="rr"><span class="who">사업부장</span>
+        <span class="to">본인이 최종 — 결재 없이 확정</span><span class="cnt">0단계</span></div>
+    </div>
+    <div class="note" style="margin-top:12px">
+      <b>본인보다 위쪽 직급만</b> 결재선에 들어갑니다. 사람이 아니라 <b>직급으로 정해지므로</b>,
+      인사이동이 있어도 <code>app_users</code> 의 직급만 고치면 결재선이 알아서 따라옵니다.
+    </div>
+    <div class="note warn" style="margin-top:10px">
+      같은 직급이 여러 명인 부서라면 그때만 <b>누구에게 올릴지</b> 한 번 고르고, 그 선택이 다음 달로 이어집니다.
+    </div>
+  </div>
+
+  <div class="card">
     <h3>결재가 끝나면 이렇게 알려드립니다 <span class="tag">웹 + 앱</span></h3>
     <div class="banwrap">
       <div class="phone">
         <div class="notch"></div>
-        <div class="appbar">☰ ATEC 운행일지 <span class="m">· 12가 3456</span></div>
+        <div class="appbar">☰ 🚗 ATEC Driving <span class="m">· 12가 3456</span></div>
         <div class="body">
           <div class="ban">
             <div class="t">✓ 6월 마감분 결재 완료</div>
-            <div class="s">05.21~06.20 · 최OO 대표이사 06.27 승인<br>결재란이 채워진 운행일지가 준비됐습니다</div>
+            <div class="s">05.21~06.20 · 박OO 사업부장 06.27 승인<br>결재란이 채워진 운행일지가 준비됐습니다</div>
             <div class="acts"><b class="gh">나중에</b><b>출력하기</b></div>
           </div>
           <div class="stub"><b>이번 마감분 (07.21~08.20)</b>운행 42건 · 예상 정산 327,900원</div>
@@ -1462,14 +1601,14 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
         <thead><tr><th>기간</th><th>결재 완료</th><th class="num">운행</th><th class="num">금액</th><th>결재란</th><th>문서</th></tr></thead>
         <tbody>
           <tr>
-            <td>6월 마감분<br><span style="font-size:11px;color:var(--muted)">05.21 ~ 06.20</span></td><td>06.27 최OO 대표이사</td>
+            <td>6월 마감분<br><span style="font-size:11px;color:var(--muted)">05.21 ~ 06.20</span></td><td>06.27 박OO 사업부장</td>
             <td class="num">37건</td><td class="num" style="font-weight:800">289,700</td>
             <td style="font-size:11.5px;color:var(--muted)">홍길동·김OO·이OO·박OO·최OO</td>
             <td><button class="btn sm pri">운행일지 출력</button>
                 <button class="btn sm">증빙 PDF</button></td>
           </tr>
           <tr>
-            <td>5월 마감분<br><span style="font-size:11px;color:var(--muted)">04.21 ~ 05.20</span></td><td>05.27 최OO 대표이사</td>
+            <td>5월 마감분<br><span style="font-size:11px;color:var(--muted)">04.21 ~ 05.20</span></td><td>05.27 박OO 사업부장</td>
             <td class="num">41건</td><td class="num" style="font-weight:800">302,150</td>
             <td style="font-size:11.5px;color:var(--muted)">홍길동·김OO·이OO·박OO·최OO</td>
             <td><button class="btn sm pri">운행일지 출력</button>
@@ -1533,9 +1672,9 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 
 <!-- ══════ 결재자: 결재함 ══════ -->
 <section id="aInbox" hidden>
-  <div class="rolebar">지금 <b>결재자</b> 화면입니다 — 팀장·실장·사업부장·대표이사가 봅니다. 관리자 권한과는 별개입니다.</div>
+  <div class="rolebar">지금 <b>결재자</b> 화면입니다 — 팀장·실장·사업부장·사업부장가 봅니다. 관리자 권한과는 별개입니다.</div>
   <h2 class="pg">결재함</h2>
-  <p class="pgsub">이OO 실장 · 내 차례인 문서 3건</p>
+  <p class="pgsub">이OO 팀장 · 내 차례인 문서 3건 · 승인하면 사업부장에게 넘어갑니다</p>
 
   <div class="chips">
     <button aria-pressed="true">내 차례<span class="c">3</span></button>
@@ -1546,16 +1685,16 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 
   <div class="tblwrap" style="margin-bottom:13px">
     <table class="wide">
-      <thead><tr><th>제출자</th><th>부서·직책</th><th>기간</th><th class="num">운행</th><th class="num">거리</th><th class="num">금액</th><th>앞 단계</th><th>대기</th><th>처리</th></tr></thead>
+      <thead><tr><th>제출자</th><th>부서·직책</th><th>기간</th><th class="num">운행</th><th class="num">거리</th><th class="num">금액</th><th>결재선</th><th>대기</th><th>처리</th></tr></thead>
       <tbody>
         <tr><td>홍길동</td><td>운영팀 대리</td><td>7월 마감분<br><span style="font-size:11px;color:var(--muted)">06.21~07.20</span></td><td class="num">39건</td><td class="num">1,180km</td><td class="num" style="font-weight:800">311,400</td>
-            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill warn">6일</span></td>
+            <td><span class="pill ok">센터장 승인 · 2/3</span></td><td><span class="pill warn">6일</span></td>
             <td><button class="btn sm">열어보기</button></td></tr>
         <tr><td>김철수</td><td>운영팀 과장</td><td>7월 마감분<br><span style="font-size:11px;color:var(--muted)">06.21~07.20</span></td><td class="num">35건</td><td class="num">920km</td><td class="num" style="font-weight:800">243,800</td>
-            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill mute">2일</span></td>
+            <td><span class="pill ok">센터장 승인 · 2/3</span></td><td><span class="pill mute">2일</span></td>
             <td><button class="btn sm">열어보기</button></td></tr>
         <tr><td>이영희</td><td>지원팀 차장</td><td>7월 마감분<br><span style="font-size:11px;color:var(--muted)">06.21~07.20</span></td><td class="num">31건</td><td class="num">1,440km</td><td class="num" style="font-weight:800">389,200</td>
-            <td><span class="pill ok">팀장 승인</span></td><td><span class="pill mute">1일</span></td>
+            <td><span class="pill mute">본인이 센터장 · 1/2</span></td><td><span class="pill mute">1일</span></td>
             <td><button class="btn sm">열어보기</button></td></tr>
       </tbody>
     </table>
@@ -1582,7 +1721,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
       <span class="pill mute">엑셀 미리보기</span>
     </div>
     <div class="note warn" style="margin-top:11px">
-      승인하면 다음 단계(<b>박OO 사업부장</b>)로 넘어갑니다. 반려하면 의견과 함께 홍길동님에게 돌아갑니다.
+      승인하면 <b>박OO 사업부장</b>에게 넘어가고, 거기서 <b>종결</b>됩니다. 반려하면 의견과 함께 홍길동님에게 돌아가 1차부터 다시 돕니다.
     </div>
   </div>
 </section>
@@ -1650,9 +1789,9 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
     <div class="r">
       <span class="nm">7월 마감분</span>
       <span class="rg">06.21 ~ 07.20</span>
-      <span class="stg"><span class="dot" style="background:var(--info)"></span><span class="no">④</span> 결재 3 / 5단계</span>
+      <span class="stg"><span class="dot" style="background:var(--info)"></span><span class="no">④</span> 결재 2 / 3단계</span>
       <span><span class="bar"><i style="width:78%;background:var(--info)"></i></span></span>
-      <span class="meta">이OO 실장에서 6일째 멈춤</span>
+      <span class="meta">이OO 팀장에서 6일째 멈춤</span>
       <span class="act"><button class="btn sm">독촉</button></span>
     </div>
     <div class="r done">
@@ -1660,7 +1799,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
       <span class="rg">05.21 ~ 06.20</span>
       <span class="stg"><span class="dot"></span><span class="no">⑤</span> 완료 · 잠김</span>
       <span><span class="bar"><i class="g" style="width:100%"></i></span></span>
-      <span class="meta">06.27 최OO 대표이사 승인</span>
+      <span class="meta">06.27 박OO 사업부장 최종 승인</span>
       <span class="act"><button class="btn sm">출력</button></span>
     </div>
   </div>
@@ -1759,11 +1898,11 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
       <rect class="bx on" x="736" y="286" width="206" height="66" stroke="#2A54C6"/>
       <rect x="736" y="286" width="3" height="66" fill="#137A52" rx="1.5"/>
       <circle class="pd i" cx="930" cy="298" r="3.4"/>
-      <text class="tt" x="752" y="305">순서대로 결재</text>
-      <text class="st" x="752" y="320">담당 → 팀장 → 실장</text>
-      <text class="st" x="752" y="333">→ 사업부장 → 대표이사</text>
+      <text class="tt" x="752" y="305">위쪽 직급만 순서대로</text>
+      <text class="st" x="752" y="320">센터장 → 팀장 → 사업부장</text>
+      <text class="st" x="752" y="333">본인 직급 위쪽만 · 최대 3단계</text>
       <text class="st" x="752" y="346" fill="#B3182C">반려하면 1차부터 다시</text>
-      <text class="cy i" x="736" y="366">▸ 7월 마감분 3/5단계 · 6일째</text>
+      <text class="cy i" x="736" y="366">▸ 7월 마감분 2/3단계 · 6일째</text>
 
       <!-- ⑤ 문서 생성 -->
       <rect class="bx" x="974" y="386" width="192" height="52"/>
@@ -1809,7 +1948,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
       </div>
       <div class="note ok" style="margin-top:12px">
         결재가 끝난 마감분은 <b>잠깁니다.</b> 그 뒤로는 앱에서도 웹에서도 못 고칩니다 —
-        대표이사가 결재한 금액과 나중에 뽑은 금액이 달라지면 안 되니까요.
+        사업부장가 결재한 금액과 나중에 뽑은 금액이 달라지면 안 되니까요.
       </div>
     </div>
 
@@ -1822,7 +1961,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
             <tr><td>① 운행</td><td>앱이 자동 기록</td><td>—</td><td>—</td></tr>
             <tr><td>② 마감 보완</td><td>통행료 · 영수증</td><td>하이패스 · 수정</td><td>—</td></tr>
             <tr><td>③ 점검·제출</td><td><b>제출</b></td><td>미제출자 독촉</td><td>—</td></tr>
-            <tr><td>④ 결재</td><td>반려 시 재상신</td><td>현황 관리</td><td><b>승인 / 반려</b></td></tr>
+            <tr><td>④ 결재</td><td>반려 시 재상신</td><td>현황 관리</td><td><b>승인 / 반려</b><br><span style="font-size:11px;color:var(--muted)">직급별 1~3단계</span></td></tr>
             <tr><td>⑤ 완료</td><td><b>출력</b></td><td>리포트 발행</td><td>—</td></tr>
           </tbody>
         </table>
@@ -1838,7 +1977,7 @@ footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px
 </main>
 </div>
 
-<footer>ATEC Mobility · 차량 운행일지 관리 화면 시안 · 서버 미연결</footer>
+<footer>🚗 ATEC Driving · 운행일지 관리 화면 시안 · 서버 미연결</footer>
 
 <script>
 (function(){
