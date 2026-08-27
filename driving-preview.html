@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>차량 운행일지 · 마감/결재 — 화면 시안</title>
+<title>차량 운행일지 관리 — 화면 시안</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,555 +14,915 @@
   --paper:#F4F0EA; --surface:#ffffff; --line:#E8E0DA; --muted:#8A7F86; --soft:#FBF8F4;
   --ok:#0F7B4F; --ok-bg:#E7F5EE; --warn:#B45309; --warn-bg:#FDF3E3;
   --bad:#C0182B; --bad-bg:#FCEBEC; --info:#1D4ED8; --info-bg:#EAF0FE;
+  --sync:#6D28D9; --sync-bg:#F1EBFD;
+  --sbw:212px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
   font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
-  background:var(--paper); color:var(--ink); font-size:14px; line-height:1.5;
+  background:var(--paper); color:var(--ink); font-size:13.5px; line-height:1.5;
   -webkit-font-smoothing:antialiased;
 }
-a{color:inherit}
-
-/* ─── 시안 배너 ─── */
-.demo-flag{
-  background:linear-gradient(90deg,var(--wine-deep),var(--magenta));
-  color:#fff; text-align:center; padding:7px 14px; font-size:12.5px; font-weight:600;
-  letter-spacing:.01em;
+.flag{
+  background:linear-gradient(90deg,var(--wine-deep),var(--magenta)); color:#fff;
+  text-align:center; padding:6px 14px; font-size:12px; font-weight:600;
 }
-.demo-flag b{font-weight:800}
+.flag b{font-weight:800}
 
-/* ─── 헤더 ─── */
+/* ── 헤더 ── */
 header.top{
-  background:var(--surface); border-bottom:1px solid var(--line);
-  padding:12px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  position:sticky; top:0; z-index:50;
+  background:var(--surface); border-bottom:1px solid var(--line); padding:10px 18px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:sticky; top:0; z-index:60;
 }
-.brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; letter-spacing:-.02em}
-.brand .mark{
-  width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--wine),var(--magenta)); color:#fff; font-size:14px;
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:-.02em}
+.brand .mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--wine),var(--magenta));color:#fff;font-size:13px}
+.brand .sub{font-weight:600;font-size:12px;color:var(--muted);border-left:1px solid var(--line);padding-left:9px}
+.top .sp{flex:1}
+.syncchip{
+  display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--sync);
+  background:var(--sync-bg);border:1px solid #DDD1FA;padding:5px 11px;border-radius:20px;cursor:pointer;
 }
-.brand .sub{font-weight:600;font-size:12.5px;color:var(--muted);border-left:1px solid var(--line);padding-left:10px}
-.top .spacer{flex:1}
-.who{font-size:12.5px;color:var(--muted)}
-.who b{color:var(--ink)}
+.syncchip .d{width:7px;height:7px;border-radius:50%;background:var(--sync)}
+.who{font-size:12px;color:var(--muted)} .who b{color:var(--ink)}
 
-/* ─── 탭 ─── */
-nav.tabs{
-  background:var(--surface); border-bottom:1px solid var(--line);
-  display:flex; gap:2px; padding:0 20px; overflow-x:auto; position:sticky; top:55px; z-index:49;
+/* ── 레이아웃 ── */
+.wrap{display:flex; min-height:calc(100vh - 78px)}
+aside{
+  width:var(--sbw); flex:none; background:var(--surface); border-right:1px solid var(--line);
+  padding:12px 0; position:sticky; top:49px; height:calc(100vh - 49px); overflow-y:auto;
 }
-nav.tabs button{
-  appearance:none; border:0; background:none; font:inherit; font-weight:600; color:var(--muted);
-  padding:12px 15px; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap;
+aside .grp{padding:12px 16px 5px;font-size:10.5px;font-weight:800;color:#B9AAB2;letter-spacing:.07em}
+aside a{
+  display:flex;align-items:center;gap:9px;padding:8px 16px;font-weight:600;color:#5D4F56;
+  text-decoration:none;cursor:pointer;border-left:2.5px solid transparent;font-size:13px;
 }
-nav.tabs button:hover{color:var(--ink)}
-nav.tabs button[aria-selected="true"]{color:var(--wine); border-bottom-color:var(--wine)}
-nav.tabs .n{
-  display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; border-radius:9px;
-  background:var(--bad); color:#fff; font-size:10.5px; font-weight:800; line-height:17px; text-align:center;
-}
-
-main{padding:20px; max-width:1400px; margin:0 auto}
+aside a:hover{background:var(--soft);color:var(--ink)}
+aside a.on{background:#FCF2F6;color:var(--wine);border-left-color:var(--wine)}
+aside a .ic{width:17px;text-align:center;font-size:13px;opacity:.85}
+aside a .b{margin-left:auto;background:var(--bad);color:#fff;font-size:10px;font-weight:800;
+  min-width:17px;padding:0 5px;border-radius:9px;line-height:16px;text-align:center}
+aside a .b.g{background:#CFC5CB}
+main{flex:1; padding:20px 22px 50px; min-width:0}
 section[hidden]{display:none}
-h2.pg{font-size:19px; font-weight:800; margin:0 0 3px; letter-spacing:-.02em}
-p.pgsub{margin:0 0 18px; color:var(--muted); font-size:13px}
 
-/* ─── 카드 ─── */
-.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
-.card + .card{margin-top:14px}
-.card h3{margin:0 0 12px; font-size:14.5px; font-weight:800; display:flex; align-items:center; gap:8px}
-.card h3 .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
-.grid{display:grid; gap:14px}
-@media(min-width:900px){ .grid.c2{grid-template-columns:1fr 1fr} .grid.c3{grid-template-columns:repeat(3,1fr)} }
+h2.pg{font-size:19px;font-weight:800;margin:0 0 3px;letter-spacing:-.025em}
+p.pgsub{margin:0 0 16px;color:var(--muted);font-size:12.5px}
 
-/* ─── 마감 체크리스트 ─── */
-.chk{list-style:none;margin:0;padding:0}
-.chk li{
-  display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);
-  cursor:pointer;
-}
-.chk li:last-child{border-bottom:0}
-.chk li:hover{background:var(--soft)}
-.chk .dot{width:9px;height:9px;border-radius:50%;flex:none}
-.chk .dot.g{background:var(--ok)} .chk .dot.r{background:var(--bad)}
-.chk .nm{font-weight:600; flex:none; width:88px}
-.chk .ds{color:var(--muted); font-size:12.5px; flex:1}
-.chk .vl{font-weight:800; font-variant-numeric:tabular-nums}
-.chk .vl.g{color:var(--ok)} .chk .vl.r{color:var(--bad)}
-.chk .go{color:var(--muted); font-size:12px}
+/* ── 카드 ── */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
+.card+.card{margin-top:13px}
+.card h3{margin:0 0 11px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.card h3 .tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;
+  background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.card h3 .sp{flex:1}
+.grid{display:grid;gap:13px}
+@media(min-width:1050px){.grid.c2{grid-template-columns:1fr 1fr}.grid.c3{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1250px){.grid.c4{grid-template-columns:repeat(4,1fr)}}
 
-/* ─── 통계 숫자 ─── */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
-.stat{
-  border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--soft);
-  cursor:pointer;
-}
-.stat:hover{border-color:var(--wine)}
-.stat .k{font-size:12px;color:var(--muted);font-weight:600}
-.stat .v{font-size:22px;font-weight:800;letter-spacing:-.03em;margin-top:3px;font-variant-numeric:tabular-nums}
-.stat .v small{font-size:13px;font-weight:700;color:var(--muted);margin-left:2px}
-.stat.alert .v{color:var(--bad)}
+/* ── KPI ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(142px,1fr));gap:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface);cursor:pointer}
+.kpi:hover{border-color:var(--wine)}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:23px;font-weight:800;letter-spacing:-.035em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:12.5px;font-weight:700;color:var(--muted);margin-left:2px}
+.kpi .d{font-size:11px;font-weight:700;margin-top:3px}
+.kpi .d.up{color:var(--ok)} .kpi .d.dn{color:var(--bad)}
+.kpi.alert{background:#FEF8F8;border-color:#F3D9DC} .kpi.alert .v{color:var(--bad)}
 
-/* ─── 버튼 ─── */
-.btn{
-  appearance:none; font:inherit; font-weight:700; font-size:13px; cursor:pointer;
-  border:1px solid var(--line); background:var(--surface); color:var(--ink);
-  padding:8px 14px; border-radius:8px;
-}
+/* ── 버튼/폼 ── */
+.btn{appearance:none;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 13px;border-radius:8px}
 .btn:hover{background:var(--soft)}
-.btn.pri{background:var(--wine); border-color:var(--wine); color:#fff}
+.btn.pri{background:var(--wine);border-color:var(--wine);color:#fff}
 .btn.pri:hover{background:var(--wine-deep)}
-.btn.pri[disabled]{background:#D9CFD4;border-color:#D9CFD4;color:#fff;cursor:not-allowed}
-.btn.sm{padding:5px 10px; font-size:12px; border-radius:6px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn.pri[disabled]{background:#DCD2D7;border-color:#DCD2D7;cursor:not-allowed}
+.btn.sm{padding:4px 9px;font-size:11.5px;border-radius:6px}
+.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
+input.f,select.f{font:inherit;font-size:12.5px;font-weight:600;padding:6px 10px;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+select.f{min-width:150px}
 
-/* ─── 업로드 ─── */
-.drop{
-  border:2px dashed #D9CBD2; border-radius:12px; padding:26px 18px; text-align:center;
-  background:var(--soft); cursor:pointer;
-}
-.drop:hover{border-color:var(--magenta); background:#FDF6F9}
-.drop .ic{font-size:26px}
-.drop .t{font-weight:800; margin-top:7px}
-.drop .s{color:var(--muted); font-size:12.5px; margin-top:3px}
-
-/* ─── 표 ─── */
-.tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface)}
-table{border-collapse:collapse; width:100%; min-width:920px; font-size:13px}
-th,td{padding:9px 11px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
-th{background:var(--soft); font-weight:700; font-size:12px; color:var(--muted); position:sticky; top:0}
-tbody tr:hover{background:#FDFAFB; cursor:pointer}
-tbody tr:last-child td{border-bottom:0}
-td.num{text-align:right; font-variant-numeric:tabular-nums}
-tr.flag td{background:#FEF7F7}
-tr.flag:hover td{background:#FDEFF0}
-
-.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:700;line-height:1.55}
+/* ── 배지 ── */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;line-height:1.6;white-space:nowrap}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}
 .pill.warn{background:var(--warn-bg);color:var(--warn)}
 .pill.bad{background:var(--bad-bg);color:var(--bad)}
 .pill.info{background:var(--info-bg);color:var(--info)}
+.pill.sync{background:var(--sync-bg);color:var(--sync)}
 .pill.mute{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
 
-/* ─── 필터 탭 ─── */
-.ftabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.ftabs button{
-  appearance:none;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
-  border:1px solid var(--line);background:var(--surface);color:var(--muted);
-  padding:6px 12px;border-radius:20px;
-}
-.ftabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
-.ftabs button .c{opacity:.65;margin-left:5px;font-weight:600}
+/* ── 표 ── */
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+table.wide{min-width:1080px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--soft);font-weight:700;font-size:11.5px;color:var(--muted)}
+tbody tr:hover{background:#FDFAFB;cursor:pointer}
+tbody tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.flag-r td{background:#FEF8F8} tr.flag-r:hover td{background:#FCEFF1}
+tr.flag-s td{background:#FAF7FE} tr.flag-s:hover td{background:#F4EEFC}
 
-/* ─── 대조 결과 ─── */
-.cmp{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
-.cmp .hd{
-  display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--soft);
-  border-bottom:1px solid var(--line);flex-wrap:wrap;
-}
-.cmp .hd .ttl{font-weight:800}
-.cmp .hd .spacer{flex:1}
-.cmp .bd{padding:12px 14px}
-.money{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.money .box{border:1px solid var(--line);border-radius:8px;padding:8px 13px;min-width:118px;background:var(--surface)}
-.money .box .k{font-size:11.5px;color:var(--muted);font-weight:600}
-.money .box .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
-.money .box.old .v{color:var(--muted);text-decoration:line-through}
-.money .box.new{border-color:var(--ok)}
-.money .box.new .v{color:var(--ok)}
-.money .arr{color:var(--muted);font-size:17px;font-weight:800}
-.money .diff{font-weight:800;color:var(--bad);font-size:13px}
-.lines{list-style:none;margin:0;padding:0;font-size:12.5px}
-.lines li{display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);color:var(--muted)}
-.lines li:last-child{border-bottom:0}
-.lines .tm{font-variant-numeric:tabular-nums;width:104px;flex:none}
-.lines .am{font-variant-numeric:tabular-nums;width:66px;flex:none;text-align:right;color:var(--ink);font-weight:700}
-.lines .of{flex:1;color:var(--ink)}
+/* ── 필터칩 ── */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px}
+.chips button{appearance:none;font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:5px 11px;border-radius:20px}
+.chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chips button .c{opacity:.6;margin-left:4px;font-weight:600}
 
-/* ─── 결재선 ─── */
-.line-set{display:grid;gap:10px}
-.step-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.step-row .no{
-  width:26px;height:26px;border-radius:50%;background:var(--soft);border:1px solid var(--line);
-  display:grid;place-items:center;font-size:11.5px;font-weight:800;color:var(--muted);flex:none
-}
-select.pick{
-  font:inherit;font-size:13px;font-weight:600;padding:7px 11px;border:1px solid var(--line);
-  border-radius:8px;background:var(--surface);color:var(--ink);min-width:190px;
-}
-label.remember{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-top:4px;cursor:pointer}
-label.remember input{width:15px;height:15px;accent-color:var(--wine)}
-
-.flow{list-style:none;margin:0;padding:0}
-.flow li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:center}
-.flow li:last-child{border-bottom:0}
-.flow .mk{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none}
-.flow .mk.done{background:var(--ok-bg);color:var(--ok)}
-.flow .mk.now{background:var(--info-bg);color:var(--info)}
-.flow .mk.wait{background:var(--soft);color:#C6BAC1;border:1px solid var(--line)}
-.flow .nm{font-weight:700;width:150px;flex:none}
-.flow .st{flex:1;color:var(--muted);font-size:12.5px}
-.flow li.now .nm{color:var(--info)}
-
-.note{
-  background:var(--info-bg);border:1px solid #C7D7FB;color:#1E3A8A;border-radius:9px;
-  padding:11px 14px;font-size:12.5px;line-height:1.6;
-}
+/* ── 안내 ── */
+.note{background:var(--info-bg);border:1px solid #C7D7FB;color:#1E3A8A;border-radius:9px;
+  padding:10px 13px;font-size:12px;line-height:1.6}
 .note b{font-weight:800}
 .note.warn{background:var(--warn-bg);border-color:#F0DCB8;color:#7C4A0B}
+.note.sync{background:var(--sync-bg);border-color:#DDD1FA;color:#4C1D95}
+.note.ok{background:var(--ok-bg);border-color:#BFE3D1;color:#0B5D3B}
 
-footer{padding:26px 20px 40px;text-align:center;color:var(--muted);font-size:12px}
+/* ── 진행바 ── */
+.bar{height:7px;border-radius:5px;background:#EDE5E9;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--wine);border-radius:5px}
+.bar i.g{background:var(--ok)} .bar i.w{background:var(--warn)}
+
+/* ── 목록형 ── */
+.lst{list-style:none;margin:0;padding:0}
+.lst li{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.lst li:last-child{border-bottom:0}
+.lst .nm{font-weight:700;width:82px;flex:none}
+.lst .ds{color:var(--muted);font-size:12px;flex:1}
+.lst .vl{font-weight:800;font-variant-numeric:tabular-nums}
+
+/* ── 동기화 다이어그램 ── */
+.syncbox{display:grid;gap:11px}
+@media(min-width:900px){.syncbox{grid-template-columns:1fr auto 1fr;align-items:center}}
+.syncside{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:var(--soft)}
+.syncside .h{font-weight:800;margin-bottom:7px;display:flex;align-items:center;gap:7px}
+.syncside ul{margin:0;padding-left:17px;color:var(--muted);font-size:12px;line-height:1.85}
+.syncmid{text-align:center;color:var(--sync);font-weight:800;font-size:12px}
+.syncmid .a{font-size:20px;line-height:1.1}
+
+/* ── 지도 자리 ── */
+.mapbox{
+  height:210px;border:1px solid var(--line);border-radius:10px;
+  background:
+    repeating-linear-gradient(45deg,#F0EBE6 0 12px,#F6F2EE 12px 24px);
+  display:grid;place-items:center;color:#B5A6AE;font-weight:700;font-size:12.5px
+}
+/* ── 미니 막대 ── */
+.mini{display:flex;align-items:flex-end;gap:3px;height:52px}
+.mini i{flex:1;background:#E4D6DD;border-radius:2px 2px 0 0}
+.mini i.hi{background:var(--wine)}
+
+.drop{border:2px dashed #D9CBD2;border-radius:11px;padding:22px 16px;text-align:center;background:var(--soft);cursor:pointer}
+.drop:hover{border-color:var(--magenta);background:#FDF6F9}
+.drop .t{font-weight:800;margin-top:6px} .drop .s{color:var(--muted);font-size:12px;margin-top:3px}
+
+footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 </style>
 </head>
 <body>
 
-<div class="demo-flag">
-  <b>화면 시안</b> · 실제 데이터가 아니라 예시입니다. 아직 서버에 연결되어 있지 않고, 버튼을 눌러도 저장되지 않습니다.
-</div>
+<div class="flag"><b>화면 시안</b> · 예시 데이터입니다. 서버에 연결되어 있지 않고, 눌러도 저장되지 않습니다.</div>
 
 <header class="top">
-  <div class="brand">
-    <span class="mark">A</span>
-    <span>ATEC Mobility</span>
-    <span class="sub">차량 운행일지 · 마감/결재</span>
-  </div>
-  <div class="spacer"></div>
-  <div class="who">2026년 8월 마감 · <b>관리자</b></div>
+  <div class="brand"><span class="mark">A</span><span>ATEC Mobility</span>
+    <span class="sub">차량 운행일지 관리</span></div>
+  <div class="sp"></div>
+  <div class="syncchip" title="앱과 웹이 서로 맞춰진 시각"><span class="d"></span>동기화 2분 전 · 대기 3건</div>
+  <div class="who">2026년 8월 · <b>관리자</b></div>
 </header>
 
-<nav class="tabs" id="tabs">
-  <button aria-selected="true" data-t="close">마감 현황</button>
-  <button aria-selected="false" data-t="logs">운행일지</button>
-  <button aria-selected="false" data-t="toll">하이패스 대조<span class="n">2</span></button>
-  <button aria-selected="false" data-t="appr">결재</button>
-</nav>
+<div class="wrap">
+<aside id="nav">
+  <div class="grp">현황</div>
+  <a class="on" data-p="dash"><span class="ic">▦</span>대시보드</a>
+  <a data-p="sync"><span class="ic">⇄</span>동기화 상태<span class="b">3</span></a>
+
+  <div class="grp">운행</div>
+  <a data-p="logs"><span class="ic">☰</span>운행일지</a>
+  <a data-p="detail"><span class="ic">◉</span>운행 상세·지도</a>
+  <a data-p="toll"><span class="ic">₩</span>통행료<span class="b">37</span></a>
+  <a data-p="evid"><span class="ic">▤</span>증빙·영수증<span class="b">6</span></a>
+
+  <div class="grp">사람·차량</div>
+  <a data-p="safety"><span class="ic">◈</span>안전운전</a>
+  <a data-p="edu"><span class="ic">▷</span>안전교육<span class="b">4</span></a>
+  <a data-p="staff"><span class="ic">☺</span>기사·권한</a>
+  <a data-p="cars"><span class="ic">▭</span>차량</a>
+
+  <div class="grp">마감</div>
+  <a data-p="settle"><span class="ic">⛽</span>정산·유류단가</a>
+  <a data-p="appr"><span class="ic">✓</span>결재<span class="b g">1</span></a>
+  <a data-p="out"><span class="ic">⤓</span>출력·리포트</a>
+</aside>
 
 <main>
 
-<!-- ══════════════ ① 마감 현황 ══════════════ -->
-<section id="close">
-  <h2 class="pg">2026년 8월 마감</h2>
-  <p class="pgsub">2026.08.01 ~ 2026.08.31 · 아래 다섯 가지가 모두 초록이어야 결재를 올릴 수 있습니다.</p>
+<!-- ═══════════ 대시보드 ═══════════ -->
+<section id="dash">
+  <h2 class="pg">대시보드</h2>
+  <p class="pgsub">2026년 8월 · 전체 차량 44대 · 기사 42명</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">이번 달 운행</div><div class="v">312<small>건</small></div><div class="d up">지난달 대비 +18</div></div>
+    <div class="kpi"><div class="k">주행거리</div><div class="v">5,847<small>km</small></div><div class="d up">+412km</div></div>
+    <div class="kpi"><div class="k">총 비용</div><div class="v">1,183<small>천원</small></div><div class="d dn">+96천원</div></div>
+    <div class="kpi alert"><div class="k">통행료 미확정</div><div class="v">37<small>건</small></div><div class="d">전체의 12%</div></div>
+    <div class="kpi alert"><div class="k">증빙 누락</div><div class="v">6<small>건</small></div><div class="d">주차 4 · 주유 2</div></div>
+    <div class="kpi alert"><div class="k">교육 미이수</div><div class="v">4<small>명</small></div><div class="d">마감 3일 전</div></div>
+  </div>
 
   <div class="grid c2">
     <div class="card">
-      <h3>마감 점검 <span class="tag">5개 항목</span></h3>
-      <ul class="chk">
-        <li><span class="dot g"></span><span class="nm">운행일지</span>
-            <span class="ds">필수 항목이 빈 운행</span><span class="vl g">0건</span><span class="go">›</span></li>
-        <li><span class="dot r"></span><span class="nm">통행료</span>
-            <span class="ds">금액이 확정되지 않은 운행</span><span class="vl r">37건</span><span class="go">›</span></li>
-        <li><span class="dot r"></span><span class="nm">영수증</span>
-            <span class="ds">비용은 있는데 증빙이 없음</span><span class="vl r">6건</span><span class="go">›</span></li>
-        <li><span class="dot g"></span><span class="nm">주차</span>
-            <span class="ds">입력 금액과 영수증 금액 대조</span><span class="vl g">일치</span><span class="go">›</span></li>
-        <li><span class="dot r"></span><span class="nm">계기판</span>
-            <span class="ds">앞 운행 종료값 ≠ 다음 시작값</span><span class="vl r">2건</span><span class="go">›</span></li>
+      <h3>마감 점검 <span class="tag">5개 항목</span><span class="sp"></span>
+        <span class="pill warn">3개 남음</span></h3>
+      <ul class="lst">
+        <li><span class="pill ok">완료</span><span class="nm">운행일지</span><span class="ds">필수 항목이 빈 운행</span><span class="vl">0건</span></li>
+        <li><span class="pill bad">미완</span><span class="nm">통행료</span><span class="ds">금액 미확정</span><span class="vl">37건</span></li>
+        <li><span class="pill bad">미완</span><span class="nm">영수증</span><span class="ds">비용 있는데 증빙 없음</span><span class="vl">6건</span></li>
+        <li><span class="pill ok">완료</span><span class="nm">주차</span><span class="ds">금액-영수증 대조</span><span class="vl">일치</span></li>
+        <li><span class="pill bad">미완</span><span class="nm">계기판</span><span class="ds">연속성 이상</span><span class="vl">2건</span></li>
       </ul>
-      <div class="row end" style="margin-top:14px">
-        <button class="btn pri" disabled>승인요청 — 빨간 항목 3개를 먼저 처리하세요</button>
+      <div class="row end" style="margin-top:12px">
+        <button class="btn pri" disabled>승인요청 — 3개 항목을 먼저 처리하세요</button>
       </div>
     </div>
 
     <div>
       <div class="card">
-        <h3>이번 달 요약</h3>
-        <div class="stats">
-          <div class="stat"><div class="k">운행</div><div class="v">312<small>건</small></div></div>
-          <div class="stat"><div class="k">주행거리</div><div class="v">5,847<small>km</small></div></div>
-          <div class="stat"><div class="k">유류비</div><div class="v">1,024<small>천원</small></div></div>
-          <div class="stat alert"><div class="k">통행료 미확정</div><div class="v">37<small>건</small></div></div>
-        </div>
+        <h3>결재 진행<span class="sp"></span><span class="pill info">7월분 검토 중</span></h3>
+        <ul class="lst">
+          <li><span class="pill ok">승인</span><span class="nm">담당</span><span class="ds">홍길동 · 08.01 09:02 상신</span></li>
+          <li><span class="pill ok">승인</span><span class="nm">팀장</span><span class="ds">김OO · 08.01 14:20</span></li>
+          <li><span class="pill info">검토중</span><span class="nm">실장</span><span class="ds">이OO · 6일째 대기</span></li>
+          <li><span class="pill mute">대기</span><span class="nm">사업부장</span><span class="ds">박OO</span></li>
+          <li><span class="pill mute">대기</span><span class="nm">대표이사</span><span class="ds">최OO</span></li>
+        </ul>
       </div>
-
       <div class="card">
-        <h3>하이패스 영수증 올리기</h3>
-        <div class="drop">
-          <div class="ic">📄</div>
-          <div class="t">PDF를 여기에 끌어놓으세요</div>
-          <div class="s">하이패스 홈페이지에서 받은 영수증 파일 · 여러 개 한 번에 가능</div>
+        <h3>일별 운행 건수</h3>
+        <div class="mini">
+          <i style="height:38%"></i><i style="height:52%"></i><i style="height:71%"></i><i style="height:44%"></i>
+          <i style="height:63%"></i><i style="height:22%"></i><i style="height:14%"></i><i style="height:58%"></i>
+          <i style="height:77%"></i><i style="height:66%"></i><i style="height:49%"></i><i style="height:83%"></i>
+          <i style="height:35%"></i><i style="height:19%"></i><i class="hi" style="height:100%"></i><i style="height:72%"></i>
+          <i style="height:55%"></i><i style="height:61%"></i><i style="height:29%"></i><i style="height:17%"></i>
         </div>
-        <div class="note" style="margin-top:12px">
-          <b>이렇게 동작합니다.</b> 영수증에 찍힌 <b>통과 시각</b>과 <b>카드 뒷자리</b>를 읽어,
-          그 시각에 운행 중이던 차량의 운행에 자동으로 붙입니다.
-          한 운행에 여러 번 지나갔으면 합산합니다. <b>자동으로 덮어쓰지 않고</b> 사람이 확인한 뒤 반영합니다.
-        </div>
+        <div style="color:var(--muted);font-size:11.5px;margin-top:6px">8/1 → 8/20 · 최다 8/15 · 주말 저조</div>
       </div>
+    </div>
+  </div>
+
+  <div class="grid c3" style="margin-top:13px">
+    <div class="card">
+      <h3>안전운전 하위</h3>
+      <ul class="lst">
+        <li><span class="nm">김OO</span><span class="ds">과속 12 · 급감속 8</span><span class="vl" style="color:var(--bad)">62점</span></li>
+        <li><span class="nm">이OO</span><span class="ds">스쿨존 과속 2</span><span class="vl" style="color:var(--warn)">71점</span></li>
+        <li><span class="nm">박OO</span><span class="ds">급가속 15</span><span class="vl" style="color:var(--warn)">74점</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>교육 미이수 <span class="tag">D-3</span></h3>
+      <ul class="lst">
+        <li><span class="nm">정OO</span><span class="ds">진도 0%</span><span class="vl" style="color:var(--bad)">미시청</span></li>
+        <li><span class="nm">최OO</span><span class="ds">진도 45%</span><span class="vl" style="color:var(--warn)">진행중</span></li>
+        <li><span class="nm">강OO</span><span class="ds">진도 0%</span><span class="vl" style="color:var(--bad)">미시청</span></li>
+      </ul>
+      <div class="row end" style="margin-top:9px"><button class="btn sm">알림 보내기</button></div>
+    </div>
+    <div class="card">
+      <h3>차량 알림</h3>
+      <ul class="lst">
+        <li><span class="nm">12가3456</span><span class="ds">보험 갱신</span><span class="vl" style="color:var(--warn)">D-12</span></li>
+        <li><span class="nm">34나5678</span><span class="ds">정기 점검</span><span class="vl" style="color:var(--bad)">지남</span></li>
+        <li><span class="nm">56다7890</span><span class="ds">계기판 미입력</span><span class="vl" style="color:var(--muted)">3일</span></li>
+      </ul>
     </div>
   </div>
 </section>
 
-<!-- ══════════════ ② 운행일지 ══════════════ -->
+<!-- ═══════════ 동기화 ═══════════ -->
+<section id="sync" hidden>
+  <h2 class="pg">동기화 상태</h2>
+  <p class="pgsub">앱에서 고치든 웹에서 고치든 <b>양쪽이 같아집니다.</b> 어느 쪽이 최신인지 규칙으로 정합니다.</p>
+
+  <div class="card">
+    <h3>동작 방식</h3>
+    <div class="syncbox">
+      <div class="syncside">
+        <div class="h">📱 앱 (기사)</div>
+        <ul>
+          <li>운행 자동 기록 · GPS 경로</li>
+          <li>종료 시 통행료·주차·계기판 입력</li>
+          <li>영수증 촬영 + 금액 자동 인식</li>
+          <li>안전교육 시청</li>
+        </ul>
+      </div>
+      <div class="syncmid"><div class="a">⇄</div>바뀐 것만<br>주고받음</div>
+      <div class="syncside">
+        <div class="h">💻 웹 (관리자·기사)</div>
+        <ul>
+          <li>표에서 일괄 수정</li>
+          <li>하이패스 PDF·영수증 스캔 업로드</li>
+          <li>기사·차량·권한 관리</li>
+          <li>마감·결재·출력</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note sync" style="margin-top:13px">
+      <b>규칙 세 가지.</b>
+      ① 나중에 고친 쪽이 이깁니다. ② 단, <b>사람이 정한 값은 기계가 계산한 값으로 덮이지 않습니다.</b>
+      ③ 양쪽이 같은 항목을 동시에 고쳤으면 덮지 않고 <b>아래에 띄워서 사람이 고릅니다.</b>
+      — 이 규칙은 지금 통행료에서 이미 쓰고 있는 방식 그대로입니다.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>지금 대기 중 <span class="tag">3건</span></h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>운행</th><th>차량 · 기사</th><th>항목</th><th>앱 값</th><th>웹 값</th><th>상태</th><th>처리</th></tr></thead>
+        <tbody>
+          <tr class="flag-s">
+            <td>08.17 09:12</td><td>12가3456 · 홍길동</td><td>주차비</td>
+            <td>3,000원 <span class="pill mute">08.17 10:31</span></td>
+            <td>2,500원 <span class="pill mute">08.20 14:02</span></td>
+            <td><span class="pill sync">웹이 최신 · 앱 반영 대기</span></td>
+            <td><button class="btn sm">지금 보내기</button></td>
+          </tr>
+          <tr class="flag-s">
+            <td>08.14 18:40</td><td>34나5678 · 김철수</td><td>계기판(도착)</td>
+            <td>88,412 <span class="pill mute">08.14 19:07</span></td>
+            <td>— </td>
+            <td><span class="pill sync">앱이 최신 · 웹 반영 대기</span></td>
+            <td><button class="btn sm">받아오기</button></td>
+          </tr>
+          <tr class="flag-r">
+            <td>08.13 09:06</td><td>34나5678 · 김철수</td><td>통행료</td>
+            <td>1,200원 <span class="pill mute">기사 입력</span></td>
+            <td>1,000원 <span class="pill mute">하이패스 영수증</span></td>
+            <td><span class="pill bad">양쪽이 다름 · 사람이 결정</span></td>
+            <td><button class="btn sm">앱 값</button> <button class="btn sm pri">웹 값</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn" style="margin-top:12px">
+      <b>충돌은 드뭅니다.</b> 기사와 관리자가 같은 운행의 같은 항목을 동시에 손대야 생깁니다.
+      그래도 <b>조용히 덮어쓰지 않고</b> 이렇게 띄워서 고르게 합니다 — 금액이 소리 없이 바뀌는 게 제일 위험하니까요.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>동기화 이력</h3>
+    <ul class="lst">
+      <li><span class="pill ok">완료</span><span class="nm">2분 전</span><span class="ds">내려받기 14건 · 올려보내기 3건</span></li>
+      <li><span class="pill ok">완료</span><span class="nm">32분 전</span><span class="ds">내려받기 7건</span></li>
+      <li><span class="pill warn">재시도</span><span class="nm">1시간 전</span><span class="ds">통신 끊김 · 자동 재시도 후 성공</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════ 운행일지 ═══════════ -->
 <section id="logs" hidden>
   <h2 class="pg">운행일지</h2>
-  <p class="pgsub">표에서 바로 고칠 수 있습니다. 고친 기록은 <b>수정된 기록</b> 탭에 따로 모여 누가 언제 무엇을 바꿨는지 남습니다.</p>
+  <p class="pgsub">셀을 눌러 바로 고칩니다 · 고친 기록은 누가 언제 무엇을 바꿨는지 남습니다.</p>
 
-  <div class="ftabs">
+  <div class="row" style="margin-bottom:11px">
+    <select class="f"><option>전체 차량 (44)</option><option>12가 3456</option><option>34나 5678</option></select>
+    <select class="f"><option>전체 기사 (42)</option><option>홍길동</option><option>김철수</option></select>
+    <input class="f" value="2026.08.01 ~ 2026.08.31" style="width:190px">
+    <span style="flex:1"></span>
+    <button class="btn sm">자동 점검</button>
+    <button class="btn sm">운행 추가</button>
+    <button class="btn sm">엑셀</button>
+  </div>
+
+  <div class="chips">
     <button aria-pressed="true">전체<span class="c">312</span></button>
     <button aria-pressed="false">통행료 미확정<span class="c">37</span></button>
     <button aria-pressed="false">증빙 누락<span class="c">6</span></button>
+    <button aria-pressed="false">계기판 이상<span class="c">2</span></button>
     <button aria-pressed="false">수정된 기록<span class="c">14</span></button>
-    <button aria-pressed="false">이상 의심<span class="c">2</span></button>
+    <button aria-pressed="false">동기화 대기<span class="c">3</span></button>
+    <button aria-pressed="false">주말·야간<span class="c">11</span></button>
   </div>
 
   <div class="tblwrap">
-    <table>
-      <thead>
-        <tr>
-          <th>운행일자</th><th>목적</th><th>차량</th><th>기사</th>
-          <th style="text-align:right">거리</th><th>운행시간</th><th>도착지</th>
-          <th style="text-align:right">계기판</th><th style="text-align:right">통행료</th>
-          <th style="text-align:right">주차</th><th>증빙</th><th>특이사항</th>
-        </tr>
-      </thead>
+    <table class="wide">
+      <thead><tr>
+        <th>운행일자</th><th>목적</th><th>차량</th><th>기사</th>
+        <th class="num">거리</th><th>시간</th><th>출발 → 도착</th>
+        <th class="num">계기판</th><th class="num">유류비</th><th class="num">통행료</th><th class="num">주차</th>
+        <th>증빙</th><th>동기화</th><th>특이사항</th>
+      </tr></thead>
       <tbody>
         <tr>
           <td>08.18(화)</td><td>일반업무</td><td>12가 3456</td><td>홍길동</td>
-          <td class="num">83km</td><td>16:57~18:18</td><td>경기 성남시 분당구</td>
-          <td class="num">127,066</td>
-          <td class="num"><span class="pill ok">800원</span></td>
-          <td class="num">—</td><td><span class="pill ok">있음</span></td>
+          <td class="num">83km</td><td>16:57~18:18</td><td>본사 → 분당</td>
+          <td class="num">127,066</td><td class="num">14,520</td>
+          <td class="num"><span class="pill ok">800</span></td><td class="num">—</td>
+          <td><span class="pill ok">있음</span></td><td><span class="pill mute">일치</span></td>
           <td><span class="pill info">하이패스 확정</span></td>
         </tr>
-        <tr class="flag">
+        <tr class="flag-r">
           <td>08.17(월)</td><td>일반업무</td><td>12가 3456</td><td>홍길동</td>
-          <td class="num">47km</td><td>09:12~10:30</td><td>서울 강남구 역삼동</td>
-          <td class="num">126,983</td>
-          <td class="num"><span class="pill bad">미확정</span></td>
-          <td class="num">3,000</td><td><span class="pill bad">없음</span></td>
+          <td class="num">47km</td><td>09:12~10:30</td><td>본사 → 역삼</td>
+          <td class="num">126,983</td><td class="num">8,225</td>
+          <td class="num"><span class="pill bad">미확정</span></td><td class="num">2,500</td>
+          <td><span class="pill bad">없음</span></td><td><span class="pill sync">대기</span></td>
           <td><span class="pill bad">주차 영수증 누락</span></td>
         </tr>
         <tr>
-          <td>08.14(금)</td><td>출퇴근</td><td>34나 5678</td><td>김철수</td>
-          <td class="num">18km</td><td>18:40~19:05</td><td>경기 용인시 수지구</td>
-          <td class="num">88,412</td>
-          <td class="num"><span class="pill mute">0원</span></td>
-          <td class="num">—</td><td><span class="pill mute">해당없음</span></td>
-          <td>—</td>
-        </tr>
-        <tr class="flag">
-          <td>08.13(목)</td><td>일반업무</td><td>34나 5678</td><td>김철수</td>
-          <td class="num">112km</td><td>09:06~10:22</td><td>인천 연수구 송도동</td>
-          <td class="num">88,394</td>
-          <td class="num"><span class="pill ok">1,000원</span></td>
-          <td class="num">—</td><td><span class="pill ok">있음</span></td>
-          <td><span class="pill warn">계기판 불연속 · 앞 운행 종료 88,390</span></td>
+          <td>08.15(금)</td><td>일반업무</td><td>56다 7890</td><td>이영희</td>
+          <td class="num">128km</td><td>08:30~11:12</td><td>본사 → 천안</td>
+          <td class="num">45,248</td><td class="num">22,400</td>
+          <td class="num"><span class="pill ok">4,400</span></td><td class="num">3,000</td>
+          <td><span class="pill ok">있음</span></td><td><span class="pill mute">일치</span></td><td>—</td>
         </tr>
         <tr>
-          <td>08.12(수)</td><td>일반업무</td><td>56다 7890</td><td>이영희</td>
-          <td class="num">64km</td><td>13:20~14:35</td><td>경기 화성시 동탄</td>
-          <td class="num">45,120</td>
-          <td class="num"><span class="pill ok">2,200원</span></td>
-          <td class="num">2,000</td><td><span class="pill ok">있음</span></td>
-          <td>—</td>
+          <td>08.14(금)</td><td>출퇴근</td><td>34나 5678</td><td>김철수</td>
+          <td class="num">18km</td><td>18:40~19:05</td><td>본사 → 자택</td>
+          <td class="num">88,412</td><td class="num">3,150</td>
+          <td class="num"><span class="pill mute">0</span></td><td class="num">—</td>
+          <td><span class="pill mute">해당없음</span></td><td><span class="pill sync">대기</span></td><td>—</td>
+        </tr>
+        <tr class="flag-r">
+          <td>08.13(목)</td><td>일반업무</td><td>34나 5678</td><td>김철수</td>
+          <td class="num">112km</td><td>09:06~10:22</td><td>본사 → 송도</td>
+          <td class="num">88,394</td><td class="num">19,600</td>
+          <td class="num"><span class="pill ok">1,000</span></td><td class="num">—</td>
+          <td><span class="pill ok">있음</span></td><td><span class="pill bad">충돌</span></td>
+          <td><span class="pill warn">계기판 불연속 · 앞 운행 88,390</span></td>
         </tr>
         <tr>
           <td>08.11(화)</td><td>비업무용</td><td>56다 7890</td><td>이영희</td>
-          <td class="num">9km</td><td>19:40~19:58</td><td>경기 수원시 영통구</td>
-          <td class="num">45,056</td>
-          <td class="num"><span class="pill mute">0원</span></td>
-          <td class="num">—</td><td><span class="pill mute">해당없음</span></td>
-          <td><span class="pill mute">개인 사용</span></td>
+          <td class="num">9km</td><td>19:40~19:58</td><td>본사 → 영통</td>
+          <td class="num">45,056</td><td class="num">—</td>
+          <td class="num"><span class="pill mute">0</span></td><td class="num">—</td>
+          <td><span class="pill mute">해당없음</span></td><td><span class="pill mute">일치</span></td>
+          <td><span class="pill mute">개인 사용 · 비용 제외</span></td>
         </tr>
       </tbody>
     </table>
   </div>
-
-  <div class="note warn" style="margin-top:14px">
-    <b>앱에서는 못 고치게 잠급니다.</b> 운행 시각과 거리는 앱에서 수정 불가로 두고, 수정은 이 화면에서만 합니다.
-    그러면 "앱에서 고친 값"과 "웹에서 고친 값"이 서로 부딪히는 일이 아예 생기지 않습니다.
-  </div>
 </section>
 
-<!-- ══════════════ ③ 하이패스 대조 ══════════════ -->
-<section id="toll" hidden>
-  <h2 class="pg">하이패스 대조 결과</h2>
-  <p class="pgsub">report.pdf · 영수증 28건을 읽어 운행에 붙였습니다. 아래 두 건은 <b>지금 값과 다릅니다.</b></p>
-
-  <div class="card" style="margin-bottom:14px">
-    <div class="stats">
-      <div class="stat"><div class="k">읽은 영수증</div><div class="v">28<small>건</small></div></div>
-      <div class="stat"><div class="k">운행에 배분</div><div class="v">19<small>건</small></div></div>
-      <div class="stat"><div class="k">지금 값과 일치</div><div class="v">7<small>건</small></div></div>
-      <div class="stat alert"><div class="k">지금 값과 다름</div><div class="v">2<small>건</small></div></div>
-      <div class="stat"><div class="k">미확정→확정</div><div class="v">4<small>건</small></div></div>
-      <div class="stat alert"><div class="k">붙일 운행 없음</div><div class="v">9<small>건</small></div></div>
-    </div>
-  </div>
-
-  <div class="cmp">
-    <div class="hd">
-      <span class="pill bad">다름</span>
-      <span class="ttl">07.31 (목) 20:31 ~ 21:45 · 12가 3456 · 홍길동</span>
-      <span class="spacer"></span>
-      <button class="btn sm">그대로 두기</button>
-      <button class="btn sm pri">영수증 금액으로 고치기</button>
-    </div>
-    <div class="bd">
-      <div class="money">
-        <div class="box old"><div class="k">지금 값</div><div class="v">2,900원</div></div>
-        <span class="arr">→</span>
-        <div class="box new"><div class="k">영수증 합계</div><div class="v">950원</div></div>
-        <span class="diff">1,950원 더 많게 잡혀 있었습니다</span>
-      </div>
-      <ul class="lines">
-        <li><span class="tm">07-31 20:49</span><span class="am">500원</span><span class="of">한국도로공사 판교영업소</span></li>
-        <li><span class="tm">07-31 20:55</span><span class="am">0원</span><span class="of">한국도로공사 청계영업소</span></li>
-        <li><span class="tm">07-31 21:13</span><span class="am">450원</span><span class="of">한국도로공사 시흥영업소</span></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="cmp">
-    <div class="hd">
-      <span class="pill bad">다름</span>
-      <span class="ttl">08.18 (화) 16:57 ~ 18:18 · 12가 3456 · 홍길동</span>
-      <span class="spacer"></span>
-      <button class="btn sm">그대로 두기</button>
-      <button class="btn sm pri">영수증 금액으로 고치기</button>
-    </div>
-    <div class="bd">
-      <div class="money">
-        <div class="box old"><div class="k">지금 값 <span style="font-weight:400">(경로 계산)</span></div><div class="v">1,000원</div></div>
-        <span class="arr">→</span>
-        <div class="box new"><div class="k">영수증 금액</div><div class="v">800원</div></div>
-        <span class="diff">200원 더 많게 잡혀 있었습니다</span>
-      </div>
-      <ul class="lines">
-        <li><span class="tm">08-18 18:04</span><span class="am">800원</span><span class="of">한국도로공사 판교영업소</span></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="cmp">
-    <div class="hd">
-      <span class="pill warn">붙일 운행 없음 · 9건</span>
-      <span class="ttl">통행 기록은 있는데 그 시각에 운행일지가 없습니다</span>
-      <span class="spacer"></span>
-      <button class="btn sm">운행 만들어 붙이기</button>
-      <button class="btn sm">다른 차량 카드로 표시</button>
-    </div>
-    <div class="bd">
-      <ul class="lines">
-        <li><span class="tm">07-06 23:29</span><span class="am">1,000원</span><span class="of">한국도로공사 청계영업소</span></li>
-        <li><span class="tm">07-06 23:47</span><span class="am">900원</span><span class="of">한국도로공사 시흥영업소</span></li>
-        <li><span class="tm">07-11 20:09</span><span class="am">2,200원</span><span class="of">한국도로공사 서울영업소 (입구 기흥)</span></li>
-        <li><span class="tm">07-14 12:25</span><span class="am">1,000원</span><span class="of">한국도로공사 대왕판교영업소</span></li>
-        <li style="color:var(--muted)"><span class="tm">…</span><span class="am"></span><span class="of">그 외 5건</span></li>
-      </ul>
-      <div class="note" style="margin-top:12px">
-        기사가 운행일지를 안 썼거나, 이 카드가 다른 차량 것일 수 있습니다.
-        <b>카드 뒷자리와 차량을 한 번 연결해 두면</b> 다음 달부터는 이런 일이 줄어듭니다.
-      </div>
-    </div>
-  </div>
-
-  <div class="row end" style="margin-top:14px">
-    <button class="btn">나중에</button>
-    <button class="btn pri">확인한 내용 반영하기</button>
-  </div>
-</section>
-
-<!-- ══════════════ ④ 결재 ══════════════ -->
-<section id="appr" hidden>
-  <h2 class="pg">결재</h2>
-  <p class="pgsub">회사 운행일지 서식의 결재란(담당·팀장·실장·사업부장·대표이사)을 그대로 전자화했습니다.</p>
+<!-- ═══════════ 운행 상세 ═══════════ -->
+<section id="detail" hidden>
+  <h2 class="pg">운행 상세</h2>
+  <p class="pgsub">08.18(화) · 12가 3456 · 홍길동 · 본사 → 분당</p>
 
   <div class="grid c2">
     <div class="card">
-      <h3>결재선 <span class="tag">처음 한 번만 정하면 됩니다</span></h3>
-      <div class="line-set">
-        <div class="step-row"><span class="no">1</span>
-          <select class="pick"><option>담당 — 본인</option></select></div>
-        <div class="step-row"><span class="no">2</span>
-          <select class="pick">
-            <option>팀장 — 이름을 고르세요</option>
-            <option selected>김OO 팀장 (운영팀)</option>
-            <option>박OO 팀장 (지원팀)</option>
-          </select></div>
-        <div class="step-row"><span class="no">3</span>
-          <select class="pick">
-            <option>실장 — 이름을 고르세요</option>
-            <option selected>이OO 실장</option>
-          </select></div>
-        <div class="step-row"><span class="no">4</span>
-          <select class="pick">
-            <option>사업부장 — 이름을 고르세요</option>
-            <option selected>박OO 사업부장</option>
-          </select></div>
-        <div class="step-row"><span class="no">5</span>
-          <select class="pick">
-            <option>대표이사 — 이름을 고르세요</option>
-            <option selected>최OO 대표이사</option>
-          </select></div>
-      </div>
-      <label class="remember"><input type="checkbox" checked>
-        <span>다음 달부터 이 결재선을 그대로 씁니다</span></label>
-      <div class="note" style="margin-top:12px">
-        한 번 저장해 두면 다음 달에는 <b>이 화면이 안 뜨고</b> 저장된 결재선으로 바로 올라갑니다.
-        사람이 바뀌었을 때만 <b>[바꾸기]</b>를 누르면 됩니다.
+      <h3>주행 경로 <span class="tag">GPS 기록</span><span class="sp"></span>
+        <span class="pill warn">과속 2</span> <span class="pill warn">급감속 1</span></h3>
+      <div class="mapbox">지도 · 경로선 + 위반 지점 마커</div>
+      <div class="note" style="margin-top:11px">
+        앱이 기록한 경로를 그대로 그립니다. 과속·급가감속이 <b>어디에서</b> 났는지 지도에 찍힙니다.
       </div>
     </div>
-
-    <div class="card">
-      <h3>진행 상황 <span class="tag">2026년 7월분 · 예시</span></h3>
-      <ul class="flow">
-        <li><span class="mk done">✓</span><span class="nm">홍길동 담당</span>
-            <span class="st">08.01 09:02 상신</span></li>
-        <li><span class="mk done">✓</span><span class="nm">김OO 팀장</span>
-            <span class="st">08.01 14:20 승인</span></li>
-        <li class="now"><span class="mk now">●</span><span class="nm">이OO 실장</span>
-            <span class="st">검토 중 — 여기서 멈춰 있습니다</span></li>
-        <li><span class="mk wait">·</span><span class="nm">박OO 사업부장</span><span class="st">대기</span></li>
-        <li><span class="mk wait">·</span><span class="nm">최OO 대표이사</span><span class="st">대기</span></li>
-      </ul>
-      <div class="note warn" style="margin-top:12px">
-        누가 <b>반려</b>하면 의견과 함께 제출자에게 돌아가고, 고쳐서 다시 올리면 <b>1차부터</b> 다시 돕니다.
-        전원 승인되면 그 달은 <b>잠기고</b>, 결재란에 이름과 날짜가 채워진 엑셀이 나옵니다.
+    <div>
+      <div class="card">
+        <h3>운행 정보 <span class="tag">수정 가능</span></h3>
+        <div class="tblwrap">
+          <table>
+            <tbody>
+              <tr><th style="width:110px">운행목적</th><td><select class="f" style="min-width:130px"><option>일반업무</option><option>출퇴근</option><option>비업무용</option></select></td></tr>
+              <tr><th>방문처</th><td><input class="f" value="OO전자 분당사업장" style="width:100%"></td></tr>
+              <tr><th>계기판 출발</th><td><input class="f" value="126,983"> <span class="pill ok">앞 운행과 연속</span></td></tr>
+              <tr><th>계기판 도착</th><td><input class="f" value="127,066"></td></tr>
+              <tr><th>주행거리</th><td>83 km <span class="pill mute">계기판에서 자동</span></td></tr>
+              <tr><th>통행료</th><td><input class="f" value="800"> <span class="pill info">하이패스 영수증</span></td></tr>
+              <tr><th>주차비</th><td><input class="f" value=""> <span class="pill mute">없음</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="row end" style="margin-top:11px">
+          <button class="btn">되돌리기</button><button class="btn pri">저장</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>안전운전</h3>
+        <div class="kpis">
+          <div class="kpi"><div class="k">점수</div><div class="v">88<small>점</small></div></div>
+          <div class="kpi"><div class="k">최고속도</div><div class="v">104<small>km/h</small></div></div>
+          <div class="kpi"><div class="k">과속</div><div class="v">2<small>회</small></div></div>
+          <div class="kpi"><div class="k">급감속</div><div class="v">1<small>회</small></div></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h3>결재 완료 시 나오는 문서</h3>
-    <div class="row">
-      <button class="btn">운행일지 엑셀 (결재란 채워짐)</button>
-      <button class="btn">증빙 모음 PDF</button>
-      <button class="btn">유류비 정산 내역</button>
-      <span style="flex:1"></span>
-      <span class="pill mute">편집 잠금 비밀번호 설정 가능</span>
+    <h3>수정 이력 <span class="tag">감사 기록</span></h3>
+    <ul class="lst">
+      <li><span class="pill sync">웹</span><span class="nm">08.20 14:02</span><span class="ds">관리자 — 통행료 1,000 → 800 (하이패스 영수증 반영)</span></li>
+      <li><span class="pill info">앱</span><span class="nm">08.18 18:20</span><span class="ds">홍길동 — 계기판 도착 127,060 → 127,066</span></li>
+      <li><span class="pill mute">자동</span><span class="nm">08.18 18:18</span><span class="ds">운행 종료 · 경로 계산으로 통행료 1,000 추정</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════ 통행료 ═══════════ -->
+<section id="toll" hidden>
+  <h2 class="pg">통행료</h2>
+  <p class="pgsub">하이패스 영수증을 올리면 실제 청구액으로 맞춥니다 · 미확정 37건</p>
+
+  <div class="grid c2" style="margin-bottom:13px">
+    <div class="card">
+      <h3>하이패스 영수증 올리기</h3>
+      <div class="drop"><div style="font-size:24px">📄</div>
+        <div class="t">PDF를 여기에 끌어놓으세요</div>
+        <div class="s">하이패스 홈페이지에서 받은 영수증 · 여러 개 한 번에</div></div>
+    </div>
+    <div class="card">
+      <h3>가장 최근 결과 <span class="tag">report.pdf</span></h3>
+      <div class="kpis">
+        <div class="kpi"><div class="k">읽은 영수증</div><div class="v">28<small>건</small></div></div>
+        <div class="kpi"><div class="k">운행에 배분</div><div class="v">19<small>건</small></div></div>
+        <div class="kpi alert"><div class="k">값이 다름</div><div class="v">2<small>건</small></div></div>
+        <div class="kpi alert"><div class="k">붙일 운행 없음</div><div class="v">9<small>건</small></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>확인이 필요한 항목</h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>운행</th><th>차량·기사</th><th class="num">지금 값</th><th class="num">영수증</th><th class="num">차이</th><th>내역</th><th>처리</th></tr></thead>
+        <tbody>
+          <tr class="flag-r">
+            <td>07.31 20:31~21:45</td><td>12가3456 · 홍길동</td>
+            <td class="num" style="text-decoration:line-through;color:var(--muted)">2,900</td>
+            <td class="num" style="color:var(--ok);font-weight:800">950</td>
+            <td class="num" style="color:var(--bad);font-weight:800">−1,950</td>
+            <td style="white-space:normal;font-size:11.5px;color:var(--muted)">
+              20:49 판교 500 · 20:55 청계 0 · 21:13 시흥 450</td>
+            <td><button class="btn sm">두기</button> <button class="btn sm pri">고치기</button></td>
+          </tr>
+          <tr class="flag-r">
+            <td>08.18 16:57~18:18</td><td>12가3456 · 홍길동</td>
+            <td class="num" style="text-decoration:line-through;color:var(--muted)">1,000</td>
+            <td class="num" style="color:var(--ok);font-weight:800">800</td>
+            <td class="num" style="color:var(--bad);font-weight:800">−200</td>
+            <td style="white-space:normal;font-size:11.5px;color:var(--muted)">18:04 판교 800</td>
+            <td><button class="btn sm">두기</button> <button class="btn sm pri">고치기</button></td>
+          </tr>
+          <tr class="flag-r">
+            <td colspan="2">붙일 운행이 없는 영수증 <b>9건</b></td>
+            <td class="num" colspan="2">합계 12,300</td><td class="num">—</td>
+            <td style="white-space:normal;font-size:11.5px;color:var(--muted)">
+              07-06 23:29 청계 1,000 · 07-11 20:09 서울 2,200 · 외 7건</td>
+            <td><button class="btn sm">운행 만들기</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note ok" style="margin-top:12px">
+      <b>왜 이게 중요한가.</b> 지금은 지도 경로로 통행료를 <b>추정</b>합니다. 영수증은 <b>실제 청구액</b>이라
+      과다·과소가 바로 드러납니다. 영수증이 없는 구간은 지금처럼 추정을 씁니다.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 증빙 ═══════════ -->
+<section id="evid" hidden>
+  <h2 class="pg">증빙 · 영수증</h2>
+  <p class="pgsub">앱에서 못 찍었으면 여기서 스캔본으로 넣습니다 · 금액은 자동으로 읽어 대조합니다</p>
+
+  <div class="grid c2" style="margin-bottom:13px">
+    <div class="card">
+      <h3>스캔본 올리기</h3>
+      <div class="drop"><div style="font-size:24px">🖨️</div>
+        <div class="t">스캔 파일을 끌어놓으세요</div>
+        <div class="s">여러 장 한 번에 · 금액과 날짜를 자동으로 읽습니다</div></div>
+      <div class="note" style="margin-top:11px">
+        앱에 들어 있는 금액 인식기를 그대로 씁니다. <b>‘결제금액’ 표시를 우선</b>해서 읽기 때문에,
+        할인 전 금액을 잘못 집는 실수가 안 생깁니다.
+      </div>
+    </div>
+    <div class="card">
+      <h3>이번 달 증빙 <span class="tag">8월</span></h3>
+      <div class="kpis">
+        <div class="kpi"><div class="k">주유</div><div class="v">24<small>장</small></div></div>
+        <div class="kpi"><div class="k">주차</div><div class="v">11<small>장</small></div></div>
+        <div class="kpi"><div class="k">통행료</div><div class="v">6<small>장</small></div></div>
+        <div class="kpi alert"><div class="k">누락</div><div class="v">6<small>건</small></div></div>
+      </div>
+      <div style="margin-top:11px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:5px">
+          <span>증빙 첨부율</span><span>87%</span></div>
+        <div class="bar"><i class="w" style="width:87%"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>금액 대조</h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>날짜</th><th>기사</th><th>차량</th><th>구분</th><th class="num">일지 금액</th><th class="num">영수증 인식</th><th>사진</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td>08.18</td><td>홍길동</td><td>12가3456</td><td>주유</td>
+            <td class="num">70,000</td><td class="num">70,000</td><td><span class="pill mute">보기</span></td><td><span class="pill ok">일치</span></td></tr>
+          <tr class="flag-r"><td>08.15</td><td>이영희</td><td>56다7890</td><td>주차</td>
+            <td class="num">3,000</td><td class="num" style="color:var(--bad);font-weight:800">2,500</td>
+            <td><span class="pill mute">보기</span></td><td><span class="pill bad">500원 차이</span></td></tr>
+          <tr class="flag-r"><td>08.17</td><td>홍길동</td><td>12가3456</td><td>주차</td>
+            <td class="num">2,500</td><td class="num">—</td><td><span class="pill bad">없음</span></td><td><span class="pill bad">증빙 누락</span></td></tr>
+          <tr><td>08.12</td><td>이영희</td><td>56다7890</td><td>통행료</td>
+            <td class="num">2,200</td><td class="num">2,200</td><td><span class="pill mute">보기</span></td><td><span class="pill ok">일치</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 안전운전 ═══════════ -->
+<section id="safety" hidden>
+  <h2 class="pg">안전운전</h2>
+  <p class="pgsub">앱이 기록한 주행 데이터로 산출 · 과속 · 스쿨존 · 지속과속 · 급가감속 · 급코너</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">전체 평균</div><div class="v">84<small>점</small></div><div class="d up">지난달 +3</div></div>
+    <div class="kpi alert"><div class="k">70점 미만</div><div class="v">3<small>명</small></div></div>
+    <div class="kpi"><div class="k">과속</div><div class="v">47<small>회</small></div></div>
+    <div class="kpi alert"><div class="k">스쿨존 과속</div><div class="v">2<small>회</small></div></div>
+    <div class="kpi"><div class="k">급가속·급감속</div><div class="v">128<small>회</small></div></div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>기사별 점수</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>기사</th><th class="num">점수</th><th class="num">과속</th><th class="num">스쿨존</th><th class="num">급가감속</th><th>추이</th></tr></thead>
+          <tbody>
+            <tr><td>홍길동</td><td class="num" style="color:var(--ok);font-weight:800">94</td><td class="num">1</td><td class="num">0</td><td class="num">4</td><td><span class="pill ok">↑ 상승</span></td></tr>
+            <tr><td>이영희</td><td class="num" style="font-weight:800">86</td><td class="num">5</td><td class="num">0</td><td class="num">18</td><td><span class="pill mute">유지</span></td></tr>
+            <tr class="flag-r"><td>김OO</td><td class="num" style="color:var(--bad);font-weight:800">62</td><td class="num">12</td><td class="num">1</td><td class="num">31</td><td><span class="pill bad">↓ 하락</span></td></tr>
+            <tr class="flag-r"><td>이OO</td><td class="num" style="color:var(--warn);font-weight:800">71</td><td class="num">6</td><td class="num">1</td><td class="num">22</td><td><span class="pill warn">↓ 하락</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>위반 발생 지점</h3>
+      <div class="mapbox">지도 · 과속·급가감속 발생 위치</div>
+      <div class="note warn" style="margin-top:11px">
+        같은 지점에서 여러 기사가 반복 위반하면 <b>도로 자체가 원인</b>일 수 있습니다.
+        기사 탓만 하지 않도록 지점별로도 모아 봅니다.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 안전교육 ═══════════ -->
+<section id="edu" hidden>
+  <h2 class="pg">안전교육</h2>
+  <p class="pgsub">회차제 의무 시청 · 이번 회차 마감 D-3</p>
+
+  <div class="kpis" style="margin-bottom:13px">
+    <div class="kpi"><div class="k">대상자</div><div class="v">42<small>명</small></div></div>
+    <div class="kpi"><div class="k">이수 완료</div><div class="v">38<small>명</small></div></div>
+    <div class="kpi alert"><div class="k">미이수</div><div class="v">4<small>명</small></div></div>
+    <div class="kpi"><div class="k">이수율</div><div class="v">90<small>%</small></div></div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>진도 현황</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>기사</th><th>영상</th><th>진도</th><th class="num">%</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>홍길동</td><td>8월 안전교육</td><td style="width:110px"><div class="bar"><i class="g" style="width:100%"></i></div></td><td class="num">100</td><td><span class="pill ok">완료</span></td></tr>
+            <tr><td>이영희</td><td>8월 안전교육</td><td><div class="bar"><i class="g" style="width:100%"></i></div></td><td class="num">100</td><td><span class="pill ok">완료</span></td></tr>
+            <tr class="flag-r"><td>최OO</td><td>8월 안전교육</td><td><div class="bar"><i class="w" style="width:45%"></i></div></td><td class="num">45</td><td><span class="pill warn">진행중</span></td></tr>
+            <tr class="flag-r"><td>정OO</td><td>8월 안전교육</td><td><div class="bar"><i style="width:0%"></i></div></td><td class="num">0</td><td><span class="pill bad">미시청</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="row end" style="margin-top:11px"><button class="btn sm">미이수자에게 알림</button></div>
+    </div>
+    <div class="card">
+      <h3>영상 관리</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>회차</th><th>제목</th><th class="num">길이</th><th>기간</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>8월</td><td>여름철 안전운전</td><td class="num">12:40</td><td>08.01~08.30</td><td><span class="pill info">진행중</span></td></tr>
+            <tr><td>7월</td><td>스쿨존 주의사항</td><td class="num">09:15</td><td>07.01~07.30</td><td><span class="pill mute">종료</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="row end" style="margin-top:11px"><button class="btn sm">영상 등록</button><button class="btn sm">대상자 지정</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 기사·권한 ═══════════ -->
+<section id="staff" hidden>
+  <h2 class="pg">기사 · 권한</h2>
+  <p class="pgsub">42명 · 부서와 직책은 결재선의 기준이 됩니다</p>
+  <div class="row" style="margin-bottom:11px">
+    <select class="f"><option>전체 부서</option><option>운영팀</option><option>지원팀</option></select>
+    <input class="f" placeholder="이름 검색" style="width:150px">
+    <span style="flex:1"></span>
+    <button class="btn sm">엑셀로 한 번에 등록</button>
+    <button class="btn sm">기사 추가</button>
+  </div>
+  <div class="tblwrap">
+    <table class="wide">
+      <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직책</th><th>배정 차량</th><th>권한</th><th class="num">이번달 운행</th><th>교육</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td>홍길동</td><td>hong</td><td>운영팀</td><td>대리</td><td>12가 3456</td><td><span class="pill mute">기사</span></td><td class="num">42건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>김철수</td><td>kimcs</td><td>운영팀</td><td>과장</td><td>34나 5678</td><td><span class="pill mute">기사</span></td><td class="num">38건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>이영희</td><td>leeyh</td><td>지원팀</td><td>차장</td><td>56다 7890</td><td><span class="pill info">부관리자</span></td><td class="num">29건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr class="flag-r"><td>정OO</td><td>jung</td><td>운영팀</td><td>사원</td><td>—</td><td><span class="pill mute">기사</span></td><td class="num">0건</td><td><span class="pill bad">미시청</span></td><td><span class="pill warn">30일 미사용</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note" style="margin-top:12px">
+    권한은 <b>부서 · 기능 · 수준</b> 세 가지를 조합합니다. 예: “운영팀 / 운행일지 / 조회만”.
+    지금 앱은 관리자냐 아니냐 둘 뿐이라, 웹에서 이걸 넓힙니다.
+  </div>
+</section>
+
+<!-- ═══════════ 차량 ═══════════ -->
+<section id="cars" hidden>
+  <h2 class="pg">차량</h2>
+  <p class="pgsub">44대 · 누적거리와 정비 시기를 함께 봅니다</p>
+  <div class="tblwrap">
+    <table class="wide">
+      <thead><tr><th>차량번호</th><th>차종</th><th>구분</th><th>배정 기사</th><th class="num">누적거리</th><th class="num">이번달</th><th>하이패스 카드</th><th>알림</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td>12가 3456</td><td>아반떼</td><td>법인</td><td>홍길동</td><td class="num">127,066</td><td class="num">1,240km</td><td>****0935</td><td><span class="pill warn">보험 D-12</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>34나 5678</td><td>K5</td><td>법인</td><td>김철수</td><td class="num">88,412</td><td class="num">980km</td><td>****1122</td><td><span class="pill bad">점검 지남</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>56다 7890</td><td>스타리아</td><td>법인</td><td>이영희</td><td class="num">45,248</td><td class="num">1,510km</td><td><span class="pill bad">미등록</span></td><td>—</td><td><span class="pill ok">사용중</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note warn" style="margin-top:12px">
+    <b>하이패스 카드 번호를 차량과 연결해 두세요.</b> 한 번만 등록하면 영수증이 어느 차량 것인지
+    자동으로 갈라집니다. 미등록 차량은 매달 손으로 골라야 합니다.
+  </div>
+</section>
+
+<!-- ═══════════ 정산 ═══════════ -->
+<section id="settle" hidden>
+  <h2 class="pg">정산 · 유류단가</h2>
+  <p class="pgsub">분기 고시단가로 유류비를 계산합니다 · 정산하면 그 시점 금액이 그대로 보관됩니다</p>
+
+  <div class="grid c2" style="margin-bottom:13px">
+    <div class="card">
+      <h3>분기 유류단가</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>분기</th><th class="num">휘발유</th><th class="num">경유</th><th class="num">LPG</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>2026 3분기</td><td class="num">1,712</td><td class="num">1,588</td><td class="num">1,024</td><td><span class="pill ok">적용중</span></td></tr>
+            <tr><td>2026 4분기</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td><span class="pill warn">고시 전</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn" style="margin-top:11px">4분기 고시단가가 나오면 9월 21일 전에 넣어야 합니다.</div>
+    </div>
+    <div class="card">
+      <h3>정산 이력 <span class="tag">금액이 얼려집니다</span></h3>
+      <ul class="lst">
+        <li><span class="pill ok">확정</span><span class="nm">7월분</span><span class="ds">07.21~08.20 · 42명 · 5,435km</span><span class="vl">1,087,400원</span></li>
+        <li><span class="pill info">임시</span><span class="nm">8월분</span><span class="ds">08.21~ 진행중</span><span class="vl">418,200원</span></li>
+      </ul>
+      <div class="note ok" style="margin-top:11px">
+        정산을 누르면 <b>그때의 금액이 그대로 보관</b>됩니다. 나중에 원본이 바뀌어도
+        결재 올린 금액과 출력 금액이 달라지지 않습니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>기사별 정산 <span class="tag">8월 임시</span></h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>기사</th><th>부서·직책</th><th class="num">운행거리</th><th class="num">유류비</th><th class="num">통행료</th><th class="num">주차</th><th class="num">기본지급액</th><th class="num">합계</th></tr></thead>
+        <tbody>
+          <tr><td>홍길동</td><td>운영팀 / 대리</td><td class="num">1,240km</td><td class="num">217,000</td><td class="num">12,400</td><td class="num">8,500</td><td class="num">90,000</td><td class="num" style="font-weight:800">327,900</td></tr>
+          <tr><td>김철수</td><td>운영팀 / 과장</td><td class="num">980km</td><td class="num">171,500</td><td class="num">6,200</td><td class="num">3,000</td><td class="num">70,000</td><td class="num" style="font-weight:800">250,700</td></tr>
+          <tr><td>이영희</td><td>지원팀 / 차장</td><td class="num">1,510km</td><td class="num">264,250</td><td class="num">18,600</td><td class="num">12,000</td><td class="num">110,000</td><td class="num" style="font-weight:800">404,850</td></tr>
+          <tr style="background:var(--soft)"><td colspan="2"><b>합계</b></td><td class="num"><b>3,730km</b></td><td class="num"><b>652,750</b></td><td class="num"><b>37,200</b></td><td class="num"><b>23,500</b></td><td class="num"><b>270,000</b></td><td class="num"><b>983,450</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 결재 ═══════════ -->
+<section id="appr" hidden>
+  <h2 class="pg">결재</h2>
+  <p class="pgsub">회사 서식의 결재란(담당·팀장·실장·사업부장·대표이사)을 그대로 전자화</p>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>결재선 <span class="tag">처음 한 번만</span></h3>
+      <div style="display:grid;gap:9px">
+        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">1</span>
+          <select class="f" style="min-width:210px"><option>담당 — 본인</option></select></div>
+        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">2</span>
+          <select class="f" style="min-width:210px"><option selected>김OO 팀장 (운영팀)</option><option>박OO 팀장 (지원팀)</option></select></div>
+        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">3</span>
+          <select class="f" style="min-width:210px"><option selected>이OO 실장</option></select></div>
+        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">4</span>
+          <select class="f" style="min-width:210px"><option selected>박OO 사업부장</option></select></div>
+        <div class="row"><span style="width:24px;height:24px;border-radius:50%;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">5</span>
+          <select class="f" style="min-width:210px"><option selected>최OO 대표이사</option></select></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin-top:11px;cursor:pointer">
+        <input type="checkbox" checked style="width:15px;height:15px;accent-color:var(--wine)">
+        다음 달부터 이 결재선을 그대로 씁니다</label>
+      <div class="note" style="margin-top:11px">
+        한 번 저장하면 다음 달에는 <b>이 화면이 안 뜨고</b> 저장된 결재선으로 바로 올라갑니다.
+        사람이 바뀌었을 때만 고치면 됩니다.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>진행 상황 <span class="tag">2026년 7월분</span></h3>
+      <ul class="lst">
+        <li><span class="pill ok">승인</span><span class="nm">홍길동</span><span class="ds">담당 · 08.01 09:02 상신</span></li>
+        <li><span class="pill ok">승인</span><span class="nm">김OO</span><span class="ds">팀장 · 08.01 14:20</span></li>
+        <li><span class="pill info">검토중</span><span class="nm">이OO</span><span class="ds">실장 · 6일째 대기</span></li>
+        <li><span class="pill mute">대기</span><span class="nm">박OO</span><span class="ds">사업부장</span></li>
+        <li><span class="pill mute">대기</span><span class="nm">최OO</span><span class="ds">대표이사</span></li>
+      </ul>
+      <div class="note warn" style="margin-top:11px">
+        반려하면 의견과 함께 제출자에게 돌아가고, 고쳐서 다시 올리면 <b>1차부터</b> 다시 돕니다.
+        전원 승인되면 그 달은 <b>잠기고</b> 앱에서도 수정할 수 없게 됩니다.
+      </div>
+      <div class="row end" style="margin-top:11px"><button class="btn sm">독촉 알림</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 출력 ═══════════ -->
+<section id="out" hidden>
+  <h2 class="pg">출력 · 리포트</h2>
+  <p class="pgsub">결재가 끝난 달은 결재란이 채워진 채로 나옵니다</p>
+
+  <div class="grid c3">
+    <div class="card">
+      <h3>운행일지 엑셀</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 11px">
+        지금 쓰시는 서식 그대로. 결재란에 이름과 날짜가 채워집니다.</p>
+      <div class="row"><select class="f"><option>2026년 7월 (결재완료)</option><option>2026년 8월 (진행중)</option></select></div>
+      <div class="row" style="margin-top:9px"><button class="btn sm pri">내려받기</button>
+        <span class="pill mute">편집 잠금 가능</span></div>
+    </div>
+    <div class="card">
+      <h3>증빙 모음 PDF</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 11px">
+        영수증 사진을 날짜순으로 묶어 한 파일로.</p>
+      <div class="row"><select class="f"><option>2026년 7월</option></select></div>
+      <div class="row" style="margin-top:9px"><button class="btn sm pri">내려받기</button></div>
+    </div>
+    <div class="card">
+      <h3>월간 리포트</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 11px">
+        경영진 보고용 요약. 매월 21일 자동 발행됩니다.</p>
+      <div class="row"><select class="f"><option>2026년 7월분</option></select></div>
+      <div class="row" style="margin-top:9px"><button class="btn sm">미리보기</button><button class="btn sm pri">내려받기</button></div>
     </div>
   </div>
 </section>
 
 </main>
+</div>
 
-<footer>ATEC Mobility · 차량 운행일지 마감/결재 화면 시안 · 서버 미연결</footer>
+<footer>ATEC Mobility · 차량 운행일지 관리 화면 시안 · 서버 미연결</footer>
 
 <script>
 (function(){
-  var tabs = document.getElementById('tabs');
-  var ids = ['close','logs','toll','appr'];
-  tabs.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-t]'); if(!b) return;
-    [].forEach.call(tabs.querySelectorAll('button'), function(x){
-      x.setAttribute('aria-selected', String(x === b));
+  var nav = document.getElementById('nav');
+  var pages = ['dash','sync','logs','detail','toll','evid','safety','edu','staff','cars','settle','appr','out'];
+  nav.addEventListener('click', function(e){
+    var a = e.target.closest('a[data-p]'); if(!a) return;
+    [].forEach.call(nav.querySelectorAll('a[data-p]'), function(x){ x.classList.toggle('on', x===a); });
+    pages.forEach(function(id){
+      var el = document.getElementById(id); if(el) el.hidden = (id !== a.dataset.p);
     });
-    ids.forEach(function(id){
-      document.getElementById(id).hidden = (id !== b.dataset.t);
-    });
-    window.scrollTo({top:0, behavior:'smooth'});
+    window.scrollTo({top:0,behavior:'smooth'});
   });
-
-  // 필터 탭 — 시안이라 표시만 바뀐다
-  [].forEach.call(document.querySelectorAll('.ftabs'), function(g){
+  [].forEach.call(document.querySelectorAll('.chips'), function(g){
     g.addEventListener('click', function(e){
       var b = e.target.closest('button'); if(!b) return;
       [].forEach.call(g.querySelectorAll('button'), function(x){
-        x.setAttribute('aria-pressed', String(x === b));
+        x.setAttribute('aria-pressed', String(x===b));
       });
     });
   });
