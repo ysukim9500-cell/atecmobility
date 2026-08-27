@@ -10,232 +10,268 @@
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#26191F; --wine:#A00040; --wine-deep:#6E002C; --magenta:#D60051;
-  --paper:#F4F0EA; --surface:#ffffff; --line:#E8E0DA; --muted:#8A7F86; --soft:#FBF8F4;
-  --ok:#0F7B4F; --ok-bg:#E7F5EE; --warn:#B45309; --warn-bg:#FDF3E3;
-  --bad:#C0182B; --bad-bg:#FCEBEC; --info:#1D4ED8; --info-bg:#EAF0FE;
-  --sync:#6D28D9; --sync-bg:#F1EBFD;
-  --sbw:212px;
+  --ink:#1B1518; --ink-2:#4A4045; --muted:#8C8188; --faint:#B6ACB1;
+  --wine:#A00040; --wine-2:#7A0031; --wine-tint:#FBF0F4;
+  --paper:#FAF8F7; --surface:#FFFFFF; --line:#EDE7E4; --line-2:#F5F1EF;
+  --ok:#137A52; --warn:#A65B10; --bad:#B3182C; --info:#2A54C6; --sync:#6B2FB5;
+  --sbw:216px;
+  --shadow:0 1px 2px rgba(27,21,24,.04), 0 4px 14px rgba(27,21,24,.045);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
   font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
-  background:var(--paper); color:var(--ink); font-size:13.5px; line-height:1.5;
-  -webkit-font-smoothing:antialiased;
+  background:var(--paper); color:var(--ink); font-size:13.5px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-feature-settings:'tnum' 0;
 }
-.flag{
-  background:linear-gradient(90deg,var(--wine-deep),var(--magenta)); color:#fff;
-  text-align:center; padding:6px 14px; font-size:12px; font-weight:600;
-}
-.flag b{font-weight:800}
+svg{display:block}
+.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;
+   stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ── 시안 표시줄 ── */
+.flag{background:var(--ink);color:#EDE5E9;text-align:center;padding:7px 14px;
+  font-size:11.5px;font-weight:500;letter-spacing:.005em}
+.flag b{font-weight:700;color:#fff}
 
 /* ── 헤더 ── */
-header.top{
-  background:var(--surface); border-bottom:1px solid var(--line); padding:10px 18px;
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:sticky; top:0; z-index:60;
-}
-.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:-.02em}
-.brand .mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--wine),var(--magenta));color:#fff;font-size:13px}
-.brand .sub{font-weight:600;font-size:12px;color:var(--muted);border-left:1px solid var(--line);padding-left:9px}
+header.top{background:var(--surface);border-bottom:1px solid var(--line);
+  padding:0 20px;height:54px;display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:60}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14.5px;letter-spacing:-.015em}
+.brand .mark{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;
+  background:var(--wine);color:#fff;font-size:11px;font-weight:800;letter-spacing:0}
+.brand .sub{font-weight:500;font-size:12.5px;color:var(--muted);
+  border-left:1px solid var(--line);padding-left:11px;margin-left:1px}
 .top .sp{flex:1}
-.syncchip{
-  display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--sync);
-  background:var(--sync-bg);border:1px solid #DDD1FA;padding:5px 11px;border-radius:20px;cursor:pointer;
-}
-.syncchip .d{width:7px;height:7px;border-radius:50%;background:var(--sync)}
-.who{font-size:12px;color:var(--muted)} .who b{color:var(--ink)}
+.syncchip{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;
+  color:var(--ink-2);padding:5px 2px;cursor:pointer}
+.syncchip .d{width:6px;height:6px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 0 2.5px rgba(19,122,82,.14)}
+.syncchip:hover{color:var(--ink)}
+.who{font-size:12px;color:var(--muted)} .who b{color:var(--ink);font-weight:600}
+
+/* ── 역할 전환 ── */
+.roleswitch{display:flex;align-items:center;gap:1px;background:var(--line-2);
+  border-radius:7px;padding:2px}
+.roleswitch .lb{font-size:11px;font-weight:500;color:var(--muted);padding:0 9px 0 6px}
+.roleswitch button{appearance:none;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  border:0;background:none;color:var(--muted);padding:5px 11px;border-radius:5px;
+  display:flex;align-items:center;gap:5px;transition:none}
+.roleswitch button em{font-style:normal;font-size:10.5px;font-weight:500;opacity:.55}
+.roleswitch button:hover{color:var(--ink)}
+.roleswitch button.on{background:var(--surface);color:var(--ink);
+  box-shadow:0 1px 2px rgba(27,21,24,.07)}
+.roleswitch button.on em{opacity:.5}
 
 /* ── 레이아웃 ── */
-.wrap{display:flex; min-height:calc(100vh - 78px)}
-aside{
-  width:var(--sbw); flex:none; background:var(--surface); border-right:1px solid var(--line);
-  padding:12px 0; position:sticky; top:49px; height:calc(100vh - 49px); overflow-y:auto;
-}
-aside .grp{padding:12px 16px 5px;font-size:10.5px;font-weight:800;color:#B9AAB2;letter-spacing:.07em}
-aside a{
-  display:flex;align-items:center;gap:9px;padding:8px 16px;font-weight:600;color:#5D4F56;
-  text-decoration:none;cursor:pointer;border-left:2.5px solid transparent;font-size:13px;
-}
-aside a:hover{background:var(--soft);color:var(--ink)}
-aside a.on{background:#FCF2F6;color:var(--wine);border-left-color:var(--wine)}
-aside a .ic{width:17px;text-align:center;font-size:13px;opacity:.85}
-aside a .b{margin-left:auto;background:var(--bad);color:#fff;font-size:10px;font-weight:800;
-  min-width:17px;padding:0 5px;border-radius:9px;line-height:16px;text-align:center}
-aside a .b.g{background:#CFC5CB}
-aside a[hidden], aside .grp[hidden]{display:none !important}
-main{flex:1; padding:20px 22px 50px; min-width:0}
+.wrap{display:flex;min-height:calc(100vh - 82px)}
+aside{width:var(--sbw);flex:none;background:var(--paper);border-right:1px solid var(--line);
+  padding:14px 0 30px;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto}
+aside .grp{padding:16px 18px 6px;font-size:10px;font-weight:700;color:var(--faint);
+  letter-spacing:.09em;text-transform:uppercase}
+aside .grp:first-child{padding-top:2px}
+aside a{display:flex;align-items:center;gap:10px;padding:7px 18px;font-weight:500;
+  color:var(--ink-2);text-decoration:none;cursor:pointer;font-size:13px;position:relative}
+aside a .i{opacity:.55;width:15px;height:15px}
+aside a:hover{color:var(--ink)} aside a:hover .i{opacity:.8}
+aside a.on{color:var(--wine);font-weight:600;background:var(--wine-tint)}
+aside a.on .i{opacity:1}
+aside a.on::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:2px;
+  background:var(--wine);border-radius:0 2px 2px 0}
+aside a .b{margin-left:auto;color:var(--bad);font-size:11px;font-weight:600;
+  font-variant-numeric:tabular-nums}
+aside a .b.g{color:var(--faint)}
+aside a[hidden],aside .grp[hidden]{display:none !important}
+main{flex:1;padding:26px 30px 60px;min-width:0;max-width:1420px}
 section[hidden]{display:none}
 
-h2.pg{font-size:19px;font-weight:800;margin:0 0 3px;letter-spacing:-.025em}
-p.pgsub{margin:0 0 16px;color:var(--muted);font-size:12.5px}
+/* ── 제목 ── */
+h2.pg{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.03em;line-height:1.25}
+p.pgsub{margin:0 0 24px;color:var(--muted);font-size:13px}
+p.pgsub b{color:var(--ink-2);font-weight:600}
 
 /* ── 카드 ── */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
-.card+.card{margin-top:13px}
-.card h3{margin:0 0 11px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
-.card h3 .tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;
-  background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.card+.card{margin-top:14px}
+.card h3{margin:0 0 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:9px;
+  letter-spacing:-.01em}
+.card h3 .tag{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0}
+.card h3 .tag::before{content:'·';margin-right:7px;color:var(--faint)}
 .card h3 .sp{flex:1}
-.grid{display:grid;gap:13px}
-@media(min-width:1050px){.grid.c2{grid-template-columns:1fr 1fr}.grid.c3{grid-template-columns:repeat(3,1fr)}}
-@media(min-width:1250px){.grid.c4{grid-template-columns:repeat(4,1fr)}}
+.grid{display:grid;gap:14px}
+@media(min-width:1060px){.grid.c2{grid-template-columns:1fr 1fr}.grid.c3{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1260px){.grid.c4{grid-template-columns:repeat(4,1fr)}}
 
-/* ── KPI ── */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(142px,1fr));gap:10px}
-.kpi{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface);cursor:pointer}
-.kpi:hover{border-color:var(--wine)}
-.kpi .k{font-size:11.5px;color:var(--muted);font-weight:600}
-.kpi .v{font-size:23px;font-weight:800;letter-spacing:-.035em;margin-top:2px;font-variant-numeric:tabular-nums}
-.kpi .v small{font-size:12.5px;font-weight:700;color:var(--muted);margin-left:2px}
-.kpi .d{font-size:11px;font-weight:700;margin-top:3px}
+/* ── 지표: 상자를 없애고 세로 실선으로 나눈다 ── */
+.kpis{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden}
+.kpi{flex:1 1 150px;padding:15px 18px;cursor:default;position:relative}
+.kpi+.kpi::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:1px;background:var(--line)}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:500}
+.kpi .v{font-size:24px;font-weight:700;letter-spacing:-.045em;margin-top:4px;
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px;letter-spacing:0}
+.kpi .d{font-size:11.5px;font-weight:500;margin-top:4px;color:var(--muted)}
 .kpi .d.up{color:var(--ok)} .kpi .d.dn{color:var(--bad)}
-.kpi.alert{background:#FEF8F8;border-color:#F3D9DC} .kpi.alert .v{color:var(--bad)}
+.kpi.alert .v{color:var(--bad)}
 
-/* ── 버튼/폼 ── */
-.btn{appearance:none;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;
-  border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 13px;border-radius:8px}
-.btn:hover{background:var(--soft)}
+/* ── 버튼 ── */
+.btn{appearance:none;font:inherit;font-weight:600;font-size:12.5px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:6px 12px;border-radius:7px;line-height:1.5}
+.btn:hover{background:var(--line-2);border-color:#E3DBD7}
 .btn.pri{background:var(--wine);border-color:var(--wine);color:#fff}
-.btn.pri:hover{background:var(--wine-deep)}
-.btn.pri[disabled]{background:#DCD2D7;border-color:#DCD2D7;cursor:not-allowed}
-.btn.sm{padding:4px 9px;font-size:11.5px;border-radius:6px}
-.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.btn.pri:hover{background:var(--wine-2);border-color:var(--wine-2)}
+.btn.pri[disabled]{background:transparent;border-color:var(--line);color:var(--faint);cursor:not-allowed}
+.btn.pri[disabled]:hover{background:transparent}
+.btn.sm{padding:3px 9px;font-size:11.5px;border-radius:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
-input.f,select.f{font:inherit;font-size:12.5px;font-weight:600;padding:6px 10px;
+input.f,select.f{font:inherit;font-size:12.5px;font-weight:500;padding:6px 10px;
   border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+input.f:focus,select.f:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
+input.f::placeholder{color:var(--faint)}
 select.f{min-width:150px}
 
-/* ── 배지 ── */
-.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;line-height:1.6;white-space:nowrap}
-.pill.ok{background:var(--ok-bg);color:var(--ok)}
-.pill.warn{background:var(--warn-bg);color:var(--warn)}
-.pill.bad{background:var(--bad-bg);color:var(--bad)}
-.pill.info{background:var(--info-bg);color:var(--info)}
-.pill.sync{background:var(--sync-bg);color:var(--sync)}
-.pill.mute{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+/* ── 상태: 채운 알약 대신 점 + 글자 ── */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;
+  color:var(--ink-2);white-space:nowrap;line-height:1.6}
+.pill::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--faint);flex:none}
+.pill.ok::before{background:var(--ok)} .pill.ok{color:var(--ok)}
+.pill.warn::before{background:var(--warn)} .pill.warn{color:var(--warn)}
+.pill.bad::before{background:var(--bad)} .pill.bad{color:var(--bad)}
+.pill.info::before{background:var(--info)} .pill.info{color:var(--info)}
+.pill.sync::before{background:var(--sync)} .pill.sync{color:var(--sync)}
+.pill.mute{color:var(--muted)}
+/* 표 안에서 금액 옆에 붙는 건 점 없이 */
+td .pill.amt::before{display:none}
 
 /* ── 표 ── */
 .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
-table.wide{min-width:1080px}
-th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
-th{background:var(--soft);font-weight:700;font-size:11.5px;color:var(--muted)}
-tbody tr:hover{background:#FDFAFB;cursor:pointer}
+table.wide{min-width:1060px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap;
+  vertical-align:middle}
+th{font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.02em;
+  border-bottom:1px solid var(--line);padding-top:11px;padding-bottom:11px}
 tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#FCFAFA}
+tbody td:first-child{font-weight:600}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-tr.flag-r td{background:#FEF8F8} tr.flag-r:hover td{background:#FCEFF1}
-tr.flag-s td{background:#FAF7FE} tr.flag-s:hover td{background:#F4EEFC}
+tr.flag-r td{box-shadow:inset 2px 0 0 var(--bad)}
+tr.flag-r td:not(:first-child){box-shadow:none}
+tr.flag-s td{box-shadow:inset 2px 0 0 var(--sync)}
+tr.flag-s td:not(:first-child){box-shadow:none}
 
 /* ── 필터칩 ── */
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px}
-.chips button{appearance:none;font:inherit;font-size:12px;font-weight:700;cursor:pointer;
-  border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:5px 11px;border-radius:20px}
-.chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
-.chips button .c{opacity:.6;margin-left:4px;font-weight:600}
+.chips{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:14px;
+  border-bottom:1px solid var(--line);padding-bottom:0}
+.chips button{appearance:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;
+  border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
+  padding:7px 12px 9px;margin-bottom:-1px}
+.chips button:hover{color:var(--ink)}
+.chips button[aria-pressed="true"]{color:var(--wine);border-bottom-color:var(--wine);font-weight:600}
+.chips button .c{margin-left:6px;font-variant-numeric:tabular-nums;color:var(--faint);font-weight:500}
+.chips button[aria-pressed="true"] .c{color:var(--wine);opacity:.6}
 
-/* ── 안내 ── */
-.note{background:var(--info-bg);border:1px solid #C7D7FB;color:#1E3A8A;border-radius:9px;
-  padding:10px 13px;font-size:12px;line-height:1.6}
-.note b{font-weight:800}
-.note.warn{background:var(--warn-bg);border-color:#F0DCB8;color:#7C4A0B}
-.note.sync{background:var(--sync-bg);border-color:#DDD1FA;color:#4C1D95}
-.note.ok{background:var(--ok-bg);border-color:#BFE3D1;color:#0B5D3B}
+/* ── 안내: 색 상자 대신 왼쪽 실선 ── */
+.note{border-left:2px solid var(--line);padding:2px 0 2px 13px;font-size:12.5px;
+  line-height:1.65;color:var(--ink-2)}
+.note b{font-weight:600;color:var(--ink)}
+.note.warn{border-left-color:var(--warn)}
+.note.sync{border-left-color:var(--sync)}
+.note.ok{border-left-color:var(--ok)}
+.note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  background:var(--line-2);padding:1px 5px;border-radius:4px}
 
 /* ── 진행바 ── */
-.bar{height:7px;border-radius:5px;background:#EDE5E9;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--wine);border-radius:5px}
+.bar{height:4px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--wine);border-radius:3px}
 .bar i.g{background:var(--ok)} .bar i.w{background:var(--warn)}
 
-/* ── 목록형 ── */
+/* ── 목록 ── */
 .lst{list-style:none;margin:0;padding:0}
-.lst li{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)}
-.lst li:last-child{border-bottom:0}
-.lst .nm{font-weight:700;width:82px;flex:none}
-.lst .ds{color:var(--muted);font-size:12px;flex:1}
-.lst .vl{font-weight:800;font-variant-numeric:tabular-nums}
+.lst li{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.lst li:last-child{border-bottom:0} .lst li:first-child{padding-top:0}
+.lst .nm{font-weight:600;width:88px;flex:none}
+.lst .ds{color:var(--muted);font-size:12.5px;flex:1}
+.lst .vl{font-weight:600;font-variant-numeric:tabular-nums}
 
-/* ── 동기화 다이어그램 ── */
-.syncbox{display:grid;gap:11px}
-@media(min-width:900px){.syncbox{grid-template-columns:1fr auto 1fr;align-items:center}}
-.syncside{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:var(--soft)}
-.syncside .h{font-weight:800;margin-bottom:7px;display:flex;align-items:center;gap:7px}
-.syncside ul{margin:0;padding-left:17px;color:var(--muted);font-size:12px;line-height:1.85}
-.syncmid{text-align:center;color:var(--sync);font-weight:800;font-size:12px}
-.syncmid .a{font-size:20px;line-height:1.1}
+/* ── 동기화 ── */
+.syncbox{display:grid;gap:14px}
+@media(min-width:920px){.syncbox{grid-template-columns:1fr 84px 1fr;align-items:center}}
+.syncside{border:1px solid var(--line);border-radius:10px;padding:15px 17px}
+.syncside .h{font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:8px;font-size:12.5px}
+.syncside ul{margin:0;padding-left:16px;color:var(--muted);font-size:12.5px;line-height:1.95}
+.syncmid{text-align:center;color:var(--sync);font-weight:500;font-size:11.5px;line-height:1.4}
+.syncmid .a{font-size:19px;line-height:1.5;font-weight:400}
 
 /* ── 지도 자리 ── */
-.mapbox{
-  height:210px;border:1px solid var(--line);border-radius:10px;
-  background:
-    repeating-linear-gradient(45deg,#F0EBE6 0 12px,#F6F2EE 12px 24px);
-  display:grid;place-items:center;color:#B5A6AE;font-weight:700;font-size:12.5px
-}
-/* ── 미니 막대 ── */
-.mini{display:flex;align-items:flex-end;gap:3px;height:52px}
-.mini i{flex:1;background:#E4D6DD;border-radius:2px 2px 0 0}
+.mapbox{height:200px;border:1px solid var(--line);border-radius:10px;background:var(--line-2);
+  display:grid;place-items:center;color:var(--faint);font-weight:500;font-size:12.5px}
+
+/* ── 미니 차트 ── */
+.mini{display:flex;align-items:flex-end;gap:3px;height:50px}
+.mini i{flex:1;background:var(--line);border-radius:2px 2px 0 0}
 .mini i.hi{background:var(--wine)}
 
-.drop{border:2px dashed #D9CBD2;border-radius:11px;padding:22px 16px;text-align:center;background:var(--soft);cursor:pointer}
-.drop:hover{border-color:var(--magenta);background:#FDF6F9}
-.drop .t{font-weight:800;margin-top:6px} .drop .s{color:var(--muted);font-size:12px;margin-top:3px}
+/* ── 업로드 ── */
+.drop{border:1px dashed #DFD5D9;border-radius:10px;padding:26px 18px;text-align:center;
+  background:var(--surface);cursor:pointer}
+.drop:hover{border-color:var(--wine);background:var(--wine-tint)}
+.drop .t{font-weight:600;margin-top:9px;font-size:13px}
+.drop .s{color:var(--muted);font-size:12px;margin-top:3px}
+.drop svg{margin:0 auto;width:22px;height:22px;stroke:var(--faint);fill:none;stroke-width:1.5}
 
-.roleswitch{display:flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);
-  border-radius:9px;padding:3px 4px 3px 10px}
-.roleswitch .lb{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
-.roleswitch button{appearance:none;font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;
-  background:none;color:var(--muted);padding:4px 9px;border-radius:6px;display:flex;align-items:center;gap:5px}
-.roleswitch button em{font-style:normal;font-size:10px;font-weight:600;opacity:.6}
-.roleswitch button:hover{background:#fff;color:var(--ink)}
-.roleswitch button.on{background:var(--wine);border-color:var(--wine);color:#fff}
-.roleswitch button.on em{opacity:.75}
-.rolebar{background:#FCF2F6;border:1px solid #F0D8E3;border-radius:9px;padding:9px 13px;margin-bottom:14px;
-  font-size:12px;font-weight:600;color:var(--wine-deep)}
-.rolebar b{font-weight:800}
-.done-banner{
-  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  background:linear-gradient(100deg,#0F7B4F,#12A268);color:#fff;border-radius:12px;
-  padding:15px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(15,123,79,.18);
-}
-.done-banner .ic{font-size:26px;line-height:1}
-.done-banner .tx{flex:1;min-width:220px}
-.done-banner .t1{font-weight:800;font-size:15px;letter-spacing:-.02em}
-.done-banner .t2{font-size:12.5px;opacity:.92;margin-top:2px}
-.done-banner .btn{background:#fff;border-color:#fff;color:#0B5D3B;font-weight:800}
-.done-banner .btn:hover{background:#EAF7F0}
-.done-banner .btn.gh{background:transparent;border-color:rgba(255,255,255,.55);color:#fff}
-.done-banner .btn.gh:hover{background:rgba(255,255,255,.14)}
-.phone{
-  width:250px;border:9px solid #221A1E;border-radius:30px;background:#fff;
-  box-shadow:0 6px 22px rgba(38,25,31,.18);overflow:hidden;flex:none;margin:0 auto;
-}
-.phone .notch{height:20px;background:#221A1E;position:relative}
+/* ── 역할 안내 ── */
+.rolebar{border-left:2px solid var(--wine);padding:1px 0 1px 13px;margin-bottom:20px;
+  font-size:12.5px;color:var(--ink-2)}
+.rolebar b{font-weight:600;color:var(--ink)}
+
+/* ── 완료 배너 ── */
+.done-banner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ok);
+  border-radius:10px;padding:16px 20px;margin-bottom:20px;box-shadow:var(--shadow)}
+.done-banner .ic{width:26px;height:26px;border-radius:50%;background:rgba(19,122,82,.1);
+  color:var(--ok);display:grid;place-items:center;flex:none}
+.done-banner .ic svg{width:14px;height:14px;stroke:currentColor;stroke-width:2.4;fill:none}
+.done-banner .tx{flex:1;min-width:230px}
+.done-banner .t1{font-weight:700;font-size:14px;letter-spacing:-.015em;display:block}
+.done-banner .t2{font-size:12.5px;color:var(--muted);margin-top:2px;display:block}
+.done-banner .btn.gh{border-color:var(--line)}
+
+/* ── 폰 목업 ── */
+.phone{width:248px;border:8px solid #1B1518;border-radius:26px;background:#fff;
+  box-shadow:0 8px 26px rgba(27,21,24,.16);overflow:hidden;flex:none;margin:0 auto}
+.phone .notch{height:18px;background:#1B1518;position:relative}
 .phone .notch::after{content:'';position:absolute;left:50%;transform:translateX(-50%);
-  top:4px;width:64px;height:11px;border-radius:7px;background:#0C0809}
-.phone .appbar{background:#3A3036;color:#fff;padding:10px 13px;font-weight:800;font-size:12.5px;
+  top:3px;width:58px;height:10px;border-radius:6px;background:#0A0708}
+.phone .appbar{background:#2B2226;color:#fff;padding:10px 13px;font-weight:600;font-size:12px;
   display:flex;align-items:center;gap:8px}
-.phone .appbar .m{opacity:.75;font-weight:600}
-.phone .body{padding:11px;background:#F4F0EA;min-height:230px}
-.phone .ban{
-  background:linear-gradient(100deg,#0F7B4F,#12A268);color:#fff;border-radius:11px;
-  padding:11px 12px;box-shadow:0 2px 8px rgba(15,123,79,.22)
-}
-.phone .ban .t{font-weight:800;font-size:12.5px;line-height:1.35}
-.phone .ban .s{font-size:11px;opacity:.92;margin-top:3px;line-height:1.45}
-.phone .ban .acts{display:flex;gap:6px;margin-top:9px}
-.phone .ban .acts b{
-  flex:1;text-align:center;background:#fff;color:#0B5D3B;border-radius:7px;
-  padding:6px 0;font-size:11.5px;font-weight:800
-}
-.phone .ban .acts b.gh{background:rgba(255,255,255,.16);color:#fff;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
-.phone .stub{margin-top:9px;background:#fff;border:1px solid var(--line);border-radius:9px;
-  padding:9px 11px;font-size:11px;color:var(--muted)}
-.phone .stub b{color:var(--ink);font-size:11.5px;display:block;margin-bottom:2px}
-.banwrap{display:grid;gap:14px}
-@media(min-width:960px){.banwrap{grid-template-columns:270px 1fr;align-items:start}}
-footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
+.phone .appbar .m{opacity:.6;font-weight:400}
+.phone .body{padding:11px;background:var(--paper);min-height:222px}
+.phone .ban{background:#fff;border:1px solid var(--line);border-left:3px solid var(--ok);
+  border-radius:9px;padding:11px 12px;box-shadow:0 1px 3px rgba(27,21,24,.06)}
+.phone .ban .t{font-weight:700;font-size:12.5px;line-height:1.35;color:var(--ok)}
+.phone .ban .s{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5}
+.phone .ban .acts{display:flex;gap:6px;margin-top:10px}
+.phone .ban .acts b{flex:1;text-align:center;background:var(--wine);color:#fff;border-radius:6px;
+  padding:6px 0;font-size:11.5px;font-weight:600}
+.phone .ban .acts b.gh{background:#fff;color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--line)}
+.phone .stub{margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:9px;
+  padding:10px 12px;font-size:11px;color:var(--muted)}
+.phone .stub b{color:var(--ink);font-size:11.5px;display:block;margin-bottom:2px;font-weight:600}
+.banwrap{display:grid;gap:20px}
+@media(min-width:980px){.banwrap{grid-template-columns:266px 1fr;align-items:start}}
+
+/* ── 프로세스 도식 ── */
+.flowwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface);padding:6px}
+.flowwrap svg{min-width:900px;width:100%;height:auto;display:block}
+
+footer{padding:26px 30px 40px;color:var(--faint);font-size:11.5px;border-top:1px solid var(--line);
+  margin-top:10px}
 </style>
 </head>
 <body>
@@ -249,7 +285,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <div class="syncchip" title="앱과 웹이 서로 맞춰진 시각"><span class="d"></span>동기화 2분 전 · 대기 3건</div>
   <div class="roleswitch" id="roleswitch">
     <span class="lb">이 화면으로 보기</span>
-    <button data-r="driver">기사<em>54명</em></button>
+    <button data-r="driver">오너드라이버<em>54명</em></button>
     <button data-r="approver">결재자<em>5명</em></button>
     <button data-r="admin" class="on">관리자<em>3명</em></button>
   </div>
@@ -257,47 +293,53 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 
 <div class="wrap">
 <aside id="nav">
-  <!-- 기사 -->
+  <!-- 오너드라이버 -->
+  <div class="grp" data-r="driver">안내</div>
+  <a data-r="driver" data-p="flow"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h6v4H4zM14 5h6v4h-6zM9 15h6v4H9z"/><path d="M7 9v3h10V9M12 12v3"/></svg>전체 흐름</a>
   <div class="grp" data-r="driver">내 운행</div>
-  <a data-r="driver" data-p="dDash"><span class="ic">▦</span>내 현황</a>
-  <a data-r="driver" data-p="dLogs"><span class="ic">☰</span>내 운행일지</a>
-  <a data-r="driver" data-p="dEvid"><span class="ic">▤</span>내 증빙 올리기<span class="b">2</span></a>
-  <a data-r="driver" data-p="dToll"><span class="ic">₩</span>내 통행료<span class="b">5</span></a>
+  <a data-r="driver" data-p="dDash"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>내 현황</a>
+  <a data-r="driver" data-p="dLogs"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h11"/></svg>내 운행일지</a>
+  <a data-r="driver" data-p="dEvid"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>내 증빙 올리기<span class="b">2</span></a>
+  <a data-r="driver" data-p="dToll"><svg class="i" viewBox="0 0 24 24"><path d="M4 7l3.2 10L12 8.5 16.8 17 20 7"/><path d="M4.6 11.5h14.8M4.2 14h15.6"/></svg>내 통행료<span class="b">5</span></a>
   <div class="grp" data-r="driver">나</div>
-  <a data-r="driver" data-p="dSafety"><span class="ic">◈</span>내 안전운전</a>
-  <a data-r="driver" data-p="dEdu"><span class="ic">▷</span>안전교육<span class="b">1</span></a>
-  <a data-r="driver" data-p="dSettle"><span class="ic">⛽</span>내 정산 내역</a>
-  <a data-r="driver" data-p="dAppr"><span class="ic">✓</span>제출·결재 현황</a>
+  <a data-r="driver" data-p="dSafety"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7.5 3.2v5.4c0 4.4-3 8.4-7.5 9.9-4.5-1.5-7.5-5.5-7.5-9.9V6.2L12 3z"/><path d="M9.2 12.2l2 2 3.6-4"/></svg>내 안전운전</a>
+  <a data-r="driver" data-p="dEdu"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10.2 8.6l5.4 3.4-5.4 3.4z"/></svg>안전교육<span class="b">1</span></a>
+  <a data-r="driver" data-p="dSettle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M14 9h3a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0v-8l-2.5-2.5"/><path d="M6.5 7.5h5"/></svg>내 정산 내역</a>
+  <a data-r="driver" data-p="dAppr"><svg class="i" viewBox="0 0 24 24"><path d="M20 6.5L9.2 17.3 4 12.1"/></svg>제출·결재 현황</a>
   <div class="grp" data-r="driver">설정</div>
-  <a data-r="driver" data-p="dProfile"><span class="ic">☺</span>프로필·차량</a>
+  <a data-r="driver" data-p="dProfile"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="7.8" r="3.6"/><path d="M4.5 20.4a7.5 7.5 0 0 1 15 0"/></svg>프로필·차량</a>
 
   <!-- 결재자 -->
+  <div class="grp" data-r="approver">안내</div>
+  <a data-r="approver" data-p="flow"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h6v4H4zM14 5h6v4h-6zM9 15h6v4H9z"/><path d="M7 9v3h10V9M12 12v3"/></svg>전체 흐름</a>
   <div class="grp" data-r="approver">결재</div>
-  <a data-r="approver" data-p="aInbox"><span class="ic">✓</span>결재함<span class="b">3</span></a>
-  <a data-r="approver" data-p="aDept"><span class="ic">▦</span>우리 부서 현황</a>
+  <a data-r="approver" data-p="aInbox"><svg class="i" viewBox="0 0 24 24"><path d="M20 6.5L9.2 17.3 4 12.1"/></svg>결재함<span class="b">3</span></a>
+  <a data-r="approver" data-p="aDept"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>우리 부서 현황</a>
   <div class="grp" data-r="approver">내 운행</div>
-  <a data-r="approver" data-p="dDash"><span class="ic">☰</span>내 현황</a>
-  <a data-r="approver" data-p="dLogs"><span class="ic">☰</span>내 운행일지</a>
-  <a data-r="approver" data-p="dSettle"><span class="ic">⛽</span>내 정산 내역</a>
+  <a data-r="approver" data-p="dDash"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h11"/></svg>내 현황</a>
+  <a data-r="approver" data-p="dLogs"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h11"/></svg>내 운행일지</a>
+  <a data-r="approver" data-p="dSettle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M14 9h3a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0v-8l-2.5-2.5"/><path d="M6.5 7.5h5"/></svg>내 정산 내역</a>
 
   <!-- 관리자 -->
+  <div class="grp" data-r="admin">안내</div>
+  <a data-r="admin" data-p="flow"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h6v4H4zM14 5h6v4h-6zM9 15h6v4H9z"/><path d="M7 9v3h10V9M12 12v3"/></svg>전체 흐름</a>
   <div class="grp" data-r="admin">현황</div>
-  <a data-r="admin" data-p="dash"><span class="ic">▦</span>대시보드</a>
-  <a data-r="admin" data-p="sync"><span class="ic">⇄</span>동기화 상태<span class="b">3</span></a>
+  <a data-r="admin" data-p="dash"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>대시보드</a>
+  <a data-r="admin" data-p="sync"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h15M15 4l4 4-4 4"/><path d="M20 16H5M9 12l-4 4 4 4"/></svg>동기화 상태<span class="b">3</span></a>
   <div class="grp" data-r="admin">운행</div>
-  <a data-r="admin" data-p="logs"><span class="ic">☰</span>운행일지</a>
-  <a data-r="admin" data-p="detail"><span class="ic">◉</span>운행 상세·지도</a>
-  <a data-r="admin" data-p="toll"><span class="ic">₩</span>통행료<span class="b">37</span></a>
-  <a data-r="admin" data-p="evid"><span class="ic">▤</span>증빙·영수증<span class="b">6</span></a>
+  <a data-r="admin" data-p="logs"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h11"/></svg>운행일지</a>
+  <a data-r="admin" data-p="detail"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="10.5" r="3"/><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/></svg>운행 상세·지도</a>
+  <a data-r="admin" data-p="toll"><svg class="i" viewBox="0 0 24 24"><path d="M4 7l3.2 10L12 8.5 16.8 17 20 7"/><path d="M4.6 11.5h14.8M4.2 14h15.6"/></svg>통행료<span class="b">37</span></a>
+  <a data-r="admin" data-p="evid"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>증빙·영수증<span class="b">6</span></a>
   <div class="grp" data-r="admin">사람·차량</div>
-  <a data-r="admin" data-p="safety"><span class="ic">◈</span>안전운전</a>
-  <a data-r="admin" data-p="edu"><span class="ic">▷</span>안전교육<span class="b">4</span></a>
-  <a data-r="admin" data-p="staff"><span class="ic">☺</span>기사·권한</a>
-  <a data-r="admin" data-p="cars"><span class="ic">▭</span>차량</a>
+  <a data-r="admin" data-p="safety"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7.5 3.2v5.4c0 4.4-3 8.4-7.5 9.9-4.5-1.5-7.5-5.5-7.5-9.9V6.2L12 3z"/><path d="M9.2 12.2l2 2 3.6-4"/></svg>안전운전</a>
+  <a data-r="admin" data-p="edu"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10.2 8.6l5.4 3.4-5.4 3.4z"/></svg>안전교육<span class="b">4</span></a>
+  <a data-r="admin" data-p="staff"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="7.8" r="3.6"/><path d="M4.5 20.4a7.5 7.5 0 0 1 15 0"/></svg>오너드라이버·권한</a>
+  <a data-r="admin" data-p="cars"><svg class="i" viewBox="0 0 24 24"><path d="M5 15.5V18a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1v-2.5m19 0V18a1 1 0 0 1-1 1H20a1 1 0 0 1-1-1v-2.5"/><path d="M2.5 15.5l1.6-5.4A2 2 0 0 1 6 8.7h12a2 2 0 0 1 1.9 1.4l1.6 5.4z" /><path d="M2.5 15.5h19"/><circle cx="6.6" cy="12.6" r=".5"/><circle cx="17.4" cy="12.6" r=".5"/></svg>차량</a>
   <div class="grp" data-r="admin">마감</div>
-  <a data-r="admin" data-p="settle"><span class="ic">⛽</span>정산·유류단가</a>
-  <a data-r="admin" data-p="appr"><span class="ic">✓</span>결재<span class="b g">1</span></a>
-  <a data-r="admin" data-p="out"><span class="ic">⤓</span>출력·리포트</a>
+  <a data-r="admin" data-p="settle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M14 9h3a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0v-8l-2.5-2.5"/><path d="M6.5 7.5h5"/></svg>정산·유류단가</a>
+  <a data-r="admin" data-p="appr"><svg class="i" viewBox="0 0 24 24"><path d="M20 6.5L9.2 17.3 4 12.1"/></svg>결재<span class="b g">1</span></a>
+  <a data-r="admin" data-p="out"><svg class="i" viewBox="0 0 24 24"><path d="M12 3.5v12"/><path d="M7.2 11l4.8 4.8 4.8-4.8"/><path d="M4.5 20.5h15"/></svg>출력·리포트</a>
 </aside>
 
 <main>
@@ -305,7 +347,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 <!-- ═══════════ 대시보드 ═══════════ -->
 <section id="dash">
   <h2 class="pg">대시보드</h2>
-  <p class="pgsub"><b>2026년 8월 마감분</b> · 2026.07.21 ~ 2026.08.20 · 전체 차량 44대 · 기사 42명</p>
+  <p class="pgsub"><b>2026년 8월 마감분</b> · 2026.07.21 ~ 2026.08.20 · 전체 차량 44대 · 오너드라이버 42명</p>
 
   <div class="kpis" style="margin-bottom:13px">
     <div class="kpi"><div class="k">이번 마감분 운행</div><div class="v">312<small>건</small></div><div class="d up">지난달 대비 +18</div></div>
@@ -409,7 +451,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
         <ul>
           <li>표에서 일괄 수정</li>
           <li>하이패스 PDF·영수증 스캔 업로드</li>
-          <li>기사·차량·권한 관리</li>
+          <li>오너드라이버·차량·권한 관리</li>
           <li>마감·결재·출력</li>
         </ul>
       </div>
@@ -426,7 +468,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     <h3>지금 대기 중 <span class="tag">3건</span></h3>
     <div class="tblwrap">
       <table class="wide">
-        <thead><tr><th>운행</th><th>차량 · 기사</th><th>항목</th><th>앱 값</th><th>웹 값</th><th>상태</th><th>처리</th></tr></thead>
+        <thead><tr><th>운행</th><th>차량 · 오너드라이버</th><th>항목</th><th>앱 값</th><th>웹 값</th><th>상태</th><th>처리</th></tr></thead>
         <tbody>
           <tr class="flag-s">
             <td>08.17 09:12</td><td>12가3456 · 홍길동</td><td>주차비</td>
@@ -444,7 +486,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
           </tr>
           <tr class="flag-r">
             <td>08.13 09:06</td><td>34나5678 · 김철수</td><td>통행료</td>
-            <td>1,200원 <span class="pill mute">기사 입력</span></td>
+            <td>1,200원 <span class="pill mute">오너드라이버 입력</span></td>
             <td>1,000원 <span class="pill mute">하이패스 영수증</span></td>
             <td><span class="pill bad">양쪽이 다름 · 사람이 결정</span></td>
             <td><button class="btn sm">앱 값</button> <button class="btn sm pri">웹 값</button></td>
@@ -453,7 +495,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
       </table>
     </div>
     <div class="note warn" style="margin-top:12px">
-      <b>충돌은 드뭅니다.</b> 기사와 관리자가 같은 운행의 같은 항목을 동시에 손대야 생깁니다.
+      <b>충돌은 드뭅니다.</b> 오너드라이버와 관리자가 같은 운행의 같은 항목을 동시에 손대야 생깁니다.
       그래도 <b>조용히 덮어쓰지 않고</b> 이렇게 띄워서 고르게 합니다 — 금액이 소리 없이 바뀌는 게 제일 위험하니까요.
     </div>
   </div>
@@ -475,7 +517,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 
   <div class="row" style="margin-bottom:11px">
     <select class="f"><option>전체 차량 (44)</option><option>12가 3456</option><option>34나 5678</option></select>
-    <select class="f"><option>전체 기사 (42)</option><option>홍길동</option><option>김철수</option></select>
+    <select class="f"><option>전체 오너드라이버 (42)</option><option>홍길동</option><option>김철수</option></select>
     <input class="f" value="2026.07.21 ~ 2026.08.20" style="width:210px">
     <span style="flex:1"></span>
     <button class="btn sm">자동 점검</button>
@@ -496,7 +538,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <div class="tblwrap">
     <table class="wide">
       <thead><tr>
-        <th>운행일자</th><th>목적</th><th>차량</th><th>기사</th>
+        <th>운행일자</th><th>목적</th><th>차량</th><th>오너드라이버</th>
         <th class="num">거리</th><th>시간</th><th>출발 → 도착</th>
         <th class="num">계기판</th><th class="num">유류비</th><th class="num">통행료</th><th class="num">주차</th>
         <th>증빙</th><th>동기화</th><th>특이사항</th>
@@ -617,7 +659,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <div class="grid c2" style="margin-bottom:13px">
     <div class="card">
       <h3>하이패스 영수증 올리기</h3>
-      <div class="drop"><div style="font-size:24px">📄</div>
+      <div class="drop"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 14h6M9 17.5h4"/></svg>
         <div class="t">PDF를 여기에 끌어놓으세요</div>
         <div class="s">하이패스 홈페이지에서 받은 영수증 · 여러 개 한 번에</div></div>
     </div>
@@ -636,7 +678,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     <h3>확인이 필요한 항목</h3>
     <div class="tblwrap">
       <table class="wide">
-        <thead><tr><th>운행</th><th>차량·기사</th><th class="num">지금 값</th><th class="num">영수증</th><th class="num">차이</th><th>내역</th><th>처리</th></tr></thead>
+        <thead><tr><th>운행</th><th>차량·오너드라이버</th><th class="num">지금 값</th><th class="num">영수증</th><th class="num">차이</th><th>내역</th><th>처리</th></tr></thead>
         <tbody>
           <tr class="flag-r">
             <td>07.31 20:31~21:45</td><td>12가3456 · 홍길동</td>
@@ -680,7 +722,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <div class="grid c2" style="margin-bottom:13px">
     <div class="card">
       <h3>스캔본 올리기</h3>
-      <div class="drop"><div style="font-size:24px">🖨️</div>
+      <div class="drop"><svg class="i" viewBox="0 0 24 24"><path d="M6.5 9V4.5A1.5 1.5 0 0 1 8 3h8a1.5 1.5 0 0 1 1.5 1.5V9"/><rect x="3" y="9" width="18" height="7.5" rx="1.5"/><path d="M6.5 14h11v6.5a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5z"/></svg>
         <div class="t">스캔 파일을 끌어놓으세요</div>
         <div class="s">여러 장 한 번에 · 금액과 날짜를 자동으로 읽습니다</div></div>
       <div class="note" style="margin-top:11px">
@@ -708,7 +750,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     <h3>금액 대조</h3>
     <div class="tblwrap">
       <table class="wide">
-        <thead><tr><th>날짜</th><th>기사</th><th>차량</th><th>구분</th><th class="num">일지 금액</th><th class="num">영수증 인식</th><th>사진</th><th>상태</th></tr></thead>
+        <thead><tr><th>날짜</th><th>오너드라이버</th><th>차량</th><th>구분</th><th class="num">일지 금액</th><th class="num">영수증 인식</th><th>사진</th><th>상태</th></tr></thead>
         <tbody>
           <tr><td>08.18</td><td>홍길동</td><td>12가3456</td><td>주유</td>
             <td class="num">70,000</td><td class="num">70,000</td><td><span class="pill mute">보기</span></td><td><span class="pill ok">일치</span></td></tr>
@@ -740,10 +782,10 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 
   <div class="grid c2">
     <div class="card">
-      <h3>기사별 점수</h3>
+      <h3>오너드라이버별 점수</h3>
       <div class="tblwrap">
         <table>
-          <thead><tr><th>기사</th><th class="num">점수</th><th class="num">과속</th><th class="num">스쿨존</th><th class="num">급가감속</th><th>추이</th></tr></thead>
+          <thead><tr><th>오너드라이버</th><th class="num">점수</th><th class="num">과속</th><th class="num">스쿨존</th><th class="num">급가감속</th><th>추이</th></tr></thead>
           <tbody>
             <tr><td>홍길동</td><td class="num" style="color:var(--ok);font-weight:800">94</td><td class="num">1</td><td class="num">0</td><td class="num">4</td><td><span class="pill ok">↑ 상승</span></td></tr>
             <tr><td>이영희</td><td class="num" style="font-weight:800">86</td><td class="num">5</td><td class="num">0</td><td class="num">18</td><td><span class="pill mute">유지</span></td></tr>
@@ -757,7 +799,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
       <h3>위반 발생 지점</h3>
       <div class="mapbox">지도 · 과속·급가감속 발생 위치</div>
       <div class="note warn" style="margin-top:11px">
-        같은 지점에서 여러 기사가 반복 위반하면 <b>도로 자체가 원인</b>일 수 있습니다.
+        같은 지점에서 여러 오너드라이버가 반복 위반하면 <b>도로 자체가 원인</b>일 수 있습니다.
         기사 탓만 하지 않도록 지점별로도 모아 봅니다.
       </div>
     </div>
@@ -781,7 +823,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
       <h3>진도 현황</h3>
       <div class="tblwrap">
         <table>
-          <thead><tr><th>기사</th><th>영상</th><th>진도</th><th class="num">%</th><th>상태</th></tr></thead>
+          <thead><tr><th>오너드라이버</th><th>영상</th><th>진도</th><th class="num">%</th><th>상태</th></tr></thead>
           <tbody>
             <tr><td>홍길동</td><td>8월 안전교육</td><td style="width:110px"><div class="bar"><i class="g" style="width:100%"></i></div></td><td class="num">100</td><td><span class="pill ok">완료</span></td></tr>
             <tr><td>이영희</td><td>8월 안전교육</td><td><div class="bar"><i class="g" style="width:100%"></i></div></td><td class="num">100</td><td><span class="pill ok">완료</span></td></tr>
@@ -808,7 +850,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ═══════════ 기사·권한 ═══════════ -->
+<!-- ═══════════ 오너드라이버·권한 ═══════════ -->
 <section id="staff" hidden>
   <h2 class="pg">기사 · 권한</h2>
   <p class="pgsub">42명 · 부서와 직책은 결재선의 기준이 됩니다</p>
@@ -817,16 +859,16 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     <input class="f" placeholder="이름 검색" style="width:150px">
     <span style="flex:1"></span>
     <button class="btn sm">엑셀로 한 번에 등록</button>
-    <button class="btn sm">기사 추가</button>
+    <button class="btn sm">오너드라이버 추가</button>
   </div>
   <div class="tblwrap">
     <table class="wide">
       <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직책</th><th>배정 차량</th><th>권한</th><th class="num">이번달 운행</th><th>교육</th><th>상태</th></tr></thead>
       <tbody>
-        <tr><td>홍길동</td><td>hong</td><td>운영팀</td><td>대리</td><td>12가 3456</td><td><span class="pill mute">기사</span></td><td class="num">42건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
-        <tr><td>김철수</td><td>kimcs</td><td>운영팀</td><td>과장</td><td>34나 5678</td><td><span class="pill mute">기사</span></td><td class="num">38건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>홍길동</td><td>hong</td><td>운영팀</td><td>대리</td><td>12가 3456</td><td><span class="pill mute">오너드라이버</span></td><td class="num">42건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
+        <tr><td>김철수</td><td>kimcs</td><td>운영팀</td><td>과장</td><td>34나 5678</td><td><span class="pill mute">오너드라이버</span></td><td class="num">38건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
         <tr><td>이영희</td><td>leeyh</td><td>지원팀</td><td>차장</td><td>56다 7890</td><td><span class="pill info">부관리자</span></td><td class="num">29건</td><td><span class="pill ok">완료</span></td><td><span class="pill ok">사용중</span></td></tr>
-        <tr class="flag-r"><td>정OO</td><td>jung</td><td>운영팀</td><td>사원</td><td>—</td><td><span class="pill mute">기사</span></td><td class="num">0건</td><td><span class="pill bad">미시청</span></td><td><span class="pill warn">30일 미사용</span></td></tr>
+        <tr class="flag-r"><td>정OO</td><td>jung</td><td>운영팀</td><td>사원</td><td>—</td><td><span class="pill mute">오너드라이버</span></td><td class="num">0건</td><td><span class="pill bad">미시청</span></td><td><span class="pill warn">30일 미사용</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -842,7 +884,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   <p class="pgsub">44대 · 누적거리와 정비 시기를 함께 봅니다</p>
   <div class="tblwrap">
     <table class="wide">
-      <thead><tr><th>차량번호</th><th>차종</th><th>구분</th><th>배정 기사</th><th class="num">누적거리</th><th class="num">이번달</th><th>하이패스 카드</th><th>알림</th><th>상태</th></tr></thead>
+      <thead><tr><th>차량번호</th><th>차종</th><th>구분</th><th>배정 오너드라이버</th><th class="num">누적거리</th><th class="num">이번달</th><th>하이패스 카드</th><th>알림</th><th>상태</th></tr></thead>
       <tbody>
         <tr><td>12가 3456</td><td>아반떼</td><td>법인</td><td>홍길동</td><td class="num">127,066</td><td class="num">1,240km</td><td>****0935</td><td><span class="pill warn">보험 D-12</span></td><td><span class="pill ok">사용중</span></td></tr>
         <tr><td>34나 5678</td><td>K5</td><td>법인</td><td>김철수</td><td class="num">88,412</td><td class="num">980km</td><td>****1122</td><td><span class="pill bad">점검 지남</span></td><td><span class="pill ok">사용중</span></td></tr>
@@ -892,10 +934,10 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 
   <div class="card">
-    <h3>기사별 정산 <span class="tag">8월 마감분 · 07.21~08.20</span></h3>
+    <h3>오너드라이버별 정산 <span class="tag">8월 마감분 · 07.21~08.20</span></h3>
     <div class="tblwrap">
       <table class="wide">
-        <thead><tr><th>기사</th><th>부서·직책</th><th class="num">운행거리</th><th class="num">유류비</th><th class="num">통행료</th><th class="num">주차</th><th class="num">기본지급액</th><th class="num">합계</th></tr></thead>
+        <thead><tr><th>오너드라이버</th><th>부서·직책</th><th class="num">운행거리</th><th class="num">유류비</th><th class="num">통행료</th><th class="num">주차</th><th class="num">기본지급액</th><th class="num">합계</th></tr></thead>
         <tbody>
           <tr><td>홍길동</td><td>운영팀 / 대리</td><td class="num">1,240km</td><td class="num">217,000</td><td class="num">12,400</td><td class="num">8,500</td><td class="num">90,000</td><td class="num" style="font-weight:800">327,900</td></tr>
           <tr><td>김철수</td><td>운영팀 / 과장</td><td class="num">980km</td><td class="num">171,500</td><td class="num">6,200</td><td class="num">3,000</td><td class="num">70,000</td><td class="num" style="font-weight:800">250,700</td></tr>
@@ -986,14 +1028,14 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
 </section>
 
 
-<!-- ══════ 기사: 내 현황 ══════ -->
+<!-- ══════ 오너드라이버: 내 현황 ══════ -->
 <section id="dDash" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 운행만 보이고, 남의 기록은 보이지 않습니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다 — 본인 운행만 보이고, 남의 기록은 보이지 않습니다.</div>
   <h2 class="pg">내 현황</h2>
   <p class="pgsub">홍길동 · 운영팀 대리 · 12가 3456 · <b>8월 마감분</b> 07.21 ~ 08.20</p>
 
   <div class="done-banner">
-    <span class="ic">✓</span>
+    <svg class="i" viewBox="0 0 24 24"><path d="M20 6.5L9.2 17.3 4 12.1"/></svg>
     <span class="tx">
       <span class="t1">6월 마감분(05.21~06.20) 결재가 모두 끝났습니다</span>
       <span class="t2">최OO 대표이사 06.27 승인 · 결재란에 다섯 분 이름과 날짜가 채워졌습니다</span>
@@ -1051,9 +1093,9 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 내 운행일지 ══════ -->
+<!-- ══════ 오너드라이버: 내 운행일지 ══════ -->
 <section id="dLogs" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 운행만 보입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다 — 본인 운행만 보입니다.</div>
   <h2 class="pg">내 운행일지</h2>
   <p class="pgsub">42건 · 폰에서 하나씩 고치는 것보다 여기서 한 번에 정리하는 게 훨씬 빠릅니다</p>
 
@@ -1114,16 +1156,16 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 내 증빙 ══════ -->
+<!-- ══════ 오너드라이버: 내 증빙 ══════ -->
 <section id="dEvid" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다.</div>
   <h2 class="pg">내 증빙 올리기</h2>
   <p class="pgsub">폰으로 못 찍었으면 여기서 넣으세요 · 금액은 자동으로 읽습니다</p>
 
   <div class="grid c2" style="margin-bottom:13px">
     <div class="card">
       <h3>영수증 올리기</h3>
-      <div class="drop"><div style="font-size:24px">🖨️</div>
+      <div class="drop"><svg class="i" viewBox="0 0 24 24"><path d="M6.5 9V4.5A1.5 1.5 0 0 1 8 3h8a1.5 1.5 0 0 1 1.5 1.5V9"/><rect x="3" y="9" width="18" height="7.5" rx="1.5"/><path d="M6.5 14h11v6.5a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5z"/></svg>
         <div class="t">사진이나 스캔 파일을 끌어놓으세요</div>
         <div class="s">여러 장 한 번에 · 금액과 날짜를 자동으로 읽습니다</div></div>
       <div class="note ok" style="margin-top:11px">
@@ -1164,9 +1206,9 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 내 통행료 ══════ -->
+<!-- ══════ 오너드라이버: 내 통행료 ══════ -->
 <section id="dToll" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다.</div>
   <h2 class="pg">내 통행료</h2>
   <p class="pgsub">금액을 못 정한 운행 5건 · 셋 중 하나를 고르면 됩니다</p>
 
@@ -1193,14 +1235,14 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 
   <div class="note ok">
-    <b>고르실수록 정확해집니다.</b> 기사님이 고른 값이 다음번 추천의 기준이 됩니다.
+    <b>고르실수록 정확해집니다.</b> 오너드라이버가 고른 값이 다음번 추천의 기준이 됩니다.
     한 번 정한 금액은 <b>자동 계산이 함부로 덮어쓰지 않습니다.</b>
   </div>
 </section>
 
-<!-- ══════ 기사: 내 안전운전 ══════ -->
+<!-- ══════ 오너드라이버: 내 안전운전 ══════ -->
 <section id="dSafety" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다 — 본인 점수만 보이고, 남과 이름으로 비교되지 않습니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다 — 본인 점수만 보이고, 남과 이름으로 비교되지 않습니다.</div>
   <h2 class="pg">내 안전운전</h2>
   <p class="pgsub">홍길동 · 8월 마감분 07.21 ~ 08.20</p>
 
@@ -1228,15 +1270,15 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
         <li><span class="pill warn">급감속</span><span class="nm">08.15</span><span class="ds">천안 IC 진입로</span></li>
       </ul>
       <div class="note" style="margin-top:11px">
-        같은 지점에서 여러 기사가 반복해서 걸리면 <b>도로 문제</b>로 보고 점수에 덜 반영합니다.
+        같은 지점에서 여러 오너드라이버가 반복해서 걸리면 <b>도로 문제</b>로 보고 점수에 덜 반영합니다.
       </div>
     </div>
   </div>
 </section>
 
-<!-- ══════ 기사: 안전교육 ══════ -->
+<!-- ══════ 오너드라이버: 안전교육 ══════ -->
 <section id="dEdu" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다.</div>
   <h2 class="pg">안전교육</h2>
   <p class="pgsub">8월 회차 · 마감 D-3 · 끝까지 보셔야 이수 처리됩니다</p>
 
@@ -1270,7 +1312,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 내 정산 ══════ -->
+<!-- ══════ 오너드라이버: 내 정산 ══════ -->
 <section id="dSettle" hidden>
   <div class="rolebar">지금 <b>본인 정산 내역</b>입니다 — 남의 금액은 보이지 않습니다.</div>
   <h2 class="pg">내 정산 내역</h2>
@@ -1302,9 +1344,9 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 제출·결재 현황 ══════ -->
+<!-- ══════ 오너드라이버: 제출·결재 현황 ══════ -->
 <section id="dAppr" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다.</div>
   <h2 class="pg">제출 · 결재 현황</h2>
   <p class="pgsub">할 일을 다 끝내면 제출 버튼이 열립니다</p>
 
@@ -1422,9 +1464,9 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
-<!-- ══════ 기사: 프로필 ══════ -->
+<!-- ══════ 오너드라이버: 프로필 ══════ -->
 <section id="dProfile" hidden>
-  <div class="rolebar">지금 <b>일반 기사</b> 화면입니다.</div>
+  <div class="rolebar">지금 <b>일반 오너드라이버</b> 화면입니다.</div>
   <h2 class="pg">프로필 · 차량</h2>
   <p class="pgsub">앱의 프로필 설정과 같은 내용입니다</p>
 
@@ -1548,6 +1590,169 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
   </div>
 </section>
 
+
+<!-- ══════ 전체 흐름 ══════ -->
+<section id="flow" hidden>
+  <h2 class="pg">전체 흐름</h2>
+  <p class="pgsub">한 마감주기(전월 21일 ~ 당월 20일)가 어떻게 돌아가는지</p>
+
+  <div class="flowwrap" style="margin-bottom:16px">
+    <svg viewBox="0 0 1180 470" role="img" aria-label="운행부터 출력까지의 업무 흐름">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="#B6ACB1"/>
+        </marker>
+        <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="#B3182C"/>
+        </marker>
+      </defs>
+      <style>
+        .ln{font:500 11px Pretendard,sans-serif;fill:#8C8188;letter-spacing:.06em}
+        .ph{font:700 11px Pretendard,sans-serif;fill:#B6ACB1;letter-spacing:.1em}
+        .bx{fill:#fff;stroke:#EDE7E4;rx:9}
+        .tt{font:600 12.5px Pretendard,sans-serif;fill:#1B1518}
+        .st{font:400 10.5px Pretendard,sans-serif;fill:#8C8188}
+        .ed{stroke:#D9D0CC;stroke-width:1.4;fill:none;marker-end:url(#ar)}
+        .edb{stroke:#B3182C;stroke-width:1.4;fill:none;marker-end:url(#arb);stroke-dasharray:4 3}
+        .lane{stroke:#F5F1EF;stroke-width:1}
+      </style>
+
+      <!-- 단계 머리글 -->
+      <text class="ph" x="118" y="26" text-anchor="middle">① 운행</text>
+      <text class="ph" x="360" y="26" text-anchor="middle">② 마감 보완</text>
+      <text class="ph" x="600" y="26" text-anchor="middle">③ 점검·제출</text>
+      <text class="ph" x="838" y="26" text-anchor="middle">④ 결재</text>
+      <text class="ph" x="1072" y="26" text-anchor="middle">⑤ 완료</text>
+      <line class="lane" x1="238" y1="36" x2="238" y2="452"/>
+      <line class="lane" x1="482" y1="36" x2="482" y2="452"/>
+      <line class="lane" x1="720" y1="36" x2="720" y2="452"/>
+      <line class="lane" x1="958" y1="36" x2="958" y2="452"/>
+
+      <!-- 레인 이름 -->
+      <text class="ln" x="14" y="86">오너드라이버</text>
+      <text class="ln" x="14" y="206">관리자</text>
+      <text class="ln" x="14" y="316">결재자</text>
+      <text class="ln" x="14" y="416">시스템</text>
+      <line class="lane" x1="0" y1="150" x2="1180" y2="150"/>
+      <line class="lane" x1="0" y1="262" x2="1180" y2="262"/>
+      <line class="lane" x1="0" y1="360" x2="1180" y2="360"/>
+
+      <!-- ① 오너드라이버: 운행 -->
+      <rect class="bx" x="26" y="98" width="196" height="42"/>
+      <rect x="26" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
+      <text class="tt" x="42" y="117">앱이 운행을 자동 기록</text>
+      <text class="st" x="42" y="132">경로 · 거리 · 계기판 · 안전운전</text>
+
+      <!-- ② 오너드라이버: 정리 -->
+      <rect class="bx" x="252" y="98" width="212" height="42"/>
+      <rect x="252" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
+      <text class="tt" x="268" y="117">웹에서 내 운행 정리</text>
+      <text class="st" x="268" y="132">통행료 고르기 · 영수증 스캔 올리기</text>
+
+      <!-- ② 관리자: 하이패스 -->
+      <rect class="bx" x="252" y="176" width="212" height="42"/>
+      <rect x="252" y="176" width="3" height="42" fill="#2A54C6" rx="1.5"/>
+      <text class="tt" x="268" y="195">하이패스 영수증 올리기</text>
+      <text class="st" x="268" y="210">PDF → 실제 청구액으로 자동 배분</text>
+
+      <!-- ③ 시스템: 자동 점검 -->
+      <rect class="bx" x="496" y="382" width="208" height="52"/>
+      <rect x="496" y="382" width="3" height="52" fill="#8C8188" rx="1.5"/>
+      <text class="tt" x="512" y="401">자동 점검 5가지</text>
+      <text class="st" x="512" y="415">운행일지 · 통행료 · 영수증</text>
+      <text class="st" x="512" y="428">주차 · 계기판 연속성</text>
+
+      <!-- ③ 오너드라이버: 제출 -->
+      <rect class="bx" x="496" y="98" width="208" height="42"/>
+      <rect x="496" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
+      <text class="tt" x="512" y="117">제출</text>
+      <text class="st" x="512" y="132">다섯 항목이 전부 통과해야 열립니다</text>
+
+      <!-- ④ 결재자 -->
+      <rect class="bx" x="736" y="282" width="206" height="66"/>
+      <rect x="736" y="282" width="3" height="66" fill="#137A52" rx="1.5"/>
+      <text class="tt" x="752" y="301">순서대로 결재</text>
+      <text class="st" x="752" y="316">담당 → 팀장 → 실장</text>
+      <text class="st" x="752" y="329">→ 사업부장 → 대표이사</text>
+      <text class="st" x="752" y="342" fill="#B3182C">반려하면 1차부터 다시</text>
+
+      <!-- ⑤ 시스템: 문서 생성 -->
+      <rect class="bx" x="974" y="382" width="192" height="52"/>
+      <rect x="974" y="382" width="3" height="52" fill="#8C8188" rx="1.5"/>
+      <text class="tt" x="990" y="401">문서 생성·보관</text>
+      <text class="st" x="990" y="415">결재란이 채워진 엑셀</text>
+      <text class="st" x="990" y="428">이후 그 달은 잠깁니다</text>
+
+      <!-- ⑤ 오너드라이버: 출력 -->
+      <rect class="bx" x="974" y="98" width="192" height="42"/>
+      <rect x="974" y="98" width="3" height="42" fill="#A00040" rx="1.5"/>
+      <text class="tt" x="990" y="117">출력하기</text>
+      <text class="st" x="990" y="132">배너 → 한 번에 내려받기</text>
+
+      <!-- 화살표 -->
+      <path class="ed" d="M222 119 H246"/>
+      <path class="ed" d="M464 119 H490"/>
+      <path class="ed" d="M464 197 C480 197 486 160 496 138"/>
+      <path class="ed" d="M600 140 V376"/>
+      <path class="ed" d="M704 408 C726 408 730 360 738 330"/>
+      <path class="ed" d="M942 315 C960 315 966 360 1000 376"/>
+      <path class="ed" d="M1070 382 V146"/>
+      <path class="edb" d="M840 348 C840 400 660 400 604 148"/>
+      <text class="st" x="676" y="404" fill="#B3182C" text-anchor="end">반려</text>
+    </svg>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h3>양방향 동기화는 늘 돌아갑니다 <span class="tag">위 흐름과 무관하게</span></h3>
+      <div class="note sync">
+        앱에서 고치든 웹에서 고치든 <b>바뀐 것만 서로 주고받습니다.</b>
+        나중에 고친 쪽이 이기되, <b>사람이 정한 값은 기계가 덮지 않고</b>,
+        양쪽이 같은 항목을 동시에 고쳤으면 조용히 덮지 않고 <b>골라 달라고 띄웁니다.</b>
+      </div>
+      <div class="note ok" style="margin-top:12px">
+        결재가 끝난 마감분은 <b>잠깁니다.</b> 그 뒤로는 앱에서도 웹에서도 못 고칩니다 —
+        대표이사가 결재한 금액과 나중에 뽑은 금액이 달라지면 안 되니까요.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>기간이 어떻게 잡히나</h3>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>이름</th><th>실제 기간</th><th>무슨 일</th></tr></thead>
+          <tbody>
+            <tr><td>9월 마감분</td><td>08.21 ~ 09.20</td><td><span class="pill mute">운행 중</span></td></tr>
+            <tr><td>8월 마감분</td><td>07.21 ~ 08.20</td><td><span class="pill warn">마감 보완 중</span></td></tr>
+            <tr><td>7월 마감분</td><td>06.21 ~ 07.20</td><td><span class="pill info">결재 3/5단계</span></td></tr>
+            <tr><td>6월 마감분</td><td>05.21 ~ 06.20</td><td><span class="pill ok">완료 · 출력 가능</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note" style="margin-top:12px">
+        달력 월이 아니라 <b>전월 21일 00:00 ~ 당월 21일 00:00</b>(끝은 포함하지 않음)입니다.
+        안전교육 회차와 유류 분기도 같은 21일 기준으로 끊깁니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>단계별로 누가 무엇을 하나</h3>
+    <div class="tblwrap">
+      <table class="wide">
+        <thead><tr><th>단계</th><th>언제</th><th>오너드라이버</th><th>관리자</th><th>결재자</th><th>시스템</th></tr></thead>
+        <tbody>
+          <tr><td>① 운행</td><td>매일</td><td>앱이 자동 기록</td><td>—</td><td>—</td><td>경로·안전운전 계산</td></tr>
+          <tr><td>② 마감 보완</td><td>21일 이후</td><td>통행료 고르기<br>영수증 올리기</td><td>하이패스 PDF 업로드<br>이상 항목 수정</td><td>—</td><td>영수증 금액 인식<br>하이패스 자동 배분</td></tr>
+          <tr><td>③ 점검·제출</td><td>보완 끝나면</td><td><b>제출</b></td><td>부서 미제출자 독촉</td><td>—</td><td>5가지 자동 점검</td></tr>
+          <tr><td>④ 결재</td><td>제출 직후</td><td>반려 시 수정·재상신</td><td>진행 현황 관리</td><td><b>순서대로 승인/반려</b></td><td>다음 단계로 전달</td></tr>
+          <tr><td>⑤ 완료</td><td>최종 승인</td><td><b>출력하기</b></td><td>월간 리포트 발행</td><td>—</td><td>문서 생성·보관<br>배너 알림 · 마감분 잠금</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
 </main>
 </div>
 
@@ -1601,7 +1806,7 @@ footer{padding:22px;text-align:center;color:var(--muted);font-size:11.5px}
     });
   });
 
-  setRole('driver');   // 95% 가 기사다 — 기사 화면부터 보여준다
+  setRole('driver');   // 95% 가 오너드라이버다 — 그 화면부터 보여준다
 })();
 </script>
 </body>
