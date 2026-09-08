@@ -280,34 +280,171 @@ html.is-mobile #flt-toggle{ color:var(--atec-ink); background:#fff; border:1px s
 .fsec b::before{ border-radius:0; transform:none; background:var(--atec-red); width:8px; height:8px; }
 .fsec span{ color:var(--atec-gray); font-weight:400; }
 html.is-mobile .form-actions{ border-radius:0; border-top:1px solid var(--atec-line); }
+
+/* ════════════════════════════════════════════════════════════════
+   CI 레이아웃 v2 (공용) — 승인 시안: 판정 우선 · 괘선 격자 · 상자 없음 · 연한 색 띠
+   자리표시자: #rail-tabs .rtab #rail-user #rail-meta rail-wrap #m-detail #rail-kpi
+   ════════════════════════════════════════════════════════════════ */
+:root{ --ink:#111111; --gray:#5A666F; --line:#D9D9D9; --red:#D70051; --soft:#C9CED2; --tint:#F6F6F7; --tint2:#EFEFF1; --rose:#FBF1F4; }
+html, body{ background:#FFFFFF !important; }
+body{ font-size:15px; line-height:1.55; }
+.h{ font-size:16px; font-weight:700; color:var(--ink); line-height:1.3; }
+.sub{ font-size:13px; color:var(--gray); }
+
+/* ── 머리글: 로고 · 시스템명 / 요약 글자 · 이름 | 포털 | 로그아웃 ── */
+header .rail-wrap{ padding:0 24px !important; min-height:60px; gap:22px !important; flex-direction:row !important; align-items:center !important; }
+header h1{ font-size:14px !important; }
+#rail-meta{ border:0 !important; padding:0 !important; font-size:13px !important; color:var(--gray) !important; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 14px; }
+#rail-meta > div{ font-size:13px !important; color:var(--gray) !important; margin:0 !important; }
+#rail-meta > div:first-child{ color:var(--ink) !important; font-weight:500 !important; }
+#rail-user{ gap:0 !important; font-size:13.5px !important; color:var(--gray); flex-wrap:nowrap !important; padding:0 !important; }
+#rail-user > span:first-child{ color:var(--ink); font-weight:500; padding-right:6px; }
+#rail-user > span.text-\[10px\], #rail-user > span.bg-amber-300{ background:transparent !important; color:var(--gray) !important; font-weight:400 !important; font-size:13.5px !important; padding:0 14px 0 0 !important; border-radius:0 !important; }
+#rail-user a, #rail-user button{ border:0 !important; border-left:1px solid var(--line) !important; padding:0 14px !important; margin:0 !important; font-size:13.5px !important; font-weight:400 !important; color:var(--gray) !important; background:transparent !important; text-decoration:none !important; min-height:0 !important; line-height:1.3; border-radius:0 !important; }
+#rail-user a:hover, #rail-user button:hover{ color:var(--ink) !important; border-color:var(--line) !important; }
+#rail-user > :last-child{ padding-right:0 !important; }
+
+/* ── 화면 목록 띠 ── */
+#tabband{ background:var(--tint); border-bottom:1px solid var(--line); }
+#tabband > div{ max-width:1600px; margin:0 auto; padding:0 24px; }
+#rail-tabs{ margin:0 !important; border:0 !important; gap:34px !important; padding:0 !important; background:transparent !important; width:100% !important; box-shadow:none !important; }
+.rtab{ font-size:14px !important; padding:14px 0 !important; gap:0 !important; }
+.rtab::before{ margin-right:8px; }
+.rtab .rtab-ico{ display:none; }
+
+/* ── 제목 띠 ── */
+.rail-wrap.py-5{ padding-top:0 !important; padding-left:24px !important; padding-right:24px !important; }
+#ci-title{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-top:26px !important; margin-bottom:0 !important; }
+#ci-title-text{ font-size:26px !important; letter-spacing:-.01em; line-height:1.2 !important; }
+#ci-sub{ font-size:13px; color:var(--gray); margin-top:4px; min-height:1.4em; }
+.ci-rule{ margin:16px 0 0 !important; }
+
+/* ── 상자 → 괘선 구획 ── */
+.panel{ border:0 !important; padding:22px 0 18px !important; margin-bottom:0 !important; background:#fff !important; overflow:visible !important; }
+.panel-head{ font-size:16px !important; border-bottom:1px solid var(--ink); padding-bottom:8px; margin-bottom:12px; }
+.panel-dot{ display:none !important; }
+.panel-sub{ margin-left:auto; font-weight:400; }
+.grid.gap-5, .grid.gap-4{ gap:0 !important; }
+.grid > .panel{ padding:22px 32px 18px !important; border-right:1px solid var(--line) !important; min-width:0; }
+.grid > .panel:first-child{ padding-left:0 !important; }
+.grid > .panel:last-child{ border-right:0 !important; padding-right:0 !important; }
+.grid > .panel.lg\:col-span-2{ padding-left:0 !important; }
+
+/* ── 필터 띠(연회색): 첫 panel 이 분석 조건/검색 조건일 때 ── */
+.fpanel{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
+.fpanel .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }
+.fpanel .flt-label{ font-size:11.5px; }
+.fpanel .fld{ height:32px; padding:0 10px !important; font-size:13px !important; background:#fff; }
+.fpanel textarea.fld{ height:auto; }
+.fpanel .btn-ghost, .fpanel .btn-main{ height:32px; padding:0 14px !important; font-size:13px !important; display:inline-flex; align-items:center; }
+.fpanel .btn-ghost{ font-weight:500; }
+.fpanel > div[style*="border-top"]{ border-top:1px solid var(--tint2) !important; }
+.fpanel .rng-tail{ margin-top:4px; }
+.flt-chip{ background:#fff !important; color:var(--ink) !important; border:1px solid var(--ink); }
+.flt-chip button{ background:transparent !important; color:var(--ink); }
+
+/* ── KPI 한 줄 (연회색 띠, 세로 괘선) ── */
+#rail-kpi{ display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:0 !important; background:var(--tint); padding:0 16px; border-bottom:1px solid var(--ink) !important; margin:16px 0 0 !important; }
+#rail-kpi .kpi{ border:0 !important; border-right:1px solid var(--line) !important; padding:18px 24px 16px !important; background:transparent !important; }
+#rail-kpi .kpi:first-child{ padding-left:8px !important; }
+#rail-kpi .kpi:last-child{ border-right:0 !important; }
+#rail-kpi .kpi .kpi-val{ font-size:34px !important; }
+
+/* ── 차트 기준 단추 ── */
+#dim-tabs, #tj-dim{ background:transparent !important; padding:0 !important; gap:6px !important; }
+.dim-btn{ height:30px; padding:0 12px !important; font-size:13px !important; }
+
+/* ── 막대 목록 ── */
+.barrow .bar, .barrow .bar > i{ border-radius:0 !important; }
+.rounded-full.relative.overflow-hidden{ border-radius:0 !important; height:10px !important; }
+.rounded-full.relative.overflow-hidden > div{ border-radius:0 !important; background:var(--gray) !important; }
+
+/* ── 처리유형 칩 ── */
+#rail-ptype .chip, .chip{ border-radius:0 !important; }
+
+/* ── 표 ── */
+.rtbl th{ background:var(--tint) !important; padding:9px 10px !important; }
+.overflow-x-auto{ max-height:none !important; }
+.panel[style*="padding:0"]{ padding:0 !important; }
+
+/* ── 입력 폼 ── */
+.fsec{ border-top:1px solid var(--line); }
+.fld{ border-radius:0 !important; }
+.btn-main{ border-radius:0 !important; }
+
+/* ── 바닥글 ── */
+footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin-top:32px !important; max-width:none !important; }
+footer.ci-foot > *{ }
+.foot-in{ max-width:1600px; margin:0 auto; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+
+/* ── 상세 시트 ── */
+#m-detail .sheet{ border-radius:0; }
+
+/* ── 모바일 ── */
+html.is-mobile header .rail-wrap{ flex-wrap:wrap !important; min-height:0; padding:10px 14px 0 !important; gap:0 !important; }
+html.is-mobile header .rail-wrap > .flex-1{ display:none; }
+html.is-mobile header .rail-wrap > div:last-child{ width:100% !important; display:flex; flex-direction:column; align-items:stretch; gap:0; }
+html.is-mobile #rail-meta{ order:1; width:100%; padding:6px 0 4px !important; font-size:12px !important; gap:0 10px; }
+html.is-mobile #rail-meta > div{ font-size:12px !important; }
+html.is-mobile #rail-user{ order:2; width:100% !important; max-width:none !important; justify-content:space-between !important; border-top:1px solid var(--line); padding:6px 0 !important; font-size:12px !important; }
+html.is-mobile #rail-user > span:first-child{ font-weight:700; }
+html.is-mobile #rail-user a, html.is-mobile #rail-user button{ border:0 !important; padding:2px 0 !important; font-size:12px !important; }
+html.is-mobile header h1{ display:none; }
+html.is-mobile #tabband{ border-bottom:0; background:transparent; }
+html.is-mobile .rtab .rtab-ico{ display:block; }
+html.is-mobile .rtab::before{ margin:0; }
+html.is-mobile .rail-wrap.py-5{ padding-left:12px !important; padding-right:12px !important; }
+html.is-mobile #ci-title{ padding-top:12px !important; }
+html.is-mobile #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+html.is-mobile #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+html.is-mobile #ci-sub{ font-size:12.5px; }
+html.is-mobile .ci-rule{ margin-top:12px !important; }
+html.is-mobile .panel{ padding:16px 0 14px !important; }
+html.is-mobile .grid > .panel{ padding:16px 0 14px !important; border-right:0 !important; border-bottom:1px solid var(--line); }
+html.is-mobile .fpanel{ padding:12px 12px 10px !important; margin-top:12px !important; }
+html.is-mobile #rail-kpi{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; padding:0 12px; }
+html.is-mobile #rail-kpi .kpi{ padding:12px 12px !important; border-bottom:1px solid var(--line) !important; }
+html.is-mobile #rail-kpi .kpi:nth-child(odd){ padding-left:0 !important; }
+html.is-mobile #rail-kpi .kpi:nth-child(even){ border-right:0 !important; }
+html.is-mobile #rail-kpi .kpi .kpi-val{ font-size:24px !important; }
+html.is-mobile footer.ci-foot{ padding:16px 12px !important; }
+html.is-mobile .panel-head{ font-size:14px !important; }
+
+/* rail 전용 보정 */
+#tab-list > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
+#tab-list > .panel:first-child .fld{ height:32px; padding:0 10px !important; font-size:13px !important; background:#fff; }
+#tab-list > .panel:first-child .btn-ghost, #tab-list > .panel:first-child .btn-main{ height:32px; padding:0 14px !important; font-size:13px !important; display:inline-flex; align-items:center; }
+#tab-list > .panel:last-child{ padding:0 !important; margin-top:8px !important; }
+#tab-entry > .panel{ max-width:none !important; }
+#tab-entry > .panel > .grid{ gap:20px 32px !important; }
+#f-edit-banner{ border-radius:0 !important; }
+html.is-mobile #tab-list > .panel:first-child{ padding:12px 12px 10px !important; margin-top:12px !important; }
+html.is-mobile #tab-entry > .panel > .grid{ gap:14px !important; }
+html.is-mobile #tab-list .rtbl th, html.is-mobile #tab-list .rtbl td.m-keep{ background:#fff !important; }
+html.is-mobile .rng-main .btn-main{ height:44px; }
 </style>
 </head>
 <body>
 
 <!-- HEADER -->
 <header class="bg-white border-b" style="border-color:#D9D9D9">
-  <div class="rail-wrap relative max-w-[1600px] mx-auto px-4 sm:px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+  <div class="rail-wrap relative max-w-[1600px] mx-auto flex items-center gap-5">
     <div class="flex items-center gap-4 min-w-0">
       <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
       <div class="w-px h-5 hidden sm:block" style="background:#D9D9D9"></div>
       <h1 class="text-[14px] font-medium truncate" style="color:#111111">한국철도공사 광역철도 장애 관리 시스템</h1>
     </div>
     <div class="flex-1"></div>
-    <div class="flex items-center gap-2">
-      <div id="rail-meta" class="text-[12px] px-3 py-1.5 border" style="border-color:#D9D9D9;color:#111111"><div class="font-medium">불러오는 중…</div></div>
-      <div id="rail-user" class="flex items-center gap-1.5 text-xs"></div>
+    <div class="flex items-center gap-5">
+      <div id="rail-meta" class="text-[12px]"><div class="font-medium">불러오는 중…</div></div>
+      <div id="rail-user" class="flex items-center text-xs"></div>
     </div>
   </div>
 </header>
 
-<div class="rail-wrap max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
-
-  <!-- 화면 제목 (goTab 이 글자만 바꾼다) -->
-  <div id="ci-title" class="pt-1 mb-3"><div id="ci-title-text" class="text-[24px] font-bold leading-tight" style="color:#111111">현황 대시보드</div></div>
-  <div class="ci-rule mb-5"></div>
-
-  <!-- TABS -->
-  <nav id="rail-tabs" class="flex gap-1 mb-5 bg-white border border-indigo-100 rounded-xl shadow-sm p-1 w-full md:w-fit overflow-x-auto no-scrollbar">
+<!-- 화면 목록: 머리글 바로 아래 한 줄 (모바일에서는 하단 고정 탭바) -->
+<div id="tabband"><div>
+  <nav id="rail-tabs" class="flex w-full overflow-x-auto no-scrollbar">
     <button data-rtab="dash" class="rtab active">
       <svg class="rtab-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
       <span class="rtab-full">현황 대시보드</span><span class="rtab-short">대시보드</span>
@@ -321,11 +458,19 @@ html.is-mobile .form-actions{ border-radius:0; border-top:1px solid var(--atec-l
       <span class="rtab-full">장애 목록</span><span class="rtab-short">목록</span>
     </button>
   </nav>
+</div></div>
+
+<div class="rail-wrap max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
+
+  <!-- 화면 제목 + 설명 (goTab 이 글자만 바꾼다) -->
+  <div id="ci-title"><div class="min-w-0"><div id="ci-title-text" class="font-bold" style="color:#111111">현황 대시보드</div><div id="ci-sub">조건을 고르면 아래 전체가 함께 바뀝니다.</div></div></div>
+  <div class="ci-rule"></div>
+
 
   <!-- ============ DASHBOARD ============ -->
   <section id="tab-dash">
     <!-- 통합 필터 바 -->
-    <div class="panel mb-5" style="padding:16px 18px">
+    <div class="panel fpanel mb-5">
       <div class="flex items-center justify-between mb-3">
         <div class="panel-head" style="margin-bottom:0"><span class="panel-dot"></span>분석 조건<span class="panel-sub">선택 시 대시보드 전체가 갱신됩니다</span></div>
         <button onclick="resetFilters()" class="text-[12px] font-semibold text-slate-400 hover:text-indigo-600 transition flex items-center gap-1 whitespace-nowrap">
@@ -577,9 +722,11 @@ html.is-mobile .form-actions{ border-radius:0; border-top:1px solid var(--atec-l
 
 </div>
 
-<footer class="ci-foot max-w-[1600px] mx-auto px-4 sm:px-5 py-4 mt-6 flex items-center justify-between gap-4 flex-wrap">
+<footer class="ci-foot">
+<div class="foot-in">
   <div>ATEC 에이텍모빌리티 · 한국철도공사 광역철도 장애 관리 시스템 · 데이터는 브라우저 내에서만 처리됩니다</div>
   <div class="font-medium">정도 · 혁신 · 협업</div>
+</div>
 </footer>
 
 <script id="rail-embedded-data" type="application/x-rail-disabled" data-note="원본 임베드 데이터(제어문자 포함)는 비활성화됨. 데이터는 rail_stations.json / rail_faults.json / rail_meta.json 에서 로드합니다.">
@@ -1332,7 +1479,7 @@ function drawDimChart(F){
     data:{labels:entries.map(e=>e[0]),datasets:[{
       data:entries.map(e=>e[1]),
       backgroundColor:(c)=>{ const {ctx,chartArea}=c.chart; if(isLine){ return LINE_COLORS[entries[c.dataIndex][0]]||'#5A666F'; } return hGrad(ctx,chartArea,'#5A666F','#5A666F'); },
-      borderRadius:7, borderSkipped:false, maxBarThickness:26,
+      borderRadius:0, borderSkipped:false, maxBarThickness:26,
       hoverBackgroundColor:(c)=>{ if(isLine){ return LINE_COLORS[entries[c.dataIndex][0]]||'#5A666F'; } return '#5A666F'; }
     }]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
@@ -1508,6 +1655,7 @@ function downloadExcel(src){
 function goTab(t){
   $$('.rtab').forEach(b=>b.classList.toggle('active', b.dataset.rtab===t));
   { const tt=$('#ci-title-text'); if(tt) tt.textContent={dash:'현황 대시보드',entry:'장애 입력',list:'장애 목록'}[t]||''; }
+  { const ss=$('#ci-sub'); if(ss) ss.textContent={dash:'조건을 고르면 아래 전체가 함께 바뀝니다.',entry:'현장에서 처리한 장애를 등록합니다. 접수 정보만으로도 저장할 수 있습니다.',list:'기간·역·모듈로 찾고 엑셀로 내려받습니다.'}[t]||''; }
   $('#tab-dash').classList.toggle('hidden', t!=='dash');
   $('#tab-entry').classList.toggle('hidden', t!=='entry');
   $('#tab-list').classList.toggle('hidden', t!=='list');

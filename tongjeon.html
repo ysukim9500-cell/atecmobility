@@ -256,13 +256,165 @@ html.is-mobile #tj-meta{ border:1px solid var(--atec-line) !important; }
 html.is-mobile #tj-user{ padding:0 !important; }
 html.is-mobile .tj-hdr-sub{ display:none !important; }
 html.is-mobile #ci-title-text{ font-size:20px; }
+
+/* ════════════════════════════════════════════════════════════════
+   CI 레이아웃 v2 (공용) — 승인 시안: 판정 우선 · 괘선 격자 · 상자 없음 · 연한 색 띠
+   자리표시자: #tj-tabs .rtab #tj-user #tj-meta tj-wrap #tj-sheet #tj-kpi
+   ════════════════════════════════════════════════════════════════ */
+:root{ --ink:#111111; --gray:#5A666F; --line:#D9D9D9; --red:#D70051; --soft:#C9CED2; --tint:#F6F6F7; --tint2:#EFEFF1; --rose:#FBF1F4; }
+html, body{ background:#FFFFFF !important; }
+body{ font-size:15px; line-height:1.55; }
+.h{ font-size:16px; font-weight:700; color:var(--ink); line-height:1.3; }
+.sub{ font-size:13px; color:var(--gray); }
+
+/* ── 머리글: 로고 · 시스템명 / 요약 글자 · 이름 | 포털 | 로그아웃 ── */
+header .tj-wrap{ padding:0 24px !important; min-height:60px; gap:22px !important; flex-direction:row !important; align-items:center !important; }
+header h1{ font-size:14px !important; }
+#tj-meta{ border:0 !important; padding:0 !important; font-size:13px !important; color:var(--gray) !important; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 14px; }
+#tj-meta > div{ font-size:13px !important; color:var(--gray) !important; margin:0 !important; }
+#tj-meta > div:first-child{ color:var(--ink) !important; font-weight:500 !important; }
+#tj-user{ gap:0 !important; font-size:13.5px !important; color:var(--gray); flex-wrap:nowrap !important; padding:0 !important; }
+#tj-user > span:first-child{ color:var(--ink); font-weight:500; padding-right:6px; }
+#tj-user > span.text-\[10px\], #tj-user > span.bg-amber-300{ background:transparent !important; color:var(--gray) !important; font-weight:400 !important; font-size:13.5px !important; padding:0 14px 0 0 !important; border-radius:0 !important; }
+#tj-user a, #tj-user button{ border:0 !important; border-left:1px solid var(--line) !important; padding:0 14px !important; margin:0 !important; font-size:13.5px !important; font-weight:400 !important; color:var(--gray) !important; background:transparent !important; text-decoration:none !important; min-height:0 !important; line-height:1.3; border-radius:0 !important; }
+#tj-user a:hover, #tj-user button:hover{ color:var(--ink) !important; border-color:var(--line) !important; }
+#tj-user > :last-child{ padding-right:0 !important; }
+
+/* ── 화면 목록 띠 ── */
+#tabband{ background:var(--tint); border-bottom:1px solid var(--line); }
+#tabband > div{ max-width:1600px; margin:0 auto; padding:0 24px; }
+#tj-tabs{ margin:0 !important; border:0 !important; gap:34px !important; padding:0 !important; background:transparent !important; width:100% !important; box-shadow:none !important; }
+.rtab{ font-size:14px !important; padding:14px 0 !important; gap:0 !important; }
+.rtab::before{ margin-right:8px; }
+.rtab .rtab-ico{ display:none; }
+
+/* ── 제목 띠 ── */
+.tj-wrap.py-5{ padding-top:0 !important; padding-left:24px !important; padding-right:24px !important; }
+#ci-title{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-top:26px !important; margin-bottom:0 !important; }
+#ci-title-text{ font-size:26px !important; letter-spacing:-.01em; line-height:1.2 !important; }
+#ci-sub{ font-size:13px; color:var(--gray); margin-top:4px; min-height:1.4em; }
+.ci-rule{ margin:16px 0 0 !important; }
+
+/* ── 상자 → 괘선 구획 ── */
+.panel{ border:0 !important; padding:22px 0 18px !important; margin-bottom:0 !important; background:#fff !important; overflow:visible !important; }
+.panel-head{ font-size:16px !important; border-bottom:1px solid var(--ink); padding-bottom:8px; margin-bottom:12px; }
+.panel-dot{ display:none !important; }
+.panel-sub{ margin-left:auto; font-weight:400; }
+.grid.gap-5, .grid.gap-4{ gap:0 !important; }
+.grid > .panel{ padding:22px 32px 18px !important; border-right:1px solid var(--line) !important; min-width:0; }
+.grid > .panel:first-child{ padding-left:0 !important; }
+.grid > .panel:last-child{ border-right:0 !important; padding-right:0 !important; }
+.grid > .panel.lg\:col-span-2{ padding-left:0 !important; }
+
+/* ── 필터 띠(연회색): 첫 panel 이 분석 조건/검색 조건일 때 ── */
+.fpanel{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
+.fpanel .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }
+.fpanel .flt-label{ font-size:11.5px; }
+.fpanel .fld{ height:32px; padding:0 10px !important; font-size:13px !important; background:#fff; }
+.fpanel textarea.fld{ height:auto; }
+.fpanel .btn-ghost, .fpanel .btn-main{ height:32px; padding:0 14px !important; font-size:13px !important; display:inline-flex; align-items:center; }
+.fpanel .btn-ghost{ font-weight:500; }
+.fpanel > div[style*="border-top"]{ border-top:1px solid var(--tint2) !important; }
+.fpanel .rng-tail{ margin-top:4px; }
+.flt-chip{ background:#fff !important; color:var(--ink) !important; border:1px solid var(--ink); }
+.flt-chip button{ background:transparent !important; color:var(--ink); }
+
+/* ── KPI 한 줄 (연회색 띠, 세로 괘선) ── */
+#tj-kpi{ display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:0 !important; background:var(--tint); padding:0 16px; border-bottom:1px solid var(--ink) !important; margin:16px 0 0 !important; }
+#tj-kpi .kpi{ border:0 !important; border-right:1px solid var(--line) !important; padding:18px 24px 16px !important; background:transparent !important; }
+#tj-kpi .kpi:first-child{ padding-left:8px !important; }
+#tj-kpi .kpi:last-child{ border-right:0 !important; }
+#tj-kpi .kpi .kpi-val{ font-size:34px !important; }
+
+/* ── 차트 기준 단추 ── */
+#dim-tabs, #tj-dim{ background:transparent !important; padding:0 !important; gap:6px !important; }
+.dim-btn{ height:30px; padding:0 12px !important; font-size:13px !important; }
+
+/* ── 막대 목록 ── */
+.barrow .bar, .barrow .bar > i{ border-radius:0 !important; }
+.rounded-full.relative.overflow-hidden{ border-radius:0 !important; height:10px !important; }
+.rounded-full.relative.overflow-hidden > div{ border-radius:0 !important; background:var(--gray) !important; }
+
+/* ── 처리유형 칩 ── */
+#rail-ptype .chip, .chip{ border-radius:0 !important; }
+
+/* ── 표 ── */
+.rtbl th{ background:var(--tint) !important; padding:9px 10px !important; }
+.overflow-x-auto{ max-height:none !important; }
+.panel[style*="padding:0"]{ padding:0 !important; }
+
+/* ── 입력 폼 ── */
+.fsec{ border-top:1px solid var(--line); }
+.fld{ border-radius:0 !important; }
+.btn-main{ border-radius:0 !important; }
+
+/* ── 바닥글 ── */
+footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin-top:32px !important; max-width:none !important; }
+footer.ci-foot > *{ }
+.foot-in{ max-width:1600px; margin:0 auto; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+
+/* ── 상세 시트 ── */
+#tj-sheet .sheet{ border-radius:0; }
+
+/* ── 모바일 ── */
+html.is-mobile header .tj-wrap{ flex-wrap:wrap !important; min-height:0; padding:10px 14px 0 !important; gap:0 !important; }
+html.is-mobile header .tj-wrap > .flex-1{ display:none; }
+html.is-mobile header .tj-wrap > div:last-child{ width:100% !important; display:flex; flex-direction:column; align-items:stretch; gap:0; }
+html.is-mobile #tj-meta{ order:1; width:100%; padding:6px 0 4px !important; font-size:12px !important; gap:0 10px; }
+html.is-mobile #tj-meta > div{ font-size:12px !important; }
+html.is-mobile #tj-user{ order:2; width:100% !important; max-width:none !important; justify-content:space-between !important; border-top:1px solid var(--line); padding:6px 0 !important; font-size:12px !important; }
+html.is-mobile #tj-user > span:first-child{ font-weight:700; }
+html.is-mobile #tj-user a, html.is-mobile #tj-user button{ border:0 !important; padding:2px 0 !important; font-size:12px !important; }
+html.is-mobile header h1{ display:none; }
+html.is-mobile #tabband{ border-bottom:0; background:transparent; }
+html.is-mobile .rtab .rtab-ico{ display:block; }
+html.is-mobile .rtab::before{ margin:0; }
+html.is-mobile .tj-wrap.py-5{ padding-left:12px !important; padding-right:12px !important; }
+html.is-mobile #ci-title{ padding-top:12px !important; }
+html.is-mobile #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+html.is-mobile #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+html.is-mobile #ci-sub{ font-size:12.5px; }
+html.is-mobile .ci-rule{ margin-top:12px !important; }
+html.is-mobile .panel{ padding:16px 0 14px !important; }
+html.is-mobile .grid > .panel{ padding:16px 0 14px !important; border-right:0 !important; border-bottom:1px solid var(--line); }
+html.is-mobile .fpanel{ padding:12px 12px 10px !important; margin-top:12px !important; }
+html.is-mobile #tj-kpi{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; padding:0 12px; }
+html.is-mobile #tj-kpi .kpi{ padding:12px 12px !important; border-bottom:1px solid var(--line) !important; }
+html.is-mobile #tj-kpi .kpi:nth-child(odd){ padding-left:0 !important; }
+html.is-mobile #tj-kpi .kpi:nth-child(even){ border-right:0 !important; }
+html.is-mobile #tj-kpi .kpi .kpi-val{ font-size:24px !important; }
+html.is-mobile footer.ci-foot{ padding:16px 12px !important; }
+html.is-mobile .panel-head{ font-size:14px !important; }
+
+/* 통전망 전용 보정 */
+#tab-dash > .panel:first-child, #tab-faults > .panel:first-child, #tab-stock > .panel:first-child, #tab-repairs > .panel:first-child, #tab-terminals > .panel:first-child, #tab-equip > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
+#tab-dash > .panel:first-child .panel-head, #tab-faults > .panel:first-child .panel-head, #tab-stock > .panel:first-child .panel-head, #tab-repairs > .panel:first-child .panel-head, #tab-terminals > .panel:first-child .panel-head, #tab-equip > .panel:first-child .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }
+#tab-faults > .panel:first-child .fld, #tab-stock > .panel:first-child .fld, #tab-repairs > .panel:first-child .fld, #tab-terminals > .panel:first-child .fld, #tab-equip > .panel:first-child .fld, #tab-dash > .panel:first-child .fld{ height:32px; padding:0 10px !important; font-size:13px !important; background:#fff; }
+#tab-faults > .panel:first-child .btn-main, #tab-stock > .panel:first-child .btn-main, #tab-repairs > .panel:first-child .btn-main, #tab-terminals > .panel:first-child .btn-main, #tab-dash > .panel:first-child .btn-main,
+#tab-faults > .panel:first-child .btn-ghost, #tab-stock > .panel:first-child .btn-ghost, #tab-repairs > .panel:first-child .btn-ghost, #tab-terminals > .panel:first-child .btn-ghost, #tab-dash > .panel:first-child .btn-ghost{ height:32px; padding:0 14px !important; font-size:13px !important; display:inline-flex; align-items:center; }
+.panel.tj-form{ background:#fff !important; padding:22px 0 18px !important; max-width:none !important; }
+.panel.tj-form > .grid{ gap:20px 32px !important; }
+.m-list > .panel, .panel[style*="padding:0"]{ padding:0 !important; margin-top:8px !important; }
+#s-low-box .panel{ padding:14px 16px !important; background:var(--rose) !important; margin-top:8px !important; }
+#s-low-box .panel-head{ border-bottom:0; }
+#e-body .panel{ padding:18px 0 14px !important; }
+#tj-kpi{ margin-top:16px !important; }
+#dim-list{ padding:0 !important; }
+.barrow .rk{ color:var(--gray); }
+.barrow .bar{ height:10px !important; background:#F2F2F2 !important; }
+.barrow .bar > i{ background:var(--gray) !important; }
+.more-item{ border-bottom:1px solid var(--line); }
+html.is-mobile #tab-dash > .panel:first-child, html.is-mobile #tab-faults > .panel:first-child, html.is-mobile #tab-stock > .panel:first-child, html.is-mobile #tab-repairs > .panel:first-child, html.is-mobile #tab-terminals > .panel:first-child, html.is-mobile #tab-equip > .panel:first-child{ padding:12px 12px 10px !important; margin-top:12px !important; }
+html.is-mobile .panel.tj-form > .grid{ gap:14px !important; }
+html.is-mobile #tj-meta{ border:0 !important; }
+html.is-mobile .m-list .rtbl th.m-keep, html.is-mobile .m-list .rtbl td.m-keep{ background:#fff !important; }
 </style>
 </head>
 <body>
 
 <!-- ══════════ HEADER ══════════ -->
 <header class="bg-white border-b" style="border-color:#D9D9D9">
-  <div class="tj-wrap relative max-w-[1600px] mx-auto px-4 sm:px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+  <div class="tj-wrap relative max-w-[1600px] mx-auto flex items-center gap-5">
     <div class="flex items-center gap-4 min-w-0">
       <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
       <div class="w-px h-5 hidden sm:block" style="background:#D9D9D9"></div>
@@ -270,21 +422,16 @@ html.is-mobile #ci-title-text{ font-size:20px; }
       <p class="tj-hdr-sub text-[12px] hidden lg:block truncate" style="color:#5A666F">버스터미널 장애·자재·장비·수리를 한 곳에서 관리합니다.</p>
     </div>
     <div class="flex-1"></div>
-    <div class="flex items-center gap-2">
-      <div id="tj-meta" class="text-[12px] px-3 py-1.5 border" style="border-color:#D9D9D9;color:#111111"><div class="font-medium">불러오는 중…</div></div>
-      <div id="tj-user" class="flex items-center gap-1.5 text-xs"></div>
+    <div class="flex items-center gap-5">
+      <div id="tj-meta" class="text-[12px]"><div class="font-medium">불러오는 중…</div></div>
+      <div id="tj-user" class="flex items-center text-xs"></div>
     </div>
   </div>
 </header>
 
-<div class="tj-wrap max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
-
-  <!-- 화면 제목 (TJ.tab 이 글자만 바꾼다) -->
-  <div id="ci-title" class="pt-1 mb-3"><div id="ci-title-text" class="text-[24px] font-bold leading-tight" style="color:#111111">현황 대시보드</div></div>
-  <div class="ci-rule mb-5"></div>
-
-  <!-- ══════════ TABS ══════════ -->
-  <nav id="tj-tabs" class="flex gap-1 mb-5 bg-white border rounded-xl shadow-sm p-1 w-full md:w-fit overflow-x-auto no-scrollbar" style="border-color:#e0eeec">
+<!-- 화면 목록: 머리글 바로 아래 한 줄 (모바일에서는 하단 고정 탭바) -->
+<div id="tabband"><div>
+  <nav id="tj-tabs" class="flex w-full overflow-x-auto no-scrollbar">
     <button data-tab="dash" class="rtab active">
       <svg class="rtab-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
       <span class="rtab-full">현황 대시보드</span><span class="rtab-short">현황</span>
@@ -314,6 +461,14 @@ html.is-mobile #ci-title-text{ font-size:20px; }
       <span class="rtab-short">더보기</span>
     </button>
   </nav>
+</div></div>
+
+<div class="tj-wrap max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
+
+  <!-- 화면 제목 + 설명 (TJ.tab 이 글자만 바꾼다) -->
+  <div id="ci-title"><div class="min-w-0"><div id="ci-title-text" class="font-bold" style="color:#111111">현황 대시보드</div><div id="ci-sub">기간을 고르면 아래 전체가 함께 바뀝니다.</div></div></div>
+  <div class="ci-rule"></div>
+
 
   <section id="tab-dash"></section>
   <section id="tab-faults" class="hidden"></section>
@@ -323,9 +478,11 @@ html.is-mobile #ci-title-text{ font-size:20px; }
   <section id="tab-terminals" class="hidden"></section>
 </div>
 
-<footer class="ci-foot max-w-[1600px] mx-auto px-4 sm:px-5 py-4 mt-6 flex items-center justify-between gap-4 flex-wrap">
+<footer class="ci-foot">
+<div class="foot-in">
   <div>ATEC 에이텍모빌리티 · 통전망 운영관리 시스템 · 버스터미널 장애·자재·장비·수리</div>
   <div class="font-medium">정도 · 혁신 · 협업</div>
+</div>
 </footer>
 
 <!-- 모바일 상세·더보기 시트 -->
