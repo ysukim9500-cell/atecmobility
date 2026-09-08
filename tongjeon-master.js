@@ -131,7 +131,7 @@
       '<div class="mb-3"><label class="fld-label">구분 <span class="text-[11px] text-slate-400">(여러 개 선택 가능)</span></label>' +
         '<div class="flex flex-wrap gap-2 mt-1">' + KINDS.map(function (k) {
           var on = t && (t.kinds || []).indexOf(k) >= 0;
-          return '<label class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-lg border" style="border-color:#d3e3e1">' +
+          return '<label class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-lg border" style="border-color:#C9CED2">' +
             '<input type="checkbox" class="tm-kind" value="' + k + '"' + (on ? ' checked' : '') + '>' + k + '</label>';
         }).join('') + '</div></div>' +
       '<div class="mb-1"><label class="fld-label">비고</label><input id="tm-note" class="fld" value="' + (t ? TJ.esc(t.note || '') : '') + '"></div>';
@@ -149,8 +149,8 @@
       var hit = tRows.find(function (x) { return normKey(x.name) === key && x.id !== id; }) ||
                 (hitId && hitId !== id ? tRows.find(function (x) { return x.id === hitId; }) : null);
       box.innerHTML = hit
-        ? '<span style="color:#B45309">⚠ 이미 등록된 터미널과 같아 보입니다: <b>' + TJ.esc(hit.name) + '</b></span>'
-        : '<span style="color:#0D9488">사용할 수 있는 이름입니다</span>';
+        ? '<span style="color:#8C6D2F">⚠ 이미 등록된 터미널과 같아 보입니다: <b>' + TJ.esc(hit.name) + '</b></span>'
+        : '<span style="color:#5A666F">사용할 수 있는 이름입니다</span>';
     });
   }
 

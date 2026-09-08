@@ -47,10 +47,10 @@
     '<div class="panel">' +
       '<div class="flex items-center justify-between flex-wrap gap-2 mb-3">' +
         '<div class="panel-head" style="margin-bottom:0"><span class="panel-dot"></span><span id="dim-title">접수구분별</span> 장애 건수<span class="panel-sub">기준 선택</span></div>' +
-        '<div id="tj-dim" class="flex items-center gap-1 rounded-lg p-1 flex-wrap" style="background:#eef8f7">' +
+        '<div id="tj-dim" class="flex items-center gap-1 p-0 flex-wrap">' +
           DIMS.map(function (d) {
             return '<button data-dim="' + d[0] + '" class="dim-btn text-[12px] font-bold px-2.5 py-1 rounded-md' +
-              (d[0] === DIM ? ' active' : '') + '" style="' + (d[0] === DIM ? 'background:#0D9488;color:#fff' : 'color:#0D9488') + '">' + d[1] + '</button>';
+              (d[0] === DIM ? ' active' : '') + '" style="' + (d[0] === DIM ? '' : '') + '">' + d[1] + '</button>';
           }).join('') +
         '</div>' +
       '</div>' +
@@ -133,10 +133,10 @@
     document.getElementById('d-summary').textContent = label + ' · ' + TJ.num(rows.length) + '건';
 
     document.getElementById('tj-kpi').innerHTML = [
-      ['접수 건수', TJ.num(rows.length), '#0D9488', label],
-      ['미처리', TJ.num(open), open > 0 ? '#EA580C' : '#0D9488', '접수 + 진행중'],
-      ['평균 처리기간', avg + (avg === '-' ? '' : '일'), '#0F5A54', '접수 → 조치'],
-      ['운영 터미널', TJ.num(Object.keys(tmap).length), '#14B8A6', '명부 등록 기준']
+      ['접수 건수', TJ.num(rows.length), '#111111', label],
+      ['미처리', TJ.num(open), open > 0 ? '#D70051' : '#111111', '접수 + 진행중'],
+      ['평균 처리기간', avg + (avg === '-' ? '' : '일'), '#111111', '접수 → 조치'],
+      ['운영 터미널', TJ.num(Object.keys(tmap).length), '#111111', '명부 등록 기준']
     ].map(function (k) {
       return '<div class="kpi"><div class="kpi-label">' + k[0] + '</div>' +
         '<div class="kpi-val" style="color:' + k[2] + '">' + k[1] + '</div>' +
@@ -165,7 +165,7 @@
       if (box) box.style.height = Math.max(320, top.length * 26 + 40) + 'px';
       charts.dim = new Chart(document.getElementById('ch-dim'), {
         type: 'bar',
-        data: { labels: top.map(function (e) { return e[0]; }), datasets: [{ data: top.map(function (e) { return e[1]; }), backgroundColor: '#0D9488', borderRadius: 7, maxBarThickness: 26 }] },
+        data: { labels: top.map(function (e) { return e[0]; }), datasets: [{ data: top.map(function (e) { return e[1]; }), backgroundColor: '#5A666F', borderRadius: 0, maxBarThickness: 22 }] },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 28 } },
           plugins: {
@@ -175,12 +175,12 @@
                                     label: function (c) { return TJ.num(c.parsed.x) + '건'; } } }
           },
           scales: {
-            x: { beginAtZero: true, grid: { color: '#eef6f5' }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
+            x: { beginAtZero: true, grid: { color: '#EDEDED' }, ticks: { font: { size: 11 }, color: '#5A666F' } },
             y: {
               grid: { display: false },
               ticks: {
                 autoSkip: false,                       // 이름을 건너뛰지 않는다
-                font: { size: 12, weight: '600' }, color: '#475569',
+                font: { size: 12, weight: '500' }, color: '#111111',
                 callback: function (v) {               // 너무 길면 줄여서 겹침을 막는다
                   var s = this.getLabelForValue ? this.getLabelForValue(v) : top[v] && top[v][0];
                   s = String(s == null ? '' : s);
@@ -225,14 +225,14 @@
       data: {
         labels: labels.map(function (l) { return l.slice(2).replace('-', '.'); }),
         datasets: [{ data: labels.map(function (k) { return m[k]; }), fill: true, tension: .38,
-          borderColor: '#0D9488', borderWidth: 3, backgroundColor: 'rgba(13,148,136,.15)',
-          pointBackgroundColor: '#fff', pointBorderColor: '#0D9488', pointBorderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6 }]
+          borderColor: '#5A666F', borderWidth: 2.5, backgroundColor: 'rgba(90,102,111,.10)',
+          pointBackgroundColor: '#fff', pointBorderColor: '#5A666F', pointBorderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return TJ.num(c.parsed.y) + '건'; } } } },
-        scales: { y: { beginAtZero: true, grid: { color: '#eef6f5' }, ticks: { font: { size: 11 }, color: '#94a3b8' } },
-                  x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#94a3b8' } } }
+        scales: { y: { beginAtZero: true, grid: { color: '#EDEDED' }, ticks: { font: { size: 11 }, color: '#5A666F' } },
+                  x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#5A666F' } } }
       }
     });
   }
@@ -243,7 +243,7 @@
       DIM = b.dataset.dim;
       document.querySelectorAll('#tj-dim .dim-btn').forEach(function (x) {
         var on = x.dataset.dim === DIM;
-        x.style.cssText = on ? 'background:#0D9488;color:#fff' : 'color:#0D9488';
+        x.style.cssText = on ? '' : '';
       });
       TJ.master.terminals().then(function (ts) { drawDim(DATA || [], TJ.indexBy(ts, 'id')); });
     });

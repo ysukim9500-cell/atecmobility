@@ -73,7 +73,7 @@
     document.getElementById('s-rows').innerHTML = view.length ? view.map(function (x) {
       return '<tr>' +
         '<td class="whitespace-nowrap">' + TJ.esc(x.org) + '</td>' +
-        '<td class="font-semibold">' + TJ.esc(x.part) + (x.low ? ' <span class="chip" style="background:#fef3c7;color:#92400e">부족</span>' : '') + '</td>' +
+        '<td class="font-semibold">' + TJ.esc(x.part) + (x.low ? ' <span class="chip" style="background:#F2F2F2;color:#8C6D2F">부족</span>' : '') + '</td>' +
         '<td style="text-align:right" class="tabular font-bold' + (x.low ? ' text-amber-600' : '') + '">' + TJ.num(x.good) + '</td>' +
         '<td style="text-align:right" class="tabular">' + TJ.num(x.bad) + '</td>' +
         '<td style="text-align:right" class="tabular">' + TJ.num(x.out) + '</td>' +
@@ -84,10 +84,10 @@
 
     var lows = list.filter(function (x) { return x.low && x.good <= 0; });
     document.getElementById('s-low-box').innerHTML = lows.length ?
-      '<div class="panel" style="border-color:#fcd9a4;background:#fffbeb">' +
-        '<div class="panel-head" style="color:#B45309"><span class="panel-dot" style="background:#F59E0B"></span>양품이 없는 자재 ' + lows.length + '건</div>' +
+      '<div class="panel" style="border-color:#8C6D2F;background:#fff">' +
+        '<div class="panel-head" style="color:#8C6D2F;border-bottom-color:#8C6D2F"><span class="panel-dot" style="background:#8C6D2F"></span>양품이 없는 자재 ' + lows.length + '건</div>' +
         '<div class="flex flex-wrap gap-1.5">' + lows.slice(0, 30).map(function (x) {
-          return '<span class="chip" style="background:#fef3c7;color:#92400e">' + TJ.esc(x.org) + ' · ' + TJ.esc(x.part) + '</span>';
+          return '<span class="chip" style="background:#F2F2F2;color:#8C6D2F">' + TJ.esc(x.org) + ' · ' + TJ.esc(x.part) + '</span>';
         }).join('') + '</div></div>' : '';
   }
 
@@ -226,8 +226,8 @@
         .then(function (ms) {
           var body = ms.length ? ms.map(function (m) {
             return '<div class="drow"><span class="dl">' + TJ.esc((m.at || '').slice(0, 10)) + ' · ' + TJ.esc(m.reason) + '</span>' +
-              '<span class="dv">' + TJ.esc(m.state) + ' <b style="color:' + (m.qty < 0 ? '#dc2626' : '#0D9488') + '">' +
-              (m.qty > 0 ? '+' : '') + m.qty + '</b>' + (m.note ? '<br><span style="font-size:11.5px;color:#94a3b8">' + TJ.esc(m.note) + '</span>' : '') + '</span></div>';
+              '<span class="dv">' + TJ.esc(m.state) + ' <b style="color:' + (m.qty < 0 ? '#D70051' : '#111111') + '">' +
+              (m.qty > 0 ? '+' : '') + m.qty + '</b>' + (m.note ? '<br><span style="font-size:11.5px;color:#5A666F">' + TJ.esc(m.note) + '</span>' : '') + '</span></div>';
           }).join('') : '<div class="text-[13px] text-slate-400 py-4">이력이 없습니다.</div>';
           TJ.openSheet('재고 이력', body, '<button class="btn-ghost px-4 py-2" onclick="TJ.closeSheet()">닫기</button>');
         }).catch(function (e) { TJ.toast(e.message || '이력을 불러오지 못했습니다.', false); });

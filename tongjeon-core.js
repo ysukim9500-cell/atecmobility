@@ -123,12 +123,12 @@ window.TJ = (function () {
     if (!t) {
       t = document.createElement('div'); t.id = 'tj-toast';
       t.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px);z-index:99999;' +
-        'padding:13px 24px;border-radius:13px;font-weight:800;font-size:15px;color:#fff;' +
-        'box-shadow:0 14px 36px -8px rgba(0,0,0,.5);opacity:0;transition:opacity .25s,transform .25s;' +
+        'padding:13px 24px;border-radius:0;font-weight:700;font-size:15px;color:#fff;' +
+        'box-shadow:none;opacity:0;transition:opacity .25s,transform .25s;' +
         'pointer-events:none;max-width:90vw;text-align:center';
       document.body.appendChild(t);
     }
-    t.style.background = (ok === false) ? '#dc2626' : '#0D9488';
+    t.style.background = (ok === false) ? '#D70051' : '#111111';
     t.textContent = text;
     requestAnimationFrame(function () { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
     clearTimeout(t._h);
@@ -168,7 +168,7 @@ window.TJ = (function () {
     openSheet('더보기', items.map(function (it) {
       return '<button class="more-item" onclick="TJ.closeSheet();TJ.tab(\'' + it[0] + '\')">' +
         '<svg viewBox="0 0 24 24" fill="none">' + it[2] + '</svg>' + it[1] +
-        '<span style="margin-left:auto;color:#C7CAD6">›</span></button>';
+        '<span style="margin-left:auto;color:#9AA3AA">›</span></button>';
     }).join(''), '');
   }
 
@@ -179,6 +179,8 @@ window.TJ = (function () {
     CUR = name;
     var btns = document.querySelectorAll('#tj-tabs .rtab');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].dataset.tab === name);
+    var tt = document.getElementById('ci-title-text');
+    if (tt) tt.textContent = { dash: '현황 대시보드', faults: '장애 관리', stock: '자재 재고', repairs: '수리 관리', equip: '장비 현황', terminals: '터미널 명부' }[name] || '';
     ['dash', 'faults', 'stock', 'repairs', 'equip', 'terminals'].forEach(function (t) {
       document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
@@ -196,8 +198,8 @@ window.TJ = (function () {
     document.getElementById('tj-user').innerHTML =
       '<span class="font-semibold">' + esc(profile.name) + '</span>' +
       (profile.role === 'admin' ? '<span class="text-[10px] bg-amber-300 text-amber-900 font-bold rounded px-1.5 py-0.5">관리자</span>' : '') +
-      '<a href="index.html" class="ml-1 text-[11px] underline decoration-white/40">포털</a>' +
-      '<button onclick="TJ.logout()" class="ml-1 text-[11px] underline decoration-white/40">로그아웃</button>';
+      '<a href="index.html" class="ml-1 text-[11px]">포털</a>' +
+      '<button onclick="TJ.logout()" class="ml-1 text-[11px]">로그아웃</button>';
 
     document.querySelectorAll('#tj-tabs .rtab[data-tab]').forEach(function (b) {
       b.addEventListener('click', function () { tab(b.dataset.tab); });
@@ -222,7 +224,7 @@ window.TJ = (function () {
       .then(function (c) {
         document.getElementById('tj-meta').innerHTML =
           '<div class="font-bold">장애 ' + num(c[0]) + '건 · 터미널 ' + num(cache.terminals.length) + '개</div>' +
-          '<div class="text-teal-100/80 mt-0.5">미처리 ' + num(c[1]) + '건</div>';
+          '<div class="mt-0.5" style="color:#5A666F">미처리 ' + num(c[1]) + '건</div>';
         tab('dash');
       })
       .catch(function (e) {

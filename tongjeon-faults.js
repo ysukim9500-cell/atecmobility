@@ -288,7 +288,7 @@
   function save() {
     if (busy) return;                       // 두 번 눌러 중복 저장되는 것을 막는다
     var msg = document.getElementById('x-msg');
-    var set = function (t, ok) { msg.textContent = t; msg.style.color = ok ? '#16A34A' : '#B91C1C'; };
+    var set = function (t, ok) { msg.textContent = t; msg.style.color = ok ? '#5A666F' : '#D70051'; };
     var val = function (id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; };
 
     var received = val('x-received'), terminal = val('x-terminal'), intake = val('x-intake');
