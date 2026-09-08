@@ -801,9 +801,14 @@ html.force-mobile .kv .v{ font-size:15px; }
 html.force-mobile .kv > div{ gap:8px; }
 @media (max-width:767px){ html:not(.force-web) .kv.vstat-row{ display:flex !important; grid-template-columns:none !important; gap:0 !important; } }
 html.force-mobile .kv.vstat-row{ display:flex !important; grid-template-columns:none !important; gap:0 !important; }
+
+/* 바탕은 흰색 하나. 머리글·탭 띠·본문이 같은 폭(1600 + 24px)으로 정렬된다 */
+html, body, #app-root{ background:#FFFFFF !important; }
+#tabband{ background:#FFFFFF; }
+.atec-header > div, #tabband > div{ max-width:1600px; }
 </style>
 </head>
-<body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #F2F2F2, transparent), #F2F2F2;">
+<body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
 
 <!-- ============ CLOUD LOADER (ATEC CI) ============ -->
 <div id="cloud-loader" aria-hidden="true">
