@@ -213,13 +213,33 @@
     }).catch(function () { return { error: '서버에 연결하지 못했습니다.' }; });
   }
 
+  /* 서버가 영어로 돌려주는 거절 사유를 사람이 읽을 수 있는 말로 옮긴다.
+     그대로 띄우면 무엇을 해야 할지 알 수 없다. */
+  function pwErrorMsg(status, raw) {
+    var m = String(raw || '');
+    // 계정에 2단계 인증이 걸려 있으면 서버가 2단계를 통과한 세션을 요구한다.
+    // 이 포털에는 2단계 인증 화면이 없어서 여기서는 바꿀 수 없다.
+    if (/aal2|insufficient_aal/i.test(m)) {
+      return '이 계정에는 2단계 인증(MFA)이 등록되어 있어 이 화면에서는 비밀번호를 바꿀 수 없습니다.\n관리자에게 2단계 인증 해제를 요청해 주세요.';
+    }
+    if (/different from the old|same.*old password/i.test(m)) return '지금 쓰는 비밀번호와 다른 것으로 정해 주세요.';
+    if (/at least|too short|length/i.test(m)) return '비밀번호는 6자 이상이어야 합니다.';
+    if (/weak|easy to guess|pwned|leaked|compromised/i.test(m)) return '너무 흔한 비밀번호입니다. 다른 것으로 정해 주세요.';
+    if (/only request this after|rate limit|too many/i.test(m)) return '요청이 너무 잦습니다. 잠시 뒤에 다시 시도해 주세요.';
+    if (status === 401 || status === 403) return '로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.';
+    return m || '변경에 실패했습니다.';
+  }
+
   function changePassword(newPassword) {
     return authFetch(SB_URL + '/auth/v1/user', {
       method: 'PUT',
       body: JSON.stringify({ password: newPassword })
     }).then(function (r) {
-      return r.ok ? { ok: true } : r.json().then(function (j) {
-        return { error: (j && (j.msg || j.message)) || '변경에 실패했습니다.' };
+      if (r.ok) return { ok: true };
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        var raw = (j && (j.msg || j.message || j.error_description || j.error)) || '';
+        if (raw) console.warn('비밀번호 변경 거절:', r.status, raw);   // 원문은 콘솔에만
+        return { error: pwErrorMsg(r.status, raw) };
       });
     });
   }
