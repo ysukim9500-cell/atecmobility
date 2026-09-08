@@ -705,7 +705,6 @@ footer.ci-foot{ margin-top:32px !important; }
   html:not(.force-web) .atec-header h1{ display:none; }
   html:not(.force-web) .tab-btn .tab-ico{ display:block; }
   html:not(.force-web) .tab-btn::before{ margin:0; }
-  html:not(.force-web) .tab-badge{ position:static !important; }
   html:not(.force-web) #ci-title{ flex-direction:column; align-items:stretch; gap:12px; padding-top:14px !important; }
   html:not(.force-web) #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
   html:not(.force-web) #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
@@ -742,7 +741,6 @@ html.force-mobile #user-badge button{ padding:0 8px !important; font-size:12px !
 html.force-mobile .atec-header h1{ display:none; }
 html.force-mobile .tab-btn .tab-ico{ display:block; }
 html.force-mobile .tab-btn::before{ margin:0; }
-html.force-mobile .tab-badge{ position:static !important; }
 html.force-mobile #ci-title{ flex-direction:column; align-items:stretch; gap:12px; padding-top:14px !important; }
 html.force-mobile #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
 html.force-mobile #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
@@ -806,6 +804,91 @@ html.force-mobile .kv.vstat-row{ display:flex !important; grid-template-columns:
 html, body, #app-root{ background:#FFFFFF !important; }
 #tabband{ background:#FFFFFF; }
 .atec-header > div, #tabband > div{ max-width:1600px; }
+
+/* ── 모바일 다듬기 v3 ── */
+.btn-red{ height:32px; padding:0 16px; background:var(--red); color:#fff; font-size:13px; font-weight:700; white-space:nowrap; }
+.btn-red:hover{ background:#C80850; }
+@media (max-width:767px){
+  /* 머리글: 1행 로고 + 이름·역할, 2행 글자 링크 고르게 */
+  html:not(.force-web) .atec-header > div{ flex-wrap:wrap !important; min-height:0; padding:10px 14px 0 !important; row-gap:0 !important; }
+  html:not(.force-web) .atec-header > div > .flex-1{ display:none; }
+  html:not(.force-web) .atec-header > div > .flex.items-center.gap-4{ flex:1 1 auto; }
+  html:not(.force-web) #user-badge{ width:100% !important; order:9; justify-content:space-between; overflow:visible; border-top:1px solid var(--line); margin-top:8px; padding:6px 0 !important; }
+  html:not(.force-web) #user-badge .ub-name{ display:none; }
+  html:not(.force-web) #user-badge button{ border:0 !important; padding:4px 0 !important; font-size:12px !important; min-height:0 !important; flex:1 1 0; text-align:center; }
+  html:not(.force-web) .atec-header > div > .flex.items-center.gap-4::after{ content:attr(data-user); margin-left:auto; font-size:12px; color:var(--gray); white-space:nowrap; }
+  /* 탭바: BETA 숨김, 뱃지는 오른쪽 위 */
+  html:not(.force-web) #tabs .bg-amber-400{ display:none !important; }
+  html:not(.force-web) .tab-badge{ position:absolute !important; top:2px !important; right:6px !important; margin:0 !important; font-size:10.5px !important; }
+  /* 필터 단추 촘촘히 */
+  html:not(.force-web) .ctile, html:not(.force-web) .qd-btn, html:not(.force-web) .pf-btn, html:not(.force-web) .scope-btn{ height:28px; padding:0 10px !important; font-size:12.5px !important; gap:5px; }
+  html:not(.force-web) .ctile .ct-num{ font-size:11.5px !important; }
+  html:not(.force-web) .fbar{ padding:8px 0; }
+  html:not(.force-web) .fdate{ height:32px; flex:1 1 auto; min-width:0; }
+  html:not(.force-web) .fgo{ height:32px; }
+  html:not(.force-web) .kpi .kpi-val{ font-size:26px !important; }
+  html:not(.force-web) .kpi .kpi-sub{ font-size:11px !important; }
+  /* 제목 띠 여백 */
+  html:not(.force-web) #ci-title{ padding-top:12px !important; gap:10px; }
+  html:not(.force-web) #ci-sub{ font-size:12.5px; }
+  /* 선제 점검 줄: 제외 단추는 오른쪽 위 */
+  html:not(.force-web) .pcard{ grid-template-columns:52px minmax(0,1fr) auto; gap:8px 10px; }
+  html:not(.force-web) .pcard .p-x{ grid-column:3; grid-row:1; justify-self:end; padding:3px 8px; font-size:12px; }
+  html:not(.force-web) .pcard .p-main{ grid-column:2 / span 2; }
+  html:not(.force-web) .pcard .p-x{ grid-column:3; }
+  html:not(.force-web) .pcard .p-top .sub:last-child{ margin-left:0 !important; width:100%; }
+  /* 차량 검색: 3칸 → 한 칸, 표는 두 줄 */
+  html:not(.force-web) .vjudge .ab-badge{ font-size:32px !important; }
+  html:not(.force-web) .hist{ padding-top:18px; }
+  html:not(.force-web) .hrow{ grid-template-columns:1fr; gap:4px; padding:10px 0; }
+  html:not(.force-web) .hrow .d{ font-size:12.5px; color:var(--gray); font-weight:400; }
+  html:not(.force-web) .hrow > span:nth-child(2){ flex-direction:row !important; gap:6px; }
+  html:not(.force-web) .hrow .memo, html:not(.force-web) .hrow .who{ grid-column:auto; font-size:12.5px; }
+  html:not(.force-web) .logbk .btn-go{ width:100%; }
+  /* 카드형 표(이벤트 사전·사용자): 상자 대신 괘선 */
+  html:not(.force-web) .overflow-x-auto table tr{ border:0 !important; border-bottom:1px solid var(--line) !important; padding:8px 0 !important; margin:0 !important; }
+}
+
+  /* 머리글: 1행 로고 + 이름·역할, 2행 글자 링크 고르게 */
+  html.force-mobile .atec-header > div{ flex-wrap:wrap !important; min-height:0; padding:10px 14px 0 !important; row-gap:0 !important; }
+  html.force-mobile .atec-header > div > .flex-1{ display:none; }
+  html.force-mobile .atec-header > div > .flex.items-center.gap-4{ flex:1 1 auto; }
+  html.force-mobile #user-badge{ width:100% !important; order:9; justify-content:space-between; overflow:visible; border-top:1px solid var(--line); margin-top:8px; padding:6px 0 !important; }
+  html.force-mobile #user-badge .ub-name{ display:none; }
+  html.force-mobile #user-badge button{ border:0 !important; padding:4px 0 !important; font-size:12px !important; min-height:0 !important; flex:1 1 0; text-align:center; }
+  html.force-mobile .atec-header > div > .flex.items-center.gap-4::after{ content:attr(data-user); margin-left:auto; font-size:12px; color:var(--gray); white-space:nowrap; }
+  /* 탭바: BETA 숨김, 뱃지는 오른쪽 위 */
+  html.force-mobile #tabs .bg-amber-400{ display:none !important; }
+  html.force-mobile .tab-badge{ position:absolute !important; top:2px !important; right:6px !important; margin:0 !important; font-size:10.5px !important; }
+  /* 필터 단추 촘촘히 */
+  html.force-mobile .ctile, html.force-mobile .qd-btn, html.force-mobile .pf-btn, html.force-mobile .scope-btn{ height:28px; padding:0 10px !important; font-size:12.5px !important; gap:5px; }
+  html.force-mobile .ctile .ct-num{ font-size:11.5px !important; }
+  html.force-mobile .fbar{ padding:8px 0; }
+  html.force-mobile .fdate{ height:32px; flex:1 1 auto; min-width:0; }
+  html.force-mobile .fgo{ height:32px; }
+  html.force-mobile .kpi .kpi-val{ font-size:26px !important; }
+  html.force-mobile .kpi .kpi-sub{ font-size:11px !important; }
+  /* 제목 띠 여백 */
+  html.force-mobile #ci-title{ padding-top:12px !important; gap:10px; }
+  html.force-mobile #ci-sub{ font-size:12.5px; }
+  /* 선제 점검 줄: 제외 단추는 오른쪽 위 */
+  html.force-mobile .pcard{ grid-template-columns:52px minmax(0,1fr) auto; gap:8px 10px; }
+  html.force-mobile .pcard .p-x{ grid-column:3; grid-row:1; justify-self:end; padding:3px 8px; font-size:12px; }
+  html.force-mobile .pcard .p-main{ grid-column:2 / span 2; }
+  html.force-mobile .pcard .p-x{ grid-column:3; }
+  html.force-mobile .pcard .p-top .sub:last-child{ margin-left:0 !important; width:100%; }
+  /* 차량 검색: 3칸 → 한 칸, 표는 두 줄 */
+  html.force-mobile .vjudge .ab-badge{ font-size:32px !important; }
+  html.force-mobile .hist{ padding-top:18px; }
+  html.force-mobile .hrow{ grid-template-columns:1fr; gap:4px; padding:10px 0; }
+  html.force-mobile .hrow .d{ font-size:12.5px; color:var(--gray); font-weight:400; }
+  html.force-mobile .hrow > span:nth-child(2){ flex-direction:row !important; gap:6px; }
+  html.force-mobile .hrow .memo, html.force-mobile .hrow .who{ grid-column:auto; font-size:12.5px; }
+  html.force-mobile .logbk .btn-go{ width:100%; }
+  /* 카드형 표(이벤트 사전·사용자): 상자 대신 괘선 */
+  html.force-mobile .overflow-x-auto table tr{ border:0 !important; border-bottom:1px solid var(--line) !important; padding:8px 0 !important; margin:0 !important; }
+@media (max-width:767px){ html:not(.force-web) .pcard .p-sc{ grid-column:1; grid-row:1 / span 2; } html:not(.force-web) .pcard .p-main{ grid-column:2 / span 2 !important; grid-row:2; } html:not(.force-web) .pcard .p-x{ grid-column:3; grid-row:1; } html:not(.force-web) .pcard{ grid-template-rows:auto auto; } html:not(.force-web) .pcard .p-top{ margin-top:-30px; padding-right:64px; } }
+html.force-mobile .pcard .p-sc{ grid-column:1; grid-row:1 / span 2; } html.force-mobile .pcard .p-main{ grid-column:2 / span 2 !important; grid-row:2; } html.force-mobile .pcard .p-x{ grid-column:3; grid-row:1; } html.force-mobile .pcard{ grid-template-rows:auto auto; } html.force-mobile .pcard .p-top{ margin-top:-30px; padding-right:64px; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -1583,6 +1666,7 @@ function isAdmin(){ return ME && ME.role==='admin'; }
 function renderUserBadge(){
   const b=$('#user-badge'); if(!b) return;
   // 시안: 이름 · 역할 뒤에 글자 링크만, 가는 세로선으로 구분 (버튼·onclick 은 그대로)
+  { const brand=b.parentElement && b.parentElement.querySelector('.flex.items-center.gap-4'); if(brand) brand.setAttribute('data-user', (ME?ME.name:'')+' '+(isAdmin()?'관리자':'일반')); }
   const adminBtn = isAdmin()?`<button onclick="gotoPortal()" class="ub-btn">사용자 관리</button>`:'';
   b.innerHTML = `<span class="ub-name"><b>${ME?ME.name:''}</b> ${isAdmin()?'관리자':'일반'}</span>
     <button onclick="showHelp()" class="ub-btn" title="사용법 도움말">도움말</button>
@@ -3012,7 +3096,7 @@ function renderVehicle(vnum, veh){
           <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
           <div class="lst"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0">
             <div id="${etaId}" class="eta-box" style="flex:1;min-width:0">차고지(종점) 도착시간을 조회할 수 있습니다.</div>
-            <button onclick="loadDepotEta('${vnum.replace(/'/g,"\\'")}','${(last.route||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${etaId}')" class="btn-ghost2">조회</button>
+            <button onclick="loadDepotEta('${vnum.replace(/'/g,"\\'")}','${(last.route||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${etaId}')" class="btn-red">조회</button>
           </div></div>
         </div>
       </div>
