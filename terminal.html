@@ -496,6 +496,311 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 .bg-cyan-50,.bg-blue-50,.bg-teal-50,.bg-sky-100,.bg-blue-100,.bg-cyan-100{ background-color:#F2F2F2 !important; }
 .border-cyan-200,.border-cyan-300,.border-blue-200,.border-teal-200,.border-sky-300{ border-color:var(--atec-line) !important; }
 .text-blue-700,.text-blue-800,.text-cyan-800,.text-sky-800,.text-teal-700{ color:var(--atec-gray) !important; }
+
+/* ════════════════════════════════════════════════════════════════
+   CI 레이아웃 v2 — 승인 시안 기준 (판정 우선 · 괘선 격자 · 상자 없음)
+   위 규칙들보다 뒤에 있어 같은 특이도면 이긴다. 기능 요소(id·onclick)는 그대로.
+   ════════════════════════════════════════════════════════════════ */
+:root{ --ink:#111111; --gray:#5A666F; --line:#D9D9D9; --red:#D70051; --soft:#C9CED2; }
+body{ font-size:15px; line-height:1.55; }
+.wrap{ max-width:1600px; margin:0 auto; padding-left:24px; padding-right:24px; }
+.h{ font-size:16px; font-weight:700; color:var(--ink); line-height:1.3; }
+.sub{ font-size:13px; color:var(--gray); }
+.hd{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.chip.ln{ display:inline-flex; align-items:center; height:22px; padding:0 9px !important; font-size:12px !important; font-weight:500; border:1px solid var(--soft) !important; color:var(--gray); background:#fff !important; white-space:nowrap; }
+.chip.ln.red{ color:var(--red); }
+.chip.ln.ink{ color:var(--ink); border-color:var(--ink) !important; }
+
+/* ── 머리글: 로고 · 시스템명 · (오른쪽) 지식베이스 요약 · 이름 | 도움말 | 로그아웃 ── */
+.atec-header > div{ padding:0 24px !important; min-height:60px; gap:22px !important; }
+.atec-header h1{ font-size:14px !important; }
+#kb-status{ border:0 !important; padding:0 !important; gap:0 !important; font-size:13px !important; color:var(--gray) !important; }
+#kb-status > div:first-child{ display:none !important; }
+#kb-meta{ gap:0 14px !important; }
+#kb-meta > div{ font-size:13px !important; color:var(--gray) !important; }
+#kb-meta > div:first-child{ color:var(--ink) !important; font-weight:500; }
+#user-badge{ gap:0 !important; font-size:13.5px !important; color:var(--gray); flex-wrap:nowrap !important; }
+#user-badge .ub-name{ padding-right:14px; white-space:nowrap; }
+#user-badge .ub-name b{ color:var(--ink); font-weight:500; }
+#user-badge button, #user-badge .ub-btn{ border:0 !important; border-left:1px solid var(--line) !important; padding:0 14px !important; font-size:13.5px !important; font-weight:400 !important; color:var(--gray) !important; background:transparent !important; min-height:0 !important; line-height:1.3; margin:0 !important; border-radius:0 !important; }
+#user-badge button:last-child{ padding-right:0 !important; }
+#user-badge button:hover{ color:var(--ink) !important; border-color:var(--line) !important; }
+
+/* ── 화면 목록 띠: 머리글 바로 아래, 글자 + 빨간 정사각 ── */
+#tabband{ border-bottom:1px solid var(--line); }
+#tabs{ margin:0 !important; border:0 !important; gap:34px !important; padding:0 !important; }
+.tab-btn{ font-size:14px !important; padding:14px 0 !important; gap:0 !important; }
+.tab-btn::before{ margin-right:8px; }
+.tab-btn .tab-ico{ display:none; }
+.tab-badge{ background:transparent !important; color:var(--red) !important; font-weight:700; font-size:12px !important; padding:0 !important; min-width:0 !important; margin-left:4px !important; }
+.tab-badge:empty{ display:none; }
+#tabs .bg-amber-400{ background:transparent !important; color:var(--gray) !important; font-weight:500 !important; padding:0 !important; margin-left:4px; font-size:11px !important; }
+
+/* ── 제목 띠: 큰 검은 제목 + 한 줄 설명, 오른쪽에 검색, 아래 빨간 선 ── */
+#ci-title{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-top:26px !important; margin-bottom:0 !important; }
+#ci-title-text{ font-size:26px !important; letter-spacing:-.01em; line-height:1.2 !important; }
+#ci-sub{ font-size:13px; color:var(--gray); margin-top:4px; min-height:1.4em; }
+#searchwrap{ position:relative; display:flex; align-items:stretch; flex:0 0 auto; }
+.searchbar{ width:360px; height:40px; padding:0 14px !important; gap:10px !important; margin:0 !important; }
+.searchbar input{ font-size:15px !important; font-weight:500; }
+.searchbar svg{ width:18px; height:18px; }
+.search-go{ height:40px; padding:0 22px; background:var(--ink); color:#fff; font-size:14px; font-weight:500; white-space:nowrap; }
+.search-go:hover{ background:#000; }
+#suggest{ position:absolute; top:100%; left:0; right:0; z-index:30; }
+#suggest > div{ border:1px solid var(--ink) !important; border-top:0 !important; border-radius:0 !important; box-shadow:none !important; margin-top:0 !important; }
+.ci-rule{ margin:16px 0 0 !important; }
+#back-bar{ display:none !important; }
+#global-filter-bar{ background:transparent !important; color:var(--ink) !important; padding:10px 0 !important; margin:0 !important; border-bottom:1px solid var(--line); font-size:13px; }
+#global-filter-bar span.font-extrabold{ background:transparent !important; border:1px solid var(--ink); padding:1px 8px; font-weight:500; border-radius:0 !important; }
+#global-filter-bar .text-pink-100\/80{ color:var(--gray) !important; }
+#global-filter-bar svg path{ stroke:var(--gray); }
+#global-filter-bar button{ background:transparent !important; border:1px solid var(--soft); color:var(--gray) !important; padding:3px 10px !important; border-radius:0 !important; min-height:0 !important; }
+#global-filter-bar button:hover{ border-color:var(--ink); color:var(--ink) !important; }
+
+/* ── 카드 상자 → 괘선 구획 ── */
+.sec{ padding:22px 0 18px; border-bottom:1px solid var(--line); }
+.sec:last-child{ border-bottom:0; }
+#app-root .rounded-xl.border{ border:0 !important; padding-left:0 !important; padding-right:0 !important; }
+#app-root .rounded-xl.border.mb-4{ padding-top:18px; padding-bottom:18px; border-bottom:1px solid var(--line) !important; }
+#ai .rounded-xl.flex-col{ border:1px solid var(--line) !important; }
+.sec-title{ font-size:16px !important; padding-bottom:0 !important; border-bottom:0 !important; }
+.sec .sec-title + p, .sec p.text-slate-500{ margin-top:4px; }
+.sec > .flex.items-start > div > .sec-title{ margin-bottom:2px; }
+
+/* ── 필터 띠 (대시보드 · 선제점검 · 이벤트) ── */
+.fbar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 6px; padding:14px 0; border-bottom:1px solid var(--line); }
+.fbar .flab{ font-size:12.5px; color:var(--gray); margin-right:6px; }
+.fbar .fgrp{ display:inline-flex; flex-wrap:wrap; gap:6px; }
+.fsep{ width:1px; height:30px; background:var(--line); margin:0 10px; }
+.fdate{ height:30px; border:1px solid var(--soft); padding:0 10px; font-size:13px; color:var(--ink); outline:none; background:#fff; }
+.fdate:focus{ border-color:var(--ink); }
+.fgo{ height:30px; padding:0 14px; background:var(--ink); color:#fff; font-size:13px; font-weight:500; }
+.ctile, .qd-btn, .pf-btn, .scope-btn, .df-btn{ display:inline-flex !important; align-items:center; gap:6px; height:30px; padding:0 12px !important; border:1px solid var(--soft) !important; background:#fff !important; font-size:13px !important; font-weight:500 !important; color:var(--gray) !important; cursor:pointer; overflow:visible !important; border-radius:0 !important; min-height:0 !important; line-height:1; }
+.ctile:hover, .qd-btn:hover, .pf-btn:hover, .scope-btn:hover{ border-color:var(--ink) !important; color:var(--ink) !important; }
+.ctile.active, .pf-btn.active, .scope-btn.active{ border-color:var(--ink) !important; color:var(--ink) !important; font-weight:700 !important; }
+.ctile.active::after{ display:none !important; }
+.ctile .ct-name{ font-size:13px !important; font-weight:inherit !important; color:inherit !important; margin:0 !important; display:inline !important; }
+.ctile .ct-num{ font-size:12px !important; font-weight:400 !important; color:var(--gray) !important; margin:0 !important; line-height:1 !important; }
+.ctile .ct-share, .ctile .ct-bar, .ctile .ct-check{ display:none !important; }
+.ms{ display:inline-flex; align-items:baseline; gap:6px; padding:0 14px; border-left:1px solid var(--line); font-size:13px; color:var(--gray); }
+.ms:first-child{ padding-left:0; border-left:0; }
+.ms .ms-v{ font-size:15px; font-weight:700; }
+
+/* ── 핵심 숫자: 가는 선으로 나눈 한 줄 ── */
+#stat-cards{ grid-template-columns:repeat(4,minmax(0,1fr)) !important; border-top:0 !important; border-bottom:1px solid var(--ink) !important; margin:0 !important; }
+.kpi{ padding:18px 24px 16px !important; }
+.kpi:first-child{ padding-left:0 !important; }
+.kpi .kpi-val{ font-size:34px !important; }
+.kpi .kpi-val small{ font-size:15px; font-weight:400; color:var(--gray); margin-left:4px; }
+.kpi .kpi-val.red{ color:var(--red) !important; }
+
+/* ── 분석 격자 (대시보드) ── */
+.dgrid{ display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr); }
+.dcol{ padding:22px 32px 18px; border-right:1px solid var(--line); min-width:0; }
+.dcol:first-child{ padding-left:0; }
+.dcol:last-child{ border-right:0; padding-right:0; }
+.bars{ display:flex; flex-direction:column; gap:10px; padding-top:10px; border-top:1px solid var(--ink); }
+.bar-row{ display:grid; grid-template-columns:120px minmax(0,1fr) 54px; gap:12px; align-items:center; font-size:13.5px; }
+.bar-row .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bar-row .bar{ height:10px; display:flex; }
+.bar-row .bar i{ display:block; height:10px; background:var(--gray); }
+.bar-row b{ text-align:right; font-weight:700; }
+.trow{ display:grid; gap:14px; padding:10px 0; border-bottom:1px solid var(--line); font-size:13.5px; align-items:baseline; }
+.trow.head{ font-size:12.5px; color:var(--gray); padding:8px 0; }
+.trow.head:first-child{ border-top:1px solid var(--ink); }
+.trow.tot{ border-bottom:1px solid var(--ink); font-weight:700; }
+.trow .r{ text-align:right; }
+
+/* ── 차량 검색 결과: 판정 · 권장 조치 · 분포 세 칸 + 접수 이력 표 ── */
+.vgrid{ display:grid; grid-template-columns:420px minmax(0,1fr) 360px; }
+.vcol{ padding:26px 32px 24px; border-right:1px solid var(--line); min-width:0; display:flex; flex-direction:column; gap:22px; }
+.vcol:first-child{ padding-left:0; }
+.vcol:last-child{ border-right:0; padding-right:0; gap:26px; }
+.vnum{ font-size:30px; font-weight:700; line-height:1.15; letter-spacing:-.01em; color:var(--ink); }
+.vmeta{ display:flex; flex-wrap:wrap; font-size:13.5px; color:var(--gray); }
+.vmeta > span{ padding:0 12px; border-left:1px solid var(--line); }
+.vmeta > span:first-child{ padding-left:0; border-left:0; }
+.vjudge{ display:flex; flex-direction:column; gap:8px; }
+.vjudge .mark{ width:36px; height:2px; background:var(--red); }
+.vjudge .lab{ font-size:13px; font-weight:500; color:var(--gray); }
+.ab-badge{ font-size:44px !important; font-weight:700 !important; line-height:1.05 !important; letter-spacing:-.02em; display:block; }
+.vjudge .note{ font-size:15px; color:var(--ink); margin-top:2px; }
+.vrisk{ display:flex; flex-direction:column; gap:8px; }
+.vrisk .row{ display:flex; align-items:baseline; gap:10px; }
+.vrisk .row b{ font-size:26px; font-weight:700; line-height:1; }
+.kv{ display:flex; flex-direction:column; border-top:1px solid var(--ink); }
+.kv > div{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+.kv .k{ font-size:13.5px; color:var(--gray); }
+.kv .v{ font-size:16px; font-weight:700; text-align:right; }
+.kv .v small{ font-size:12.5px; font-weight:400; color:var(--gray); }
+.steps{ display:flex; flex-direction:column; border-top:1px solid var(--ink); }
+.step{ display:grid; grid-template-columns:26px minmax(0,1fr); gap:10px; align-items:start; padding:12px 0; border-bottom:1px solid var(--line); }
+.step .n{ font-size:15px; font-weight:700; color:var(--red); }
+.step .t{ font-size:15px; font-weight:500; color:var(--ink); }
+.step .s{ font-size:13px; color:var(--gray); margin-top:2px; }
+.evrow{ display:grid; grid-template-columns:52px 64px 1fr auto; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px; align-items:baseline; }
+.evrow .tm{ color:var(--gray); }
+.evrow .cd{ font-weight:700; }
+.evrow .n{ color:var(--gray); font-size:12.5px; }
+.lst{ display:flex; flex-direction:column; border-top:1px solid var(--ink); }
+.hist{ padding-top:26px; }
+.hrow{ display:grid; grid-template-columns:96px 84px minmax(0,1.2fr) minmax(0,1fr) 110px; gap:20px; padding:10px 0; border-bottom:1px solid var(--line); font-size:13.5px; align-items:start; }
+.hrow.head{ font-size:12.5px; color:var(--gray); padding:0 0 9px; border-bottom:1px solid var(--ink); }
+.hrow .d{ font-weight:500; }
+.hrow .memo{ color:var(--gray); white-space:pre-line; }
+.hrow .who{ color:var(--gray); font-size:13px; }
+.hrow .err b{ font-weight:500; }
+.hrow .err .arr{ color:var(--gray); font-weight:400; }
+.hrow .inq{ font-size:13px; color:var(--gray); margin-top:2px; white-space:pre-line; }
+#tl-body{ max-height:none !important; overflow:visible !important; padding:0 !important; }
+#tl-body::before{ display:none; }
+.recv-chip{ border:1px solid var(--soft) !important; color:var(--gray) !important; background:#fff !important; height:22px; padding:0 9px !important; font-size:12px !important; }
+.recv-chip.active{ border-color:var(--ink) !important; color:var(--ink) !important; font-weight:700; }
+.logbk{ padding:26px 0 0; border-top:1px solid var(--line); }
+.logbk .lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:32px; }
+.logbk .lbox{ border-top:1px solid var(--ink); padding-top:10px; }
+.logbk .lbox .t{ font-size:14px; font-weight:700; margin-bottom:6px; }
+.logbk input[type=file]{ font-size:12.5px; color:var(--gray); }
+.logbk input[type=file]::file-selector-button{ border:1px solid var(--soft); background:#fff; color:var(--ink); font-size:12.5px; padding:4px 10px; margin-right:8px; cursor:pointer; }
+.logbk .btn-go{ height:40px; padding:0 24px; background:var(--red); color:#fff; font-size:14px; font-weight:700; }
+.logbk .btn-go:hover{ background:#C80850; }
+.eta-box{ font-size:13px; color:var(--gray); }
+.btn-ghost2{ height:30px; padding:0 12px; border:1px solid var(--soft); font-size:13px; color:var(--ink); background:#fff; white-space:nowrap; }
+.btn-ghost2:hover{ border-color:var(--ink); }
+
+/* ── 선제 점검: 카드 → 줄 ── */
+#preempt-list{ display:flex; flex-direction:column; border-top:1px solid var(--ink); }
+#preempt-list > div{ margin:0 !important; }
+.pcard{ display:grid; grid-template-columns:72px minmax(0,1fr) auto; gap:20px; padding:14px 0 !important; border:0 !important; border-bottom:1px solid var(--line) !important; background:#fff !important; align-items:start; }
+.pcard .p-sc{ cursor:pointer; text-align:left; }
+.pcard .p-rank{ font-size:11px; color:var(--gray); }
+.pcard .p-num{ font-size:30px; font-weight:700; line-height:1; }
+.pcard .p-lv{ font-size:12px; font-weight:500; margin-top:2px; }
+.pcard .p-main{ cursor:pointer; min-width:0; }
+.pcard .p-top{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; }
+.pcard .p-v{ font-size:18px; font-weight:700; color:var(--ink); }
+.pcard .p-err{ font-size:13.5px; color:var(--gray); margin-top:4px; }
+.pcard .p-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pcard .p-x{ font-size:12.5px; color:var(--gray); border:1px solid var(--soft); padding:4px 10px; min-height:0 !important; white-space:nowrap; }
+.pcard .p-x:hover{ color:var(--red); border-color:var(--red); }
+.pcard.excluded{ opacity:.7; }
+
+/* ── 표(이벤트 사전 · 사용자) ── */
+#app-root table thead tr{ border-bottom:1px solid var(--ink) !important; color:var(--gray); }
+#app-root table th{ font-weight:500; font-size:12.5px; }
+#app-root table tbody tr{ border-bottom:1px solid var(--line) !important; }
+#app-root table td{ padding-top:8px !important; padding-bottom:8px !important; }
+#ev-table tr.bg-rose-50\/30{ background:transparent !important; }
+
+/* ── 바닥글 ── */
+footer.ci-foot{ margin-top:32px !important; }
+
+/* ── 모바일: 한 칸으로 흐르고, 탭은 하단 고정(기존 규칙) ── */
+@media (max-width:767px){
+  html:not(.force-web) .atec-header > div{ padding:8px 14px !important; min-height:52px; gap:8px !important; }
+  html:not(.force-web) #kb-status{ display:none !important; }
+  html:not(.force-web) #user-badge{ width:auto !important; padding:0 !important; }
+  html:not(.force-web) #user-badge .ub-name{ padding-right:8px; font-size:12px; }
+  html:not(.force-web) #user-badge button{ padding:0 8px !important; font-size:12px !important; }
+  html:not(.force-web) .atec-header h1{ display:none; }
+  html:not(.force-web) .tab-btn .tab-ico{ display:block; }
+  html:not(.force-web) .tab-btn::before{ margin:0; }
+  html:not(.force-web) .tab-badge{ position:static !important; }
+  html:not(.force-web) #ci-title{ flex-direction:column; align-items:stretch; gap:12px; padding-top:14px !important; }
+  html:not(.force-web) #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+  html:not(.force-web) #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+  html:not(.force-web) #searchwrap{ width:100%; }
+  html:not(.force-web) .searchbar{ width:auto; flex:1 1 auto; height:40px; padding:0 12px !important; }
+  html:not(.force-web) .search-go{ padding:0 16px; }
+  html:not(.force-web) .ci-rule{ margin-top:12px !important; }
+  html:not(.force-web) .fbar{ gap:6px 4px; padding:10px 0; }
+  html:not(.force-web) .fsep{ display:none; }
+  html:not(.force-web) .fbar .flab{ width:100%; margin:4px 0 0; }
+  html:not(.force-web) #stat-cards{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  html:not(.force-web) .kpi{ padding:12px 14px !important; border-bottom:1px solid var(--line) !important; }
+  html:not(.force-web) .kpi:nth-child(odd){ padding-left:0 !important; }
+  html:not(.force-web) .kpi:nth-child(even){ border-right:0 !important; }
+  html:not(.force-web) .dgrid, html:not(.force-web) .vgrid{ grid-template-columns:1fr; }
+  html:not(.force-web) .dcol, html:not(.force-web) .vcol{ padding:18px 0 !important; border-right:0; border-bottom:1px solid var(--line); gap:16px; }
+  html:not(.force-web) .vnum{ font-size:24px; }
+  html:not(.force-web) .ab-badge{ font-size:34px !important; }
+  html:not(.force-web) .hrow{ grid-template-columns:56px 1fr; gap:6px 10px; }
+  html:not(.force-web) .hrow.head{ display:none; }
+  html:not(.force-web) .hrow .memo, html:not(.force-web) .hrow .who{ grid-column:2; }
+  html:not(.force-web) .logbk .lgrid{ grid-template-columns:1fr; gap:18px; }
+  html:not(.force-web) .pcard{ grid-template-columns:56px minmax(0,1fr); gap:10px; }
+  html:not(.force-web) .pcard .p-x{ grid-column:2; justify-self:start; }
+  html:not(.force-web) .pcard .p-num{ font-size:24px; }
+  html:not(.force-web) .bar-row{ grid-template-columns:96px minmax(0,1fr) 48px; }
+  html:not(.force-web) .ms{ padding:0 8px; font-size:12px; }
+}
+html.force-mobile .atec-header > div{ padding:8px 14px !important; min-height:52px; gap:8px !important; }
+html.force-mobile #kb-status{ display:none !important; }
+html.force-mobile #user-badge{ width:auto !important; padding:0 !important; }
+html.force-mobile #user-badge .ub-name{ padding-right:8px; font-size:12px; }
+html.force-mobile #user-badge button{ padding:0 8px !important; font-size:12px !important; }
+html.force-mobile .atec-header h1{ display:none; }
+html.force-mobile .tab-btn .tab-ico{ display:block; }
+html.force-mobile .tab-btn::before{ margin:0; }
+html.force-mobile .tab-badge{ position:static !important; }
+html.force-mobile #ci-title{ flex-direction:column; align-items:stretch; gap:12px; padding-top:14px !important; }
+html.force-mobile #ci-title-text{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+html.force-mobile #ci-title-text::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+html.force-mobile #searchwrap{ width:100%; }
+html.force-mobile .searchbar{ width:auto; flex:1 1 auto; height:40px; padding:0 12px !important; }
+html.force-mobile .search-go{ padding:0 16px; }
+html.force-mobile .ci-rule{ margin-top:12px !important; }
+html.force-mobile .fbar{ gap:6px 4px; padding:10px 0; }
+html.force-mobile .fsep{ display:none; }
+html.force-mobile .fbar .flab{ width:100%; margin:4px 0 0; }
+html.force-mobile #stat-cards{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+html.force-mobile .kpi{ padding:12px 14px !important; border-bottom:1px solid var(--line) !important; }
+html.force-mobile .kpi:nth-child(odd){ padding-left:0 !important; }
+html.force-mobile .kpi:nth-child(even){ border-right:0 !important; }
+html.force-mobile .dgrid, html.force-mobile .vgrid{ grid-template-columns:1fr; }
+html.force-mobile .dcol, html.force-mobile .vcol{ padding:18px 0 !important; border-right:0; border-bottom:1px solid var(--line); gap:16px; }
+html.force-mobile .vnum{ font-size:24px; }
+html.force-mobile .ab-badge{ font-size:34px !important; }
+html.force-mobile .hrow{ grid-template-columns:56px 1fr; gap:6px 10px; }
+html.force-mobile .hrow.head{ display:none; }
+html.force-mobile .hrow .memo, html.force-mobile .hrow .who{ grid-column:2; }
+html.force-mobile .logbk .lgrid{ grid-template-columns:1fr; gap:18px; }
+html.force-mobile .pcard{ grid-template-columns:56px minmax(0,1fr); gap:10px; }
+html.force-mobile .pcard .p-x{ grid-column:2; justify-self:start; }
+html.force-mobile .pcard .p-num{ font-size:24px; }
+html.force-mobile .bar-row{ grid-template-columns:96px minmax(0,1fr) 48px; }
+html.force-mobile .ms{ padding:0 8px; font-size:12px; }
+html.force-mobile #tabband{ border-bottom:0; }
+@media (max-width:767px){ html:not(.force-web) #tabband{ border-bottom:0; } }
+
+/* v2 보정 */
+.fbar .fgw{ display:inline-flex; align-items:center; gap:6px; }
+.fbar .fgw .flab{ margin-right:2px; }
+#user-badge .ub-name{ display:inline-flex; gap:5px; }
+@media (max-width:767px){
+  html:not(.force-web) .atec-header > div{ flex-wrap:nowrap !important; flex-direction:row !important; align-items:center !important; }
+  html:not(.force-web) #user-badge{ flex-wrap:nowrap !important; overflow-x:auto; -ms-overflow-style:none; scrollbar-width:none; }
+  html:not(.force-web) #user-badge::-webkit-scrollbar{ display:none; }
+  html:not(.force-web) #user-badge .ub-name{ font-size:12px; padding-right:8px; }
+  html:not(.force-web) #user-badge .ub-name b{ font-weight:700; }
+  html:not(.force-web) #user-badge button{ padding:0 8px !important; font-size:12px !important; white-space:nowrap; }
+  html:not(.force-web) .fbar .fgw{ display:flex; flex-wrap:wrap; width:100%; }
+  html:not(.force-web) .fbar .fgw .flab{ width:100%; margin:6px 0 2px; }
+  html:not(.force-web) .kv .v{ font-size:15px; }
+  html:not(.force-web) .kv > div{ gap:8px; }
+}
+html.force-mobile .atec-header > div{ flex-wrap:nowrap !important; flex-direction:row !important; align-items:center !important; }
+html.force-mobile #user-badge{ flex-wrap:nowrap !important; overflow-x:auto; -ms-overflow-style:none; scrollbar-width:none; }
+html.force-mobile #user-badge::-webkit-scrollbar{ display:none; }
+html.force-mobile #user-badge .ub-name{ font-size:12px; padding-right:8px; }
+html.force-mobile #user-badge .ub-name b{ font-weight:700; }
+html.force-mobile #user-badge button{ padding:0 8px !important; font-size:12px !important; white-space:nowrap; }
+html.force-mobile .fbar .fgw{ display:flex; flex-wrap:wrap; width:100%; }
+html.force-mobile .fbar .fgw .flab{ width:100%; margin:6px 0 2px; }
+html.force-mobile .kv .v{ font-size:15px; }
+html.force-mobile .kv > div{ gap:8px; }
+@media (max-width:767px){ html:not(.force-web) .kv.vstat-row{ display:flex !important; grid-template-columns:none !important; gap:0 !important; } }
+html.force-mobile .kv.vstat-row{ display:flex !important; grid-template-columns:none !important; gap:0 !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #F2F2F2, transparent), #F2F2F2;">
@@ -586,88 +891,91 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 <div id="app-root" class="hidden">
 
 <header class="atec-header">
-  <div class="relative max-w-[1600px] mx-auto px-4 sm:px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+  <div class="relative max-w-[1600px] mx-auto flex items-center gap-5">
     <div class="flex items-center gap-4 min-w-0">
       <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
       <div class="w-px h-5 hidden sm:block" style="background:var(--atec-line)"></div>
       <h1 class="text-[14px] font-medium truncate" style="color:var(--atec-ink)">단말기 현장처리 판정 시스템</h1>
     </div>
     <div class="flex-1"></div>
-    <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 w-full md:w-auto">
-      <div id="kb-status" class="flex items-center gap-2 text-[12px] px-3 py-1.5 border" style="border-color:var(--atec-line);color:var(--atec-gray)">
-        <div class="text-[11px] font-medium">지식베이스</div>
-        <div id="kb-meta" class="font-medium" style="color:var(--atec-ink)">로딩 중…</div>
-      </div>
-      <div id="user-badge" class="flex items-center flex-wrap gap-1.5 text-xs"></div>
+    <div id="kb-status" class="flex items-center gap-2 text-[12px]">
+      <div class="text-[11px] font-medium">지식베이스</div>
+      <div id="kb-meta" class="font-medium">로딩 중…</div>
     </div>
+    <div id="user-badge" class="flex items-center text-xs"></div>
   </div>
 </header>
 
-
-<div class="max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
-
-  <!-- 화면 제목 (setTab 이 글자만 바꾼다) -->
-  <div id="ci-title" class="flex items-end justify-between gap-4 pt-1 mb-3">
-    <div id="ci-title-text" class="text-[24px] font-bold leading-tight" style="color:var(--atec-ink)">대시보드</div>
-  </div>
-  <div class="ci-rule mb-5"></div>
-
-  <!-- SEARCH -->
-  <section class="mb-5">
-    <div class="searchbar bg-white border border-rose-200 rounded-xl shadow-sm flex items-center gap-2 px-4 py-2.5 transition">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#5A666F]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 검색 (뒷자리만 입력해도 OK)" class="flex-1 outline-none text-sm bg-transparent placeholder:text-slate-400">
-      <button onclick="document.getElementById('q').value='';doSearch('')" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
-    </div>
-    <div id="suggest" class="relative"></div>
-  </section>
-
-  <!-- TAB NAV -->
-  <nav id="tabs" class="flex gap-1 mb-5 bg-white border border-rose-100 rounded-xl shadow-sm p-1 w-full md:w-fit overflow-x-auto no-scrollbar">
-    <button data-tab="dash" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+<!-- 화면 목록: 머리글 바로 아래 한 줄 (모바일에서는 하단 고정 탭바) -->
+<div id="tabband">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6">
+  <nav id="tabs" class="flex w-full overflow-x-auto no-scrollbar">
+    <button data-tab="dash" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
       <span class="tab-full">대시보드</span><span class="tab-short">대시보드</span>
     </button>
-    <button data-tab="preempt" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5 relative">
+    <button data-tab="preempt" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5 relative">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-full">선제 점검 대상</span><span class="tab-short">선제점검</span>
-      <span id="preempt-badge" class="tab-badge ml-0.5 text-[10px] bg-[#D70051] text-white rounded-full px-1.5 py-0.5"></span>
+      <span id="preempt-badge" class="tab-badge"></span>
     </button>
-    <button data-tab="search" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+    <button data-tab="search" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span class="tab-full">차량 검색</span><span class="tab-short">차량검색</span>
     </button>
-    <button data-tab="sn" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+    <button data-tab="sn" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="6" y="6" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span class="tab-full">단말기 조회</span><span class="tab-short">단말기</span>
     </button>
-    <button data-tab="events" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+    <button data-tab="events" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 13h4l2 5 4-12 2 7h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-full">이벤트 분석</span><span class="tab-short">이벤트</span>
     </button>
-    <button data-tab="ai" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
+    <button data-tab="ai" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2l1.8 4.5L18 8.5l-4.2 2L12 15l-1.8-4.5L6 8.5l4.2-2L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="19" cy="19" r="2" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="19" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
       <span class="tab-full">AI 챗봇</span><span class="tab-short">AI</span>
-      <span class="ml-0.5 text-[9px] bg-amber-400 text-amber-900 font-extrabold rounded px-1 py-0.5">BETA</span>
+      <span class="text-[9px] bg-amber-400 text-amber-900 font-extrabold px-1 py-0.5">BETA</span>
     </button>
-    <button id="tab-admin" data-tab="admin" data-admin class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5" style="display:none">
+    <button id="tab-admin" data-tab="admin" data-admin class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5" style="display:none">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <span class="tab-full">사용자 관리</span><span class="tab-short">사용자</span> <span id="admin-badge" class="ml-0.5 text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 hidden"></span>
+      <span class="tab-full">사용자 관리</span><span class="tab-short">사용자</span> <span id="admin-badge" class="tab-badge hidden"></span>
     </button>
   </nav>
+  </div>
+</div>
+
+<div class="max-w-[1600px] mx-auto px-4 sm:px-6 pb-5">
+
+  <!-- 제목 띠: 제목 + 설명, 오른쪽 검색 (setTab 이 글자만 바꾼다) -->
+  <div id="ci-title">
+    <div class="min-w-0">
+      <div id="ci-title-text" class="font-bold" style="color:var(--atec-ink)">대시보드</div>
+      <div id="ci-sub"></div>
+    </div>
+    <div id="searchwrap">
+      <div class="searchbar bg-white flex items-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-[#5A666F]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 · 뒷자리만 입력해도 됩니다" class="flex-1 min-w-0 outline-none bg-transparent placeholder:text-slate-400">
+        <button onclick="document.getElementById('q').value='';doSearch('')" class="text-slate-400 hover:text-slate-600 text-sm" style="min-height:0">✕</button>
+      </div>
+      <button type="button" class="search-go" onclick="(function(){var m=matchVehicles(document.getElementById('q').value.trim());if(m[0]){document.getElementById('q').value=m[0];doSearch(m[0]);}})()">검색</button>
+      <div id="suggest"></div>
+    </div>
+  </div>
+  <div class="ci-rule"></div>
 
   <!-- GLOBAL FILTER BANNER (visible when any filter is active) -->
-  <div id="global-filter-bar" class="hidden mb-5 px-4 py-2.5 flex items-center justify-between gap-3 text-white" style="background:#111111">
+  <div id="global-filter-bar" class="hidden flex items-center justify-between gap-3">
     <div class="flex items-center gap-2 text-[13px] flex-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5h18M6 12h12M10 19h4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
       <span class="font-semibold">전역 필터:</span>
       <span id="global-filter-label" class="flex items-center gap-1.5 flex-wrap"></span>
       <span class="text-pink-100/80 text-[11px]">기준으로 모든 화면이 필터링됩니다</span>
     </div>
-    <button onclick="clearGlobalFilter()" class="text-[12px] font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1 transition shrink-0">✕ 전체 해제</button>
+    <button onclick="clearGlobalFilter()" class="text-[12px] font-semibold shrink-0">✕ 전체 해제</button>
   </div>
 
-  <!-- BACK BAR (shown on non-dashboard screens) -->
+  <!-- BACK BAR (기능 유지 · 화면 목록이 대신하므로 숨김) -->
   <div id="back-bar" class="hidden mb-4">
     <button onclick="setTab('dash')" class="flex items-center gap-1.5 text-[13px] font-medium bg-white border px-3.5 py-2 transition" style="color:var(--atec-ink);border-color:var(--atec-ink)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -677,45 +985,47 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- DEFAULT DASHBOARD (when no search) -->
   <section id="dash">
-    <!-- Large channel selector -->
-    <div class="mb-3">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111]">접수구분 선택</h2>
-        <span class="text-[11px] text-slate-400">선택 시 선제점검·차량검색에도 함께 적용됩니다</span>
-      </div>
-      <div id="channel-tiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+    <div class="fbar">
+      <span class="fgw"><span class="flab">접수</span><div id="channel-tiles" class="fgrp"></div></span>
+      <span class="fsep"></span>
+      <span class="fgw"><span class="flab">센터</span><div id="center-tiles" class="fgrp"></div></span>
+      <span class="fsep"></span>
+      <span class="fgw"><span class="flab">기종</span><div id="term-tiles" class="fgrp"></div></span>
+    </div>
+    <div class="fbar" style="border-bottom:0">
+      <span class="flab">기간</span>
+      <input id="gf-from" type="date" class="fdate">
+      <span class="text-slate-400 text-[12px]">~</span>
+      <input id="gf-to" type="date" class="fdate">
+      <button onclick="applyDateFilter()" class="fgo">조회</button>
+      <span class="flab" style="margin-left:10px">빠른 선택</span>
+      <button onclick="quickDate(7)" class="qd-btn">최근 7일</button>
+      <button onclick="quickDate(30)" class="qd-btn">최근 30일</button>
+      <button onclick="quickDate(90)" class="qd-btn">최근 90일</button>
+      <button onclick="clearDateFilter()" class="qd-btn">전체</button>
     </div>
 
-    <!-- 센터 + 기종 나란히 + 기간 -->
-    <div class="grid lg:grid-cols-2 gap-x-5 gap-y-3 mb-4">
-      <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">센터 선택</h2>
-        <div id="center-tiles" class="grid grid-cols-3 md:grid-cols-5 gap-2.5"></div>
+    <!-- 핵심 숫자 네 칸 -->
+    <div id="stat-cards" class="grid"></div>
+
+    <!-- 추이 · 비중 · 센터 -->
+    <div class="dgrid">
+      <div class="dcol">
+        <div class="hd"><div class="h">월별 접수 추이</div><div class="sub" id="dm-sub">월별, 건</div></div>
+        <div style="height:230px"><canvas id="ch-month"></canvas></div>
       </div>
-      <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">단말기 기종 선택</h2>
-        <div id="term-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
+      <div class="dcol">
+        <div class="hd"><div class="h">접수 채널</div><div class="sub">건</div></div>
+        <div id="d-recv" class="bars"></div>
+        <div class="hd" style="margin-top:22px"><div class="h">단말기 기종</div><div class="sub">건</div></div>
+        <div id="d-term" class="bars"></div>
       </div>
-      <div class="lg:col-span-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">기간 선택</h2>
-        <div class="panel" style="padding:10px 14px">
-          <div class="flex items-center gap-2 flex-wrap">
-            <input id="gf-from" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D70051]">
-            <span class="text-slate-400 text-[12px]">~</span>
-            <input id="gf-to" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D70051]">
-            <button onclick="applyDateFilter()" class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition" style="background:var(--atec-magenta)">조회</button>
-            <span class="text-[11px] text-slate-400 ml-2">빠른 선택:</span>
-            <button onclick="quickDate(7)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 7일</button>
-            <button onclick="quickDate(30)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 30일</button>
-            <button onclick="quickDate(90)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 90일</button>
-            <button onclick="clearDateFilter()" class="qd-btn text-[11px] border border-slate-200 rounded-md px-2 py-0.5 text-slate-500 hover:bg-slate-50 transition">전체</button>
-          </div>
-        </div>
+      <div class="dcol">
+        <div class="hd"><div class="h">센터별 접수</div><div class="sub">건, 차량, 위험</div></div>
+        <div id="d-center"></div>
+        <div class="sub" style="margin-top:10px">위험은 위험도 70 이상 차량 수입니다. 선제 점검 대상에서 센터별로 봅니다.</div>
       </div>
     </div>
-
-    <!-- KPI cards -->
-    <div id="stat-cards" class="grid grid-cols-3 md:grid-cols-3 gap-4 mb-6"></div>
 
     <!-- (삭제됨) 자주 발생하는 장애·재불량 주의 조치·재불량 다발 차량 — 렌더 안전용 숨김 placeholder -->
     <div style="display:none"><div id="top-err"></div><div id="repeat-risk"></div><div id="top-veh"></div></div>
@@ -723,28 +1033,28 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- PREEMPTIVE CHECK -->
   <section id="preempt" class="hidden">
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+    <div class="sec" style="padding-top:0">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#D70051]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
+          <h2 class="sec-title">센터별 위험도 상위 10대</h2>
+          <p class="sub max-w-2xl">장애접수 이력과 단말기 핵심 이벤트를 종합해 각 센터별 위험 상위 10대씩 고릅니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. 기준일 <span id="ref-date" class="font-semibold" style="color:var(--atec-ink)"></span></p>
         </div>
-        <div id="preempt-summary" class="flex gap-2 flex-wrap"></div>
+        <div id="preempt-summary" class="flex flex-wrap items-baseline"></div>
       </div>
-      <div class="flex flex-wrap items-center gap-2 mt-3 pl-3">
-        <span class="text-[11px] text-slate-500 font-semibold">우선순위:</span>
-        <button data-pf="all" class="pf-btn chip border transition">전체</button>
-        <button data-pf="high" class="pf-btn chip border transition">높음 (70+)</button>
-        <button data-pf="mid" class="pf-btn chip border transition">중간 (50-69)</button>
-        <button data-pf="low" class="pf-btn chip border transition">낮음 (30-49)</button>
-        <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer ml-2">
+      <div class="fbar" style="border-bottom:0;padding-bottom:0">
+        <span class="flab">우선순위</span>
+        <button data-pf="all" class="pf-btn">전체</button>
+        <button data-pf="high" class="pf-btn">높음 (70+)</button>
+        <button data-pf="mid" class="pf-btn">중간 (50-69)</button>
+        <button data-pf="low" class="pf-btn">낮음 (30-49)</button>
+        <label class="flex items-center gap-1 text-[13px] cursor-pointer" style="color:var(--atec-gray);margin-left:10px">
           <input type="checkbox" id="pf-showexcluded" onchange="renderPreempt()" class="accent-[#D70051]"> 제외 차량 보기 <span id="pf-exc-count" class="text-slate-400"></span>
         </label>
-        <span class="text-[11px] text-slate-400 ml-auto">센터:</span>
-        <select id="pf-center" onchange="renderPreempt()" class="text-[11px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체</option></select>
+        <span class="flab" style="margin-left:auto">센터</span>
+        <select id="pf-center" onchange="renderPreempt()" class="fdate"><option value="">전체</option></select>
       </div>
     </div>
-    <div id="preempt-list" class="space-y-2.5"></div>
+    <div id="preempt-list"></div>
   </section>
 
   <!-- VEHICLE RESULT -->
@@ -753,10 +1063,10 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
   <!-- 단말기(S/N) 조회 -->
   <section id="sn" class="hidden">
     <div class="flex items-center justify-between mb-2">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">단말기(S/N) 조회 · 개체 이력 추적</h2>
+      <h2 class="sec-title">단말기(S/N) 조회 · 개체 이력 추적</h2>
     </div>
-    <p class="text-[12px] text-slate-500 mb-3 pl-3 max-w-2xl">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+    <p class="sub max-w-2xl" style="margin-bottom:12px">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
+    <div class="sec">
       <div class="flex gap-2">
         <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 입력 — 뒤 4자리만 쳐도 됩니다 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
           class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#D70051]">
@@ -769,18 +1079,18 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- EVENT ANALYSIS -->
   <section id="events" class="hidden">
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+    <div class="sec">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">이벤트 분석</h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl">단말기 이벤트코드 사전과, 업로드한 이벤트 로그의 <b>이상/단절 이벤트</b>를 분석합니다. 다발 차량을 선제 점검에 활용하세요.</p>
+          <h2 class="sec-title">이벤트 분석</h2>
+          <p class="sub max-w-2xl">단말기 이벤트코드 사전과, 업로드한 이벤트 로그의 <b>이상/단절 이벤트</b>를 분석합니다. 다발 차량을 선제 점검에 활용하세요.</p>
         </div>
-        <div id="ev-summary" class="flex gap-2 flex-wrap"></div>
+        <div id="ev-summary" class="flex flex-wrap items-baseline"></div>
       </div>
-      <div class="flex flex-wrap items-center gap-2 mt-3 pl-3">
-        <span class="text-[11px] text-slate-500 font-semibold">표시 범위:</span>
-        <button data-scope="core" class="scope-btn chip border transition">핵심 이상 이벤트 <span class="opacity-70">(지정 33종)</span></button>
-        <button data-scope="all" class="scope-btn chip border transition">전체 이상 이벤트</button>
+      <div class="fbar" style="border-bottom:0;padding-bottom:0">
+        <span class="flab">표시 범위</span>
+        <button data-scope="core" class="scope-btn">핵심 이상 이벤트 <span class="opacity-70">(지정 33종)</span></button>
+        <button data-scope="all" class="scope-btn">전체 이상 이벤트</button>
         <span class="text-[11px] text-slate-400 ml-1">※ 핵심 = 통신 끊김·모뎀·CSAM·GPS·CPU 등 현장에서 중점 관리하는 이벤트</span>
       </div>
     </div>
@@ -789,7 +1099,7 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
     <div id="ev-log-section"></div>
 
     <!-- code dictionary -->
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+    <div class="sec">
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <h3 class="text-xs font-extrabold text-[#111111]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
         <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D70051]">
@@ -811,11 +1121,11 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- AI CHATBOT (BETA) -->
   <section id="ai" class="hidden">
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+    <div class="sec">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111] flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3">차량 이력·이벤트·맞춤 권장 데이터를 바탕으로 AI가 답변합니다. 진단 참고용이며 최종 판단은 기사님이 하세요.</p>
+          <h2 class="sec-title flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
+          <p class="sub">차량 이력·이벤트·맞춤 권장 데이터를 바탕으로 AI가 답변합니다. 진단 참고용이며 최종 판단은 기사님이 하세요.</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <span id="ai-key-status" class="text-[11px] font-bold text-slate-400">⏳ 키 확인 중…</span>
@@ -827,7 +1137,7 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
     </div>
 
     <!-- 빠른 질문 예시 -->
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
+    <div class="sec">
       <div class="text-[12px] font-bold text-slate-600 mb-2">💡 이렇게 물어보세요</div>
       <div id="ai-suggest" class="flex flex-wrap gap-2"></div>
     </div>
@@ -853,13 +1163,13 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- ADMIN: USER MANAGEMENT -->
   <section id="admin" class="hidden" data-admin>
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">사용자 관리</h2>
-      <p class="text-[12px] text-slate-500 mt-1 pl-3">가입 신청 승인/거부, 권한(관리자/일반) 변경, 계정 삭제를 관리합니다.</p>
+    <div class="sec">
+      <h2 class="sec-title">사용자 관리</h2>
+      <p class="sub">가입 신청 승인/거부, 권한(관리자/일반) 변경, 계정 삭제를 관리합니다.</p>
     </div>
     <div id="admin-pending" class="mb-4"></div>
     <div id="admin-resets" class="mb-4"></div>
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
+    <div class="sec">
       <h3 class="text-xs font-extrabold text-[#111111] mb-3">전체 사용자</h3>
       <div class="overflow-x-auto">
         <table class="w-full text-[12px]">
@@ -876,7 +1186,7 @@ html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:
 
   <!-- DATA MANAGEMENT -->
   <section class="mt-6" data-admin>
-    <details class="bg-white border border-rose-100 rounded-xl shadow-sm">
+    <details class="sec">
       <summary class="px-4 py-3 flex items-center justify-between">
         <span class="text-xs font-extrabold text-[#111111] flex items-center gap-1.5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16" stroke="#D70051" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1267,15 +1577,14 @@ function logout(){
 function isAdmin(){ return ME && ME.role==='admin'; }
 function renderUserBadge(){
   const b=$('#user-badge'); if(!b) return;
-  const roleChip = isAdmin()? '<span class="bg-amber-400 text-amber-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ml-1">관리자</span>' : '<span class="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-bold ml-1">일반</span>';
-  const adminBtn = isAdmin()?`<button onclick="gotoPortal()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[10px] font-bold transition">👤 사용자 관리</button>`:'';
-  b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="shrink-0"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <span class="font-bold truncate max-w-[140px]">${ME?ME.name:''}</span>${roleChip}
-    <button onclick="showHelp()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[10px] font-bold transition" title="사용법 도움말">❓ 도움말</button>
+  // 시안: 이름 · 역할 뒤에 글자 링크만, 가는 세로선으로 구분 (버튼·onclick 은 그대로)
+  const adminBtn = isAdmin()?`<button onclick="gotoPortal()" class="ub-btn">사용자 관리</button>`:'';
+  b.innerHTML = `<span class="ub-name"><b>${ME?ME.name:''}</b> ${isAdmin()?'관리자':'일반'}</span>
+    <button onclick="showHelp()" class="ub-btn" title="사용법 도움말">도움말</button>
     ${adminBtn}
-    <button onclick="promptChangePw(false)" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[10px] font-bold transition">🔑 비밀번호</button>
-    <button onclick="gotoPortal()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[10px] font-bold transition">🏠 포털</button>
-    <button onclick="logout()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[10px] font-bold transition">🚪 로그아웃</button>`;
+    <button onclick="promptChangePw(false)" class="ub-btn">비밀번호</button>
+    <button onclick="gotoPortal()" class="ub-btn">포털</button>
+    <button onclick="logout()" class="ub-btn">로그아웃</button>`;
 }
 function toggleUserMenu(){ /* deprecated — buttons now always visible */ }
 document.addEventListener('click', e=>{
@@ -1357,6 +1666,7 @@ function setTab(t){
   if(t==='admin' && !isAdmin()) t='dash';
   CURTAB=t;
   { const tt=$('#ci-title-text'); if(tt) tt.textContent={dash:'대시보드',preempt:'선제 점검 대상',search:'차량 검색',sn:'단말기 조회',events:'이벤트 분석',ai:'AI 챗봇',admin:'사용자 관리'}[t]||''; }
+  { const ss=$('#ci-sub'); if(ss) ss.textContent={dash:'조건을 고르면 아래 전체가 함께 바뀝니다.',preempt:'장애 접수 이력과 단말기 핵심 이벤트를 종합해 센터별 위험 상위 10대를 고릅니다.',search:'차량번호를 넣으면 이력과 위험도를 보고 현장에서 할 일을 정합니다.',sn:'S/N(개체) 기준으로 어느 차량을 거치든 반복되는 불량 단말기를 찾습니다.',events:'이벤트코드 사전과 업로드한 로그의 이상·단절 이벤트를 분석합니다.',ai:'차량 이력·이벤트·권장 데이터를 바탕으로 답합니다. 진단 참고용입니다.',admin:'가입 승인, 권한 변경, 계정 삭제를 관리합니다.'}[t]||''; }
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
   ['dash','preempt','result','events','admin','ai','sn'].forEach(id=>$('#'+id).classList.add('hidden'));
   if(t==='dash'){ $('#dash').classList.remove('hidden'); }
@@ -1563,13 +1873,11 @@ function renderStorageStatus(usedStore){
 }
 function renderStatus(){
   const m=KB.meta;
-  const src = CLOUD_INFO ? '☁ 클라우드' : (STORED_RECS>0 ? '누적' : '기본');
-  $('#kb-meta').innerHTML = `<div class="text-[13px]">${num(m.records)}건 · 차량 ${num(m.vehicles)}대</div>
-    <div class="flex items-center gap-1.5 mt-1.5 bg-white/15 rounded-md px-2 py-1">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><path d="M3 9h18M8 3v4M16 3v4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-      <span class="text-[11px] font-semibold text-white">${m.period}</span>
-      <span class="text-[10px] text-pink-100/80 ml-auto">${src}</span>
-    </div>${CLOUD_INFO?`<div class="text-[10px] text-pink-100/70 mt-1">최종 게시: ${fmtCloudTime(CLOUD_INFO.updated_at)}</div>`:''}`;
+  const src = CLOUD_INFO ? '클라우드' : (STORED_RECS>0 ? '누적' : '기본');
+  // 머리글 오른쪽 한 줄 요약 (상자 없음)
+  $('#kb-meta').innerHTML = `<div>${num(m.records)}건 · 차량 ${num(m.vehicles)}대</div>
+    <div>${m.period}</div>
+    <div>${src}${CLOUD_INFO?` · ${fmtCloudTime(CLOUD_INFO.updated_at)}`:''}</div>`;
 }
 const num = n => (n||0).toLocaleString('ko-KR');
 
@@ -1689,72 +1997,45 @@ function termCounts(){
   }
   return {c,total};
 }
+/* 필터 단추: 시안의 테두리 칩 — 이름 + 건수. 클릭 함수는 그대로 */
 function renderChannelTiles(){
   const box=$('#channel-tiles'); if(!box) return;
   const {c,total}=channelCounts();
   const meta=[
-    {k:'', name:'전체', color:'#111111', n:total, ico:'▦'},
-    {k:'전화접수', name:'전화접수', color:'#D70051', n:c['전화접수'], ico:'☎'},
-    {k:'시스템접수', name:'시스템접수', color:'#5A666F', n:c['시스템접수'], ico:'⚙'},
-    {k:'B/S처리', name:'B/S처리', color:'#5A666F', n:c['B/S처리'], ico:'🛡'},
-    {k:'현장접수', name:'현장접수', color:'#5A666F', n:c['현장접수'], ico:'📍'},
+    {k:'', name:'전체', n:total},
+    {k:'전화접수', name:'전화', n:c['전화접수']},
+    {k:'시스템접수', name:'시스템', n:c['시스템접수']},
+    {k:'B/S처리', name:'B/S', n:c['B/S처리']},
+    {k:'현장접수', name:'현장', n:c['현장접수']},
   ];
   box.innerHTML = meta.map(m=>{
     const active = (m.k||'')===GF.ch;
-    const share = total? Math.round(m.n/total*100):0;
-    const bg = active? `background:linear-gradient(135deg, ${m.color}, ${shade(m.color,-18)});` : '';
-    const barFill = active? 'rgba(255,255,255,.85)' : m.color;
-    return `<div class="ctile ${active?'active':''}" style="${bg}" onclick="setChannel('${m.k}')">
-      <svg class="ct-check" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="rgba(255,255,255,.25)"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="ct-name"><span style="font-size:14px">${m.ico}</span> ${m.name}</div>
-      <div class="ct-num" style="${active?'':'color:'+m.color}">${num(m.n)}</div>
-      <div class="ct-share">${m.k?share+'% · 채널 비중':'전체 접수'}</div>
-      <div class="ct-bar"><i style="width:${m.k?share:100}%;background:${barFill}"></i></div>
-    </div>`;
+    return `<button type="button" class="ctile ${active?'active':''}" onclick="setChannel('${m.k}')"><span class="ct-name">${m.name}</span><span class="ct-num">${num(m.n)}</span></button>`;
   }).join('');
 }
 function renderCenterTiles(){
   const box=$('#center-tiles'); if(!box) return;
   const {c,total}=centerCounts();
   const order=['강북센터','강동센터','강남센터','강서센터'];
-  const present=order.filter(k=>c[k]!=null); 
-  const meta=[{k:'',name:'전체',color:'#111111',n:total,ico:'▦'}].concat(present.map(k=>({k,name:k.replace('센터',''),color:CENTER_COLORS[k]||'#D70051',n:c[k]||0,ico:'🏢'})));
+  const present=order.filter(k=>c[k]!=null);
+  const meta=[{k:'',name:'전체',n:total}].concat(present.map(k=>({k,name:k.replace('센터',''),n:c[k]||0})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.center;
-    const share=total?Math.round(m.n/total*100):0;
-    const bg=active?`background:linear-gradient(135deg, ${m.color}, ${shade(m.color,-18)});`:'';
-    const barFill=active?'rgba(255,255,255,.85)':m.color;
-    return `<div class="ctile ${active?'active':''}" style="${bg}" onclick="setCenter('${m.k}')">
-      <svg class="ct-check" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="rgba(255,255,255,.25)"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="ct-name"><span style="font-size:13px">${m.ico}</span> ${m.name}</div>
-      <div class="ct-num" style="${active?'':'color:'+m.color}">${num(m.n)}</div>
-      <div class="ct-share">${m.k?share+'% · 센터 비중':'전체 센터'}</div>
-      <div class="ct-bar"><i style="width:${m.k?share:100}%;background:${barFill}"></i></div>
-    </div>`;
+    return `<button type="button" class="ctile ${active?'active':''}" onclick="setCenter('${m.k}')"><span class="ct-name">${m.name}</span><span class="ct-num">${num(m.n)}</span></button>`;
   }).join('');
 }
 function renderTermTiles(){
   const box=$('#term-tiles'); if(!box) return;
   const {c,total}=termCounts();
-  const TERM_COLORS={'C-ITS통합단말기(B700)':'#D70051','차세대통합단말기(B710)':'#5A666F','통합단말기(B800)':'#5A666F'};
   const order=Object.keys(c).sort((a,b)=>{
     const PRI={'B800':0,'B700':1,'B710':2};
     const ra=PRI[termShort(a)]!=null?PRI[termShort(a)]:9, rb=PRI[termShort(b)]!=null?PRI[termShort(b)]:9;
     return ra-rb || c[b]-c[a];
   });
-  const meta=[{k:'',name:'전체',color:'#111111',n:total,ico:'▦'}].concat(order.map(k=>({k,name:termShort(k),color:TERM_COLORS[k]||'#D70051',n:c[k]||0,ico:'📟'})));
+  const meta=[{k:'',name:'전체',n:total}].concat(order.map(k=>({k,name:termShort(k),n:c[k]||0})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.term;
-    const share=total?Math.round(m.n/total*100):0;
-    const bg=active?`background:linear-gradient(135deg, ${m.color}, ${shade(m.color,-18)});`:'';
-    const barFill=active?'rgba(255,255,255,.85)':m.color;
-    return `<div class="ctile ${active?'active':''}" style="${bg}" onclick="setTerm('${m.k.replace(/'/g,"\\'")}')" title="${m.k||'전체 기종'}">
-      <svg class="ct-check" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="rgba(255,255,255,.25)"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="ct-name"><span style="font-size:13px">${m.ico}</span> ${m.name}</div>
-      <div class="ct-num" style="${active?'':'color:'+m.color}">${num(m.n)}</div>
-      <div class="ct-share">${m.k?share+'% · 기종 비중':'전체 기종'}</div>
-      <div class="ct-bar"><i style="width:${m.k?share:100}%;background:${barFill}"></i></div>
-    </div>`;
+    return `<button type="button" class="ctile ${active?'active':''}" onclick="setTerm('${m.k.replace(/'/g,"\\'")}')" title="${m.k||'전체 기종'}"><span class="ct-name">${m.name}</span><span class="ct-num">${num(m.n)}</span></button>`;
   }).join('');
 }
 function shade(hex,p){
@@ -1765,6 +2046,7 @@ function shade(hex,p){
 /* compute aggregates from vehicles honoring full global filter; also returns repeat-rate */
 function computeDashView(){
   const month_recv={}, err_total={}, center={}, term={}, handling={};
+  const center_veh={};                       // 센터별 차량 집합 (시안의 '차량' 열)
   let records=0; const vehSet=new Set();
   // for repeat rate within filtered set
   const byVehFiltered={};
@@ -1776,7 +2058,7 @@ function computeDashView(){
       const mk=it.date.slice(0,7);
       if(it.recv){const k=mk+'|'+it.recv; month_recv[k]=(month_recv[k]||0)+1;}
       if(it.err) err_total[it.err]=(err_total[it.err]||0)+1;
-      if(it.center) center[it.center]=(center[it.center]||0)+1;
+      if(it.center){ center[it.center]=(center[it.center]||0)+1; (center_veh[it.center]=center_veh[it.center]||new Set()).add(v); }
       if(it.term) term[it.term]=(term[it.term]||0)+1;
       (byVehFiltered[v]=byVehFiltered[v]||[]).push(it);
     }
@@ -1794,7 +2076,8 @@ function computeDashView(){
     }
   }
   const repeatRate = hTot? Math.round(hRep/hTot*1000)/10 : 0;
-  return {records, vehicles:vehSet.size, month_recv, err_total, center, term, repeatRate};
+  const centerVeh={}; for(const k in center_veh) centerVeh[k]=center_veh[k].size;
+  return {records, vehicles:vehSet.size, month_recv, err_total, center, term, repeatRate, centerVeh, hTot};
 }
 function renderDash(){
   const active = gfActive();
@@ -1804,26 +2087,54 @@ function renderDash(){
   const vehN = view.vehicles;
   const subTxt = active ? '필터 적용 기준' : '전체 누적';
 
-  const ICONS={
-    rec:'<path d="M4 4h16v4H4zM4 12h16v8H4z" stroke="currentColor" stroke-width="1.5"/>',
-    veh:'<path d="M4 16V8a2 2 0 012-2h12a2 2 0 012 2v8M4 16h16M6 19v1M18 19v1M7 9h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-    err:'<path d="M12 3l9 16H3z M12 10v4 M12 17v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
-    rate:'<path d="M3 17l5-5 4 3 8-8M21 7v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
-  };
+  // 위험 차량: 선제점검과 같은 계산(채널·센터·기간 필터 반영), 위험도 70 이상
+  let riskAll=[], riskTop=0;
+  try{
+    const all=computePreempt(GF.ch||'');
+    const gfHas = gfActive() ? (v=>vehMatches(v)) : (()=>true);
+    const act=all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v));
+    riskAll=act.filter(p=>p.sc>=70);
+    riskTop=capPreempt(act,10).length;
+  }catch(e){}
+
+  // 채널 비중 한 줄 (총 접수 아래 설명)
+  const chTot={}; for(const k in view.month_recv){ const ch=k.split('|')[1]; chTot[ch]=(chTot[ch]||0)+view.month_recv[k]; }
+  const chOrder=['전화접수','시스템접수','B/S처리','현장접수'];
+  const chShort={'전화접수':'전화','시스템접수':'시스템','B/S처리':'B/S','현장접수':'현장'};
+  const chLine = recordsN? chOrder.filter(ch=>chTot[ch]).slice(0,3).map(ch=>`${chShort[ch]} ${Math.round(chTot[ch]/recordsN*100)}%`).join(', ') : subTxt;
+
   const cards = [
-    ['총 접수', num(recordsN), '#D70051', subTxt, ICONS.rec],
-    ['해당 차량', num(vehN), '#111111', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
-    ['장애 유형', num(errEntries.length), '#D70051', '분류된 오류 종류', ICONS.err],
+    ['총 접수', num(recordsN), '건', '', chLine||subTxt],
+    ['해당 차량', num(vehN), '대', '', active?'필터 발생 차량':'검색 가능 대수'],
+    ['30일 재접수율', String(view.repeatRate), '%', '', `처리 뒤 30일 안에 다시 접수된 비율 · 조치 ${num(view.hTot)}건`],
+    ['위험 차량', num(riskAll.length), '대', 'red', `위험도 70 이상 · 선제 점검 상위 ${num(riskTop)}대`],
   ];
   $('#stat-cards').innerHTML = cards.map(c=>`
     <div class="kpi">
       <div class="kpi-label">${c[0]}</div>
-      <div class="kpi-val" style="color:${c[2]}">${c[1]}</div>
-      <div class="kpi-sub">${c[3]}</div>
-      <svg class="kpi-ico" width="78" height="78" viewBox="0 0 24 24" fill="none" style="color:${c[2]}">${c[4]}</svg>
+      <div class="kpi-val ${c[3]}">${c[1]}<small>${c[2]}</small></div>
+      <div class="kpi-sub">${c[4]}</div>
     </div>`).join('');
 
-  // top errors
+  // 막대 목록 (접수 채널 · 단말기 기종)
+  const barRows = (entries, max) => entries.map(([k,n])=>`<div class="bar-row"><span class="nm" title="${k}">${k}</span><span class="bar"><i style="width:${max?Math.max(1,Math.round(n/max*100)):0}%"></i></span><b>${num(n)}</b></div>`).join('') || '<div class="sub">해당 조건의 데이터가 없습니다.</div>';
+  const recvEntries = chOrder.filter(ch=>chTot[ch]).map(ch=>[chShort[ch], chTot[ch]]);
+  if($('#d-recv')) $('#d-recv').innerHTML = barRows(recvEntries, recvEntries[0]?Math.max(...recvEntries.map(x=>x[1])):0);
+  const termEntries = Object.entries(view.term).map(([k,n])=>[termShort(k), n]).sort((a,b)=>b[1]-a[1]);
+  if($('#d-term')) $('#d-term').innerHTML = barRows(termEntries, termEntries[0]?termEntries[0][1]:0);
+
+  // 센터별 표: 접수 · 차량 · 위험
+  if($('#d-center')){
+    const riskBy={}; riskAll.forEach(p=>{ const c=p.center||'센터 미지정'; riskBy[c]=(riskBy[c]||0)+1; });
+    const cK=Object.keys(view.center).sort((a,b)=>view.center[b]-view.center[a]);
+    const row=(name,n,veh,risk,cls,muted)=>`<div class="trow ${cls||''}" style="grid-template-columns:1fr 80px 80px 64px"><span${muted?' style="color:var(--atec-gray)"':' style="font-weight:500"'}>${name}</span><span class="r">${n}</span><span class="r" style="color:var(--atec-gray)">${veh}</span><span class="r" style="font-weight:700;color:var(--atec-red)">${risk}</span></div>`;
+    let totRisk=0; for(const c in riskBy) totRisk+=riskBy[c];
+    $('#d-center').innerHTML = `<div class="trow head" style="grid-template-columns:1fr 80px 80px 64px"><span>센터</span><span class="r">접수</span><span class="r">차량</span><span class="r">위험</span></div>`
+      + cK.map(c=>row(c.replace('센터','')||'센터 미지정', num(view.center[c]), num(view.centerVeh[c]||0), riskBy[c]?num(riskBy[c]):'<span style="color:var(--atec-gray);font-weight:400">–</span>', '', !c)).join('')
+      + row('합계', num(recordsN), num(vehN), num(totRisk), 'tot');
+  }
+
+  // top errors (숨김 placeholder — 다른 기능이 참조)
   const maxE = errEntries[0] ? errEntries[0][1].total : 1;
   $('#top-err').innerHTML = errEntries.slice(0,10).map(([e,o])=>`
     <div class="flex items-center gap-2 mb-1.5">
@@ -1856,35 +2167,35 @@ function renderCharts(view){
   const d = view || KB.dash || {};
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS={};
   if(typeof Chart==='undefined') return;
-  Chart.defaults.font.family='Noto Sans KR'; Chart.defaults.font.size=11;
-  const C={wine:'#111111',mag:'#D70051',pink:'#9AA3AA',rose:'#C9CED2',cyan:'#5A666F',purple:'#9AA3AA',green:'#111111',amber:'#8C6D2F'};   // 계열 구분: 레드·그레이·연회색·검정
+  Chart.defaults.font.family='Noto Sans KR'; Chart.defaults.font.size=11; Chart.defaults.color='#5A666F';
+  const C={wine:'#111111',mag:'#D70051',pink:'#9AA3AA',rose:'#C9CED2',cyan:'#5A666F',purple:'#9AA3AA',green:'#111111',amber:'#8C6D2F'};
 
-  // monthly stacked by channel
+  // 월별 추이 — 시안의 회색 선, 마지막 점만 빨강
   const mr = d.month_recv||{};
   const months=[...new Set(Object.keys(mr).map(k=>k.split('|')[0]))].sort();
   const channels=['전화접수','시스템접수','B/S처리','현장접수'];
-  const chColors={'전화접수':C.mag,'시스템접수':C.cyan,'B/S처리':C.purple,'현장접수':C.green};
   const activeCh = GF.ch? [GF.ch] : channels;
-  if($('#ch-month')) CHARTS.month=new Chart($('#ch-month'),{type:'bar',data:{labels:months.map(m=>m.slice(5)+'월'),
-    datasets:activeCh.map(ch=>({label:ch,data:months.map(m=>mr[m+'|'+ch]||0),backgroundColor:chColors[ch],borderRadius:0,stack:'s'}))},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10}}},
-      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#D9D9D9'}}}}});
+  const totals=months.map(m=>activeCh.reduce((s,ch)=>s+(mr[m+'|'+ch]||0),0));
+  const last=months.length-1;
+  if($('#dm-sub')) $('#dm-sub').textContent = months.length? `${months[0].replace('-','.')} – ${months[last].replace('-','.')}, 건` : '월별, 건';
+  if($('#ch-month')) CHARTS.month=new Chart($('#ch-month'),{type:'line',data:{labels:months.map(m=>m.slice(2).replace('-','.')),
+    datasets:[{label:GF.ch||'접수',data:totals,borderColor:C.cyan,borderWidth:2,tension:0,fill:false,
+      pointRadius:months.map((m,i)=>i===last?4.5:3.5),pointBackgroundColor:months.map((m,i)=>i===last?C.mag:'#fff'),pointBorderColor:months.map((m,i)=>i===last?'#fff':C.cyan),pointBorderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#111111',cornerRadius:0,padding:10}},
+      scales:{x:{grid:{display:false},border:{color:'#D9D9D9'},ticks:{maxTicksLimit:8}},y:{beginAtZero:true,grid:{color:'#EDEDED'},border:{display:false},ticks:{maxTicksLimit:5}}}}});
 
-  // channel doughnut
+  // 아래 세 차트는 캔버스가 있을 때만 (지금은 막대 목록으로 대신 그린다)
   const recvTot={}; channels.forEach(ch=>{recvTot[ch]=months.reduce((s,m)=>s+(mr[m+'|'+ch]||0),0);});
   const rLabels=channels.filter(ch=>recvTot[ch]>0);
+  const chColors={'전화접수':C.mag,'시스템접수':C.cyan,'B/S처리':C.purple,'현장접수':C.green};
   if($('#ch-recv')) CHARTS.recv=new Chart($('#ch-recv'),{type:'doughnut',data:{labels:rLabels,
     datasets:[{data:rLabels.map(ch=>recvTot[ch]),backgroundColor:rLabels.map(ch=>chColors[ch]),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8}}}}});
-
-  // center bar
   const cen=d.center||{}; const cK=Object.keys(cen).sort((a,b)=>cen[b]-cen[a]);
   if($('#ch-center')) CHARTS.center=new Chart($('#ch-center'),{type:'bar',data:{labels:cK,
     datasets:[{data:cK.map(k=>cen[k]),backgroundColor:'#5A666F',borderRadius:0}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{x:{grid:{color:'#D9D9D9'}},y:{grid:{display:false}}}}});
-
-  // terminal doughnut
   const term=d.term||{}; const tK=Object.keys(term).map(k=>{const m=k.match(/B7\d0|B800/);return {full:k,s:m?m[0]:k.slice(0,8)}});
   if($('#ch-term')) CHARTS.term=new Chart($('#ch-term'),{type:'doughnut',data:{labels:tK.map(t=>t.s),
     datasets:[{data:tK.map(t=>term[t.full]),backgroundColor:[C.mag,C.cyan,C.pink,C.wine],borderWidth:2,borderColor:'#fff'}]},
@@ -2201,57 +2512,44 @@ function renderPreempt(){
   const active=all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v));
   const hi=active.filter(p=>p.sc>=70).length, mid=active.filter(p=>p.sc>=50&&p.sc<70).length;
   const evChip = DAILY_AGG? miniStat('이벤트 반영','ON','#5A666F') : miniStat('이벤트','미반영','#5A666F');
-  const fchips = (GF.ch?miniStat('채널 기준',GF.ch,RECV_COLORS[GF.ch]||'#5A666F'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),CENTER_COLORS[GF.center]||'#5A666F'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#5A666F'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#5A666F'):'');
+  const fchips = (GF.ch?miniStat('채널 기준',GF.ch,'#5A666F'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),'#5A666F'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#5A666F'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#5A666F'):'');
   $('#preempt-summary').innerHTML =
     fchips+evChip+miniStat('위험 차량', active.length+'대','#111111')+miniStat('센터별 상위', list.length+'대','#D70051')+miniStat('높음',hi+'대','#D70051')+miniStat('제외',EXCLUDED.size+'대','#5A666F');
 
-  if(!list.length){ $('#preempt-list').innerHTML=`<div class="bg-white border border-rose-100 rounded-xl p-8 text-center text-sm text-slate-400">${showExcluded?'제외 처리된 차량이 없습니다.':'해당 조건의 선제 점검 대상이 없습니다.'}</div>`; return; }
+  if(!list.length){ $('#preempt-list').innerHTML=`<div class="sub" style="padding:32px 0;text-align:center">${showExcluded?'제외 처리된 차량이 없습니다.':'해당 조건의 선제 점검 대상이 없습니다.'}</div>`; return; }
   $('#preempt-list').innerHTML = list.map((p,i)=>{
-    const reco = ER()[p.err];
-    const best = reco? reco.handlings.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n)[0] : null;
     const excInfo = EXC_REASONS[p.v];
     if(showExcluded){
-      return `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 opacity-90">
-        <div class="flex items-start gap-3">
-          <div class="shrink-0 w-12 text-center">
-            <div class="w-11 h-11 rounded-full grid place-items-center text-white font-extrabold text-sm" style="background:#5A666F">${p.sc}</div>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-base font-extrabold text-slate-600">${p.v}</span>
-              <span class="text-[11px] text-slate-500">${p.op}</span>
-              <span class="chip bg-slate-200 text-slate-600">제외됨</span>
-              <span class="text-[11px] text-slate-400 ml-auto">총 ${p.tot}건 · 최근30일 ${p.r30}건</span>
-            </div>
-            ${excInfo?`<div class="text-[11px] text-slate-500 mt-1">사유: <b>${excInfo.reason}</b> <span class="text-slate-400">(${excInfo.at})</span></div>`:''}
-          </div>
-          <button onclick="restoreVeh('${p.v}',event)" class="shrink-0 text-[11px] font-semibold text-[#D70051] border border-rose-200 rounded-md px-2.5 py-1 hover:bg-rose-50 transition">복원</button>
+      return `<div class="pcard excluded">
+        <div class="p-sc"><div class="p-num" style="color:#5A666F">${p.sc}</div><div class="p-lv" style="color:#5A666F">제외됨</div></div>
+        <div class="p-main">
+          <div class="p-top"><span class="p-v" style="color:#5A666F">${p.v}</span><span class="sub">${p.op}</span><span class="sub" style="margin-left:auto">총 ${p.tot}건 · 최근30일 ${p.r30}건</span></div>
+          ${excInfo?`<div class="p-err">사유 <b style="color:var(--atec-ink)">${excInfo.reason}</b> <span>(${excInfo.at})</span></div>`:''}
         </div>
+        <button onclick="restoreVeh('${p.v}',event)" class="p-x">복원</button>
       </div>`;
     }
-    return `<div class="pcard bg-white border border-rose-100 rounded-xl shadow-sm p-3.5">
-      <div class="flex items-start gap-3">
-        <div class="shrink-0 w-12 text-center cursor-pointer" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
-          <div class="text-[10px] text-slate-400 font-semibold">#${i+1}</div>
-          <div class="w-11 h-11 rounded-full grid place-items-center text-white font-extrabold text-sm mt-0.5" style="background:${scoreColor(p.sc)}">${p.sc}</div>
-          <div class="text-[10px] font-bold mt-0.5" style="color:${scoreColor(p.sc)}">${scoreLabel(p.sc)}</div>
-        </div>
-        <div class="flex-1 min-w-0 cursor-pointer" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-lg font-extrabold text-[#111111]">${p.v}</span>
-            <span class="text-[12px] text-slate-500">${p.op}</span>
-            ${p.center?`<span class="chip bg-rose-50 text-[#111111] border border-rose-200" style="font-size:11.5px">${p.center}</span>`:''}
-            <span class="text-[12px] text-slate-400 ml-auto">총 ${p.tot}건 · 최근30일 ${p.r30}건${p.ds<999?` · ${p.ds}일 전 처리`:''}</span>
-          </div>
-          <div class="text-[13.5px] text-slate-600 mt-1.5">주 장애 <b class="text-[#D70051]">${p.err||'-'}</b>${p.last_err?` · 최근 <span class="text-slate-700">${p.last_err}</span> → <span class="text-[#111111] font-semibold">${p.last_field||'-'}</span>`:''}</div>
-          <div class="flex flex-wrap gap-1.5 mt-2">
-            ${p.core>0?`<span class="chip" style="background:#F2F2F2;color:#D70051;font-weight:800;font-size:11.5px">핵심이벤트 ${p.core}건</span>`:''}
-            ${p.rs.slice(0,3).map(r=>`<span class="chip bg-amber-50 text-amber-800 border border-amber-200" style="font-size:11.5px">${r}</span>`).join('')}
-          </div>
-          ${buildSmartReco(p)}
-        </div>
-        <button onclick="excludeVeh('${p.v}',event)" title="선제 점검 대상에서 제외 (관리자)" class="shrink-0 self-start text-[11px] font-semibold text-slate-400 border border-slate-200 rounded-md px-2 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">✕ 제외</button>
+    return `<div class="pcard">
+      <div class="p-sc" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
+        <div class="p-rank">#${i+1}</div>
+        <div class="p-num" style="color:${scoreColor(p.sc)}">${p.sc}</div>
+        <div class="p-lv" style="color:${scoreColor(p.sc)}">${scoreLabel(p.sc)}</div>
       </div>
+      <div class="p-main" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
+        <div class="p-top">
+          <span class="p-v">${p.v}</span>
+          <span class="sub">${p.op}</span>
+          ${p.center?`<span class="chip ln">${p.center}</span>`:''}
+          <span class="sub" style="margin-left:auto">총 ${p.tot}건 · 최근30일 ${p.r30}건${p.ds<999?` · ${p.ds}일 전 처리`:''}</span>
+        </div>
+        <div class="p-err">주 장애 <b style="color:var(--atec-red)">${p.err||'-'}</b>${p.last_err?` · 최근 <span style="color:var(--atec-ink)">${p.last_err}</span> → <span style="color:var(--atec-ink);font-weight:500">${p.last_field||'-'}</span>`:''}</div>
+        <div class="p-chips">
+          ${p.core>0?`<span class="chip ln red">핵심이벤트 ${p.core}건</span>`:''}
+          ${p.rs.slice(0,3).map(r=>`<span class="chip ln">${r}</span>`).join('')}
+        </div>
+        ${buildSmartReco(p)}
+      </div>
+      <button onclick="excludeVeh('${p.v}',event)" title="선제 점검 대상에서 제외 (관리자)" class="p-x">✕ 제외</button>
     </div>`;
   }).join('');
 }
@@ -2317,8 +2615,8 @@ function renderEvLog(){
     let n=0; for(const c in v.codes){ if(isLogged(c)) n+=v.codes[c]; }
     return {...v, scopeN:n};
   }).filter(v=>v.scopeN>0).sort((a,b)=>b.scopeN-a.scopeN).slice(0,40);
-  box.innerHTML=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-    <h3 class="text-xs font-extrabold text-[#111111] mb-1">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
+  box.innerHTML=`<div class="sec">
+    <h3 class="sec-title">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
     <p class="text-[11px] text-slate-500 mb-3">${EV_SCOPE==='core'?'지정된 핵심 이상 이벤트(통신 끊김·모뎀·CSAM·GPS·CPU 등)':'통신 끊김·실패·오류·Reset 등 이상 이벤트'}가 많은 차량입니다. 장애 접수 전 선제 점검 후보로 활용하세요.</p>
     ${ranked.length? `<div class="space-y-1.5">${ranked.map((v,i)=>{
       const topCodes=Object.entries(v.codes).filter(([c])=>isLogged(c)).sort((a,b)=>b[1]-a[1]).slice(0,3)
@@ -2386,55 +2684,66 @@ function renderVehicleNoFault(vnum, m){
   const modelLabel = MODEL_LABEL[m.m]||m.m||'-';
   const rt = m.rt||'';
   const html = `
-  <div class="space-y-4">
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-lg font-extrabold text-[#111111]">${escHtml(vnum)}</span>
-        <span class="chip" style="background:#F2F2F2;color:#5A666F;font-weight:700">${escHtml(modelLabel)}</span>
-        <span class="chip" style="background:#F2F2F2;color:#5A666F;font-weight:700">장애 이력 없음</span>
+  <div class="fadein">
+    <div class="vgrid">
+      <div class="vcol">
+        <div>
+          <div class="vnum">${escHtml(vnum)}</div>
+          <div class="vmeta"><span>${escHtml(m.op||'-')}</span><span>${escHtml(modelLabel)}</span>${rt?`<span>${escHtml(rt)}</span>`:''}<span>${escHtml(m.ct||'-')}</span></div>
+        </div>
+        <div class="vjudge">
+          <div class="mark"></div>
+          <div class="lab">현장 판정</div>
+          <div class="ab-badge" style="color:var(--atec-gray)">이력 없음</div>
+          <div class="note">등록된 장애·AS 접수 이력이 없는 차량입니다. 백업을 올리면 아래에서 로그 분석을 받을 수 있습니다.</div>
+        </div>
+        <div class="kv vstat-row">
+          <div><span class="k">총 접수</span><span class="v">0건</span></div>
+          <div><span class="k">최근 90일 접수</span><span class="v">0건</span></div>
+          <div><span class="k">단말기</span><span class="v">${escHtml(modelLabel)}</span></div>
+        </div>
       </div>
-      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-3 text-[13px]">
-        <div><span class="text-slate-400">운수사</span> <b class="text-slate-700">${escHtml(m.op||'-')}</b></div>
-        <div><span class="text-slate-400">센터</span> <b class="text-slate-700">${escHtml(m.ct||'-')}</b></div>
-        <div class="sm:col-span-2"><span class="text-slate-400">노선</span> <b class="text-slate-700">${escHtml(rt||'-')}</b></div>
+      <div class="vcol">
+        <div class="hd"><h3 class="h">권장 현장 조치</h3><span class="sub">접수 이력 없음</span></div>
+        <div class="steps"><div class="step"><span class="n">1</span><div><div class="t">단말기 로그 백업을 올려 상태를 확인합니다.</div><div class="s">통합단말기와 승하차단말기 백업을 함께 올리면 원인을 격리합니다.</div></div></div></div>
       </div>
-      <p class="text-[12px] text-slate-500 mt-3 bg-emerald-50/60 border border-emerald-100 rounded-lg px-3 py-2">이 차량은 등록된 <b>장애·AS 접수 이력이 없습니다</b> (무사고). 백업을 올리면 아래에서 로그 분석을 받을 수 있습니다.</p>
+      <div class="vcol">
+        <div>
+          <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
+          <div class="lst"><div style="padding:10px 0" id="eta-box-nf" class="eta-box">—</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- 로그백업 분석 (장애이력 없는 차량도 동일 제공) -->
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#111111] mb-1">📂 단말기 로그백업 분석</h3>
-      <p class="text-[11px] text-slate-500 mb-2"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
-      <div class="space-y-3">
-        <div class="border border-rose-100 rounded-lg p-2.5" style="background:#F2F2F2">
-          <div class="text-[12px] font-extrabold text-[#111111] mb-1">① 통합단말기 백업</div>
-          <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
-          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
-          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
+    <div class="logbk">
+      <div class="hd"><h3 class="h">단말기 로그백업 분석</h3><span class="sub">기기 안에서만 분석되고 원본은 저장되지 않습니다</span></div>
+      <p class="sub" style="margin-bottom:14px"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다.</p>
+      <div class="lgrid">
+        <div class="lbox">
+          <div class="t">① 통합단말기 백업</div>
+          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full">
+          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full">
         </div>
-        <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#F2F2F2">
-          <div class="text-[12px] font-extrabold text-[#5A666F] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
-          <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
-          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
-          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
+        <div class="lbox">
+          <div class="t">② 승하차단말기 백업 <span class="sub">(승차/하차1/하차2 중 문제 유닛)</span></div>
+          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full">
+          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full">
         </div>
-        <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">🔍 분석하기</button>
       </div>
+      <p class="sub" style="margin:12px 0">아이폰은 폴더 선택이 안 됩니다 — 백업 폴더를 zip으로 압축해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, 둘 다 올리면 원인 격리가 정확해집니다.</p>
+      <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="btn-go">분석하기</button>
       <div id="logbk-iso" class="mt-3"></div>
       <div id="logbk-result" class="mt-3"></div>
-    </div>
-    <div id="logbk-action" class="bg-white border border-rose-100 rounded-xl shadow-sm p-4" style="display:none"></div>
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#111111] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
-      <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
-    </div>
-
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#111111] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
-      <div id="eta-box-nf">—</div>
+      <div id="logbk-action" class="mt-4" style="display:none"></div>
+      <div class="mt-6">
+        <div class="hd"><h3 class="h">로그 진단·처리 이력</h3><span class="sub">재불량 추적</span></div>
+        <div id="logbk-history"><span class="sub">불러오는 중…</span></div>
+      </div>
     </div>
   </div>`;
   $('#result').innerHTML = html;
@@ -2482,6 +2791,7 @@ function doSearch(v){
   $('#result').classList.remove('hidden');
   CURTAB='search';
   { const tt=$('#ci-title-text'); if(tt) tt.textContent='차량 검색'; }
+  { const ss=$('#ci-sub'); if(ss) ss.textContent='차량번호를 넣으면 이력과 위험도를 보고 현장에서 할 일을 정합니다.'; }
   const bb=$('#back-bar'); if(bb) bb.classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='search'));
   if(veh){ renderVehicle(v, veh); }
@@ -2562,8 +2872,19 @@ function renderVehicle(vnum, veh){
   // risk score: receipts count + recent recurrence
   const recent90 = items.filter(it=>daysAgo(it.date)<=90).length;
   const risk = riskLevel(items.length, recent90, reproRate);
+  const reproN = reproCount['재현']||0;
 
-  // 맞춤 권장 + 매뉴얼 절차 (선제점검과 동일 로직 재사용)
+  // 위험도 점수: 선제점검과 같은 계산. 목록에 없으면(최근 처리·점수 0) 표시하지 않는다
+  let sc=null, scPct='', median=0, preN=0, scMax=100;
+  try{
+    const all=computePreempt('');
+    preN=all.length; if(all[0]) scMax=Math.max(100, all[0].sc);
+    const me=all.find(p=>p.v===vnum); if(me) sc=me.sc;
+    if(preN){ const s=all.map(p=>p.sc).sort((a,b)=>a-b); median=s[Math.floor(s.length/2)]; }
+    if(me){ const rank=all.findIndex(p=>p.v===vnum); scPct=`전체 ${num(preN)}대 중 상위 ${Math.max(1,Math.round((rank+1)/preN*100))}%`; }
+  }catch(e){}
+
+  // 맞춤 권장 + 매뉴얼 절차 (선제점검과 동일 로직 재사용 — 현재 비표시 설정이면 빈 문자열)
   let smartBlock='';
   try{
     const lastItem=items[items.length-1]||{};
@@ -2571,133 +2892,167 @@ function renderVehicle(vnum, veh){
     const _p={v:vnum, err:chronicErr, last_err:lastItem.err||'', last_field:lastItem.field||'',
              sc:0, ds:0, r30:0, tot:items.length, core:0, rs:[]};
     const _smart=buildSmartReco(_p);
-    if(_smart){
-      smartBlock=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-        <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111] mb-1">맞춤 권장 · 매뉴얼 절차</h3>
-        <p class="text-[11px] text-slate-500 mb-2 pl-3">이 차량의 이력·이벤트·매뉴얼을 종합한 권장</p>
-        <div class="pl-3">${_smart}</div>
-      </div>`;
-    }
+    if(_smart){ smartBlock=`<div style="margin-top:14px">${_smart}</div>`; }
   }catch(e){ console.warn('smart reco build failed', e); }
 
-  // daily event hint
-  let dailyHint='';
+  // 권장 현장 조치: 이 차량의 주 장애 유형에 대해 통계상 조치별 재접수율 (기종 기준)
+  let steps='', basis='', recoSub='';
+  try{
+    const E=ER(RECO_TERM);
+    const rec = topErr && E[topErr];
+    if(rec && rec.handlings && rec.handlings.length){
+      let pool=rec.handlings.filter(x=>x.n>=5); if(pool.length<2) pool=rec.handlings.slice();
+      const byRate=pool.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n);
+      const hs=byRate.slice(0,4);
+      const best=byRate[0];
+      const totN=rec.handlings.reduce((s,x)=>s+x.n,0);
+      recoSub=`${RECO_TERM?termShort(RECO_TERM)+' · ':''}${topErr} ${num(totN)}건 통계 · 재접수 적은 순`;
+      steps=hs.map((x,i)=>{
+        const done=fieldCount[x.h]?` 이 차량에 ${fieldCount[x.h]}회 적용했습니다.`:'';
+        return `<div class="step"><span class="n">${i+1}</span><div><div class="t">${x.h}</div><div class="s">재접수 <b style="color:${rateColor(x.rate)}">${x.rate}%</b> · ${num(x.n)}건${done}</div></div></div>`;
+      }).join('');
+      basis=`같은 유형 ${num(totN)}건에서 ${byRate.slice(0,3).map(x=>`${x.h} 뒤 재접수 ${x.rate}%`).join(', ')}였습니다.${best&&fieldCount[best.h]?` 이 차량은 ${best.h}을(를) 이미 ${fieldCount[best.h]}회 했습니다.`:''}`;
+    } else {
+      const fb=Object.entries(fieldCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
+      recoSub='이 차량에 적용한 조치';
+      steps=fb.map((x,i)=>`<div class="step"><span class="n">${i+1}</span><div><div class="t">${x[0]}</div><div class="s">${x[1]}회 적용</div></div></div>`).join('') || `<div class="step"><span class="n">–</span><div class="t" style="color:var(--atec-gray)">권장할 조치 통계가 없습니다.</div></div>`;
+      basis='';
+    }
+  }catch(e){ console.warn('reco build failed', e); }
+
+  // 당일 이벤트
+  let evRows='', evSub='', evTotal=0;
   if(DAILY && veh.vid && DAILY[veh.vid]){
     const allEvs=DAILY[veh.vid];
     const evs=allEvs.filter(e=>isLogged(e.code)); // scope filter (핵심/전체)
     const scopeLabel = EV_SCOPE==='core'?'핵심 이상':'이상/단절';
-    // group by code with count + first/last time
+    evTotal=evs.length;
     const grp={};
     evs.forEach(e=>{ const k=e.code; if(!grp[k]) grp[k]={code:k,n:0,first:e.time,last:e.time}; grp[k].n++; if(e.time<grp[k].first)grp[k].first=e.time; if(e.time>grp[k].last)grp[k].last=e.time; });
     const grouped=Object.values(grp).sort((a,b)=>b.n-a.n);
-    const evRow = g=>{
-      const E=EVENTS[g.code]; const core=isCore(g.code);
-      return `<div class="flex items-center gap-2 py-1 border-b border-amber-100/60 last:border-0">
-        <span class="font-mono font-bold text-[11px] shrink-0 w-12 text-[#D70051]">${g.code}</span>
-        ${core?'<span class="chip shrink-0" style="background:#F2F2F2;color:#D70051;font-weight:800">핵심</span>':''}
-        <span class="text-[11px] text-slate-700 flex-1 min-w-0 truncate" title="${E?(E.t||''):''}">${E?(E.t||'(코드미상)'):'(코드미상)'}${E&&E.cat?` <span class="text-slate-400">· ${E.cat}</span>`:''}${E&&E.dev?` <span class="text-slate-300">· ${E.dev}</span>`:''}</span>
-        <span class="text-[11px] font-bold text-amber-700 shrink-0">×${g.n}</span>
-        <span class="text-[10px] text-slate-400 shrink-0 w-24 text-right">${g.first}${g.n>1?'~'+g.last:''}</span>
-      </div>`;
-    };
-    if(grouped.length){
-      dailyHint = `<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
-        <div class="text-xs font-extrabold text-amber-800 flex items-center gap-1.5 mb-2">⚠ 당일 ${scopeLabel} 이벤트 <span class="text-amber-600 font-medium">${evs.length}건 · ${grouped.length}종</span>${EV_SCOPE==='core'&&allEvs.length>evs.length?`<span class="text-amber-500 font-normal">(전체 이상 ${allEvs.length}건 중 핵심만)</span>`:''}</div>
-        <div class="space-y-0">${grouped.map(evRow).join('')}</div>
-        <div class="text-[10px] text-amber-600 mt-2">※ '이벤트 분석' 탭의 표시 범위(핵심/전체) 설정에 따라 표시됩니다.</div>
-      </div>`;
-    } else {
-      dailyHint = `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-3 text-[11px] text-emerald-700">✓ 당일 ${scopeLabel} 이벤트가 없습니다.${allEvs.length>0?` (전체 이상 이벤트 ${allEvs.length}건은 있음 — '전체 이상' 범위로 전환해 확인)`:' (정상 운행 중)'}</div>`;
-    }
+    evSub = `${scopeLabel} ${evs.length}건 · ${grouped.length}종${EV_SCOPE==='core'&&allEvs.length>evs.length?` (전체 ${allEvs.length}건)`:''}`;
+    evRows = grouped.length? grouped.slice(0,8).map(g=>{ const E=EVENTS[g.code];
+      return `<div class="evrow"><span class="tm">${g.first}</span><span class="cd" style="${isCore(g.code)?'color:var(--atec-red)':''}">${g.code}</span><span title="${E?(E.t||''):''}">${E?(E.t||'(코드미상)'):'(코드미상)'}</span><span class="n">×${g.n}${g.n>1?' ~'+g.last:''}</span></div>`;
+    }).join('') : `<div class="sub" style="padding:10px 0">당일 ${scopeLabel} 이벤트가 없습니다.${allEvs.length>0?` (전체 이상 ${allEvs.length}건은 있음)`:''}</div>`;
   } else if(DAILY && veh.vid){
-    dailyHint = `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-3 text-[11px] text-emerald-700">✓ 당일 이상/단절 이벤트가 없습니다. (정상 운행 중)</div>`;
+    evSub='당일'; evRows=`<div class="sub" style="padding:10px 0">당일 이상/단절 이벤트가 없습니다. (정상 운행 중)</div>`;
+  } else {
+    evSub='로그 미업로드'; evRows=`<div class="sub" style="padding:10px 0">이벤트 로그를 올리면 여기에 표시됩니다.</div>`;
   }
+
+  // 장애 유형 분포
+  const maxErr = errSorted[0]?errSorted[0][1]:1;
+  const errBars = errSorted.slice(0,5).map(([e,n])=>`<div class="bar-row"><span class="nm" title="${e}">${e}</span><span class="bar"><i style="width:${Math.max(2,Math.round(n/maxErr*100))}%"></i></span><b>${n}</b></div>`).join('');
+
+  const judgeNote = risk.label==='재불량 다발' ? `총 ${items.length}건 접수, 최근 90일 ${recent90}건. 같은 차량에서 장애가 반복되고 있습니다.`
+    : risk.label==='주의 차량' ? `총 ${items.length}건 접수, 최근 90일 ${recent90}건. 재발 여부를 지켜볼 차량입니다.`
+    : `총 ${items.length}건 접수, 최근 90일 ${recent90}건. 특이한 반복은 없습니다.`;
+  const lastFix = last ? `${last.date.slice(5,10).replace('-','.')} ${last.field||last.err||'-'}` : '-';
+  const routeTxt = last.route||'';
+  const etaId = `depot-eta-${veh.vid||'x'}`;
 
   const html = `
   <div class="fadein">
-    <!-- HEADER CARD -->
-    <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-      <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="vgrid">
+      <!-- 판정 -->
+      <div class="vcol">
         <div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-2xl font-extrabold text-[#111111]">${vnum}</span>
-            <span class="ab-badge" style="color:${risk.color}">${risk.label}</span>
-          </div>
-          <div class="text-xs text-slate-500 mt-1">${veh.op} · 차량ID ${veh.vid||'-'} · ${last.center||''}</div>
-          <div class="text-xs text-slate-500">${last.route||''}</div>
+          <div class="vnum">${vnum}</div>
+          <div class="vmeta"><span>${veh.op}</span><span>${short(last.term)}</span>${routeTxt?`<span>${routeTxt}</span>`:''}${last.center?`<span>${last.center}</span>`:''}</div>
         </div>
-        <div class="vstat-row flex gap-2 flex-wrap">
-          ${miniStat('총 접수', items.length+'건','#D70051')}
-          ${miniStat('최근 90일', recent90+'건','#D70051')}
-          ${miniStat('증상 재현율', reproRate+'%', reproRate>40?'#D70051':'#5A666F')}
-          ${miniStat('단말기', short(last.term),'#111111')}
+        <div class="vjudge">
+          <div class="mark"></div>
+          <div class="lab">현장 판정</div>
+          <div class="ab-badge" style="color:${risk.color}">${risk.label}</div>
+          <div class="note">${judgeNote}</div>
+        </div>
+        <div class="vrisk">
+          <div class="row"><span class="lab sub">위험도</span><b>${sc!=null?sc:'—'}</b><span class="sub">${sc!=null?scPct:'선제 점검 대상 아님'}</span></div>
+          <svg width="100%" height="34" viewBox="0 0 388 34" preserveAspectRatio="none" style="display:block">
+            <line x1="0" y1="12" x2="388" y2="12" stroke="#D9D9D9" stroke-width="6"/>
+            ${sc!=null?`<line x1="0" y1="12" x2="${Math.round(Math.min(scMax,sc)/scMax*388)}" y2="12" stroke="#D70051" stroke-width="6"/>`:''}
+            ${preN?`<line x1="${Math.round(median/scMax*388)}" y1="4" x2="${Math.round(median/scMax*388)}" y2="20" stroke="#5A666F" stroke-width="1.5"/><text x="${Math.round(median/scMax*388)}" y="32" font-size="10.5" fill="#5A666F" text-anchor="middle" font-family="Noto Sans KR, sans-serif">전체 중앙값 ${median}</text>`:''}
+            <text x="0" y="32" font-size="10.5" fill="#5A666F" font-family="Noto Sans KR, sans-serif">0</text>
+            <text x="388" y="32" font-size="10.5" fill="#5A666F" text-anchor="end" font-family="Noto Sans KR, sans-serif">${scMax}</text>
+          </svg>
+        </div>
+        <div class="kv vstat-row">
+          <div><span class="k">총 접수</span><span class="v">${items.length}건</span></div>
+          <div><span class="k">최근 90일 접수</span><span class="v">${recent90}건</span></div>
+          <div><span class="k">증상 재현</span><span class="v">${reproN}건 <small>${reproRate}%</small></span></div>
+          <div><span class="k">당일 이벤트</span><span class="v">${DAILY?evTotal+'건':'<small>로그 없음</small>'}</span></div>
+          <div><span class="k">마지막 조치</span><span class="v" style="font-size:15px;font-weight:500">${lastFix}</span></div>
         </div>
       </div>
-      ${risk.note?`<div class="mt-3 text-[12px] rounded-lg px-3 py-2 ${risk.bg}">${risk.note}</div>`:''}
-      ${dailyHint}
-      <div class="mt-3 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <div id="depot-eta-${veh.vid||'x'}" class="flex-1 min-w-0 text-[12px] text-slate-500">🚌 차고지(종점) 실시간 도착시간을 조회할 수 있습니다.</div>
-        <button onclick="loadDepotEta('${vnum.replace(/'/g,"\\'")}','${(last.route||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','depot-eta-${veh.vid||'x'}')"
-          class="shrink-0 text-[12px] font-bold text-white rounded-lg px-3 py-2 hover:brightness-110 active:scale-95 transition" style="background:#5A666F">🚌 차고지 도착 조회</button>
+
+      <!-- 권장 조치 -->
+      <div class="vcol">
+        <div class="hd"><h3 class="h">권장 현장 조치</h3><span class="sub">${recoSub}</span></div>
+        <div class="steps">${steps}</div>
+        ${basis?`<div><div style="font-size:13px;font-weight:500;color:var(--atec-ink)">이 조치를 권하는 근거</div><div class="sub" style="line-height:1.6;margin-top:6px">${basis}</div></div>`:''}
+        ${smartBlock}
+      </div>
+
+      <!-- 분포 · 당일 이벤트 · 차고지 -->
+      <div class="vcol">
+        <div>
+          <div class="hd"><h3 class="h">장애 유형</h3><span class="sub">전체 ${items.length}건</span></div>
+          <div class="bars">${errBars||'<div class="sub">유형 정보 없음</div>'}</div>
+        </div>
+        <div>
+          <div class="hd"><h3 class="h">당일 이벤트</h3><span class="sub">${evSub}</span></div>
+          <div class="lst">${evRows}</div>
+        </div>
+        <div>
+          <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
+          <div class="lst"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0">
+            <div id="${etaId}" class="eta-box" style="flex:1;min-width:0">차고지(종점) 도착시간을 조회할 수 있습니다.</div>
+            <button onclick="loadDepotEta('${vnum.replace(/'/g,"\\'")}','${(last.route||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${etaId}')" class="btn-ghost2">조회</button>
+          </div></div>
+        </div>
       </div>
     </div>
 
-    <div class="grid lg:grid-cols-5 gap-4">
-      <!-- LEFT: RECOMMENDATION -->
-      <div class="lg:col-span-2 space-y-4">
-        <!-- 로그백업 분석 -->
-        <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111] mb-1">📂 단말기 로그백업 분석</h3>
-          <p class="text-[11px] text-slate-500 mb-2 pl-3"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
-          <div class="pl-3 space-y-3">
-            <!-- ① 통합단말기 -->
-            <div class="border border-rose-100 rounded-lg p-2.5" style="background:#F2F2F2">
-              <div class="text-[12px] font-extrabold text-[#111111] mb-1">① 통합단말기 백업</div>
-              <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-              <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
-              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
-              <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
-            </div>
-            <!-- ② 승하차단말기 -->
-            <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#F2F2F2">
-              <div class="text-[12px] font-extrabold text-[#5A666F] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
-              <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-              <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
-              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
-              <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
-            </div>
-            <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-            <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">🔍 분석하기</button>
-          </div>
-          <div id="logbk-iso" class="mt-3 pl-3"></div>
-          <div id="logbk-result" class="mt-3 pl-3"></div>
+    <!-- 접수 이력 -->
+    <div class="hist">
+      <div class="hd">
+        <h3 class="h">접수 이력 <span class="sub">최신순 · <span id="tl-count">${items.length}</span>건</span></h3>
+        <div class="flex flex-wrap items-center gap-1.5">${recvFilterChips(items)}</div>
+      </div>
+      <div class="hrow head"><span>날짜</span><span>접수</span><span>장애 · 문의</span><span>처리 내용</span><span>처리자</span></div>
+      <div id="tl-body">
+        ${[...items].reverse().map(renderTL).join('')}
+      </div>
+    </div>
+
+    <!-- 로그백업 분석 -->
+    <div class="logbk" style="margin-top:26px">
+      <div class="hd"><h3 class="h">단말기 로그백업 분석</h3><span class="sub">기기 안에서만 분석되고 원본은 저장되지 않습니다</span></div>
+      <p class="sub" style="margin-bottom:14px"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다.</p>
+      <div class="lgrid">
+        <div class="lbox">
+          <div class="t">① 통합단말기 백업</div>
+          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full">
+          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full">
         </div>
-
-        <!-- 처리 기록 (분석 후 표시) -->
-        <div id="logbk-action" class="bg-white border border-rose-100 rounded-xl shadow-sm p-4" style="display:none"></div>
-
-        <!-- 진단·처리 이력 / 재불량 추적 -->
-        <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="text-xs font-extrabold text-[#111111] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
-          <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
+        <div class="lbox">
+          <div class="t">② 승하차단말기 백업 <span class="sub">(승차/하차1/하차2 중 문제 유닛)</span></div>
+          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full">
+          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full">
         </div>
       </div>
-
-      <!-- RIGHT: TIMELINE -->
-      <div class="lg:col-span-3">
-        <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">처리 이력 타임라인</h3>
-            <span class="text-[11px] text-slate-400">최신순 · <span id="tl-count">${items.length}</span>건</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-1.5 mb-3 pl-3">
-            <span class="text-[11px] text-slate-500 font-semibold">접수구분:</span>
-            ${recvFilterChips(items)}
-          </div>
-          <div id="tl-body" class="relative tl-line pl-7 space-y-3 max-h-[600px] overflow-y-auto pr-1">
-            ${[...items].reverse().map(renderTL).join('')}
-          </div>
-        </div>
+      <p class="sub" style="margin:12px 0">아이폰은 폴더 선택이 안 됩니다 — 백업 폴더를 zip으로 압축해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, 둘 다 올리면 원인 격리가 정확해집니다.</p>
+      <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="btn-go">분석하기</button>
+      <div id="logbk-iso" class="mt-3"></div>
+      <div id="logbk-result" class="mt-3"></div>
+      <div id="logbk-action" class="mt-4" style="display:none"></div>
+      <div class="mt-6">
+        <div class="hd"><h3 class="h">로그 진단·처리 이력</h3><span class="sub">재불량 추적</span></div>
+        <div id="logbk-history"><span class="sub">불러오는 중…</span></div>
       </div>
     </div>
   </div>`;
@@ -2709,11 +3064,8 @@ const RECV_COLORS={'전화접수':'#D70051','시스템접수':'#5A666F','B/S처�
 function recvFilterChips(items){
   const counts={}; items.forEach(it=>{ if(it.recv) counts[it.recv]=(counts[it.recv]||0)+1; });
   const order=['전화접수','시스템접수','B/S처리','현장접수'];
-  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip border active" style="border-color:#D70051;background:#D70051;color:#fff">전체 ${items.length}</button>`;
-  chips+=order.filter(r=>counts[r]).map(r=>{
-    const c=RECV_COLORS[r];
-    return `<button data-recv="${r}" onclick="filterTL('${r}')" class="recv-chip chip border" style="border-color:${c}66;color:${c}">${r} ${counts[r]}</button>`;
-  }).join('');
+  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip active">전체 ${items.length}</button>`;
+  chips+=order.filter(r=>counts[r]).map(r=>`<button data-recv="${r}" onclick="filterTL('${r}')" class="recv-chip chip">${r} ${counts[r]}</button>`).join('');
   return chips;
 }
 function toggleEvView(mode){
@@ -2730,15 +3082,9 @@ function toggleEvView(mode){
 function filterTL(recv){
   const items=window.__tlItems||[];
   const filtered = recv? items.filter(it=>it.recv===recv) : items;
-  $('#tl-body').innerHTML = filtered.length? [...filtered].reverse().map(renderTL).join('') : '<div class="text-[12px] text-slate-400 py-4 text-center">해당 접수구분 이력이 없습니다.</div>';
+  $('#tl-body').innerHTML = filtered.length? [...filtered].reverse().map(renderTL).join('') : '<div class="sub" style="padding:16px 0;text-align:center">해당 접수구분 이력이 없습니다.</div>';
   $('#tl-count').textContent = filtered.length;
-  document.querySelectorAll('.recv-chip').forEach(b=>{
-    const on = b.dataset.recv===recv;
-    b.classList.toggle('active', on);
-    const c = b.dataset.recv? RECV_COLORS[b.dataset.recv] : '#D70051';
-    if(on){ b.style.background=c; b.style.color='#fff'; b.style.borderColor=c; }
-    else { b.style.background='#fff'; b.style.color=c; b.style.borderColor=c+'66'; }
-  });
+  document.querySelectorAll('.recv-chip').forEach(b=>{ b.classList.toggle('active', b.dataset.recv===recv); });
 }
 
 function onRecoErrChange(){
@@ -2763,7 +3109,7 @@ function renderReco(err, vehFields){
 function recoRow(i, name, rate, n){
   const col = rate==null? '#5A666F' : rateColor(rate);
   return `<div class="flex items-center gap-2.5">
-    <span class="w-5 h-5 shrink-0 rounded-full text-white text-[11px] font-bold grid place-items-center" style="background:${i===0?'#D70051':'#D70051'}">${i+1}</span>
+    <span class="w-5 h-5 shrink-0 text-[11px] font-bold grid place-items-center" style="color:#D70051">${i+1}</span>
     <div class="flex-1">
       <div class="text-[13px] font-semibold text-slate-800">${name}</div>
       <div class="flex items-center gap-2 mt-0.5">
@@ -2775,28 +3121,16 @@ function recoRow(i, name, rate, n){
 }
 
 function renderTL(it){
-  const repColor = it.repro==='재현'?'#D70051':'#5A666F';
-  const recvChip = {'전화접수':'#D70051','시스템접수':'#5A666F','B/S처리':'#5A666F','현장접수':'#5A666F'}[it.recv]||'#5A666F';
-  const worker = it.worker? `<span class="chip inline-flex items-center gap-1" style="background:#F2F2F2;color:#5A666F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${it.worker}</span>`:'';
-  const inquiry = it.inquiry? `<div class="mt-1.5">
-    <div class="text-[10px] font-bold text-slate-400 mb-0.5">문의내용</div>
-    <div class="text-[11px] text-slate-500 leading-relaxed bg-slate-50 rounded p-2 whitespace-pre-line">${escHtml(it.inquiry)}</div>
-  </div>`:'';
-  const memo = it.memo? `<div class="mt-1.5">
-    <div class="text-[10px] font-bold text-[#D70051] mb-0.5 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>처리내용</div>
-    <div class="text-[11px] text-slate-700 leading-relaxed bg-rose-50/60 border border-rose-100 rounded p-2 whitespace-pre-line">${highlightMemo(it.memo)}</div>
-  </div>`:'';
-  return `<div class="relative">
-    <span class="absolute -left-7 top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#D70051]"></span>
-    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-      <span class="font-bold text-slate-700">${it.date}</span>
-      <span class="chip" style="background:${recvChip}1a;color:${recvChip}">${it.recv||'-'}</span>
-      ${it.repro?`<span class="chip" style="background:${repColor}1a;color:${repColor}">${it.repro}</span>`:''}
-      ${worker}
-    </div>
-    <div class="text-[13px] font-semibold text-slate-800 mt-1">${it.err||'(유형미상)'} ${it.field?`<span class="text-slate-400 font-normal">→</span> <span class="text-[#111111]">${it.field}</span>`:''}</div>
-    ${inquiry}
+  // 접수 이력 한 줄: 날짜 · 접수 · 장애→조치(문의) · 처리내용 · 처리자
+  const chips = `<span class="chip ln">${it.recv||'-'}</span>${it.repro?`<span class="chip ln ${it.repro==='재현'?'red':''}" style="margin-top:4px">${it.repro}</span>`:''}`;
+  const inquiry = it.inquiry? `<div class="inq">${escHtml(it.inquiry)}</div>`:'';
+  const memo = it.memo? `<div class="memo">${highlightMemo(it.memo)}</div>`:'<span class="memo">-</span>';
+  return `<div class="hrow">
+    <span class="d">${it.date}</span>
+    <span style="display:flex;flex-direction:column;align-items:flex-start">${chips}</span>
+    <span class="err"><b>${it.err||'(유형미상)'}</b>${it.field?` <span class="arr">→</span> ${it.field}`:''}${inquiry}</span>
     ${memo}
+    <span class="who">${it.worker||'-'}</span>
   </div>`;
 }
 function escHtml(t){ return (''+t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -2806,7 +3140,7 @@ function highlightMemo(t){
 }
 
 /* helpers */
-function miniStat(label,val,col){ return `<div class="text-center px-2.5 py-1.5 bg-rose-50 rounded-lg border border-rose-100"><div class="text-[10px] text-slate-500">${label}</div><div class="text-sm font-extrabold" style="color:${col}">${val}</div></div>`; }
+function miniStat(label,val,col){ return `<span class="ms"><span class="ms-k">${label}</span><b class="ms-v" style="color:${col}">${val}</b></span>`; }
 function short(t){ if(!t)return '-'; const m=t.match(/B7\d0|B800/); return m?m[0]:t.slice(0,8); }
 function daysAgo(dstr){ const d=new Date(dstr.replace(' ','T')); return Math.floor((Date.now()-d)/864e5); }
 function riskLevel(total, recent, repro){
