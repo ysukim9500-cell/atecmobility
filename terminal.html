@@ -889,6 +889,58 @@ html, body, #app-root{ background:#FFFFFF !important; }
   html.force-mobile .overflow-x-auto table tr{ border:0 !important; border-bottom:1px solid var(--line) !important; padding:8px 0 !important; margin:0 !important; }
 @media (max-width:767px){ html:not(.force-web) .pcard .p-sc{ grid-column:1; grid-row:1 / span 2; } html:not(.force-web) .pcard .p-main{ grid-column:2 / span 2 !important; grid-row:2; } html:not(.force-web) .pcard .p-x{ grid-column:3; grid-row:1; } html:not(.force-web) .pcard{ grid-template-rows:auto auto; } html:not(.force-web) .pcard .p-top{ margin-top:-30px; padding-right:64px; } }
 html.force-mobile .pcard .p-sc{ grid-column:1; grid-row:1 / span 2; } html.force-mobile .pcard .p-main{ grid-column:2 / span 2 !important; grid-row:2; } html.force-mobile .pcard .p-x{ grid-column:3; grid-row:1; } html.force-mobile .pcard{ grid-template-rows:auto auto; } html.force-mobile .pcard .p-top{ margin-top:-30px; padding-right:64px; }
+
+/* ── 색 띠: CI 연회색(F2F2F2 계열)과 레드의 아주 연한 색을 면에 깐다. 흰 바탕만으로 심심하지 않게 ── */
+:root{ --tint:#F6F6F7; --tint2:#EFEFF1; --rose:#FBF1F4; --rose2:#F6E3EA; }
+#tabband{ background:var(--tint); }
+.atec-header{ border-bottom:1px solid var(--line); }
+.fbar{ background:var(--tint); padding:12px 16px; border:0; margin-top:14px; }
+.fbar + .fbar{ margin-top:1px; }
+#dash > .fbar:first-child{ margin-top:16px; }
+#stat-cards{ margin-top:16px !important; }
+.ctile, .qd-btn, .pf-btn, .scope-btn, .fdate{ background:#fff !important; }
+.fsep{ background:var(--tint2); }
+/* 판정 칸: 표지처럼 아주 연한 레드 면 */
+.vgrid .vcol:first-child{ background:var(--rose); padding:26px 28px 24px !important; border-right:0; margin-right:32px; }
+.vgrid .vcol:first-child .kv{ border-top-color:var(--ink); }
+.vgrid .vcol:first-child .kv > div{ border-bottom-color:var(--rose2); }
+.vgrid .vcol:nth-child(2){ padding-left:0; }
+/* 대시보드: KPI 한 줄은 연회색 면 위에 */
+#stat-cards{ background:var(--tint); padding:0 16px; border-bottom:1px solid var(--ink) !important; }
+#stat-cards .kpi:first-child{ padding-left:8px !important; }
+.trow.head{ background:var(--tint); padding:8px 8px !important; margin:0 -8px; }
+/* 선제 점검 머리 · 요약: 연회색 면 */
+#preempt .sec{ background:var(--tint); padding:18px 16px !important; margin-top:16px; border-bottom:0; }
+#preempt .sec .fbar{ background:transparent; padding:10px 0 0 !important; margin:0; }
+#preempt-list{ margin-top:14px; }
+.pcard .p-sc{ background:var(--tint); padding:8px 10px; margin:-14px 0; align-self:stretch; display:flex; flex-direction:column; justify-content:center; }
+/* 다른 화면 머리(단말기 조회·이벤트·AI·사용자): 연회색 면 */
+#sn > .sec:first-child, #events > .sec:first-child, #ai > .sec:first-child, #admin > .sec:first-child{ background:var(--tint); padding:18px 16px !important; margin-top:16px; border-bottom:0; }
+#events .sec .fbar{ background:transparent; padding:10px 0 0 !important; margin:0; }
+#ai .rounded-xl.flex-col{ background:var(--tint) !important; border:0 !important; }
+#ai .rounded-xl.flex-col > .border-t{ background:#fff; border-top:1px solid var(--line) !important; }
+/* 데이터 갱신 접이식 · 바닥글 */
+details.sec > summary{ background:var(--tint); padding:12px 16px; }
+footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin-left:-24px; margin-right:-24px; }
+/* 전역 필터 띠: 연한 레드 */
+#global-filter-bar{ background:var(--rose) !important; padding:10px 16px !important; border-bottom:0; margin-top:14px !important; }
+/* 표 위 머리행 */
+#app-root table thead tr{ background:var(--tint); }
+#app-root table th{ padding:9px 8px !important; }
+@media (max-width:767px){
+  html:not(.force-web) .vgrid .vcol:first-child{ margin-right:0; padding:16px 14px !important; margin-left:0; }
+  html:not(.force-web) .fbar{ padding:10px 12px; }
+  html:not(.force-web) #stat-cards{ padding:0 12px; }
+  html:not(.force-web) #stat-cards .kpi:first-child{ padding-left:0 !important; }
+  html:not(.force-web) .pcard .p-sc{ margin:-14px 0 -14px 0; }
+  html:not(.force-web) footer.ci-foot{ margin-left:-12px; margin-right:-12px; padding:16px 12px !important; }
+}
+html.force-mobile .vgrid .vcol:first-child{ margin-right:0; padding:16px 14px !important; margin-left:0; }
+html.force-mobile .fbar{ padding:10px 12px; }
+html.force-mobile #stat-cards{ padding:0 12px; }
+html.force-mobile #stat-cards .kpi:first-child{ padding-left:0 !important; }
+html.force-mobile .pcard .p-sc{ margin:-14px 0 -14px 0; }
+html.force-mobile footer.ci-foot{ margin-left:-12px; margin-right:-12px; padding:16px 12px !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
