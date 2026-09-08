@@ -34,6 +34,50 @@
   .ci-foot{ border-top:1px solid #D9D9D9; font-size:12px; color:#5A666F; }
   /* 좁은 폭: 로고를 줄이고 이름 줄은 숨긴다 (잘려서 '홍…' 으로 보이던 것) */
   @media (max-width:640px){ header .atec-mark{ height:14px; } #hdr-sub{ display:none; } }
+
+/* ════ CI 레이아웃 v2 — 괘선 구획 · 연한 색 띠 ════ */
+:root{ --ink:#111111; --gray:#5A666F; --line:#D9D9D9; --red:#D70051; --soft:#C9CED2; --tint:#F6F6F7; --rose:#FBF1F4; }
+html, body{ background:#FFFFFF !important; }
+body{ font-size:15px; line-height:1.55; }
+header{ padding:0 24px !important; min-height:60px; gap:22px !important; }
+header .tapbtn{ border:0 !important; padding:0 14px !important; font-size:13.5px !important; font-weight:400 !important; color:var(--gray) !important; background:transparent !important; min-height:0 !important; }
+header .tapbtn:hover{ color:var(--ink) !important; }
+header > a.tapbtn{ border-right:1px solid var(--line) !important; padding-left:0 !important; }
+header > button.tapbtn{ border-left:1px solid var(--line) !important; padding-right:0 !important; }
+#hdr-sub{ font-size:13px !important; }
+header .min-w-0 > div:first-child{ white-space:nowrap; }
+main{ max-width:1100px !important; padding:0 24px !important; }
+main > .pt-2{ padding-top:26px !important; }
+main > .pt-2 > div:first-child{ font-size:26px !important; letter-spacing:-.01em; }
+main > .pt-2 .ci-rule{ margin-top:16px !important; }
+#ci-sub{ font-size:13px; color:var(--gray); margin-top:4px; }
+main.space-y-4 > * + *{ margin-top:0 !important; }
+main > section, #box-migrate > section{ border:0 !important; box-shadow:none !important; padding:24px 0 20px !important; border-bottom:1px solid var(--line) !important; background:#fff !important; }
+main > section h2, #box-migrate h2{ font-size:16px !important; color:var(--ink) !important; border-bottom:1px solid var(--ink); padding-bottom:8px; margin-bottom:10px !important; }
+main > section > .flex.items-center.justify-between{ border-bottom:1px solid var(--ink); padding-bottom:8px; margin-bottom:10px !important; }
+main > section > .flex.items-center.justify-between h2{ border-bottom:0; padding-bottom:0; margin-bottom:0 !important; }
+main > section p.text-slate-500{ font-size:13px !important; }
+main > section > .rounded-lg.border{ border:0 !important; border-top:1px solid var(--line) !important; padding:14px 0 12px !important; margin:0 !important; }
+main > section > .rounded-lg.border:first-of-type{ border-top:0 !important; }
+main > section > .rounded-lg.border > div:first-child{ font-size:14px !important; color:var(--ink) !important; }
+main input[type=email], main input[type=text]{ border:1px solid var(--soft) !important; border-radius:0 !important; height:40px; padding:0 12px !important; font-size:14px !important; }
+main input:focus{ border-color:var(--ink) !important; }
+.bg-indigo-600, .bg-emerald-600, .bg-teal-600, .hover\:bg-indigo-700:hover, .hover\:bg-emerald-700:hover, .hover\:bg-teal-700:hover{ background-color:var(--red) !important; }
+main .tapbtn.text-white{ height:40px; padding:0 18px !important; font-size:14px !important; }
+.bg-indigo-50\/60, .bg-indigo-50{ background:var(--tint) !important; border:0 !important; padding:10px 14px !important; }
+#box-pending > section, #box-resets > section{ background:var(--rose) !important; border:0 !important; padding:16px 16px 12px !important; margin-top:16px !important; }
+#box-pending .bg-white, #box-resets .bg-white{ border:0 !important; border-top:1px solid #F0DCE3 !important; border-radius:0 !important; background:transparent !important; padding:8px 0 !important; }
+#user-cards > div{ border:0 !important; border-top:1px solid var(--line) !important; border-radius:0 !important; padding:12px 0 !important; }
+#user-cards > div:first-child{ border-top:0 !important; }
+.chip{ border-radius:0 !important; }
+footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin:32px -24px 0 !important; }
+@media (max-width:640px){
+  header{ padding:0 14px !important; min-height:52px; }
+  main{ padding:0 14px !important; }
+  footer.ci-foot{ margin:24px -14px 0 !important; padding:16px 14px !important; }
+  main > .pt-2 > div:first-child{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+  main > .pt-2 > div:first-child::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+}
 </style>
 </head>
 <body class="min-h-screen">
@@ -50,7 +94,7 @@
 
 <!-- 헤더 -->
 <header class="sticky top-0 z-30 bg-white border-b px-3 sm:px-5 flex items-center gap-3" style="border-color:#D9D9D9;min-height:56px">
-  <a href="index.html" class="tapbtn shrink-0 border px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1" style="border-color:#D9D9D9;color:#111111" title="메인으로">← 메인</a>
+  <a href="index.html" class="tapbtn shrink-0 border px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1" style="border-color:#D9D9D9;color:#111111" title="메인으로">메인</a>
   <div class="flex-1 min-w-0 flex items-center gap-3">
     <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
     <div class="w-px h-5 hidden sm:block" style="background:#D9D9D9"></div>
@@ -67,6 +111,7 @@
 
   <div class="pt-2">
     <div class="text-[24px] font-bold leading-tight" style="color:#111111">사용자 · 알림 관리</div>
+    <div id="ci-sub">가입 승인 · 권한 · 알림 수신자를 관리합니다.</div>
     <div class="ci-rule mt-3"></div>
   </div>
 

@@ -161,9 +161,54 @@ img, video, canvas, table{ max-width:100%; }
 .ci-rule{ height:2px; background:#D70051; }
 .ci-foot{ border-top:1px solid #D9D9D9; font-size:12px; color:#5A666F; }
 .hero3 > .scrim{ background:linear-gradient(105deg, rgba(17,17,17,.94) 0%, rgba(17,17,17,.80) 46%, rgba(215,0,81,.45) 100%) !important; }
+
+/* ════ CI 레이아웃 v2 — 런처: 괘선 격자 · 글자 링크 머리글 · 연한 색 띠 ════ */
+:root{ --ink:#111111; --gray:#5A666F; --line:#D9D9D9; --red:#D70051; --soft:#C9CED2; --tint:#F6F6F7; --rose:#FBF1F4; }
+html, body{ background:#FFFFFF !important; }
+#app-root header > div{ padding:0 24px !important; min-height:60px; max-width:1600px; }
+#app-root header .text-\[14px\]{ font-size:14px !important; }
+#user-badge{ gap:0 !important; font-size:13.5px !important; color:var(--gray); flex-wrap:nowrap !important; }
+#user-badge > span:first-child, #user-badge > .font-semibold, #user-badge > .font-bold{ color:var(--ink) !important; font-weight:500 !important; padding-right:6px; }
+#user-badge > span.rounded, #user-badge > span.rounded-full, #user-badge .bg-amber-300, #user-badge .bg-amber-400, #user-badge .bg-slate-200{ background:transparent !important; color:var(--gray) !important; font-weight:400 !important; font-size:13.5px !important; padding:0 14px 0 0 !important; }
+#user-badge button, #user-badge .ub-btn, #user-badge a{ border:0 !important; border-left:1px solid var(--line) !important; padding:0 14px !important; margin:0 !important; font-size:13.5px !important; font-weight:400 !important; color:var(--gray) !important; background:transparent !important; min-height:0 !important; line-height:1.3; }
+#user-badge button:hover, #user-badge .ub-btn:hover{ color:var(--ink) !important; border-color:var(--line) !important; }
+#user-badge > :last-child{ padding-right:0 !important; }
+#app-root > .max-w-\[1280px\]{ max-width:1600px !important; padding:26px 24px 0 !important; }
+#app-root h1.v3-title{ font-size:26px !important; letter-spacing:-.01em; margin-bottom:4px !important; }
+#app-root h1.v3-title + p{ font-size:13px !important; margin-bottom:0 !important; }
+#app-root .ci-rule{ margin:16px 0 0 !important; }
+#launcher-grid{ gap:0 !important; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.launch3{ border:0 !important; border-right:1px solid var(--line) !important; border-bottom:1px solid var(--line) !important; border-radius:0 !important; box-shadow:none !important; background:#fff !important; padding:26px 32px 24px !important; transition:background .12s; }
+.launch3:hover{ background:var(--tint) !important; transform:none !important; box-shadow:none !important; }
+.launch3:nth-child(3n){ border-right:0 !important; }
+.launch3 .ico{ width:40px !important; height:40px !important; border-radius:0 !important; }
+.launch3 .ico svg{ width:22px; height:22px; }
+.launch3 .text-\[16px\]{ font-size:17px !important; color:var(--ink) !important; font-weight:700 !important; }
+.launch3 p{ font-size:13.5px !important; color:var(--gray) !important; }
+.launch3 .mt-4{ color:var(--red) !important; }
+#app-root footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin:32px -24px 0 !important; max-width:none !important; }
+@media (max-width:767px){
+  #app-root header > div{ padding:10px 14px !important; min-height:0; flex-wrap:wrap !important; flex-direction:row !important; gap:0 !important; }
+  #user-badge{ width:100% !important; justify-content:space-between !important; border-top:1px solid var(--line); margin-top:8px; padding:6px 0 !important; font-size:12px !important; }
+  #user-badge button, #user-badge .ub-btn{ border:0 !important; padding:2px 0 !important; font-size:12px !important; }
+  #app-root > .max-w-\[1280px\]{ padding:12px 12px 0 !important; }
+  #app-root h1.v3-title{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
+  #app-root h1.v3-title::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+  #launcher-grid{ grid-template-columns:1fr; }
+  .launch3{ border-right:0 !important; padding:18px 0 16px !important; }
+  #app-root footer.ci-foot{ margin:24px -12px 0 !important; padding:16px 12px !important; }
+}
+html.force-mobile #app-root header > div{ padding:10px 14px !important; min-height:0; flex-wrap:wrap !important; flex-direction:row !important; gap:0 !important; }
+html.force-mobile #user-badge{ width:100% !important; justify-content:space-between !important; border-top:1px solid var(--line); margin-top:8px; padding:6px 0 !important; font-size:12px !important; }
+html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ border:0 !important; padding:2px 0 !important; font-size:12px !important; }
+html.force-mobile #app-root > .max-w-\[1280px\]{ padding:12px 12px 0 !important; }
+html.force-mobile #launcher-grid{ grid-template-columns:1fr; }
+html.force-mobile .launch3{ border-right:0 !important; padding:18px 0 16px !important; }
+/* 로그인 전 소개 화면: 바탕만 흰색으로, 나머지는 그대로 */
+#auth-overlay{ background:#FFFFFF !important; }
 </style>
 </head>
-<body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 500px at 80% -120px, #F2F2F2, transparent), #F2F2F2;">
+<body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
 
 <!-- ===================== LANDING (로그아웃 상태) ===================== -->
 <div id="auth-overlay" class="hidden fixed inset-0 z-50 overflow-y-auto" style="background:#F2F2F2;">
