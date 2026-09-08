@@ -149,6 +149,10 @@ window.TJ = (function () {
     document.getElementById('tj-sheet').classList.remove('open');
     document.documentElement.style.overflow = ''; document.body.style.overflow = '';
   }
+  /** 적어 넣는 시트인지. 입력칸이 하나라도 있으면 배경을 눌러도 닫지 않는다. */
+  function sheetHasInput() {
+    return !!document.querySelector('#tj-sheet-body input, #tj-sheet-body select, #tj-sheet-body textarea');
+  }
   function detailRows(pairs) {
     return pairs.filter(function (p) { return p[1] !== null && p[1] !== undefined && p[1] !== ''; })
       .map(function (p) {
@@ -198,8 +202,18 @@ window.TJ = (function () {
     document.querySelectorAll('#tj-tabs .rtab[data-tab]').forEach(function (b) {
       b.addEventListener('click', function () { tab(b.dataset.tab); });
     });
-    document.getElementById('tj-sheet').addEventListener('click', function (e) {
-      if (e.target.id === 'tj-sheet') closeSheet();
+    /* 배경을 눌러 닫되, 실수로 닫히는 두 경우는 막는다.
+       · 적어 넣는 시트 — 닫히면 쓰던 내용이 통째로 사라진다
+       · 시트 안에서 시작한 드래그 — 글자를 끌다 바깥에서 손을 떼면
+         브라우저가 배경에 click 을 보낸다 */
+    var sheetEl = document.getElementById('tj-sheet');
+    var pressedBackdrop = false;
+    sheetEl.addEventListener('pointerdown', function (e) { pressedBackdrop = (e.target === sheetEl); });
+    sheetEl.addEventListener('click', function (e) {
+      if (e.target !== sheetEl || !pressedBackdrop) return;
+      pressedBackdrop = false;
+      if (sheetHasInput()) return;
+      closeSheet();
     });
 
     // 마스터를 미리 받아두고 헤더 요약을 채운다
