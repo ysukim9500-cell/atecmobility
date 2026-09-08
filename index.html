@@ -330,8 +330,10 @@ img, video, canvas, table{ max-width:100%; }
 </div>
 
 <!-- ===================== LOGIN MODAL ===================== -->
-<div id="login-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(30,5,18,.6)" onclick="closeLoginModal()">
-  <div class="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl p-6 sm:p-8" onclick="event.stopPropagation()">
+<!-- 배경을 눌러도 닫지 않는다. 입력칸에서 글자를 끌어 바깥에서 손을 떼면
+     브라우저가 배경에 click 을 보내, 적던 내용이 통째로 사라졌다. -->
+<div id="login-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(30,5,18,.6)">
+  <div class="relative bg-white w-full max-w-[420px] rounded-2xl shadow-2xl p-6 sm:p-8">
     <button onclick="closeLoginModal()" class="absolute top-3.5 right-3.5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" title="닫기">✕</button>
     <div class="text-center mb-5">
       <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark lg" style="margin:0 auto">
@@ -629,8 +631,8 @@ function showLanding(){
   const modal=$('#login-modal'); if(modal) modal.classList.add('hidden');
   try{ window.scrollTo({top:0}); }catch(e){}
 }
+/* 닫는 방법은 오른쪽 위 ✕ 하나뿐이다 (Esc 도 받지 않는다) */
 function closeLoginModal(){ const m=$('#login-modal'); if(m) m.classList.add('hidden'); }
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLoginModal(); });
 
 /* 화면 모드(웹/모바일) 선택 */
 let UI_MODE='';
