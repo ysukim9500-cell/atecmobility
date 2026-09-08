@@ -230,7 +230,52 @@
     return m || '변경에 실패했습니다.';
   }
 
-  function changePassword(newPassword) {
+  /* ---------- 2단계 인증(MFA) ---------- */
+
+  /** 내 계정에 등록된 2단계 인증 수단. 서버가 /user 응답에 담아 준다. */
+  function verifiedFactors() {
+    return authFetch(SB_URL + '/auth/v1/user').then(function (r) {
+      if (!r.ok) return [];
+      return r.json().then(function (u) {
+        return ((u && u.factors) || []).filter(function (f) { return f.status === 'verified'; });
+      });
+    }).catch(function () { return []; });
+  }
+
+  function mfaErrorMsg(status, raw) {
+    var m = String(raw || '');
+    if (/invalid|incorrect|mismatch/i.test(m)) return '코드가 맞지 않습니다. 인증 앱에 지금 떠 있는 6자리를 다시 확인해 주세요.';
+    if (/expired|timeout/i.test(m)) return '입력 시간이 지났습니다. 새로 뜬 코드로 다시 시도해 주세요.';
+    if (/only request this after|rate limit|too many/i.test(m)) return '시도가 너무 잦습니다. 잠시 뒤에 다시 해 주세요.';
+    if (status === 401 || status === 403) return '로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.';
+    return m || '2단계 인증에 실패했습니다.';
+  }
+
+  /** 6자리 코드로 2단계를 통과해 세션 등급을 올린다.
+   *  통과하면 서버가 새 토큰을 주므로 그것으로 갈아 끼운다. */
+  function verifyFactor(factorId, code) {
+    return authFetch(SB_URL + '/auth/v1/factors/' + factorId + '/challenge', {
+      method: 'POST', body: '{}'
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (ch) {
+        if (!r.ok || !ch.id) return { error: mfaErrorMsg(r.status, ch.msg || ch.message || '') };
+        return authFetch(SB_URL + '/auth/v1/factors/' + factorId + '/verify', {
+          method: 'POST',
+          body: JSON.stringify({ challenge_id: ch.id, code: String(code || '').replace(/[^0-9]/g, '') })
+        }).then(function (r2) {
+          return r2.json().catch(function () { return {}; }).then(function (j) {
+            if (!r2.ok) return { error: mfaErrorMsg(r2.status, j.msg || j.message || '') };
+            storeTokens(j);
+            return { ok: true };
+          });
+        });
+      });
+    });
+  }
+
+  /* ---------- 비밀번호 변경 ---------- */
+
+  function putPassword(newPassword) {
     return authFetch(SB_URL + '/auth/v1/user', {
       method: 'PUT',
       body: JSON.stringify({ password: newPassword })
@@ -239,11 +284,37 @@
       return r.json().catch(function () { return {}; }).then(function (j) {
         var raw = (j && (j.msg || j.message || j.error_description || j.error)) || '';
         if (raw) console.warn('비밀번호 변경 거절:', r.status, raw);   // 원문은 콘솔에만
-        return { error: pwErrorMsg(r.status, raw) };
+        return { error: pwErrorMsg(r.status, raw), needsMfa: /aal2|insufficient_aal/i.test(raw) };
       });
     });
   }
 
+  /** 비밀번호 변경.
+   *  2단계 인증이 걸린 계정은 서버가 2단계를 통과한 세션을 요구한다.
+   *  askCode 를 넘기면 그때 6자리 코드를 받아 통과시킨 뒤 다시 시도한다.
+   *  askCode(안내문) → 코드 문자열 | null(취소).  최대 3번까지 다시 묻는다. */
+  function changePassword(newPassword, askCode) {
+    return putPassword(newPassword).then(function (res) {
+      if (res.ok || !res.needsMfa || typeof askCode !== 'function') return res;
+      return verifiedFactors().then(function (fs) {
+        // 서버는 막는데 통과할 수단이 없다 — 이건 관리자가 손봐야 한다
+        if (!fs.length) return res;
+        var id = fs[0].id, tries = 0;
+        var attempt = function (hint) {
+          tries++;
+          return Promise.resolve(askCode(hint)).then(function (code) {
+            if (code == null || String(code).trim() === '') return { cancelled: true };
+            return verifyFactor(id, code).then(function (v) {
+              if (v.ok) return putPassword(newPassword);
+              if (tries >= 3) return { error: v.error };
+              return attempt(v.error);
+            });
+          });
+        };
+        return attempt('');
+      });
+    });
+  }
   function logout() {
     var t = get(K_AT);
     if (t) {
