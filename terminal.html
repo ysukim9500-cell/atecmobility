@@ -19,69 +19,83 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
-:root { --atec-wine:#A00040; --atec-magenta:#D60051; --atec-pink:#D81B60; --atec-rose:#EC407A; }
-body { font-family: 'Pretendard', sans-serif; }
-.atec-header { background: linear-gradient(110deg, var(--atec-wine) 0%, var(--atec-magenta) 55%, var(--atec-pink) 130%); }
-.atec-header .grid-overlay { background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px); background-size: 26px 26px; }
-.btn-atec { background: var(--atec-magenta); } .btn-atec:hover { background: var(--atec-wine); }
-.ico { display:inline-block; vertical-align:-2px; }
-.sec-title { border-left: 5px solid var(--atec-magenta); }
-.ab-badge { font-weight:800; font-size:11px; padding:2px 9px; border-radius:6px; color:#fff; }
-::-webkit-scrollbar { width: 8px; height:8px; }
-::-webkit-scrollbar-thumb { background: #e3c4d2; border-radius: 4px; }
-.fadein { animation: fade .35s ease both; } @keyframes fade { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-.tl-line::before { content:''; position:absolute; left:7px; top:0; bottom:0; width:2px; background:#f1d6e0; }
-mark { background:#FCE4EC; color:#880E4F; padding:0 2px; border-radius:3px; }
-.chip { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
-.gauge-track{background:#f1d6e0;border-radius:999px;overflow:hidden}
-.gauge-fill{height:100%;border-radius:999px;transition:width .5s ease}
-details > summary { list-style:none; cursor:pointer; } details > summary::-webkit-details-marker{display:none;}
-.searchbar:focus-within{box-shadow:0 0 0 3px rgba(194,24,91,.18); border-color:var(--atec-magenta);}
-.tab-btn{ color:#94a3b8; } .tab-btn:hover{ color:var(--atec-magenta); background:#fdf2f6; }
-.tab-btn.active{ background:linear-gradient(110deg,var(--atec-wine),var(--atec-magenta)); color:#fff; }
-.pf-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; } .pf-btn:hover{ background:#fdf2f6; }
-.pf-btn.active{ background:var(--atec-magenta); color:#fff; border-color:var(--atec-magenta); }
-.df-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; } .df-btn:hover{ background:#fdf2f6; }
-.df-btn.active{ background:var(--atec-wine); color:#fff; border-color:var(--atec-wine); }
-.scope-btn{ border-color:#f1d6e0; color:#A00040; background:#fff; font-weight:700; padding:4px 12px; } .scope-btn:hover{ background:#fdf2f6; }
-.scope-btn.active{ background:var(--atec-magenta); color:#fff; border-color:var(--atec-magenta); }
-.pcard{ transition:transform .15s, box-shadow .15s; } .pcard:hover{ transform:translateY(-1px); box-shadow:0 4px 14px rgba(194,24,91,.12); }
-.recv-chip{ transition:all .12s; cursor:pointer; } .recv-chip:hover{ filter:brightness(.97); }
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+/* ── ATEC CI 토큰 — 가이드라인: 레드 PANTONE 2040C · 그레이 431C · 흰 바탕 · 지정 서체 Noto Sans CJK KR ── */
+:root{ --atec-red:#D70051; --atec-red-deep:#C80850; --atec-gray:#5A666F; --atec-gold:#8C6D2F; --atec-ink:#111111; --atec-line:#D9D9D9; --atec-bg:#F2F2F2;
+       /* 옛 이름은 새 값을 가리킨다 — JS 템플릿이 var(--atec-magenta) 등을 그대로 쓴다 */
+       --atec-wine:#111111; --atec-magenta:#D70051; --atec-pink:#D70051; --atec-rose:#D70051; }
+body{ font-family:'Noto Sans KR','Noto Sans CJK KR','Malgun Gothic',sans-serif; color:#111111; background:#FFFFFF; font-variant-numeric:tabular-nums; }
+.atec-header{ background:#FFFFFF; border-bottom:1px solid var(--atec-line); color:#111111; }
+.atec-header .grid-overlay{ display:none; }
+.ci-rule{ height:2px; background:var(--atec-red); }
+.ci-sq{ width:10px; height:10px; background:var(--atec-red); display:inline-block; flex:0 0 auto; }
+.ci-foot{ border-top:1px solid var(--atec-line); font-size:12px; color:var(--atec-gray); }
+.btn-atec{ background:var(--atec-red); color:#fff; } .btn-atec:hover{ background:var(--atec-red-deep); }
+.ico{ display:inline-block; vertical-align:-2px; }
+.sec-title{ border-left:0 !important; padding-left:0 !important; color:var(--atec-ink) !important; font-size:15px !important; font-weight:700 !important; padding-bottom:6px; border-bottom:1px solid var(--atec-ink); }
+.ab-badge{ font-weight:700; font-size:18px; padding:0; border-radius:0; background:transparent !important; }
+::-webkit-scrollbar{ width:8px; height:8px; } ::-webkit-scrollbar-thumb{ background:#C9CED2; }
+.fadein{ animation:fade .25s ease both; } @keyframes fade{ from{opacity:0} to{opacity:1} }
+.tl-line::before{ content:''; position:absolute; left:7px; top:0; bottom:0; width:1px; background:var(--atec-line); }
+mark{ background:#F2F2F2; color:var(--atec-red); padding:0 2px; }
+.chip{ font-size:11px; font-weight:500; padding:2px 8px; border-radius:0 !important; white-space:nowrap; }
+.gauge-track{ background:#EDEDED; border-radius:0; overflow:hidden; } .gauge-fill{ height:100%; border-radius:0; transition:width .4s ease; }
+details > summary{ list-style:none; cursor:pointer; } details > summary::-webkit-details-marker{ display:none; }
+.searchbar{ border:1px solid var(--atec-ink) !important; border-radius:0 !important; box-shadow:none !important; }
+.searchbar:focus-within{ box-shadow:0 0 0 2px rgba(215,0,81,.15) !important; }
+/* 탭: 알약이 아니라 글자 + 빨간 정사각 (PPT 마스터의 제목 탭) */
+#tabs{ background:transparent !important; border:0 !important; border-bottom:1px solid var(--atec-line) !important; border-radius:0 !important; box-shadow:none !important; padding:0 !important; gap:30px !important; width:100% !important; }
+.tab-btn{ color:var(--atec-gray); background:transparent !important; border-radius:0 !important; padding:14px 0 12px !important; font-weight:500; position:relative; }
+.tab-btn::before{ content:''; width:10px; height:10px; background:transparent; display:inline-block; margin-right:8px; flex:0 0 auto; }
+.tab-btn:hover{ color:var(--atec-ink); background:transparent; }
+.tab-btn.active{ color:var(--atec-ink); font-weight:700; background:transparent !important; }
+.tab-btn.active::before{ background:var(--atec-red); }
+.pf-btn,.df-btn,.scope-btn{ border:1px solid #C9CED2 !important; color:var(--atec-gray) !important; background:#fff !important; border-radius:0 !important; font-weight:500; }
+.scope-btn{ padding:4px 12px; }
+.pf-btn:hover,.df-btn:hover,.scope-btn:hover{ border-color:var(--atec-ink) !important; color:var(--atec-ink) !important; background:#fff !important; }
+.pf-btn.active,.df-btn.active,.scope-btn.active{ border-color:var(--atec-ink) !important; color:var(--atec-ink) !important; background:#fff !important; font-weight:700; }
+.pcard{ transition:none; } .pcard:hover{ transform:none; box-shadow:none; }
+.recv-chip{ cursor:pointer; }
 #ev-table tr{ transition:background .1s; }
-
-/* Premium panels */
-.panel{ background:#fff; border:1px solid #f6e3ea; border-radius:18px; padding:22px 22px 18px;
-  box-shadow:0 1px 2px rgba(160,0,64,.04), 0 6px 20px -12px rgba(160,0,64,.18); position:relative; overflow:hidden; }
-.panel::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px;
-  background:linear-gradient(90deg,var(--atec-wine),var(--atec-magenta),var(--atec-rose)); opacity:.85; }
-.panel-head{ display:flex; align-items:center; gap:9px; font-size:15px; font-weight:800; color:#A00040; margin-bottom:16px; letter-spacing:-.01em; }
-.panel-dot{ width:8px; height:8px; border-radius:2px; background:var(--atec-magenta); display:inline-block; transform:rotate(45deg); }
-.panel-sub{ font-size:12px; font-weight:600; color:#c89aae; margin-left:3px; }
-
-/* Channel selector tiles */
-.ctile{ position:relative; border-radius:14px; padding:12px 14px; cursor:pointer; border:1.5px solid #f1d6e0; background:#fff;
-  transition:transform .14s, box-shadow .14s, border-color .14s; overflow:hidden; }
-.ctile:hover{ transform:translateY(-2px); box-shadow:0 8px 22px -10px rgba(160,0,64,.35); }
-.ctile .ct-name{ font-size:13px; font-weight:800; color:#475569; display:flex; align-items:center; gap:5px; }
-.ctile .ct-num{ font-size:27px; font-weight:800; line-height:1.0; margin-top:5px; letter-spacing:-.025em; }
-.ctile .ct-share{ font-size:11px; font-weight:700; color:#94a3b8; margin-top:2px; }
-.ctile .ct-bar{ height:4px; border-radius:99px; background:#f1d6e0; margin-top:8px; overflow:hidden; }
-.ctile .ct-bar>i{ display:block; height:100%; border-radius:99px; }
-.ctile.active{ border-color:transparent; color:#fff; box-shadow:0 10px 26px -8px rgba(160,0,64,.5); }
-.ctile.active .ct-name, .ctile.active .ct-num{ color:#fff; }
-.ctile.active .ct-share{ color:rgba(255,255,255,.85); }
-.ctile.active .ct-bar{ background:rgba(255,255,255,.3); }
-.ctile .ct-check{ position:absolute; top:10px; right:11px; opacity:0; transition:opacity .14s; }
-.ctile.active .ct-check{ opacity:1; }
-
-/* KPI cards */
-.kpi{ position:relative; background:#fff; border:1px solid #f6e3ea; border-radius:18px; padding:20px 22px;
-  box-shadow:0 1px 2px rgba(160,0,64,.04), 0 6px 18px -14px rgba(160,0,64,.2); overflow:hidden; }
-.kpi .kpi-ico{ position:absolute; right:-4px; bottom:-6px; opacity:.06; }
-.kpi .kpi-label{ font-size:12.5px; font-weight:700; color:#94a3b8; }
-.kpi .kpi-val{ font-size:38px; font-weight:800; letter-spacing:-.035em; line-height:1.05; margin-top:4px; }
-.kpi .kpi-sub{ font-size:11.5px; color:#b8a0ac; margin-top:5px; font-weight:600; }
+/* 패널·KPI·타일: 가는 선, 모서리 0, 그림자 0 */
+.panel{ background:#fff; border:1px solid var(--atec-line) !important; border-radius:0 !important; padding:18px 20px 16px; box-shadow:none !important; position:relative; overflow:hidden; }
+.panel::before{ display:none !important; }
+.panel-head{ display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--atec-ink); margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid var(--atec-ink); }
+.panel-dot{ width:10px; height:10px; background:var(--atec-red); display:inline-block; transform:none; border-radius:0; }
+.panel-sub{ font-size:12px; font-weight:400; color:var(--atec-gray); margin-left:auto; }
+.ctile{ position:relative; border-radius:0 !important; padding:12px 14px; cursor:pointer; border:1px solid #C9CED2 !important; background:#fff !important; box-shadow:none !important; transition:border-color .12s; overflow:hidden; }
+.ctile:hover{ transform:none; box-shadow:none; border-color:var(--atec-ink) !important; }
+.ctile .ct-name{ font-size:13px; font-weight:500; color:var(--atec-gray); display:flex; align-items:center; gap:5px; }
+.ctile .ct-name > span:first-child{ display:none; }
+.ctile .ct-num{ font-size:26px; font-weight:700; line-height:1; margin-top:5px; color:var(--atec-ink) !important; }
+.ctile .ct-share{ font-size:11px; color:var(--atec-gray); margin-top:2px; }
+.ctile .ct-bar{ height:4px; border-radius:0; background:#EDEDED; margin-top:8px; overflow:hidden; }
+.ctile .ct-bar>i{ display:block; height:100%; border-radius:0; background:var(--atec-gray) !important; }
+.ctile.active{ border-color:var(--atec-ink) !important; background:#fff !important; color:var(--atec-ink); }
+.ctile.active::after{ content:''; position:absolute; top:0; left:0; width:10px; height:10px; background:var(--atec-red); }
+.ctile.active .ct-name,.ctile.active .ct-num{ color:var(--atec-ink) !important; }
+.ctile.active .ct-share{ color:var(--atec-gray); }
+.ctile.active .ct-bar{ background:#EDEDED; } .ctile.active .ct-bar>i{ background:var(--atec-red) !important; }
+.ctile .ct-check{ display:none; }
+.kpi{ position:relative; background:#fff; border:0 !important; border-right:1px solid var(--atec-line) !important; border-radius:0 !important; padding:18px 22px; box-shadow:none !important; overflow:hidden; }
+.kpi:last-child{ border-right:0 !important; }
+.kpi .kpi-ico{ display:none; }
+.kpi .kpi-label{ font-size:13px; font-weight:400; color:var(--atec-gray); }
+.kpi .kpi-val{ font-size:34px; font-weight:700; letter-spacing:-.01em; line-height:1.1; margin-top:4px; color:var(--atec-ink) !important; }
+.kpi .kpi-sub{ font-size:12px; color:var(--atec-gray); margin-top:5px; }
+#stat-cards{ border-top:1px solid var(--atec-ink); border-bottom:1px solid var(--atec-ink); gap:0 !important; }
+/* Tailwind 색 유틸리티 → CI (JS 템플릿 안의 클래스명은 그대로 두고 뜻만 바꾼다) */
+.bg-rose-50,.bg-rose-100,.bg-amber-50,.bg-amber-100,.bg-emerald-50,.bg-green-50,.bg-sky-50,.bg-indigo-50,.bg-slate-50,.bg-slate-100,.bg-red-50{ background-color:#F2F2F2 !important; }
+.border-rose-100,.border-rose-200,.border-amber-100,.border-amber-200,.border-emerald-200,.border-green-200,.border-sky-200,.border-indigo-100,.border-indigo-200,.border-slate-100,.border-slate-200,.border-red-200{ border-color:var(--atec-line) !important; }
+.text-amber-600,.text-amber-700,.text-amber-800,.text-yellow-700{ color:var(--atec-gold) !important; }
+.text-emerald-600,.text-emerald-700,.text-emerald-800,.text-green-700,.text-sky-700,.text-cyan-700,.text-indigo-700{ color:var(--atec-gray) !important; }
+.text-red-600,.text-red-700,.text-red-800,.text-rose-600,.text-rose-700{ color:var(--atec-red) !important; }
+.bg-emerald-600,.bg-emerald-700{ background-color:var(--atec-ink) !important; }
+.bg-amber-400,.bg-amber-500{ background-color:var(--atec-gold) !important; }
+.bg-amber-400.text-amber-900,.bg-amber-500.text-amber-900{ color:#fff !important; }
+.rounded,.rounded-md,.rounded-lg,.rounded-xl,.rounded-2xl{ border-radius:0 !important; }
+.shadow-sm,.shadow,.shadow-md,.shadow-lg,.shadow-xl,.shadow-2xl{ box-shadow:none !important; }
+.hover\:bg-rose-50:hover,.hover\:bg-rose-100:hover{ background-color:#F2F2F2 !important; }
 /* ===== 모바일 대응 (자동: 폭<768px / 강제: html.force-mobile / 무효: html.force-web) ===== */
 .no-scrollbar::-webkit-scrollbar{ display:none; }
 .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
@@ -136,7 +150,7 @@ html.force-mobile .max-w-\[1600px\]{ padding-left:12px !important; padding-right
 @media (max-width:767px){
   html:not(.force-web) #channel-tiles{ grid-template-columns:repeat(3,1fr) !important; gap:7px !important; }
   html:not(.force-web) #center-tiles{ gap:7px !important; }
-  html:not(.force-web) .ctile{ padding:8px 9px !important; border-radius:12px !important; border-width:1px !important; }
+  html:not(.force-web) .ctile{ padding:8px 9px !important; border-radius:0 !important; border-width:1px !important; }
   html:not(.force-web) .ctile .ct-name{ font-size:11px !important; font-weight:700 !important; margin:0 !important; }
   html:not(.force-web) .ctile .ct-num{ font-size:15px !important; line-height:1.05 !important; margin-top:2px !important; }
   html:not(.force-web) .ctile .ct-share{ font-size:9px !important; margin-top:1px !important; }
@@ -144,7 +158,7 @@ html.force-mobile .max-w-\[1600px\]{ padding-left:12px !important; padding-right
 }
 html.force-mobile #channel-tiles{ grid-template-columns:repeat(3,1fr) !important; gap:7px !important; }
 html.force-mobile #center-tiles{ gap:7px !important; }
-html.force-mobile .ctile{ padding:8px 9px !important; border-radius:12px !important; border-width:1px !important; }
+html.force-mobile .ctile{ padding:8px 9px !important; border-radius:0 !important; border-width:1px !important; }
 html.force-mobile .ctile .ct-name{ font-size:11px !important; font-weight:700 !important; margin:0 !important; }
 html.force-mobile .ctile .ct-num{ font-size:15px !important; line-height:1.05 !important; margin-top:2px !important; }
 html.force-mobile .ctile .ct-share{ font-size:9px !important; margin-top:1px !important; }
@@ -159,14 +173,14 @@ html.force-mobile .sec-title{ font-size:13px !important; margin-bottom:8px !impo
 /* === KPI 카드 === */
 @media (max-width:767px){
   html:not(.force-web) #stat-cards{ gap:8px !important; margin-bottom:14px !important; }
-  html:not(.force-web) .kpi{ padding:9px 11px !important; border-radius:12px !important; }
+  html:not(.force-web) .kpi{ padding:9px 11px !important; border-radius:0 !important; }
   html:not(.force-web) .kpi .kpi-val{ font-size:18px !important; }
   html:not(.force-web) .kpi .kpi-label{ font-size:10px !important; }
   html:not(.force-web) .kpi .kpi-sub{ font-size:9px !important; }
   html:not(.force-web) .kpi .kpi-ico{ width:36px !important; height:36px !important; opacity:.05 !important; right:-2px !important; bottom:-4px !important; }
 }
 html.force-mobile #stat-cards{ gap:8px !important; margin-bottom:14px !important; }
-html.force-mobile .kpi{ padding:9px 11px !important; border-radius:12px !important; }
+html.force-mobile .kpi{ padding:9px 11px !important; border-radius:0 !important; }
 html.force-mobile .kpi .kpi-val{ font-size:18px !important; }
 html.force-mobile .kpi .kpi-label{ font-size:10px !important; }
 html.force-mobile .kpi .kpi-sub{ font-size:9px !important; }
@@ -174,12 +188,12 @@ html.force-mobile .kpi .kpi-ico{ width:36px !important; height:36px !important; 
 
 /* === 패널 / 차트 === */
 @media (max-width:767px){
-  html:not(.force-web) .panel{ padding:12px 12px 10px !important; border-radius:12px !important; margin-bottom:10px !important; }
+  html:not(.force-web) .panel{ padding:12px 12px 10px !important; border-radius:0 !important; margin-bottom:10px !important; }
   html:not(.force-web) .panel-head{ font-size:12px !important; gap:6px !important; }
   html:not(.force-web) .panel-sub{ font-size:10px !important; }
   html:not(.force-web) .chart-box{ height:200px !important; }
 }
-html.force-mobile .panel{ padding:12px 12px 10px !important; border-radius:12px !important; margin-bottom:10px !important; }
+html.force-mobile .panel{ padding:12px 12px 10px !important; border-radius:0 !important; margin-bottom:10px !important; }
 html.force-mobile .panel-head{ font-size:12px !important; gap:6px !important; }
 html.force-mobile .panel-sub{ font-size:10px !important; }
 html.force-mobile .chart-box{ height:200px !important; }
@@ -212,12 +226,12 @@ html.force-mobile #q{ font-size:14px !important; padding:10px 14px !important; }
 
 /* === 도움말 모달 === */
 @media (max-width:767px){
-  html:not(.force-web) #help-modal > div{ max-height:95vh !important; border-radius:14px !important; }
+  html:not(.force-web) #help-modal > div{ max-height:95vh !important; border-radius:0 !important; }
   html:not(.force-web) #help-tabs{ padding:0 12px !important; gap:0 !important; }
   html:not(.force-web) .help-tab{ padding:8px 10px !important; font-size:11px !important; }
   html:not(.force-web) #help-body{ padding:14px 14px !important; font-size:12px !important; }
 }
-html.force-mobile #help-modal > div{ max-height:95vh !important; border-radius:14px !important; }
+html.force-mobile #help-modal > div{ max-height:95vh !important; border-radius:0 !important; }
 html.force-mobile #help-tabs{ padding:0 12px !important; gap:0 !important; }
 html.force-mobile .help-tab{ padding:8px 10px !important; font-size:11px !important; }
 html.force-mobile #help-body{ padding:14px 14px !important; font-size:12px !important; }
@@ -234,164 +248,37 @@ html.force-web body{ min-width:1100px; }
 html.force-mobile #user-badge{ flex-wrap:wrap; }
 html.force-mobile .ub-btn{ font-size:10px !important; padding:3px 7px !important; }
 
-/* === 클라우드 로딩 오버레이 (ATEC CI) === */
-#cloud-loader{
-  position:fixed; inset:0; z-index:9999;
-  background:linear-gradient(135deg, #A00040 0%, #D60051 55%, #D81B60 100%);
-  display:flex; align-items:center; justify-content:center;
-  opacity:0; pointer-events:none; transition:opacity .4s ease;
-}
+/* === 클라우드 로딩 오버레이 (ATEC CI) — 흰 바탕 위 원본 로고 === */
+#cloud-loader{ position:fixed; inset:0; z-index:9999; background:#FFFFFF; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .4s ease; }
 #cloud-loader.show{ opacity:1; pointer-events:auto; }
-#cloud-loader::before{
-  content:''; position:absolute; inset:0;
-  background:
-    radial-gradient(ellipse 600px 400px at 80% -10%, rgba(255,255,255,.18), transparent 60%),
-    radial-gradient(ellipse 500px 400px at 10% 110%, rgba(0,0,0,.18), transparent 60%);
-  pointer-events:none;
-}
-#cloud-loader::after{
-  content:''; position:absolute; inset:0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events:none;
-}
-.cl-wrap{ position:relative; text-align:center; color:#fff; padding:20px; max-width:90%; }
-/* 로고 박스 */
-.cl-logo-box{
-  position:relative; width:180px; height:180px; margin:0 auto 32px;
-  display:flex; align-items:center; justify-content:center;
-}
-/* 회전 링 */
-.cl-ring{
-  position:absolute; inset:0;
-  border-radius:50%;
-  border:3px solid rgba(255,255,255,.18);
-  border-top-color:#ffffff;
-  border-right-color:rgba(255,255,255,.6);
-  animation: cl-spin 1.4s linear infinite;
-}
-.cl-ring.r2{
-  inset:14px;
-  border:2px solid rgba(255,255,255,.1);
-  border-bottom-color:rgba(255,255,255,.55);
-  border-left-color:rgba(255,255,255,.85);
-  animation: cl-spin 2.2s linear infinite reverse;
-}
-@keyframes cl-spin{ to { transform: rotate(360deg); } }
-/* 로고 자체 */
-.cl-logo{
-  position:relative; z-index:2;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  width:128px; height:128px;
-  border-radius:50%;
-  background:rgba(255,255,255,.08);
-  backdrop-filter: blur(8px);
-  border:1px solid rgba(255,255,255,.22);
-  animation: cl-pulse 2.4s ease-in-out infinite;
-}
-@keyframes cl-pulse{
-  0%,100%{ transform:scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.3); }
-  50%{ transform:scale(1.05); box-shadow: 0 0 0 18px rgba(255,255,255,0); }
-}
-/* 어두운 바탕 위 원 안이라 로고는 흰색 한 가지로 얹는다 */
-.cl-logo .cl-mark{ width:84px; height:auto; display:block; filter:brightness(0) invert(1); }
-.cl-logo .cl-bus{
-  margin-top:8px; width:34px; height:34px;
-  display:flex; align-items:center; justify-content:center;
-  background:rgba(255,255,255,.15);
-  border-radius:8px;
-}
-/* 클라우드 아이콘 (왼쪽 위 모서리 떠다님) */
-.cl-cloud-icon{
-  position:absolute; top:-8px; right:-8px;
-  width:42px; height:42px;
-  background:#fff; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:0 6px 20px rgba(0,0,0,.25);
-  animation: cl-bob 2.6s ease-in-out infinite;
-}
-@keyframes cl-bob{
-  0%,100%{ transform:translateY(0); }
-  50%{ transform:translateY(-6px); }
-}
-/* 텍스트 */
-.cl-title{ font-size:22px; font-weight:800; letter-spacing:-.5px; margin-bottom:8px; }
-.cl-subtitle{ font-size:13px; font-weight:500; opacity:.85; margin-bottom:24px; }
-.cl-status{
-  display:inline-block;
-  font-size:13px; font-weight:600;
-  background:rgba(255,255,255,.18);
-  border:1px solid rgba(255,255,255,.28);
-  border-radius:999px;
-  padding:8px 18px;
-  backdrop-filter: blur(6px);
-  min-width:240px;
-  transition:all .3s ease;
-}
-.cl-progress{
-  margin-top:18px;
-  width:240px; height:4px;
-  background:rgba(255,255,255,.18);
-  border-radius:999px; overflow:hidden;
-  margin-left:auto; margin-right:auto;
-}
-.cl-progress-bar{
-  height:100%;
-  background:linear-gradient(90deg, rgba(255,255,255,.6), #fff, rgba(255,255,255,.6));
-  background-size: 200% 100%;
-  border-radius:999px;
-  animation: cl-shimmer 1.4s linear infinite;
-  width:0%;
-  transition: width .5s ease;
-}
-@keyframes cl-shimmer{
-  0%{ background-position: 200% 0; }
-  100%{ background-position: -200% 0; }
-}
-.cl-steps{
-  margin-top:20px;
-  display:flex; gap:6px; justify-content:center;
-  font-size:11px; font-weight:600;
-  opacity:.8;
-}
-.cl-step{
-  display:inline-flex; align-items:center; gap:4px;
-  padding:3px 10px;
-  background:rgba(255,255,255,.1);
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.15);
-  transition: all .3s ease;
-}
-.cl-step.active{
-  background:rgba(255,255,255,.28);
-  border-color:rgba(255,255,255,.5);
-  opacity:1;
-  transform:scale(1.04);
-}
-.cl-step.done{
-  background:rgba(34,197,94,.25);
-  border-color:rgba(134,239,172,.6);
-  opacity:1;
-}
-.cl-step .cl-dot{
-  width:6px; height:6px; border-radius:50%;
-  background:rgba(255,255,255,.4);
-}
-.cl-step.active .cl-dot{ background:#fff; animation:cl-blink 1s ease-in-out infinite; }
-.cl-step.done .cl-dot{ background:#86efac; }
+.cl-wrap{ position:relative; text-align:center; color:var(--atec-ink); padding:20px; max-width:90%; }
+.cl-logo-box{ position:relative; width:180px; height:180px; margin:0 auto 32px; display:flex; align-items:center; justify-content:center; }
+.cl-ring{ position:absolute; inset:0; border-radius:50%; border:2px solid var(--atec-line); border-top-color:var(--atec-red); animation:cl-spin 1.4s linear infinite; }
+.cl-ring.r2{ inset:14px; border:1px solid var(--atec-line); border-bottom-color:var(--atec-gray); animation:cl-spin 2.2s linear infinite reverse; }
+@keyframes cl-spin{ to{ transform:rotate(360deg); } }
+.cl-logo{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; width:128px; height:128px; border-radius:50%; background:#fff; border:1px solid var(--atec-line); }
+.cl-logo .cl-mark{ width:84px; height:auto; display:block; }
+.cl-logo .cl-bus{ margin-top:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; background:#F2F2F2; border-radius:0; }
+.cl-logo .cl-bus svg path{ stroke:var(--atec-gray); }
+.cl-cloud-icon{ position:absolute; top:-8px; right:-8px; width:42px; height:42px; background:#fff; border:1px solid var(--atec-line); border-radius:50%; display:flex; align-items:center; justify-content:center; animation:cl-bob 2.6s ease-in-out infinite; }
+@keyframes cl-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+.cl-title{ font-size:22px; font-weight:700; letter-spacing:-.3px; margin-bottom:8px; color:var(--atec-ink); }
+.cl-subtitle{ font-size:13px; font-weight:400; color:var(--atec-gray); margin-bottom:24px; }
+.cl-status{ display:inline-block; font-size:13px; font-weight:500; background:#fff; border:1px solid var(--atec-line); border-radius:0; padding:8px 18px; min-width:240px; color:var(--atec-ink); transition:all .3s ease; }
+.cl-progress{ margin-top:18px; width:240px; height:4px; background:#EDEDED; border-radius:0; overflow:hidden; margin-left:auto; margin-right:auto; }
+.cl-progress-bar{ height:100%; background:var(--atec-red); border-radius:0; width:0%; transition:width .5s ease; }
+.cl-steps{ margin-top:20px; display:flex; gap:6px; justify-content:center; font-size:11px; font-weight:500; color:var(--atec-gray); }
+.cl-step{ display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:#fff; border:1px solid var(--atec-line); border-radius:0; transition:all .3s ease; }
+.cl-step.active{ border-color:var(--atec-ink); color:var(--atec-ink); }
+.cl-step.done{ border-color:var(--atec-gray); color:var(--atec-gray); }
+.cl-step .cl-dot{ width:6px; height:6px; border-radius:0; background:var(--atec-line); }
+.cl-step.active .cl-dot{ background:var(--atec-red); animation:cl-blink 1s ease-in-out infinite; }
+.cl-step.done .cl-dot{ background:var(--atec-gray); }
 @keyframes cl-blink{ 0%,100%{opacity:1} 50%{opacity:.3} }
 @media (max-width:480px){
-  .cl-logo-box{ width:150px; height:150px; margin-bottom:24px; }
-  .cl-logo{ width:108px; height:108px; }
-  .cl-logo .cl-mark{ width:70px; }
-  .cl-title{ font-size:18px; }
-  .cl-subtitle{ font-size:12px; margin-bottom:18px; }
-  .cl-status{ font-size:12px; min-width:200px; padding:7px 14px; }
-  .cl-progress{ width:200px; }
-  .cl-steps{ font-size:10px; gap:4px; }
-  .cl-step{ padding:2px 7px; }
+  .cl-logo-box{ width:150px; height:150px; margin-bottom:24px; } .cl-logo{ width:108px; height:108px; } .cl-logo .cl-mark{ width:70px; }
+  .cl-title{ font-size:18px; } .cl-subtitle{ font-size:12px; margin-bottom:18px; } .cl-status{ font-size:12px; min-width:200px; padding:7px 14px; }
+  .cl-progress{ width:200px; } .cl-steps{ font-size:10px; gap:4px; } .cl-step{ padding:2px 7px; }
 }
 
 /* === 탭 메뉴 === */
@@ -400,23 +287,23 @@ html.force-mobile .ub-btn{ font-size:10px !important; padding:3px 7px !important
 .tab-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:18px; }
 @media (max-width:767px){
   html:not(.force-web) #tabs{ width:100%; padding:4px !important; gap:3px !important; margin-bottom:14px !important; }
-  html:not(.force-web) .tab-btn{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; border-radius:10px !important; position:relative; }
+  html:not(.force-web) .tab-btn{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; border-radius:0 !important; position:relative; }
   html:not(.force-web) .tab-ico{ width:19px !important; height:19px !important; display:block; }
   html:not(.force-web) .tab-full{ display:none; }
   html:not(.force-web) .tab-short{ display:inline; font-size:11px !important; font-weight:600; line-height:1; white-space:nowrap; }
   html:not(.force-web) .tab-badge{ position:absolute; top:3px; right:8px; margin:0 !important; font-size:9px !important; padding:1px 5px !important; min-width:16px; }
 }
 html.force-mobile #tabs{ width:100%; padding:4px !important; gap:3px !important; margin-bottom:14px !important; }
-html.force-mobile .tab-btn{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; border-radius:10px !important; position:relative; }
+html.force-mobile .tab-btn{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px !important; padding:8px 2px !important; border-radius:0 !important; position:relative; }
 html.force-mobile .tab-ico{ width:19px !important; height:19px !important; display:block; }
 html.force-mobile .tab-full{ display:none; }
 html.force-mobile .tab-short{ display:inline; font-size:11px !important; font-weight:600; line-height:1; white-space:nowrap; }
 html.force-mobile .tab-badge{ position:absolute; top:3px; right:8px; margin:0 !important; font-size:9px !important; padding:1px 5px !important; min-width:16px; }
 
 /* === 도움말 탭 === */
-.help-tab{ padding:6px 12px; font-size:12px; font-weight:700; color:#64748b; border-bottom:2px solid transparent; flex:0 0 auto; cursor:pointer; }
-.help-tab:hover{ color:#D60051; }
-.help-tab.active{ color:#A00040; border-bottom-color:#D60051; }
+.help-tab{ padding:6px 12px; font-size:12px; font-weight:700; color:#5A666F; border-bottom:2px solid transparent; flex:0 0 auto; cursor:pointer; }
+.help-tab:hover{ color:#D70051; }
+.help-tab.active{ color:#111111; border-bottom-color:#D70051; }
 
 /* === 모바일 정렬 보정 (오와열) === */
 /* 차량 상세 상단 미니통계: 모바일에서 4칸을 가지런한 2×2 그리드로 */
@@ -436,7 +323,7 @@ html.force-mobile .ai-bubble{ max-width:90% !important; }
   html:not(.force-web) input[type=text], html:not(.force-web) input[type=search], html:not(.force-web) input[type=email],
   html:not(.force-web) input[type=password], html:not(.force-web) input[type=date], html:not(.force-web) input[type=number],
   html:not(.force-web) select, html:not(.force-web) textarea{ font-size:16px !important; }
-  html:not(.force-web) .searchbar{ padding:13px 14px !important; border-radius:14px !important; }
+  html:not(.force-web) .searchbar{ padding:13px 14px !important; border-radius:0 !important; }
   html:not(.force-web) .searchbar input{ font-size:16px !important; }
   html:not(.force-web) #logbk-file{ font-size:13px !important; }
   html:not(.force-web) button{ min-height:40px; }
@@ -444,61 +331,32 @@ html.force-mobile .ai-bubble{ max-width:90% !important; }
 html.force-mobile input[type=text], html.force-mobile input[type=search], html.force-mobile input[type=email],
 html.force-mobile input[type=password], html.force-mobile input[type=date], html.force-mobile input[type=number],
 html.force-mobile select, html.force-mobile textarea{ font-size:16px !important; }
-html.force-mobile .searchbar{ padding:13px 14px !important; border-radius:14px !important; }
+html.force-mobile .searchbar{ padding:13px 14px !important; border-radius:0 !important; }
 html.force-mobile .searchbar input{ font-size:16px !important; }
 html.force-mobile button{ min-height:40px; }
 
 /* ============================================================
-   ATEC 리디자인 오버라이드 — 디자인만(기능 코드 변경 없음)
-   ① 팔레트 톤 정리  ② 카드 정렬·여백 통일  ③ 모바일 하단 탭바
+   ATEC CI 레이어 — 터치 영역 · 모바일 하단 탭바 (같은 요소 재배치 · 기능/권한 그대로)
    ============================================================ */
-:root{
-  --atec-magenta:#D60051;
-  --atec-pink:#C42B66;
-  --atec-rose:#D45C86;
-  --atec-bg:#F7F4F6;
-  --atec-line:#ECE4E8;
-}
-/* 배경: 분홍 그라데이션 → 차분한 웜 화이트 */
-body{ background:var(--atec-bg) !important; }
-
-/* 패널·카드: 테두리 차분하게 · 그림자 부드럽게 · 모서리 통일 */
-.panel{ border-color:#EDE6E9 !important; border-radius:16px !important;
-  box-shadow:0 1px 2px rgba(42,37,48,.04), 0 8px 24px -16px rgba(42,37,48,.16) !important; }
-.panel::before{ opacity:.5 !important; }
-.bg-white.border-rose-100, .bg-white.border-rose-200{ border-color:#EDE6E9 !important; }
-.border-rose-100{ border-color:#EFE7EB !important; }
-.rounded-xl{ border-radius:14px !important; }
-.searchbar, .border-rose-200{ border-color:#E6DCE2 !important; }
-.sec-title{ border-left-color:var(--atec-magenta) !important; }
-.tab-btn.active{ background:linear-gradient(115deg,#6E002C,#A00040 60%,#9A1450) !important; }
-
-/* 터치 영역 키우기 */
 @media (max-width:767px){ html:not(.force-web) button{ min-height:44px; } }
 html.force-mobile button{ min-height:44px !important; }
-
-/* ===== 모바일: 상단 탭 → 하단 탭바 도킹 (같은 요소 재배치 · 기능/권한 그대로) ===== */
 @media (max-width:767px){
-  html:not(.force-web) #tabs{
-    position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
-    width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
-    border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important;
-    box-shadow:0 -6px 20px -12px rgba(42,37,48,.22) !important;
+  html:not(.force-web) #tabs{ position:fixed !important; left:0; right:0; bottom:0; top:auto !important; width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+    border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important; box-shadow:none !important; gap:0 !important;
     padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
-  html:not(.force-web) #tabs .tab-btn{ border-radius:12px !important; }
-  html:not(.force-web) #tabs .tab-btn:not(.active){ color:#ABA3AA !important; }
-  html:not(.force-web) #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-magenta) !important; }
+  html:not(.force-web) #tabs .tab-btn{ border-radius:0 !important; }
+  html:not(.force-web) #tabs .tab-btn:not(.active){ color:var(--atec-gray) !important; }
+  html:not(.force-web) #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-ink) !important; }
+  html:not(.force-web) #tabs .tab-btn::before{ position:absolute; top:0; left:50%; transform:translateX(-50%); width:10px; height:4px; margin:0; }
   html:not(.force-web) body{ padding-bottom:76px !important; }
 }
-html.force-mobile #tabs{
-  position:fixed !important; left:0; right:0; bottom:0; top:auto !important;
-  width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
-  border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important;
-  box-shadow:0 -6px 20px -12px rgba(42,37,48,.22) !important;
+html.force-mobile #tabs{ position:fixed !important; left:0; right:0; bottom:0; top:auto !important; width:100% !important; margin:0 !important; z-index:50; border-radius:0 !important;
+  border:none !important; border-top:1px solid var(--atec-line) !important; background:#fff !important; box-shadow:none !important; gap:0 !important;
   padding:6px 4px calc(8px + env(safe-area-inset-bottom)) !important; }
-html.force-mobile #tabs .tab-btn{ border-radius:12px !important; }
-html.force-mobile #tabs .tab-btn:not(.active){ color:#ABA3AA !important; }
-html.force-mobile #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-magenta) !important; }
+html.force-mobile #tabs .tab-btn{ border-radius:0 !important; }
+html.force-mobile #tabs .tab-btn:not(.active){ color:var(--atec-gray) !important; }
+html.force-mobile #tabs .tab-btn.active{ background:transparent !important; color:var(--atec-ink) !important; }
+html.force-mobile #tabs .tab-btn::before{ position:absolute; top:0; left:50%; transform:translateX(-50%); width:10px; height:4px; margin:0; }
 html.force-mobile body{ padding-bottom:76px !important; }
 
 /* ============================================================
@@ -515,54 +373,51 @@ p, li, .kpi-sub, .ct-share, .panel-sub, #kb-meta{ line-height:1.6; }
 
 /* --- 모바일 글자 최소크기 보장 (force-mobile + 자동 폭<768) --- */
 html.force-mobile{ font-size:15px !important; }
-@media (max-width:767px){ html:not(.force-web){ font-size:15px !important; } }
-
-html.force-mobile .kpi .kpi-val,
-html:not(.force-web) .kpi .kpi-val{ font-size:21px !important; line-height:1.12 !important; }
-html.force-mobile .kpi .kpi-label,
-html:not(.force-web) .kpi .kpi-label{ font-size:11.5px !important; line-height:1.4 !important; }
-html.force-mobile .kpi .kpi-sub,
-html:not(.force-web) .kpi .kpi-sub{ font-size:11px !important; line-height:1.45 !important; }
-html.force-mobile .ctile .ct-name,
-html:not(.force-web) .ctile .ct-name{ font-size:11.5px !important; line-height:1.35 !important; }
-html.force-mobile .ctile .ct-num,
-html:not(.force-web) .ctile .ct-num{ font-size:17px !important; line-height:1.1 !important; }
-html.force-mobile .ctile .ct-share,
-html:not(.force-web) .ctile .ct-share{ font-size:10.5px !important; }
-html.force-mobile .chip,
-html:not(.force-web) .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
-html.force-mobile .pcard .chip,
-html:not(.force-web) .pcard .chip{ font-size:11px !important; padding:3px 9px !important; }
-html.force-mobile .sec-title,
-html:not(.force-web) .sec-title{ font-size:14px !important; margin-bottom:11px !important; line-height:1.4 !important; }
-html.force-mobile .panel-head,
-html:not(.force-web) .panel-head{ font-size:14px !important; }
-html.force-mobile .panel-sub,
-html:not(.force-web) .panel-sub{ font-size:11px !important; }
-html.force-mobile #kb-meta,
-html:not(.force-web) #kb-meta{ font-size:11.5px !important; line-height:1.5 !important; }
-html.force-mobile header.atec-header h1,
-html:not(.force-web) header.atec-header h1{ font-size:16px !important; line-height:1.3 !important; }
-html.force-mobile #user-badge button,
-html:not(.force-web) #user-badge button,
-html.force-mobile .ub-btn,
-html:not(.force-web) .ub-btn{ font-size:11px !important; padding:5px 10px !important; }
-
+html.force-mobile .kpi .kpi-val{ font-size:21px !important; line-height:1.12 !important; }
+html.force-mobile .kpi .kpi-label{ font-size:11.5px !important; line-height:1.4 !important; }
+html.force-mobile .kpi .kpi-sub{ font-size:11px !important; line-height:1.45 !important; }
+html.force-mobile .ctile .ct-name{ font-size:11.5px !important; line-height:1.35 !important; }
+html.force-mobile .ctile .ct-num{ font-size:17px !important; line-height:1.1 !important; }
+html.force-mobile .ctile .ct-share{ font-size:10.5px !important; }
+html.force-mobile .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
+html.force-mobile .pcard .chip{ font-size:11px !important; padding:3px 9px !important; }
+html.force-mobile .sec-title{ font-size:14px !important; margin-bottom:11px !important; line-height:1.4 !important; }
+html.force-mobile .panel-head{ font-size:14px !important; }
+html.force-mobile .panel-sub{ font-size:11px !important; }
+html.force-mobile #kb-meta{ font-size:11.5px !important; line-height:1.5 !important; }
+html.force-mobile header.atec-header h1{ font-size:16px !important; line-height:1.3 !important; }
+html.force-mobile #user-badge button, html.force-mobile .ub-btn{ font-size:11px !important; padding:5px 10px !important; }
 /* --- 모바일 카드/패널 숨통 트이는 여백 --- */
-html.force-mobile .panel,
-html:not(.force-web) .panel{ padding:15px 15px 13px !important; border-radius:15px !important; margin-bottom:12px !important; }
-html.force-mobile .kpi,
-html:not(.force-web) .kpi{ padding:13px 14px !important; border-radius:15px !important; }
-html.force-mobile .ctile,
-html:not(.force-web) .ctile{ padding:11px 12px !important; border-radius:13px !important; }
-
+html.force-mobile .panel{ padding:15px 15px 13px !important; border-radius:0 !important; margin-bottom:12px !important; }
+html.force-mobile .kpi{ padding:13px 14px !important; border-radius:0 !important; }
+html.force-mobile .ctile{ padding:11px 12px !important; border-radius:0 !important; }
 /* --- 하단 탭바: 라벨 가독성 --- */
-html.force-mobile .tab-btn,
-html:not(.force-web) .tab-btn{ padding:7px 2px !important; gap:4px !important; }
-html.force-mobile .tab-btn .tab-short,
-html:not(.force-web) .tab-btn .tab-short{ font-size:10.5px !important; font-weight:700 !important; letter-spacing:-0.01em !important; }
-html.force-mobile .tab-ico,
-html:not(.force-web) .tab-ico{ width:21px !important; height:21px !important; }
+html.force-mobile .tab-btn{ padding:7px 2px !important; gap:4px !important; }
+html.force-mobile .tab-btn .tab-short{ font-size:10.5px !important; font-weight:700 !important; letter-spacing:-0.01em !important; }
+html.force-mobile .tab-ico{ width:21px !important; height:21px !important; }
+@media (max-width:767px){
+  html:not(.force-web){ font-size:15px !important; }
+  html:not(.force-web) .kpi .kpi-val{ font-size:21px !important; line-height:1.12 !important; }
+  html:not(.force-web) .kpi .kpi-label{ font-size:11.5px !important; line-height:1.4 !important; }
+  html:not(.force-web) .kpi .kpi-sub{ font-size:11px !important; line-height:1.45 !important; }
+  html:not(.force-web) .ctile .ct-name{ font-size:11.5px !important; line-height:1.35 !important; }
+  html:not(.force-web) .ctile .ct-num{ font-size:17px !important; line-height:1.1 !important; }
+  html:not(.force-web) .ctile .ct-share{ font-size:10.5px !important; }
+  html:not(.force-web) .chip{ font-size:11px !important; padding:3px 9px !important; line-height:1.5 !important; }
+  html:not(.force-web) .pcard .chip{ font-size:11px !important; padding:3px 9px !important; }
+  html:not(.force-web) .sec-title{ font-size:14px !important; margin-bottom:11px !important; line-height:1.4 !important; }
+  html:not(.force-web) .panel-head{ font-size:14px !important; }
+  html:not(.force-web) .panel-sub{ font-size:11px !important; }
+  html:not(.force-web) #kb-meta{ font-size:11.5px !important; line-height:1.5 !important; }
+  html:not(.force-web) header.atec-header h1{ font-size:16px !important; line-height:1.3 !important; }
+  html:not(.force-web) #user-badge button, html:not(.force-web) .ub-btn{ font-size:11px !important; padding:5px 10px !important; }
+  html:not(.force-web) .panel{ padding:15px 15px 13px !important; border-radius:0 !important; margin-bottom:12px !important; }
+  html:not(.force-web) .kpi{ padding:13px 14px !important; border-radius:0 !important; }
+  html:not(.force-web) .ctile{ padding:11px 12px !important; border-radius:0 !important; }
+  html:not(.force-web) .tab-btn{ padding:7px 2px !important; gap:4px !important; }
+  html:not(.force-web) .tab-btn .tab-short{ font-size:10.5px !important; font-weight:700 !important; letter-spacing:-0.01em !important; }
+  html:not(.force-web) .tab-ico{ width:21px !important; height:21px !important; }
+}
 
 /* ============================================================
    기기 호환 안정화 레이어 v3 — 폰 기종 무관 정렬 유지
@@ -584,17 +439,17 @@ img, video, canvas, table{ max-width:100%; }
 @media (max-width:767px){
   html:not(.force-web) .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
   html:not(.force-web) .overflow-x-auto table, html:not(.force-web) .overflow-x-auto tbody, html:not(.force-web) .overflow-x-auto table tr, html:not(.force-web) .overflow-x-auto table td{ display:block !important; width:auto !important; }
-  html:not(.force-web) .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(160,0,64,.05); }
+  html:not(.force-web) .overflow-x-auto table tr{ background:#fff; border:1px solid #D9D9D9 !important; border-radius:0; padding:8px 12px; margin-bottom:9px; }
   html:not(.force-web) .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
-  html:not(.force-web) .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
+  html:not(.force-web) .overflow-x-auto table td::before{ content:attr(data-label); color:#5A666F; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
   html:not(.force-web) .overflow-x-auto table td:empty{ display:none !important; }
   html:not(.force-web) .overflow-x-auto{ overflow:visible !important; }
 }
 html.force-mobile .overflow-x-auto table thead{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 html.force-mobile .overflow-x-auto table, html.force-mobile .overflow-x-auto tbody, html.force-mobile .overflow-x-auto table tr, html.force-mobile .overflow-x-auto table td{ display:block !important; width:auto !important; }
-html.force-mobile .overflow-x-auto table tr{ background:#fff; border:1px solid #F0E5EA !important; border-radius:13px; padding:8px 12px; margin-bottom:9px; box-shadow:0 1px 2px rgba(160,0,64,.05); }
+html.force-mobile .overflow-x-auto table tr{ background:#fff; border:1px solid #D9D9D9 !important; border-radius:0; padding:8px 12px; margin-bottom:9px; }
 html.force-mobile .overflow-x-auto table td{ border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:14px; align-items:center; font-size:13px; text-align:right; line-height:1.45; }
-html.force-mobile .overflow-x-auto table td::before{ content:attr(data-label); color:#9A8A92; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
+html.force-mobile .overflow-x-auto table td::before{ content:attr(data-label); color:#5A666F; font-weight:700; font-size:11.5px; text-align:left; flex:0 0 auto; }
 html.force-mobile .overflow-x-auto table td:empty{ display:none !important; }
 html.force-mobile .overflow-x-auto{ overflow:visible !important; }
 
@@ -617,9 +472,33 @@ html.force-mobile #kb-meta > div:nth-child(3){ display:none !important; }
 html.force-mobile #user-badge{ padding:5px 8px !important; gap:5px !important; flex-wrap:wrap !important; justify-content:flex-start; }
 html.force-mobile #user-badge::-webkit-scrollbar{ display:none; }
 html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ font-size:10px !important; padding:4px 8px !important; min-height:0 !important; flex:0 0 auto; white-space:nowrap; }
+
+/* === 머리글 보정 (흰 바 위 지식베이스·사용자 배지) === */
+#kb-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; }
+#kb-meta > div{ color:var(--atec-ink) !important; background:transparent !important; border:0 !important; padding:0 !important; margin:0 !important; font-size:12.5px !important; }
+#kb-meta.text-amber-200{ color:var(--atec-gold) !important; }
+/* 옛 어두운 머리글용 흰 글자·흰 아이콘을 잉크/그레이로 */
+#kb-meta .text-white{ color:var(--atec-ink) !important; }
+#kb-meta .text-pink-100\/80, #kb-meta .text-pink-100\/70, #kb-meta .text-pink-100\/90{ color:var(--atec-gray) !important; margin-left:4px !important; }
+#kb-meta svg rect, #kb-meta svg path{ stroke:var(--atec-gray) !important; }
+#user-badge{ color:var(--atec-ink); }
+#user-badge button, #user-badge .ub-btn{ background:transparent !important; border:1px solid var(--atec-line) !important; color:var(--atec-ink) !important; border-radius:0 !important; font-weight:500 !important; }
+#user-badge button:hover, #user-badge .ub-btn:hover{ border-color:var(--atec-ink) !important; }
+@media (max-width:767px){
+  html:not(.force-web) #kb-status{ padding:3px 8px !important; }
+  html:not(.force-web) #kb-status > div:first-child{ display:none !important; }
+  html:not(.force-web) #kb-meta > div:nth-child(2), html:not(.force-web) #kb-meta > div:nth-child(3){ display:none !important; }
+}
+html.force-mobile #kb-status{ padding:3px 8px !important; }
+html.force-mobile #kb-status > div:first-child{ display:none !important; }
+html.force-mobile #kb-meta > div:nth-child(2), html.force-mobile #kb-meta > div:nth-child(3){ display:none !important; }
+/* 도움말·안내 상자의 하늘색 계열도 회색으로 */
+.bg-cyan-50,.bg-blue-50,.bg-teal-50,.bg-sky-100,.bg-blue-100,.bg-cyan-100{ background-color:#F2F2F2 !important; }
+.border-cyan-200,.border-cyan-300,.border-blue-200,.border-teal-200,.border-sky-300{ border-color:var(--atec-line) !important; }
+.text-blue-700,.text-blue-800,.text-cyan-800,.text-sky-800,.text-teal-700{ color:var(--atec-gray) !important; }
 </style>
 </head>
-<body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #fdeef4, transparent), #fbf7f9;">
+<body class="text-slate-800 min-h-screen" style="background:radial-gradient(1200px 400px at 80% -100px, #F2F2F2, transparent), #F2F2F2;">
 
 <!-- ============ CLOUD LOADER (ATEC CI) ============ -->
 <div id="cloud-loader" aria-hidden="true">
@@ -637,7 +516,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
       </div>
       <div class="cl-cloud-icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path d="M7 18a5 5 0 110-10 6 6 0 0111.7 1.5A4.5 4.5 0 0118 18H7z" fill="#D60051"/>
+          <path d="M7 18a5 5 0 110-10 6 6 0 0111.7 1.5A4.5 4.5 0 0118 18H7z" fill="#D70051"/>
         </svg>
       </div>
     </div>
@@ -656,9 +535,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 </div>
 
 <!-- ===================== AUTH OVERLAY ===================== -->
-<div id="auth-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:linear-gradient(135deg, #A00040, #D60051 60%, #D81B60);">
-  <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px);background-size:28px 28px;"></div>
-  <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
+<div id="auth-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:#F2F2F2">
+  <div class="relative w-full max-w-sm bg-white border p-6" style="border-color:var(--atec-line)">
     <div class="text-center mb-5">
       <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark lg" style="margin:0 auto 6px">
       <div class="text-[12px] text-slate-500">단말기 현장처리 판정 시스템</div>
@@ -666,38 +544,38 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
     <!-- LOGIN FORM -->
     <div id="login-form">
-      <div class="text-sm font-extrabold text-[#A00040] mb-3">로그인</div>
-      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
-      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="text-sm font-extrabold text-[#111111] mb-3">로그인</div>
+      <input id="li-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D70051]">
+      <input id="li-pw" type="password" placeholder="비밀번호" autocomplete="current-password" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D70051]" onkeydown="if(event.key==='Enter')doLogin()">
       <button onclick="doLogin()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">로그인</button>
       <div id="li-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="flex items-center justify-between mt-2">
-        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#D60051] hover:underline">비밀번호 찾기</button>
-        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#D60051] font-bold hover:underline">회원가입</button></div>
+        <button onclick="showAuth('reset')" class="text-[12px] text-slate-500 hover:text-[#D70051] hover:underline">비밀번호 찾기</button>
+        <div class="text-[12px] text-slate-500">계정이 없으신가요? <button onclick="showAuth('signup')" class="text-[#D70051] font-bold hover:underline">회원가입</button></div>
       </div>
     </div>
 
     <!-- SIGNUP FORM -->
     <div id="signup-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#A00040] mb-3">회원가입</div>
-      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
-      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
-      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D60051]">
-      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]">
+      <div class="text-sm font-extrabold text-[#111111] mb-3">회원가입</div>
+      <input id="su-user" type="email" placeholder="이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D70051]">
+      <input id="su-name" type="text" placeholder="이름" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D70051]">
+      <input id="su-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-[#D70051]">
+      <input id="su-pw2" type="password" placeholder="비밀번호 확인" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D70051]">
       <button onclick="doSignup()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">가입하기</button>
       <div id="su-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
       <div class="text-[11px] text-slate-400 text-center mt-1">가입 즉시 사용할 수 있습니다.</div>
-      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2">이미 계정이 있으신가요? <button onclick="showAuth('login')" class="text-[#D70051] font-bold hover:underline">로그인</button></div>
     </div>
 
     <!-- PASSWORD RESET REQUEST FORM -->
     <div id="reset-form" class="hidden">
-      <div class="text-sm font-extrabold text-[#A00040] mb-1">비밀번호 찾기</div>
+      <div class="text-sm font-extrabold text-[#111111] mb-1">비밀번호 찾기</div>
       <p class="text-[11px] text-slate-500 mb-3">가입한 이메일로 <b>재설정 요청</b>을 보냅니다. 관리자가 임시 비밀번호를 발급하면 로그인 후 변경할 수 있습니다.</p>
-      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter')requestReset()">
+      <input id="rs-user" type="email" placeholder="가입한 이메일 주소" autocomplete="email" class="w-full text-sm border border-rose-200 rounded-lg px-3 py-2 mb-3 outline-none focus:border-[#D70051]" onkeydown="if(event.key==='Enter')requestReset()">
       <button onclick="requestReset()" class="w-full text-sm font-bold text-white rounded-lg py-2.5 transition" style="background:var(--atec-magenta)">재설정 요청 보내기</button>
       <div id="rs-msg" class="text-[12px] text-center mt-2 min-h-[18px]"></div>
-      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#D60051] font-bold hover:underline">로그인으로 돌아가기</button></div>
+      <div class="text-center text-[12px] text-slate-500 mt-2"><button onclick="showAuth('login')" class="text-[#D70051] font-bold hover:underline">로그인으로 돌아가기</button></div>
     </div>
 
     <div id="first-admin-note" class="hidden text-[11px] text-center text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 mt-3"></div>
@@ -707,27 +585,20 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 <!-- ===================== MAIN APP (hidden until login) ===================== -->
 <div id="app-root" class="hidden">
 
-<header class="atec-header relative overflow-hidden text-white">
-  <div class="grid-overlay absolute inset-0"></div>
-  <div class="absolute -right-16 -top-20 w-80 h-80 rounded-full" style="background:radial-gradient(circle, rgba(236,64,122,.45), transparent 70%)"></div>
-  <div class="relative max-w-[1600px] mx-auto px-4 sm:px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-    <div>
-      <div class="flex items-center gap-2 leading-none">
-        <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark on-dark">
-        <span class="hidden sm:inline-block text-[10px] font-semibold bg-white/15 border border-white/25 rounded-full px-2 py-0.5 backdrop-blur-sm">현장 유지보수 지원</span>
-      </div>
-      <h1 class="text-base md:text-lg font-bold mt-1.5 flex items-center gap-1.5">
-        <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M5 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M16 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2zM7 8h10" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        단말기 장애 현장처리 판정 시스템
-      </h1>
-      <p class="hidden sm:block text-[12px] text-pink-100/90 mt-0.5 max-w-2xl">차량번호 검색 → 과거 이력·재불량 위험·권장 조치를 한 화면에서. 증상 미재현 시에도 데이터 기반으로 선제 조치를 판단합니다.</p>
+<header class="atec-header">
+  <div class="relative max-w-[1600px] mx-auto px-4 sm:px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+    <div class="flex items-center gap-4 min-w-0">
+      <img src="assets/atec-logo.png" alt="ATEC 에이텍모빌리티" class="atec-mark">
+      <div class="w-px h-5 hidden sm:block" style="background:var(--atec-line)"></div>
+      <h1 class="text-[14px] font-medium truncate" style="color:var(--atec-ink)">단말기 현장처리 판정 시스템</h1>
     </div>
-    <div class="flex flex-col items-stretch md:items-end gap-2 self-stretch md:self-center w-full md:w-auto">
-      <div id="user-badge" class="flex items-center flex-wrap gap-1.5 sm:gap-2 bg-white/12 backdrop-blur-sm border border-white/20 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs"></div>
-      <div id="kb-status" class="bg-white/15 backdrop-blur-sm border border-white/25 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs md:min-w-[210px]">
-        <div class="text-pink-100/90 text-[10px] font-bold uppercase tracking-wide mb-1">지식베이스</div>
-        <div id="kb-meta" class="font-bold">로딩 중…</div>
+    <div class="flex-1"></div>
+    <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 w-full md:w-auto">
+      <div id="kb-status" class="flex items-center gap-2 text-[12px] px-3 py-1.5 border" style="border-color:var(--atec-line);color:var(--atec-gray)">
+        <div class="text-[11px] font-medium">지식베이스</div>
+        <div id="kb-meta" class="font-medium" style="color:var(--atec-ink)">로딩 중…</div>
       </div>
+      <div id="user-badge" class="flex items-center flex-wrap gap-1.5 text-xs"></div>
     </div>
   </div>
 </header>
@@ -735,10 +606,16 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
 <div class="max-w-[1600px] mx-auto px-4 sm:px-5 py-5">
 
+  <!-- 화면 제목 (setTab 이 글자만 바꾼다) -->
+  <div id="ci-title" class="flex items-end justify-between gap-4 pt-1 mb-3">
+    <div id="ci-title-text" class="text-[24px] font-bold leading-tight" style="color:var(--atec-ink)">대시보드</div>
+  </div>
+  <div class="ci-rule mb-5"></div>
+
   <!-- SEARCH -->
   <section class="mb-5">
     <div class="searchbar bg-white border border-rose-200 rounded-xl shadow-sm flex items-center gap-2 px-4 py-2.5 transition">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#D60051]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#5A666F]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 검색 (뒷자리만 입력해도 OK)" class="flex-1 outline-none text-sm bg-transparent placeholder:text-slate-400">
       <button onclick="document.getElementById('q').value='';doSearch('')" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
     </div>
@@ -754,7 +631,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <button data-tab="preempt" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5 relative">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-full">선제 점검 대상</span><span class="tab-short">선제점검</span>
-      <span id="preempt-badge" class="tab-badge ml-0.5 text-[10px] bg-[#D60051] text-white rounded-full px-1.5 py-0.5"></span>
+      <span id="preempt-badge" class="tab-badge ml-0.5 text-[10px] bg-[#D70051] text-white rounded-full px-1.5 py-0.5"></span>
     </button>
     <button data-tab="search" class="tab-btn px-4 py-2 text-[13px] font-bold rounded-lg transition flex items-center gap-1.5">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -780,7 +657,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   </nav>
 
   <!-- GLOBAL FILTER BANNER (visible when any filter is active) -->
-  <div id="global-filter-bar" class="hidden mb-5 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-white shadow-sm" style="background:linear-gradient(110deg,var(--atec-wine),var(--atec-magenta))">
+  <div id="global-filter-bar" class="hidden mb-5 px-4 py-2.5 flex items-center justify-between gap-3 text-white" style="background:#111111">
     <div class="flex items-center gap-2 text-[13px] flex-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5h18M6 12h12M10 19h4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
       <span class="font-semibold">전역 필터:</span>
@@ -792,7 +669,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
   <!-- BACK BAR (shown on non-dashboard screens) -->
   <div id="back-bar" class="hidden mb-4">
-    <button onclick="setTab('dash')" class="flex items-center gap-1.5 text-[13px] font-bold text-[#A00040] bg-white border border-rose-200 rounded-lg px-3.5 py-2 shadow-sm hover:bg-rose-50 hover:border-[#D60051] transition">
+    <button onclick="setTab('dash')" class="flex items-center gap-1.5 text-[13px] font-medium bg-white border px-3.5 py-2 transition" style="color:var(--atec-ink);border-color:var(--atec-ink)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       대시보드로 돌아가기
     </button>
@@ -803,7 +680,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- Large channel selector -->
     <div class="mb-3">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040]">접수구분 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111]">접수구분 선택</h2>
         <span class="text-[11px] text-slate-400">선택 시 선제점검·차량검색에도 함께 적용됩니다</span>
       </div>
       <div id="channel-tiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
@@ -812,25 +689,25 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- 센터 + 기종 나란히 + 기간 -->
     <div class="grid lg:grid-cols-2 gap-x-5 gap-y-3 mb-4">
       <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">센터 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">센터 선택</h2>
         <div id="center-tiles" class="grid grid-cols-3 md:grid-cols-5 gap-2.5"></div>
       </div>
       <div>
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">단말기 기종 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">단말기 기종 선택</h2>
         <div id="term-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
       </div>
       <div class="lg:col-span-2">
-        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#A00040] mb-2">기간 선택</h2>
+        <h2 class="sec-title pl-3 text-[14px] font-extrabold text-[#111111] mb-2">기간 선택</h2>
         <div class="panel" style="padding:10px 14px">
           <div class="flex items-center gap-2 flex-wrap">
-            <input id="gf-from" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D60051]">
+            <input id="gf-from" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D70051]">
             <span class="text-slate-400 text-[12px]">~</span>
-            <input id="gf-to" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D60051]">
+            <input id="gf-to" type="date" class="text-[12px] border border-rose-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#D70051]">
             <button onclick="applyDateFilter()" class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition" style="background:var(--atec-magenta)">조회</button>
             <span class="text-[11px] text-slate-400 ml-2">빠른 선택:</span>
-            <button onclick="quickDate(7)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 7일</button>
-            <button onclick="quickDate(30)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 30일</button>
-            <button onclick="quickDate(90)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#A00040] hover:bg-rose-50 transition">최근 90일</button>
+            <button onclick="quickDate(7)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 7일</button>
+            <button onclick="quickDate(30)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 30일</button>
+            <button onclick="quickDate(90)" class="qd-btn text-[11px] border border-rose-200 rounded-md px-2 py-0.5 text-[#111111] hover:bg-rose-50 transition">최근 90일</button>
             <button onclick="clearDateFilter()" class="qd-btn text-[11px] border border-slate-200 rounded-md px-2 py-0.5 text-slate-500 hover:bg-slate-50 transition">전체</button>
           </div>
         </div>
@@ -849,8 +726,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
-          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#D60051]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">선제 점검 대상 · 센터별 위험도 TOP 10</h2>
+          <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl"><b class="text-[#D70051]">장애접수 이력 + 단말기 핵심 이벤트</b>를 종합해 <b>각 센터별 위험 상위 10대씩</b> 자동 선별합니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. (기준일 <span id="ref-date" class="font-semibold"></span>)</p>
         </div>
         <div id="preempt-summary" class="flex gap-2 flex-wrap"></div>
       </div>
@@ -861,7 +738,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         <button data-pf="mid" class="pf-btn chip border transition">중간 (50-69)</button>
         <button data-pf="low" class="pf-btn chip border transition">낮음 (30-49)</button>
         <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer ml-2">
-          <input type="checkbox" id="pf-showexcluded" onchange="renderPreempt()" class="accent-[#D60051]"> 제외 차량 보기 <span id="pf-exc-count" class="text-slate-400"></span>
+          <input type="checkbox" id="pf-showexcluded" onchange="renderPreempt()" class="accent-[#D70051]"> 제외 차량 보기 <span id="pf-exc-count" class="text-slate-400"></span>
         </label>
         <span class="text-[11px] text-slate-400 ml-auto">센터:</span>
         <select id="pf-center" onchange="renderPreempt()" class="text-[11px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체</option></select>
@@ -876,14 +753,14 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <!-- 단말기(S/N) 조회 -->
   <section id="sn" class="hidden">
     <div class="flex items-center justify-between mb-2">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">단말기(S/N) 조회 · 개체 이력 추적</h2>
+      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">단말기(S/N) 조회 · 개체 이력 추적</h2>
     </div>
     <p class="text-[12px] text-slate-500 mb-3 pl-3 max-w-2xl">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex gap-2">
         <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 입력 — 뒤 4자리만 쳐도 됩니다 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
-          class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#D60051]">
-        <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">조회</button>
+          class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#D70051]">
+        <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">조회</button>
       </div>
       <div id="sn-result" class="mt-3"></div>
     </div>
@@ -895,7 +772,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">이벤트 분석</h2>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">이벤트 분석</h2>
           <p class="text-[12px] text-slate-500 mt-1 pl-3 max-w-2xl">단말기 이벤트코드 사전과, 업로드한 이벤트 로그의 <b>이상/단절 이벤트</b>를 분석합니다. 다발 차량을 선제 점검에 활용하세요.</p>
         </div>
         <div id="ev-summary" class="flex gap-2 flex-wrap"></div>
@@ -914,8 +791,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <!-- code dictionary -->
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <h3 class="text-xs font-extrabold text-[#A00040]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
-        <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D60051]">
+        <h3 class="text-xs font-extrabold text-[#111111]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
+        <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D70051]">
         <select id="ev-cat" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 분류</option></select>
         <select id="ev-sev" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 코드</option><option value="core">핵심만</option><option value="의심">이상만</option><option value="정상">정상만</option></select>
       </div>
@@ -937,12 +814,12 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
+          <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111] flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
           <p class="text-[12px] text-slate-500 mt-1 pl-3">차량 이력·이벤트·맞춤 권장 데이터를 바탕으로 AI가 답변합니다. 진단 참고용이며 최종 판단은 기사님이 하세요.</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <span id="ai-key-status" class="text-[11px] font-bold text-slate-400">⏳ 키 확인 중…</span>
-          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#A00040] hover:bg-[#5d0828] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">🔑 공용 키 등록/변경</button>
+          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#111111] hover:bg-[#111111] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">🔑 공용 키 등록/변경</button>
           <button onclick="deletePublicAIKey()" id="ai-delete-key" data-admin class="text-[11px] border border-rose-300 text-rose-700 hover:bg-rose-50 rounded px-3 py-1.5 font-bold transition" style="display:none">🗑 공용 키 삭제</button>
           <button onclick="clearAIChat()" class="text-[11px] border border-slate-300 hover:bg-slate-50 rounded px-3 py-1.5 font-bold transition">🗑 대화 초기화</button>
         </div>
@@ -965,8 +842,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         </div>
       </div>
       <div class="border-t border-rose-100 p-3 flex gap-2">
-        <input id="ai-input" type="text" placeholder="예: 1234차량 어떻게 처리하지?" class="flex-1 border border-rose-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-[#D60051]" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}">
-        <button onclick="sendAI()" id="ai-send-btn" class="bg-[#D60051] hover:bg-[#a01049] text-white rounded-lg px-4 py-2 text-[13px] font-bold transition flex items-center gap-1.5">
+        <input id="ai-input" type="text" placeholder="예: 1234차량 어떻게 처리하지?" class="flex-1 border border-rose-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-[#D70051]" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}">
+        <button onclick="sendAI()" id="ai-send-btn" class="bg-[#D70051] hover:bg-[#D70051] text-white rounded-lg px-4 py-2 text-[13px] font-bold transition flex items-center gap-1.5">
           전송 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
@@ -977,13 +854,13 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <!-- ADMIN: USER MANAGEMENT -->
   <section id="admin" class="hidden" data-admin>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">사용자 관리</h2>
+      <h2 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">사용자 관리</h2>
       <p class="text-[12px] text-slate-500 mt-1 pl-3">가입 신청 승인/거부, 권한(관리자/일반) 변경, 계정 삭제를 관리합니다.</p>
     </div>
     <div id="admin-pending" class="mb-4"></div>
     <div id="admin-resets" class="mb-4"></div>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#A00040] mb-3">전체 사용자</h3>
+      <h3 class="text-xs font-extrabold text-[#111111] mb-3">전체 사용자</h3>
       <div class="overflow-x-auto">
         <table class="w-full text-[12px]">
           <thead><tr class="text-slate-400 border-b border-rose-100 text-left">
@@ -1001,8 +878,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
   <section class="mt-6" data-admin>
     <details class="bg-white border border-rose-100 rounded-xl shadow-sm">
       <summary class="px-4 py-3 flex items-center justify-between">
-        <span class="text-xs font-extrabold text-[#A00040] flex items-center gap-1.5">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16" stroke="#D60051" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="text-xs font-extrabold text-[#111111] flex items-center gap-1.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16" stroke="#D70051" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           데이터 갱신 (매일 업로드)
         </span>
         <span class="text-[11px] text-slate-400">▼ 펼치기</span>
@@ -1012,7 +889,7 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
         <div id="store-status" class="text-[11px] mb-3 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></div>
         <div class="grid md:grid-cols-2 gap-3">
           <div class="border border-dashed border-rose-300 rounded-lg p-3">
-            <div class="text-xs font-bold text-[#D60051] mb-1">① 전체접수건 (.xls / .xlsx)</div>
+            <div class="text-xs font-bold text-[#D70051] mb-1">① 전체접수건 (.xls / .xlsx)</div>
             <div class="text-[11px] text-slate-500 mb-2">'단말기장애목록' 시트 · 누적 저장 + 차량별 이력·권장조치 재계산</div>
             <input id="rec-file" type="file" accept=".xls,.xlsx" onchange="stageFile('rec')" class="text-[11px] w-full mb-2">
             <div class="flex items-center gap-2">
@@ -1022,8 +899,8 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
             <div id="rec-updated" class="text-[10px] text-emerald-700 mt-1.5"></div>
           </div>
           <div class="border border-dashed border-rose-300 rounded-lg p-3">
-            <div class="text-xs font-bold text-[#D60051] mb-1">② 이벤트 로그 (TrcnStaList_*.csv)</div>
-            <div class="text-[11px] text-slate-500 mb-2">이상/단절 이벤트만 추출·날짜별 누적 저장 · 선제점검 참고 <b class="text-[#D60051]">(여러 파일 동시 선택 가능)</b></div>
+            <div class="text-xs font-bold text-[#D70051] mb-1">② 이벤트 로그 (TrcnStaList_*.csv)</div>
+            <div class="text-[11px] text-slate-500 mb-2">이상/단절 이벤트만 추출·날짜별 누적 저장 · 선제점검 참고 <b class="text-[#D70051]">(여러 파일 동시 선택 가능)</b></div>
             <input id="ev-file" type="file" accept=".csv" multiple onchange="stageFile('ev')" class="text-[11px] w-full mb-2">
             <div class="flex items-center gap-2">
               <button id="ev-confirm" onclick="ingestEvents()" disabled class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed" style="background:var(--atec-magenta)">확인 (적용)</button>
@@ -1036,27 +913,27 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
 
         <!-- CLOUD PUBLISH (관리자가 올린 데이터를 모두에게 공유) -->
         <div class="mt-3 pt-3 border-t border-rose-50">
-          <div class="text-[11px] font-bold text-[#0E7490] mb-1.5">☁ 클라우드에 게시 <span class="text-[10px] text-slate-400 font-normal">(모든 사용자에게 공유)</span></div>
+          <div class="text-[11px] font-bold text-[#5A666F] mb-1.5">☁ 클라우드에 게시 <span class="text-[10px] text-slate-400 font-normal">(모든 사용자에게 공유)</span></div>
           <div class="text-[11px] text-slate-600 mb-2 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 leading-relaxed">
             업로드·적용한 데이터를 <b>클라우드에 게시</b>하면, 다른 사용자가 로그인할 때 이 데이터를 자동으로 보게 됩니다.
             현재 화면에 보이는 데이터(접수 + 이벤트)가 그대로 게시됩니다.
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button id="cloud-publish-btn" onclick="publishToCloud()" class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition" style="background:#0891B2">☁ 지금 클라우드에 게시</button>
-            <button onclick="refreshFromCloud()" class="text-[11px] font-semibold border border-cyan-300 text-[#0E7490] rounded-md px-2.5 py-1 hover:bg-cyan-50 transition">클라우드 최신 불러오기</button>
+            <button id="cloud-publish-btn" onclick="publishToCloud()" class="text-[12px] font-bold text-white rounded-lg px-3 py-1.5 transition" style="background:#5A666F">☁ 지금 클라우드에 게시</button>
+            <button onclick="refreshFromCloud()" class="text-[11px] font-semibold border border-cyan-300 text-[#5A666F] rounded-md px-2.5 py-1 hover:bg-cyan-50 transition">클라우드 최신 불러오기</button>
             <span id="cloud-status" class="text-[11px] text-slate-400"></span>
           </div>
         </div>
 
         <!-- DOWNLOAD -->
         <div class="mt-3 pt-3 border-t border-rose-50">
-          <div class="text-[11px] font-bold text-[#A00040] mb-1.5">📥 데이터 다운로드 (백업/내보내기)</div>
+          <div class="text-[11px] font-bold text-[#111111] mb-1.5">📥 데이터 다운로드 (백업/내보내기)</div>
           <div class="flex flex-wrap gap-2">
-            <button onclick="downloadData('rec_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 CSV</button>
-            <button onclick="downloadData('rec_json')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 JSON</button>
-            <button onclick="downloadData('ev_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">이벤트 로그 CSV</button>
-            <button onclick="downloadData('preempt_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#A00040] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">선제점검 목록 CSV</button>
-            <button onclick="downloadData('backup')" class="text-[11px] font-semibold border border-[#D60051] text-[#D60051] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">전체 백업 (JSON)</button>
+            <button onclick="downloadData('rec_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#111111] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 CSV</button>
+            <button onclick="downloadData('rec_json')" class="text-[11px] font-semibold border border-rose-200 text-[#111111] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">접수내역 JSON</button>
+            <button onclick="downloadData('ev_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#111111] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">이벤트 로그 CSV</button>
+            <button onclick="downloadData('preempt_csv')" class="text-[11px] font-semibold border border-rose-200 text-[#111111] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">선제점검 목록 CSV</button>
+            <button onclick="downloadData('backup')" class="text-[11px] font-semibold border border-[#D70051] text-[#D70051] rounded-md px-2.5 py-1 hover:bg-rose-50 transition">전체 백업 (JSON)</button>
           </div>
         </div>
 
@@ -1080,8 +957,9 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ fon
     </details>
   </section>
 
-  <footer class="text-center text-[11px] text-slate-400 mt-6 pb-4">
-    ATEC Mobility · 단말기 현장처리 판정 시스템 · 데이터는 브라우저 내에서만 처리됩니다
+  <footer class="ci-foot mt-8 py-4 flex items-center justify-between gap-4 flex-wrap">
+    <div>ATEC 에이텍모빌리티 · 단말기 현장처리 판정 시스템 · 데이터는 브라우저 내에서만 처리됩니다</div>
+    <div class="font-medium">정도 · 혁신 · 협업</div>
   </footer>
 </div>
 </div><!-- /app-root -->
@@ -1313,7 +1191,7 @@ async function doSignup(){
   const name=($('#su-name').value||'').trim();
   const pw=$('#su-pw').value||'', pw2=$('#su-pw2').value||'';
   const msg=$('#su-msg');
-  const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
+  const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#5A666F':'#D70051'; };
   if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
   if(!name) return set('이름을 입력하세요.');
   if(pw.length<6) return set('비밀번호는 6자 이상이어야 합니다.');
@@ -1335,7 +1213,7 @@ async function doLogin(){
   const u=normEmail($('#li-user').value);
   const pw=$('#li-pw').value||'';
   const msg=$('#li-msg');
-  const set=t=>{ msg.textContent=t; msg.style.color='#B91C1C'; };
+  const set=t=>{ msg.textContent=t; msg.style.color='#D70051'; };
   if(!u||!pw) return set('이메일과 비밀번호를 입력하세요.');
   if(!idbAvailable()) return set('이 브라우저는 로그인 저장을 지원하지 않습니다.');
   const user=await getUser(u);
@@ -1354,7 +1232,7 @@ async function doLogin(){
 async function requestReset(){
   const u=normEmail($('#rs-user').value);
   const msg=$('#rs-msg');
-  const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#16A34A':'#B91C1C'; };
+  const set=(t,ok)=>{ msg.textContent=t; msg.style.color=ok?'#5A666F':'#D70051'; };
   if(!EMAIL_RE.test(u)) return set('올바른 이메일 주소를 입력하세요.');
   if(!idbAvailable()) return set('이 브라우저는 계정 기능을 지원하지 않습니다.');
   const user=await getUser(u);
@@ -1478,6 +1356,7 @@ async function loadInspectedBackups(){
 function setTab(t){
   if(t==='admin' && !isAdmin()) t='dash';
   CURTAB=t;
+  { const tt=$('#ci-title-text'); if(tt) tt.textContent={dash:'대시보드',preempt:'선제 점검 대상',search:'차량 검색',sn:'단말기 조회',events:'이벤트 분석',ai:'AI 챗봇',admin:'사용자 관리'}[t]||''; }
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
   ['dash','preempt','result','events','admin','ai','sn'].forEach(id=>$('#'+id).classList.add('hidden'));
   if(t==='dash'){ $('#dash').classList.remove('hidden'); }
@@ -1702,7 +1581,7 @@ function HS(term){ const t=(term!==undefined)?term:GF.term; return (t && KB.hand
 function ER(term){ const t=(term!==undefined)?term:GF.term; return (t && KB.err_reco_by_term && KB.err_reco_by_term[t]) || KB.err_reco || {}; }
 let RECO_TERM='';  // 차량 상세에서 그 차량 기종 보관
 const CHANNELS=['전화접수','시스템접수','B/S처리','현장접수'];
-const CENTER_COLORS={'강북센터':'#D60051','강동센터':'#7C3AED','강남센터':'#0891B2','강서센터':'#16A34A'};
+const CENTER_COLORS={'강북센터':'#D70051','강동센터':'#5A666F','강남센터':'#5A666F','강서센터':'#5A666F'};
 function gfActive(){ return !!(GF.ch||GF.center||GF.term||GF.from||GF.to); }
 function matchItem(it){
   if(GF.ch && it.recv!==GF.ch) return false;
@@ -1814,11 +1693,11 @@ function renderChannelTiles(){
   const box=$('#channel-tiles'); if(!box) return;
   const {c,total}=channelCounts();
   const meta=[
-    {k:'', name:'전체', color:'#A00040', n:total, ico:'▦'},
-    {k:'전화접수', name:'전화접수', color:'#D60051', n:c['전화접수'], ico:'☎'},
-    {k:'시스템접수', name:'시스템접수', color:'#0891B2', n:c['시스템접수'], ico:'⚙'},
-    {k:'B/S처리', name:'B/S처리', color:'#7C3AED', n:c['B/S처리'], ico:'🛡'},
-    {k:'현장접수', name:'현장접수', color:'#16A34A', n:c['현장접수'], ico:'📍'},
+    {k:'', name:'전체', color:'#111111', n:total, ico:'▦'},
+    {k:'전화접수', name:'전화접수', color:'#D70051', n:c['전화접수'], ico:'☎'},
+    {k:'시스템접수', name:'시스템접수', color:'#5A666F', n:c['시스템접수'], ico:'⚙'},
+    {k:'B/S처리', name:'B/S처리', color:'#5A666F', n:c['B/S처리'], ico:'🛡'},
+    {k:'현장접수', name:'현장접수', color:'#5A666F', n:c['현장접수'], ico:'📍'},
   ];
   box.innerHTML = meta.map(m=>{
     const active = (m.k||'')===GF.ch;
@@ -1839,7 +1718,7 @@ function renderCenterTiles(){
   const {c,total}=centerCounts();
   const order=['강북센터','강동센터','강남센터','강서센터'];
   const present=order.filter(k=>c[k]!=null); 
-  const meta=[{k:'',name:'전체',color:'#A00040',n:total,ico:'▦'}].concat(present.map(k=>({k,name:k.replace('센터',''),color:CENTER_COLORS[k]||'#D60051',n:c[k]||0,ico:'🏢'})));
+  const meta=[{k:'',name:'전체',color:'#111111',n:total,ico:'▦'}].concat(present.map(k=>({k,name:k.replace('센터',''),color:CENTER_COLORS[k]||'#D70051',n:c[k]||0,ico:'🏢'})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.center;
     const share=total?Math.round(m.n/total*100):0;
@@ -1857,13 +1736,13 @@ function renderCenterTiles(){
 function renderTermTiles(){
   const box=$('#term-tiles'); if(!box) return;
   const {c,total}=termCounts();
-  const TERM_COLORS={'C-ITS통합단말기(B700)':'#D60051','차세대통합단말기(B710)':'#7C3AED','통합단말기(B800)':'#0891B2'};
+  const TERM_COLORS={'C-ITS통합단말기(B700)':'#D70051','차세대통합단말기(B710)':'#5A666F','통합단말기(B800)':'#5A666F'};
   const order=Object.keys(c).sort((a,b)=>{
     const PRI={'B800':0,'B700':1,'B710':2};
     const ra=PRI[termShort(a)]!=null?PRI[termShort(a)]:9, rb=PRI[termShort(b)]!=null?PRI[termShort(b)]:9;
     return ra-rb || c[b]-c[a];
   });
-  const meta=[{k:'',name:'전체',color:'#A00040',n:total,ico:'▦'}].concat(order.map(k=>({k,name:termShort(k),color:TERM_COLORS[k]||'#D60051',n:c[k]||0,ico:'📟'})));
+  const meta=[{k:'',name:'전체',color:'#111111',n:total,ico:'▦'}].concat(order.map(k=>({k,name:termShort(k),color:TERM_COLORS[k]||'#D70051',n:c[k]||0,ico:'📟'})));
   box.innerHTML = meta.map(m=>{
     const active=(m.k||'')===GF.term;
     const share=total?Math.round(m.n/total*100):0;
@@ -1932,9 +1811,9 @@ function renderDash(){
     rate:'<path d="M3 17l5-5 4 3 8-8M21 7v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
   };
   const cards = [
-    ['총 접수', num(recordsN), '#D60051', subTxt, ICONS.rec],
-    ['해당 차량', num(vehN), '#A00040', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
-    ['장애 유형', num(errEntries.length), '#D81B60', '분류된 오류 종류', ICONS.err],
+    ['총 접수', num(recordsN), '#D70051', subTxt, ICONS.rec],
+    ['해당 차량', num(vehN), '#111111', active?'필터 발생 차량':'검색 가능 대수', ICONS.veh],
+    ['장애 유형', num(errEntries.length), '#D70051', '분류된 오류 종류', ICONS.err],
   ];
   $('#stat-cards').innerHTML = cards.map(c=>`
     <div class="kpi">
@@ -1949,8 +1828,8 @@ function renderDash(){
   $('#top-err').innerHTML = errEntries.slice(0,10).map(([e,o])=>`
     <div class="flex items-center gap-2 mb-1.5">
       <div class="w-36 shrink-0 text-[11px] text-slate-700 truncate" title="${e}">${e}</div>
-      <div class="flex-1 gauge-track h-3.5"><div class="gauge-fill" style="width:${o.total/maxE*100}%;background:linear-gradient(90deg,#EC407A,#D60051)"></div></div>
-      <div class="w-12 text-right text-[11px] font-bold text-[#D60051]">${num(o.total)}</div>
+      <div class="flex-1 gauge-track h-3.5"><div class="gauge-fill" style="width:${o.total/maxE*100}%;background:#D70051"></div></div>
+      <div class="w-12 text-right text-[11px] font-bold text-[#D70051]">${num(o.total)}</div>
     </div>`).join('') || '<div class="text-[12px] text-slate-400 py-2">해당 조건의 데이터가 없습니다.</div>';
 
   // repeat risk — 선택 기종 기준(없으면 전체)
@@ -1967,8 +1846,8 @@ function renderDash(){
   // top vehicles — honoring full filter
   const vs=Object.entries(KB.vehicles).map(([v,o])=>[v,o.items.filter(matchItem).length]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,24);
   $('#top-veh').innerHTML = vs.map(([v,n])=>`
-    <button onclick="$('#q').value='${v}';doSearch('${v}')" class="chip bg-rose-50 border border-rose-200 text-[#A00040] hover:bg-rose-100 transition">
-      ${v} <span class="text-[#D60051]">${n}건</span></button>`).join('') || '<div class="text-[12px] text-slate-400">해당 차량 없음</div>';
+    <button onclick="$('#q').value='${v}';doSearch('${v}')" class="chip bg-rose-50 border border-rose-200 text-[#111111] hover:bg-rose-100 transition">
+      ${v} <span class="text-[#D70051]">${n}건</span></button>`).join('') || '<div class="text-[12px] text-slate-400">해당 차량 없음</div>';
 
   renderCharts(view);
 }
@@ -1977,8 +1856,8 @@ function renderCharts(view){
   const d = view || KB.dash || {};
   Object.values(CHARTS).forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS={};
   if(typeof Chart==='undefined') return;
-  Chart.defaults.font.family='Pretendard'; Chart.defaults.font.size=11;
-  const C={wine:'#A00040',mag:'#D60051',pink:'#D81B60',rose:'#EC407A',cyan:'#0891B2',purple:'#7C3AED',green:'#16A34A',amber:'#F59E0B'};
+  Chart.defaults.font.family='Noto Sans KR'; Chart.defaults.font.size=11;
+  const C={wine:'#111111',mag:'#D70051',pink:'#9AA3AA',rose:'#C9CED2',cyan:'#5A666F',purple:'#9AA3AA',green:'#111111',amber:'#8C6D2F'};   // 계열 구분: 레드·그레이·연회색·검정
 
   // monthly stacked by channel
   const mr = d.month_recv||{};
@@ -1987,9 +1866,9 @@ function renderCharts(view){
   const chColors={'전화접수':C.mag,'시스템접수':C.cyan,'B/S처리':C.purple,'현장접수':C.green};
   const activeCh = GF.ch? [GF.ch] : channels;
   if($('#ch-month')) CHARTS.month=new Chart($('#ch-month'),{type:'bar',data:{labels:months.map(m=>m.slice(5)+'월'),
-    datasets:activeCh.map(ch=>({label:ch,data:months.map(m=>mr[m+'|'+ch]||0),backgroundColor:chColors[ch],borderRadius:3,stack:'s'}))},
+    datasets:activeCh.map(ch=>({label:ch,data:months.map(m=>mr[m+'|'+ch]||0),backgroundColor:chColors[ch],borderRadius:0,stack:'s'}))},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10}}},
-      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#f1e3ea'}}}}});
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#D9D9D9'}}}}});
 
   // channel doughnut
   const recvTot={}; channels.forEach(ch=>{recvTot[ch]=months.reduce((s,m)=>s+(mr[m+'|'+ch]||0),0);});
@@ -2001,14 +1880,14 @@ function renderCharts(view){
   // center bar
   const cen=d.center||{}; const cK=Object.keys(cen).sort((a,b)=>cen[b]-cen[a]);
   if($('#ch-center')) CHARTS.center=new Chart($('#ch-center'),{type:'bar',data:{labels:cK,
-    datasets:[{data:cK.map(k=>cen[k]),backgroundColor:[C.mag,C.wine,C.rose,C.pink,C.purple],borderRadius:4}]},
+    datasets:[{data:cK.map(k=>cen[k]),backgroundColor:'#5A666F',borderRadius:0}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{x:{grid:{color:'#f1e3ea'}},y:{grid:{display:false}}}}});
+      scales:{x:{grid:{color:'#D9D9D9'}},y:{grid:{display:false}}}}});
 
   // terminal doughnut
   const term=d.term||{}; const tK=Object.keys(term).map(k=>{const m=k.match(/B7\d0|B800/);return {full:k,s:m?m[0]:k.slice(0,8)}});
   if($('#ch-term')) CHARTS.term=new Chart($('#ch-term'),{type:'doughnut',data:{labels:tK.map(t=>t.s),
-    datasets:[{data:tK.map(t=>term[t.full]),backgroundColor:[C.wine,C.mag,C.rose,C.pink],borderWidth:2,borderColor:'#fff'}]},
+    datasets:[{data:tK.map(t=>term[t.full]),backgroundColor:[C.mag,C.cyan,C.pink,C.wine],borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8}}}}});
 }
 function avgRepeat(){
@@ -2016,7 +1895,7 @@ function avgRepeat(){
   const t=hs.reduce((s,x)=>s+x.n,0), r=hs.reduce((s,x)=>s+x.rep,0);
   return t? Math.round(r/t*100):0;
 }
-function rateColor(r){ return r>=55?'#B91C1C': r>=40?'#EA580C':'#16A34A'; }
+function rateColor(r){ return r>=55?'#D70051': r>=40?'#8C6D2F':'#5A666F'; }
 function rateBadge(r){ return r>=55?'위험': r>=40?'주의':'양호'; }
 
 /* ============ PREEMPTIVE CHECK ============ */
@@ -2032,7 +1911,7 @@ function initPreemptControls(){
   const centers=[...new Set((KB.preempt||[]).map(p=>p.center).filter(Boolean))];
   sel.innerHTML='<option value="">전체 센터</option>'+centers.map(c=>`<option value="${c}">${c}</option>`).join('');
 }
-function scoreColor(s){ return s>=70?'#B91C1C': s>=50?'#EA580C':'#D97706'; }
+function scoreColor(s){ return s>=70?'#D70051': s>=50?'#8C6D2F':'#5A666F'; }   // 위험 레드 · 주의 골드 · 낮음 그레이
 function scoreLabel(s){ return s>=70?'높음': s>=50?'중간':'낮음'; }
 async function excludeVeh(v, ev){
   if(ev){ ev.stopPropagation(); }
@@ -2257,7 +2136,7 @@ function buildSmartReco(p){
   }
   // (d) 메모 키워드가 있으면 알려주기
   if(flags.length){
-    lines.push(`<b>과거 메모 키워드</b>: ${flags.map(f=>`<span class="chip bg-rose-50 text-[#B91C1C] border border-rose-200">${f}</span>`).join(' ')}`);
+    lines.push(`<b>과거 메모 키워드</b>: ${flags.map(f=>`<span class="chip bg-rose-50 text-[#D70051] border border-rose-200">${f}</span>`).join(' ')}`);
   }
   // (e) 통계 기반 추천(이전 best) 추가
   const reco = erR[p.err];
@@ -2273,7 +2152,7 @@ function buildSmartReco(p){
   if(mm){
     const m=mm.m;
     manualBlock = `<div class="mt-2 bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-lg px-3.5 py-2.5">
-      <div class="text-[12.5px] font-extrabold text-[#92400E] mb-2">📖 매뉴얼 절차 — <span class="text-[#A00040]">${mm.key}</span></div>
+      <div class="text-[12.5px] font-extrabold text-[#8C6D2F] mb-2">📖 매뉴얼 절차 — <span class="text-[#111111]">${mm.key}</span></div>
       <div class="text-[12.5px] text-slate-700 mb-1.5"><b>원인:</b> ${m.cause}</div>
       <ol class="text-[12.5px] text-slate-700 leading-relaxed list-decimal pl-5 space-y-1 mb-2">
         ${m.steps.map(s=>`<li>${s}</li>`).join('')}
@@ -2284,9 +2163,9 @@ function buildSmartReco(p){
   }
 
   const smartBlock = lines.length? `<div class="mt-2 bg-gradient-to-br from-cyan-50 to-sky-50 border border-cyan-200 rounded-lg px-3.5 py-2.5">
-    <div class="text-[12.5px] font-extrabold text-[#0E7490] mb-2">🔧 이 차량 맞춤 권장</div>
+    <div class="text-[12.5px] font-extrabold text-[#5A666F] mb-2">🔧 이 차량 맞춤 권장</div>
     <ul class="space-y-1.5 text-[12.5px] text-slate-700 leading-relaxed">
-      ${lines.map(l=>`<li class="flex gap-1.5"><span class="text-[#0891B2]">•</span><span>${l}</span></li>`).join('')}
+      ${lines.map(l=>`<li class="flex gap-1.5"><span class="text-[#5A666F]">•</span><span>${l}</span></li>`).join('')}
     </ul>
   </div>`:'';
 
@@ -2321,10 +2200,10 @@ function renderPreempt(){
   // summary (active = non-excluded, honoring GF)
   const active=all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v));
   const hi=active.filter(p=>p.sc>=70).length, mid=active.filter(p=>p.sc>=50&&p.sc<70).length;
-  const evChip = DAILY_AGG? miniStat('이벤트 반영','ON','#16A34A') : miniStat('이벤트','미반영','#94a3b8');
-  const fchips = (GF.ch?miniStat('채널 기준',GF.ch,RECV_COLORS[GF.ch]||'#64748b'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),CENTER_COLORS[GF.center]||'#64748b'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#7C3AED'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#0891B2'):'');
+  const evChip = DAILY_AGG? miniStat('이벤트 반영','ON','#5A666F') : miniStat('이벤트','미반영','#5A666F');
+  const fchips = (GF.ch?miniStat('채널 기준',GF.ch,RECV_COLORS[GF.ch]||'#5A666F'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),CENTER_COLORS[GF.center]||'#5A666F'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#5A666F'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#5A666F'):'');
   $('#preempt-summary').innerHTML =
-    fchips+evChip+miniStat('위험 차량', active.length+'대','#A00040')+miniStat('센터별 상위', list.length+'대','#D60051')+miniStat('높음',hi+'대','#B91C1C')+miniStat('제외',EXCLUDED.size+'대','#64748b');
+    fchips+evChip+miniStat('위험 차량', active.length+'대','#111111')+miniStat('센터별 상위', list.length+'대','#D70051')+miniStat('높음',hi+'대','#D70051')+miniStat('제외',EXCLUDED.size+'대','#5A666F');
 
   if(!list.length){ $('#preempt-list').innerHTML=`<div class="bg-white border border-rose-100 rounded-xl p-8 text-center text-sm text-slate-400">${showExcluded?'제외 처리된 차량이 없습니다.':'해당 조건의 선제 점검 대상이 없습니다.'}</div>`; return; }
   $('#preempt-list').innerHTML = list.map((p,i)=>{
@@ -2335,7 +2214,7 @@ function renderPreempt(){
       return `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 opacity-90">
         <div class="flex items-start gap-3">
           <div class="shrink-0 w-12 text-center">
-            <div class="w-11 h-11 rounded-full grid place-items-center text-white font-extrabold text-sm" style="background:#94a3b8">${p.sc}</div>
+            <div class="w-11 h-11 rounded-full grid place-items-center text-white font-extrabold text-sm" style="background:#5A666F">${p.sc}</div>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2">
@@ -2346,7 +2225,7 @@ function renderPreempt(){
             </div>
             ${excInfo?`<div class="text-[11px] text-slate-500 mt-1">사유: <b>${excInfo.reason}</b> <span class="text-slate-400">(${excInfo.at})</span></div>`:''}
           </div>
-          <button onclick="restoreVeh('${p.v}',event)" class="shrink-0 text-[11px] font-semibold text-[#D60051] border border-rose-200 rounded-md px-2.5 py-1 hover:bg-rose-50 transition">복원</button>
+          <button onclick="restoreVeh('${p.v}',event)" class="shrink-0 text-[11px] font-semibold text-[#D70051] border border-rose-200 rounded-md px-2.5 py-1 hover:bg-rose-50 transition">복원</button>
         </div>
       </div>`;
     }
@@ -2359,14 +2238,14 @@ function renderPreempt(){
         </div>
         <div class="flex-1 min-w-0 cursor-pointer" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-lg font-extrabold text-[#A00040]">${p.v}</span>
+            <span class="text-lg font-extrabold text-[#111111]">${p.v}</span>
             <span class="text-[12px] text-slate-500">${p.op}</span>
-            ${p.center?`<span class="chip bg-rose-50 text-[#A00040] border border-rose-200" style="font-size:11.5px">${p.center}</span>`:''}
+            ${p.center?`<span class="chip bg-rose-50 text-[#111111] border border-rose-200" style="font-size:11.5px">${p.center}</span>`:''}
             <span class="text-[12px] text-slate-400 ml-auto">총 ${p.tot}건 · 최근30일 ${p.r30}건${p.ds<999?` · ${p.ds}일 전 처리`:''}</span>
           </div>
-          <div class="text-[13.5px] text-slate-600 mt-1.5">주 장애 <b class="text-[#D60051]">${p.err||'-'}</b>${p.last_err?` · 최근 <span class="text-slate-700">${p.last_err}</span> → <span class="text-[#A00040] font-semibold">${p.last_field||'-'}</span>`:''}</div>
+          <div class="text-[13.5px] text-slate-600 mt-1.5">주 장애 <b class="text-[#D70051]">${p.err||'-'}</b>${p.last_err?` · 최근 <span class="text-slate-700">${p.last_err}</span> → <span class="text-[#111111] font-semibold">${p.last_field||'-'}</span>`:''}</div>
           <div class="flex flex-wrap gap-1.5 mt-2">
-            ${p.core>0?`<span class="chip" style="background:#fce4ec;color:#D60051;font-weight:800;font-size:11.5px">핵심이벤트 ${p.core}건</span>`:''}
+            ${p.core>0?`<span class="chip" style="background:#F2F2F2;color:#D70051;font-weight:800;font-size:11.5px">핵심이벤트 ${p.core}건</span>`:''}
             ${p.rs.slice(0,3).map(r=>`<span class="chip bg-amber-50 text-amber-800 border border-amber-200" style="font-size:11.5px">${r}</span>`).join('')}
           </div>
           ${buildSmartReco(p)}
@@ -2412,11 +2291,11 @@ function renderEvents(){
     const cats=[...new Set(codes.map(c=>E[c].cat).filter(Boolean))];
     catSel.innerHTML='<option value="">전체 분류</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
   }
-  let sum = miniStat('표시 범위', scopeLabel, EV_SCOPE==='core'?'#D60051':'#A00040')+miniStat('핵심 코드', coreN+'종','#B91C1C')+miniStat('이상 코드', susN+'종','#EA580C');
+  let sum = miniStat('표시 범위', scopeLabel, EV_SCOPE==='core'?'#D70051':'#111111')+miniStat('핵심 코드', coreN+'종','#D70051')+miniStat('이상 코드', susN+'종','#8C6D2F');
   if(DAILY_AGG){
     // count logged (scope) events
     let scopeRows=0; for(const c in DAILY_AGG.codeCount){ if(isLogged(c)) scopeRows+=DAILY_AGG.codeCount[c]; }
-    sum+=miniStat(scopeLabel+' 발생', num(scopeRows)+'건','#0891B2');
+    sum+=miniStat(scopeLabel+' 발생', num(scopeRows)+'건','#5A666F');
   }
   $('#ev-summary').innerHTML=sum;
   renderEvLog();
@@ -2439,7 +2318,7 @@ function renderEvLog(){
     return {...v, scopeN:n};
   }).filter(v=>v.scopeN>0).sort((a,b)=>b.scopeN-a.scopeN).slice(0,40);
   box.innerHTML=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4 mb-4">
-    <h3 class="text-xs font-extrabold text-[#A00040] mb-1">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
+    <h3 class="text-xs font-extrabold text-[#111111] mb-1">${scopeLabel} 이벤트 다발 차량 <span class="text-slate-400 font-medium">(당일 로그 기준)</span></h3>
     <p class="text-[11px] text-slate-500 mb-3">${EV_SCOPE==='core'?'지정된 핵심 이상 이벤트(통신 끊김·모뎀·CSAM·GPS·CPU 등)':'통신 끊김·실패·오류·Reset 등 이상 이벤트'}가 많은 차량입니다. 장애 접수 전 선제 점검 후보로 활용하세요.</p>
     ${ranked.length? `<div class="space-y-1.5">${ranked.map((v,i)=>{
       const topCodes=Object.entries(v.codes).filter(([c])=>isLogged(c)).sort((a,b)=>b[1]-a[1]).slice(0,3)
@@ -2447,9 +2326,9 @@ function renderEvLog(){
       const clk=v.vnum?`onclick="$('#q').value='${v.vnum}';doSearch('${v.vnum}')"`:'';
       return `<div ${clk} class="flex items-center gap-2.5 p-1.5 rounded-lg ${v.vnum?'cursor-pointer hover:bg-rose-50':''}">
         <span class="w-6 text-center text-[11px] font-bold text-slate-400">${i+1}</span>
-        <span class="w-9 h-9 shrink-0 rounded-full grid place-items-center text-white text-[12px] font-extrabold" style="background:${v.scopeN>=10?'#B91C1C':v.scopeN>=5?'#EA580C':'#D97706'}">${v.scopeN}</span>
+        <span class="w-9 h-9 shrink-0 rounded-full grid place-items-center text-white text-[12px] font-extrabold" style="background:${v.scopeN>=10?'#D70051':v.scopeN>=5?'#8C6D2F':'#8C6D2F'}">${v.scopeN}</span>
         <div class="flex-1 min-w-0">
-          <div class="text-[13px] font-bold text-[#A00040]">${v.vnum||'차량ID '+v.vid} ${v.vnum?'':'<span class="text-[10px] text-slate-400 font-normal">(접수이력 없음)</span>'}</div>
+          <div class="text-[13px] font-bold text-[#111111]">${v.vnum||'차량ID '+v.vid} ${v.vnum?'':'<span class="text-[10px] text-slate-400 font-normal">(접수이력 없음)</span>'}</div>
           <div class="text-[11px] text-slate-500 truncate">${topCodes||'-'}</div>
         </div>
         <span class="text-[11px] text-slate-400 shrink-0">전체 ${v.total}건</span>
@@ -2471,13 +2350,13 @@ function renderEvTable(){
   else rows.sort((a,b)=>{ const ca=a[1].core?0:1, cb=b[1].core?0:1; return ca-cb || a[0].localeCompare(b[0]); });
   $('#ev-table').innerHTML = rows.slice(0,250).map(([c,o])=>{
     const cnt=DAILY_AGG?(DAILY_AGG.codeCount[c]||0):'';
-    const coreChip = o.core?'<span class="chip" style="background:#fce4ec;color:#D60051;font-weight:800">핵심</span> ':'';
-    const sevChip=o.sev==='의심'?'<span class="chip" style="background:#fee2e2;color:#B91C1C">이상</span>':'<span class="chip" style="background:#dcfce7;color:#16A34A">정상</span>';
+    const coreChip = o.core?'<span class="chip" style="background:#F2F2F2;color:#D70051;font-weight:800">핵심</span> ':'';
+    const sevChip=o.sev==='의심'?'<span class="chip" style="background:#F2F2F2;color:#D70051">이상</span>':'<span class="chip" style="background:#F2F2F2;color:#5A666F">정상</span>';
     return `<tr class="border-b border-rose-50 hover:bg-rose-50/50 ${o.core?'bg-rose-50/30':''}">
-      <td class="py-1.5 pr-2 font-mono font-bold text-[#D60051]">${c}</td>
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#D70051]">${c}</td>
       <td class="py-1.5 pr-2 text-slate-700">${o.t||'-'}</td>
       <td class="py-1.5 pr-2 text-slate-500">${o.dev||o.d}</td>
-      <td class="py-1.5 pr-2"><span class="chip bg-rose-50 text-[#A00040] border border-rose-200">${o.cat||'-'}</span></td>
+      <td class="py-1.5 pr-2"><span class="chip bg-rose-50 text-[#111111] border border-rose-200">${o.cat||'-'}</span></td>
       <td class="py-1.5 pr-2 whitespace-nowrap">${coreChip}${sevChip}</td>
       <td class="py-1.5 pr-2 text-right font-bold ${cnt?'text-slate-700':'text-slate-300'}">${DAILY_AGG?num(cnt):'—'}</td>
     </tr>`;
@@ -2510,9 +2389,9 @@ function renderVehicleNoFault(vnum, m){
   <div class="space-y-4">
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-lg font-extrabold text-[#A00040]">${escHtml(vnum)}</span>
-        <span class="chip" style="background:#e0e7ff;color:#3730A3;font-weight:700">${escHtml(modelLabel)}</span>
-        <span class="chip" style="background:#dcfce7;color:#16A34A;font-weight:700">장애 이력 없음</span>
+        <span class="text-lg font-extrabold text-[#111111]">${escHtml(vnum)}</span>
+        <span class="chip" style="background:#F2F2F2;color:#5A666F;font-weight:700">${escHtml(modelLabel)}</span>
+        <span class="chip" style="background:#F2F2F2;color:#5A666F;font-weight:700">장애 이력 없음</span>
       </div>
       <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-3 text-[13px]">
         <div><span class="text-slate-400">운수사</span> <b class="text-slate-700">${escHtml(m.op||'-')}</b></div>
@@ -2524,37 +2403,37 @@ function renderVehicleNoFault(vnum, m){
 
     <!-- 로그백업 분석 (장애이력 없는 차량도 동일 제공) -->
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#A00040] mb-1">📂 단말기 로그백업 분석</h3>
+      <h3 class="text-sm font-extrabold text-[#111111] mb-1">📂 단말기 로그백업 분석</h3>
       <p class="text-[11px] text-slate-500 mb-2"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
       <div class="space-y-3">
-        <div class="border border-rose-100 rounded-lg p-2.5" style="background:#fff5f8">
-          <div class="text-[12px] font-extrabold text-[#A00040] mb-1">① 통합단말기 백업</div>
+        <div class="border border-rose-100 rounded-lg p-2.5" style="background:#F2F2F2">
+          <div class="text-[12px] font-extrabold text-[#111111] mb-1">① 통합단말기 백업</div>
           <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
-          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
+          <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
+          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
+          <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
         </div>
-        <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#f5f4ff">
-          <div class="text-[12px] font-extrabold text-[#3730A3] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
+        <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#F2F2F2">
+          <div class="text-[12px] font-extrabold text-[#5A666F] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
           <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
-          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
+          <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
+          <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
         </div>
         <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">🔍 분석하기</button>
+        <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">🔍 분석하기</button>
       </div>
       <div id="logbk-iso" class="mt-3"></div>
       <div id="logbk-result" class="mt-3"></div>
     </div>
     <div id="logbk-action" class="bg-white border border-rose-100 rounded-xl shadow-sm p-4" style="display:none"></div>
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-xs font-extrabold text-[#A00040] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
+      <h3 class="text-xs font-extrabold text-[#111111] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
       <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
     </div>
 
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-extrabold text-[#A00040] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
+      <h3 class="text-sm font-extrabold text-[#111111] mb-2">🅿️ 차고지(종점) 실시간 도착</h3>
       <div id="eta-box-nf">—</div>
     </div>
   </div>`;
@@ -2602,6 +2481,7 @@ function doSearch(v){
   ['dash','preempt','events'].forEach(id=>$('#'+id).classList.add('hidden'));
   $('#result').classList.remove('hidden');
   CURTAB='search';
+  { const tt=$('#ci-title-text'); if(tt) tt.textContent='차량 검색'; }
   const bb=$('#back-bar'); if(bb) bb.classList.remove('hidden');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='search'));
   if(veh){ renderVehicle(v, veh); }
@@ -2634,7 +2514,7 @@ async function loadDepotEta(plate, route, boxId){
         box.innerHTML=`<div class="text-[13px] leading-relaxed">
           <b class="text-amber-700">📡 이 차량 GPS 미수신 — 앞차 기준 안내</b>
           <div class="mt-1 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-            <b class="text-[#B45309]">앞차 ${escHtml(f.tail||f.plate||'')}</b>
+            <b class="text-[#8C6D2F]">앞차 ${escHtml(f.tail||f.plate||'')}</b>
             <span class="text-[12px] text-slate-600">· ${escHtml(fEta)}</span>
             ${f.gap?`<span class="text-[11px] text-slate-400"> · 앞차와 ${f.gap}구간 차이</span>`:''}
           </div>
@@ -2652,7 +2532,7 @@ async function loadDepotEta(plate, route, boxId){
     if(d.etaMin==null){
       head='<b class="text-slate-600">실시간 위치 확인 · 종점 소요시간 미제공</b>';
     } else {
-      head=`<b class="text-[#D60051]">🚏 차고지(종점) 도착까지 약 ${d.etaMin}분</b>`
+      head=`<b class="text-[#D70051]">🚏 차고지(종점) 도착까지 약 ${d.etaMin}분</b>`
         + (d.atStop?' <span class="text-[11px] text-slate-500">· 정류소 정차중</span>':'')
         + (d.isLast?' <span class="chip bg-rose-100 text-rose-700">막차</span>':'');
     }
@@ -2693,7 +2573,7 @@ function renderVehicle(vnum, veh){
     const _smart=buildSmartReco(_p);
     if(_smart){
       smartBlock=`<div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-        <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-1">맞춤 권장 · 매뉴얼 절차</h3>
+        <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111] mb-1">맞춤 권장 · 매뉴얼 절차</h3>
         <p class="text-[11px] text-slate-500 mb-2 pl-3">이 차량의 이력·이벤트·매뉴얼을 종합한 권장</p>
         <div class="pl-3">${_smart}</div>
       </div>`;
@@ -2713,8 +2593,8 @@ function renderVehicle(vnum, veh){
     const evRow = g=>{
       const E=EVENTS[g.code]; const core=isCore(g.code);
       return `<div class="flex items-center gap-2 py-1 border-b border-amber-100/60 last:border-0">
-        <span class="font-mono font-bold text-[11px] shrink-0 w-12 text-[#B91C1C]">${g.code}</span>
-        ${core?'<span class="chip shrink-0" style="background:#fce4ec;color:#D60051;font-weight:800">핵심</span>':''}
+        <span class="font-mono font-bold text-[11px] shrink-0 w-12 text-[#D70051]">${g.code}</span>
+        ${core?'<span class="chip shrink-0" style="background:#F2F2F2;color:#D70051;font-weight:800">핵심</span>':''}
         <span class="text-[11px] text-slate-700 flex-1 min-w-0 truncate" title="${E?(E.t||''):''}">${E?(E.t||'(코드미상)'):'(코드미상)'}${E&&E.cat?` <span class="text-slate-400">· ${E.cat}</span>`:''}${E&&E.dev?` <span class="text-slate-300">· ${E.dev}</span>`:''}</span>
         <span class="text-[11px] font-bold text-amber-700 shrink-0">×${g.n}</span>
         <span class="text-[10px] text-slate-400 shrink-0 w-24 text-right">${g.first}${g.n>1?'~'+g.last:''}</span>
@@ -2740,17 +2620,17 @@ function renderVehicle(vnum, veh){
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-2xl font-extrabold text-[#A00040]">${vnum}</span>
-            <span class="ab-badge" style="background:${risk.color}">${risk.label}</span>
+            <span class="text-2xl font-extrabold text-[#111111]">${vnum}</span>
+            <span class="ab-badge" style="color:${risk.color}">${risk.label}</span>
           </div>
           <div class="text-xs text-slate-500 mt-1">${veh.op} · 차량ID ${veh.vid||'-'} · ${last.center||''}</div>
           <div class="text-xs text-slate-500">${last.route||''}</div>
         </div>
         <div class="vstat-row flex gap-2 flex-wrap">
-          ${miniStat('총 접수', items.length+'건','#D60051')}
-          ${miniStat('최근 90일', recent90+'건','#D81B60')}
-          ${miniStat('증상 재현율', reproRate+'%', reproRate>40?'#B91C1C':'#16A34A')}
-          ${miniStat('단말기', short(last.term),'#A00040')}
+          ${miniStat('총 접수', items.length+'건','#D70051')}
+          ${miniStat('최근 90일', recent90+'건','#D70051')}
+          ${miniStat('증상 재현율', reproRate+'%', reproRate>40?'#D70051':'#5A666F')}
+          ${miniStat('단말기', short(last.term),'#111111')}
         </div>
       </div>
       ${risk.note?`<div class="mt-3 text-[12px] rounded-lg px-3 py-2 ${risk.bg}">${risk.note}</div>`:''}
@@ -2758,7 +2638,7 @@ function renderVehicle(vnum, veh){
       <div class="mt-3 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
         <div id="depot-eta-${veh.vid||'x'}" class="flex-1 min-w-0 text-[12px] text-slate-500">🚌 차고지(종점) 실시간 도착시간을 조회할 수 있습니다.</div>
         <button onclick="loadDepotEta('${vnum.replace(/'/g,"\\'")}','${(last.route||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','depot-eta-${veh.vid||'x'}')"
-          class="shrink-0 text-[12px] font-bold text-white rounded-lg px-3 py-2 hover:brightness-110 active:scale-95 transition" style="background:#0891B2">🚌 차고지 도착 조회</button>
+          class="shrink-0 text-[12px] font-bold text-white rounded-lg px-3 py-2 hover:brightness-110 active:scale-95 transition" style="background:#5A666F">🚌 차고지 도착 조회</button>
       </div>
     </div>
 
@@ -2767,27 +2647,27 @@ function renderVehicle(vnum, veh){
       <div class="lg:col-span-2 space-y-4">
         <!-- 로그백업 분석 -->
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040] mb-1">📂 단말기 로그백업 분석</h3>
+          <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111] mb-1">📂 단말기 로그백업 분석</h3>
           <p class="text-[11px] text-slate-500 mb-2 pl-3"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다. <b>기기 안에서만 분석</b>되고 원본은 저장되지 않습니다.</p>
           <div class="pl-3 space-y-3">
             <!-- ① 통합단말기 -->
-            <div class="border border-rose-100 rounded-lg p-2.5" style="background:#fff5f8">
-              <div class="text-[12px] font-extrabold text-[#A00040] mb-1">① 통합단말기 백업</div>
+            <div class="border border-rose-100 rounded-lg p-2.5" style="background:#F2F2F2">
+              <div class="text-[12px] font-extrabold text-[#111111] mb-1">① 통합단말기 백업</div>
               <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-              <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
-              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-              <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D60051]">
+              <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
+              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
+              <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-rose-50 file:text-[#D70051]">
             </div>
             <!-- ② 승하차단말기 -->
-            <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#f5f4ff">
-              <div class="text-[12px] font-extrabold text-[#3730A3] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
+            <div class="border border-indigo-100 rounded-lg p-2.5" style="background:#F2F2F2">
+              <div class="text-[12px] font-extrabold text-[#5A666F] mb-1">② 승하차단말기 백업 <span class="text-[10px] font-normal text-slate-400">(승차/하차1/하차2 중 문제 유닛)</span></div>
               <div class="text-[10.5px] font-bold text-slate-500 mb-0.5">📁 폴더 <span class="text-emerald-600 font-normal">(PC·안드로이드)</span></div>
-              <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
-              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#0E7490] font-bold">(아이폰)</span></div>
-              <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#3730A3]">
+              <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
+              <div class="text-[10.5px] font-bold text-slate-500 mt-1.5 mb-0.5">🗜 또는 zip <span class="text-[#5A666F] font-bold">(아이폰)</span></div>
+              <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-bold file:bg-indigo-50 file:text-[#5A666F]">
             </div>
             <div class="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 leading-relaxed">📱 <b>아이폰</b>은 폴더 선택이 안 됩니다 — 백업 폴더를 <b>zip으로 압축</b>해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, <b>둘 다 올리면 원인 격리가 정확</b>해집니다.</div>
-            <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#A00040,#D60051)">🔍 분석하기</button>
+            <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="w-full text-[13px] font-bold text-white rounded-lg py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">🔍 분석하기</button>
           </div>
           <div id="logbk-iso" class="mt-3 pl-3"></div>
           <div id="logbk-result" class="mt-3 pl-3"></div>
@@ -2798,7 +2678,7 @@ function renderVehicle(vnum, veh){
 
         <!-- 진단·처리 이력 / 재불량 추적 -->
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
-          <h3 class="text-xs font-extrabold text-[#A00040] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
+          <h3 class="text-xs font-extrabold text-[#111111] mb-2">📊 로그 진단·처리 이력 <span class="text-[10px] font-normal text-slate-400">(재불량 추적)</span></h3>
           <div id="logbk-history"><span class="text-[12px] text-slate-400">불러오는 중…</span></div>
         </div>
       </div>
@@ -2807,7 +2687,7 @@ function renderVehicle(vnum, veh){
       <div class="lg:col-span-3">
         <div class="bg-white border border-rose-100 rounded-xl shadow-sm p-4">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="sec-title pl-3 text-sm font-extrabold text-[#A00040]">처리 이력 타임라인</h3>
+            <h3 class="sec-title pl-3 text-sm font-extrabold text-[#111111]">처리 이력 타임라인</h3>
             <span class="text-[11px] text-slate-400">최신순 · <span id="tl-count">${items.length}</span>건</span>
           </div>
           <div class="flex flex-wrap items-center gap-1.5 mb-3 pl-3">
@@ -2825,11 +2705,11 @@ function renderVehicle(vnum, veh){
   window.__tlItems = items;
   if(typeof loadLogHistory==='function'){ try{ loadLogHistory(vnum); }catch(e){} }
 }
-const RECV_COLORS={'전화접수':'#D60051','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'};
+const RECV_COLORS={'전화접수':'#D70051','시스템접수':'#5A666F','B/S처리':'#5A666F','현장접수':'#5A666F'};
 function recvFilterChips(items){
   const counts={}; items.forEach(it=>{ if(it.recv) counts[it.recv]=(counts[it.recv]||0)+1; });
   const order=['전화접수','시스템접수','B/S처리','현장접수'];
-  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip border active" style="border-color:#D60051;background:#D60051;color:#fff">전체 ${items.length}</button>`;
+  let chips=`<button data-recv="" onclick="filterTL('')" class="recv-chip chip border active" style="border-color:#D70051;background:#D70051;color:#fff">전체 ${items.length}</button>`;
   chips+=order.filter(r=>counts[r]).map(r=>{
     const c=RECV_COLORS[r];
     return `<button data-recv="${r}" onclick="filterTL('${r}')" class="recv-chip chip border" style="border-color:${c}66;color:${c}">${r} ${counts[r]}</button>`;
@@ -2843,8 +2723,8 @@ function toggleEvView(mode){
   else { susBox.classList.add('hidden'); allBox.classList.remove('hidden'); }
   const sb=$('#evv-sus'), ab=$('#evv-all');
   if(sb&&ab){
-    if(mode==='sus'){ sb.style.background='#B91C1C'; sb.style.color='#fff'; sb.style.borderColor='#B91C1C'; ab.style.background='#fff'; ab.style.color='#b45309'; ab.style.borderColor='#d97706'; }
-    else { ab.style.background='#d97706'; ab.style.color='#fff'; ab.style.borderColor='#d97706'; sb.style.background='#fff'; sb.style.color='#B91C1C'; sb.style.borderColor='#B91C1C'; }
+    if(mode==='sus'){ sb.style.background='#D70051'; sb.style.color='#fff'; sb.style.borderColor='#D70051'; ab.style.background='#fff'; ab.style.color='#8C6D2F'; ab.style.borderColor='#8C6D2F'; }
+    else { ab.style.background='#8C6D2F'; ab.style.color='#fff'; ab.style.borderColor='#8C6D2F'; sb.style.background='#fff'; sb.style.color='#D70051'; sb.style.borderColor='#D70051'; }
   }
 }
 function filterTL(recv){
@@ -2855,7 +2735,7 @@ function filterTL(recv){
   document.querySelectorAll('.recv-chip').forEach(b=>{
     const on = b.dataset.recv===recv;
     b.classList.toggle('active', on);
-    const c = b.dataset.recv? RECV_COLORS[b.dataset.recv] : '#D60051';
+    const c = b.dataset.recv? RECV_COLORS[b.dataset.recv] : '#D70051';
     if(on){ b.style.background=c; b.style.color='#fff'; b.style.borderColor=c; }
     else { b.style.background='#fff'; b.style.color=c; b.style.borderColor=c+'66'; }
   });
@@ -2877,13 +2757,13 @@ function renderReco(err, vehFields){
   const h = E[err].handlings;
   return `<div class="pl-3 space-y-2">
     ${h.slice(0,6).map((x,i)=>recoRow(i,x.h,x.rate,x.n)).join('')}
-    <p class="text-[10px] text-slate-400 pt-1 leading-relaxed">※ ${RECO_TERM?termShort(RECO_TERM)+' 기준 · ':''}빈도순 정렬. <b style="color:#16A34A">초록</b>=재접수 적음(효과적), <b style="color:#B91C1C">빨강</b>=재접수 잦음(재불량 주의·원인 재확인 권장).</p>
+    <p class="text-[10px] text-slate-400 pt-1 leading-relaxed">※ ${RECO_TERM?termShort(RECO_TERM)+' 기준 · ':''}빈도순 정렬. <b style="color:#5A666F">초록</b>=재접수 적음(효과적), <b style="color:#D70051">빨강</b>=재접수 잦음(재불량 주의·원인 재확인 권장).</p>
   </div>`;
 }
 function recoRow(i, name, rate, n){
-  const col = rate==null? '#94a3b8' : rateColor(rate);
+  const col = rate==null? '#5A666F' : rateColor(rate);
   return `<div class="flex items-center gap-2.5">
-    <span class="w-5 h-5 shrink-0 rounded-full text-white text-[11px] font-bold grid place-items-center" style="background:${i===0?'#D60051':'#D8839f'}">${i+1}</span>
+    <span class="w-5 h-5 shrink-0 rounded-full text-white text-[11px] font-bold grid place-items-center" style="background:${i===0?'#D70051':'#D70051'}">${i+1}</span>
     <div class="flex-1">
       <div class="text-[13px] font-semibold text-slate-800">${name}</div>
       <div class="flex items-center gap-2 mt-0.5">
@@ -2895,26 +2775,26 @@ function recoRow(i, name, rate, n){
 }
 
 function renderTL(it){
-  const repColor = it.repro==='재현'?'#B91C1C':'#64748b';
-  const recvChip = {'전화접수':'#D60051','시스템접수':'#0891B2','B/S처리':'#7C3AED','현장접수':'#16A34A'}[it.recv]||'#94a3b8';
-  const worker = it.worker? `<span class="chip inline-flex items-center gap-1" style="background:#eef2ff;color:#4338ca"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${it.worker}</span>`:'';
+  const repColor = it.repro==='재현'?'#D70051':'#5A666F';
+  const recvChip = {'전화접수':'#D70051','시스템접수':'#5A666F','B/S처리':'#5A666F','현장접수':'#5A666F'}[it.recv]||'#5A666F';
+  const worker = it.worker? `<span class="chip inline-flex items-center gap-1" style="background:#F2F2F2;color:#5A666F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${it.worker}</span>`:'';
   const inquiry = it.inquiry? `<div class="mt-1.5">
     <div class="text-[10px] font-bold text-slate-400 mb-0.5">문의내용</div>
     <div class="text-[11px] text-slate-500 leading-relaxed bg-slate-50 rounded p-2 whitespace-pre-line">${escHtml(it.inquiry)}</div>
   </div>`:'';
   const memo = it.memo? `<div class="mt-1.5">
-    <div class="text-[10px] font-bold text-[#D60051] mb-0.5 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>처리내용</div>
+    <div class="text-[10px] font-bold text-[#D70051] mb-0.5 flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>처리내용</div>
     <div class="text-[11px] text-slate-700 leading-relaxed bg-rose-50/60 border border-rose-100 rounded p-2 whitespace-pre-line">${highlightMemo(it.memo)}</div>
   </div>`:'';
   return `<div class="relative">
-    <span class="absolute -left-7 top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#D60051]"></span>
+    <span class="absolute -left-7 top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#D70051]"></span>
     <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
       <span class="font-bold text-slate-700">${it.date}</span>
       <span class="chip" style="background:${recvChip}1a;color:${recvChip}">${it.recv||'-'}</span>
       ${it.repro?`<span class="chip" style="background:${repColor}1a;color:${repColor}">${it.repro}</span>`:''}
       ${worker}
     </div>
-    <div class="text-[13px] font-semibold text-slate-800 mt-1">${it.err||'(유형미상)'} ${it.field?`<span class="text-slate-400 font-normal">→</span> <span class="text-[#A00040]">${it.field}</span>`:''}</div>
+    <div class="text-[13px] font-semibold text-slate-800 mt-1">${it.err||'(유형미상)'} ${it.field?`<span class="text-slate-400 font-normal">→</span> <span class="text-[#111111]">${it.field}</span>`:''}</div>
     ${inquiry}
     ${memo}
   </div>`;
@@ -2930,9 +2810,9 @@ function miniStat(label,val,col){ return `<div class="text-center px-2.5 py-1.5 
 function short(t){ if(!t)return '-'; const m=t.match(/B7\d0|B800/); return m?m[0]:t.slice(0,8); }
 function daysAgo(dstr){ const d=new Date(dstr.replace(' ','T')); return Math.floor((Date.now()-d)/864e5); }
 function riskLevel(total, recent, repro){
-  if(total>=10 || recent>=4) return {label:'재불량 다발', color:'#B91C1C', bg:'bg-red-50 text-red-800 border border-red-200', note:''};
-  if(total>=4 || recent>=2) return {label:'주의 차량', color:'#EA580C', bg:'bg-amber-50 text-amber-800 border border-amber-200', note:''};
-  return {label:'일반', color:'#16A34A', bg:'', note:''};
+  if(total>=10 || recent>=4) return {label:'재불량 다발', color:'#D70051', bg:'bg-red-50 text-red-800 border border-red-200', note:''};
+  if(total>=4 || recent>=2) return {label:'주의 차량', color:'#8C6D2F', bg:'bg-amber-50 text-amber-800 border border-amber-200', note:''};
+  return {label:'일반', color:'#5A666F', bg:'', note:''};
 }
 /* 이벤트 표시 범위: 'core' = 핵심 이상 이벤트(지정 33종)만, 'all' = 전체 이상/단절 이벤트 */
 let EV_SCOPE='core';
@@ -2971,7 +2851,7 @@ function renderUpdated(){
 function renderCloudStatus(){
   const s=$('#cloud-status'); if(!s) return;
   if(CLOUD_INFO && CLOUD_INFO.updated_at){
-    s.innerHTML = `☁ 클라우드 게시본: <b class="text-[#0E7490]">${fmtCloudTime(CLOUD_INFO.updated_at)}</b>${CLOUD_INFO.updated_by?` · ${CLOUD_INFO.updated_by}`:''}`;
+    s.innerHTML = `☁ 클라우드 게시본: <b class="text-[#5A666F]">${fmtCloudTime(CLOUD_INFO.updated_at)}</b>${CLOUD_INFO.updated_by?` · ${CLOUD_INFO.updated_by}`:''}`;
   } else {
     s.innerHTML = `<span class="text-slate-400">아직 클라우드에 게시된 데이터가 없습니다.</span>`;
   }
@@ -3009,11 +2889,11 @@ async function publishToCloud(){
     try{ const si=await cloudGetStamp('kb'); if(si) await saveCloudCache(si.stamp, KB, (DAILY&&Object.keys(DAILY).length)?DAILY:null); }catch(e){}
     renderCloudStatus();
     CLOAD.doneStep('apply'); CLOAD.set('게시 완료!','apply'); CLOAD.hide();
-    log(`✔ 클라우드 게시 완료 — 이제 모든 사용자가 이 데이터를 보게 됩니다. (${fmtCloudTime(CLOUD_INFO.updated_at)})`,'#0891B2');
+    log(`✔ 클라우드 게시 완료 — 이제 모든 사용자가 이 데이터를 보게 됩니다. (${fmtCloudTime(CLOUD_INFO.updated_at)})`,'#5A666F');
     alert('클라우드에 게시되었습니다.\n다른 사용자가 로그인하면 이 데이터를 보게 됩니다.');
   }catch(err){
     CLOAD.set('게시 실패','apply'); setTimeout(()=>CLOAD.hide(), 700);
-    log('클라우드 게시 실패: '+err.message,'#B91C1C');
+    log('클라우드 게시 실패: '+err.message,'#D70051');
     alert('게시 실패: '+err.message);
   }finally{
     if(btn){ btn.disabled=false; btn.textContent=orig||'☁ 지금 클라우드에 게시'; }
@@ -3031,14 +2911,14 @@ async function refreshFromCloud(){
     renderStatus(); renderDash(); renderCloudStatus();
     if(CURTAB==='preempt') renderPreempt();
     if(CURTAB==='events') renderEvents();
-    log('✔ 클라우드 최신 데이터를 불러왔습니다.','#0891B2');
-  }catch(err){ log('불러오기 실패: '+err.message,'#B91C1C'); }
+    log('✔ 클라우드 최신 데이터를 불러왔습니다.','#5A666F');
+  }catch(err){ log('불러오기 실패: '+err.message,'#D70051'); }
 }
 
 /* ============ DAILY UPLOAD: RECEPTION (.xls) -> accumulate + rebuild KB ============ */
 function ingestReception(){
   const inp=$('#rec-file'); const file=inp&&inp.files&&inp.files[0];
-  if(!file){ log('먼저 전체접수건 파일을 선택하세요.','#B91C1C'); return; }
+  if(!file){ log('먼저 전체접수건 파일을 선택하세요.','#D70051'); return; }
   const btn=$('#rec-confirm'); if(btn){ btn.disabled=true; btn.textContent='처리 중…'; }
   log('전체접수건 처리 중… (잠시만요)');
   const reader=new FileReader();
@@ -3048,7 +2928,7 @@ function ingestReception(){
       let sheet = wb.Sheets['단말기장애목록'] || wb.Sheets[wb.SheetNames.find(n=>n.includes('장애')) || wb.SheetNames[wb.SheetNames.length-1]];
       const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:null});
       const recs=extractRecords(rows);
-      if(!recs){ log('⚠ 헤더(접수번호/차량번호 등)를 찾지 못했습니다. 올바른 파일인지 확인하세요.','#B91C1C'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} return; }
+      if(!recs){ log('⚠ 헤더(접수번호/차량번호 등)를 찾지 못했습니다. 올바른 파일인지 확인하세요.','#D70051'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} return; }
 
       let totalRecs=recs, added=recs.length;
       if(idbAvailable()){
@@ -3093,8 +2973,8 @@ function ingestReception(){
       setTab('dash');
       const accMsg = idbAvailable()? `누적 ${num(totalRecs.length)}건 (이번 신규 ${num(added)}건)` : `${num(recs.length)}건 (저장 미지원)`;
       const refMsg = (oldRef && newRef && newRef !== oldRef) ? ` · 최신 데이터일 ${oldRef} → <b>${newRef}</b>` : (newRef? ` · 최신 ${newRef}` : '');
-      log(`✔ 갱신 완료 (${UPDATED.rec}) — ${accMsg} / 차량 ${num(KB.meta.vehicles)}대 / 선제점검 ${(KB.preempt||[]).length}대${refMsg}`,'#16A34A');
-    }catch(err){ log('처리 실패: '+err.message,'#B91C1C'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} }
+      log(`✔ 갱신 완료 (${UPDATED.rec}) — ${accMsg} / 차량 ${num(KB.meta.vehicles)}대 / 선제점검 ${(KB.preempt||[]).length}대${refMsg}`,'#5A666F');
+    }catch(err){ log('처리 실패: '+err.message,'#D70051'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3236,7 +3116,7 @@ function readFileText(file){
 }
 async function ingestEvents(){
   const inp=$('#ev-file'); const files=inp&&inp.files?[...inp.files]:[];
-  if(!files.length){ log('먼저 이벤트 로그 파일을 선택하세요.','#B91C1C'); return; }
+  if(!files.length){ log('먼저 이벤트 로그 파일을 선택하세요.','#D70051'); return; }
   const btn=$('#ev-confirm'); if(btn){ btn.disabled=true; btn.textContent='처리 중…'; }
   log(`이벤트 로그 처리 중… (${files.length}개 파일)`);
   try{
@@ -3277,12 +3157,12 @@ async function ingestEvents(){
     renderStorageStatus(STORED_RECS>0);
     if(inp) inp.value=''; stageFile('ev'); if(btn){ btn.textContent='확인 (적용)'; }
     const dayLabel = days.filter(d=>d!=='unknown').sort();
-    log(`✔ 이벤트 로그 적재 (${UPDATED.ev}) — 파일 ${files.length}개 · 전체 ${num(rowN)}행 중 이상/단절 ${num(kept)}건 저장 · 날짜 ${dayLabel.length?dayLabel.join(', '):'?'}${idbAvailable()?' · 누적 저장됨':''} · '이벤트 분석' 탭에서 확인`,'#16A34A');
-  }catch(err){ log('처리 실패: '+err.message,'#B91C1C'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} }
+    log(`✔ 이벤트 로그 적재 (${UPDATED.ev}) — 파일 ${files.length}개 · 전체 ${num(rowN)}행 중 이상/단절 ${num(kept)}건 저장 · 날짜 ${dayLabel.length?dayLabel.join(', '):'?'}${idbAvailable()?' · 누적 저장됨':''} · '이벤트 분석' 탭에서 확인`,'#5A666F');
+  }catch(err){ log('처리 실패: '+err.message,'#D70051'); if(btn){btn.disabled=false;btn.textContent='확인 (적용)';} }
 }
 function fmtTime(t){ t=(''+t).padStart(6,'0'); return t.slice(0,2)+':'+t.slice(2,4)+':'+t.slice(4,6); }
 
-function log(msg,col){ $('#ingest-log').innerHTML=`<span style="color:${col||'#64748b'}">${msg}</span>`; }
+function log(msg,col){ $('#ingest-log').innerHTML=`<span style="color:${col||'#5A666F'}">${msg}</span>`; }
 
 /* ============ ADMIN: USER MANAGEMENT ============ */
 async function renderAdmin(){
@@ -3310,32 +3190,32 @@ async function renderAdmin(){
   if(rbox){
     if(resetReqs.length){
       rbox.innerHTML=`<div class="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4">
-        <div class="text-xs font-extrabold text-[#B91C1C] mb-2">🔑 비밀번호 재설정 요청 (${resetReqs.length}건)</div>
+        <div class="text-xs font-extrabold text-[#D70051] mb-2">🔑 비밀번호 재설정 요청 (${resetReqs.length}건)</div>
         <div class="space-y-2">${resetReqs.map(u=>`
           <div class="flex items-center gap-2 bg-white rounded-lg border border-rose-100 px-3 py-2">
             <div class="flex-1"><b class="text-slate-800">${u.name}</b> <span class="text-slate-400 text-[11px]">${u.username}</span> <span class="text-[10px] text-slate-400">· 요청 ${u.resetReqAt||''}</span></div>
-            <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#D60051] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
+            <button onclick="issueTempPw('${u.username}')" class="text-[11px] font-bold text-white bg-[#D70051] hover:opacity-90 rounded-md px-2.5 py-1 transition">임시 비밀번호 발급</button>
             <button onclick="dismissReset('${u.username}')" class="text-[11px] text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-md px-2.5 py-1 transition">요청 무시</button>
           </div>`).join('')}</div>
       </div>`;
     } else rbox.innerHTML='';
   }
   // all users table
-  const statusChip=s=>({approved:'<span class="chip" style="background:#dcfce7;color:#16A34A">승인됨</span>',pending:'<span class="chip" style="background:#fef9c3;color:#a16207">대기</span>',rejected:'<span class="chip" style="background:#fee2e2;color:#B91C1C">거부됨</span>'}[s]||s);
+  const statusChip=s=>({approved:'<span class="chip" style="background:#F2F2F2;color:#5A666F">승인됨</span>',pending:'<span class="chip" style="background:#F2F2F2;color:#8C6D2F">대기</span>',rejected:'<span class="chip" style="background:#F2F2F2;color:#D70051">거부됨</span>'}[s]||s);
   $('#admin-users').innerHTML = users.sort((a,b)=>(a.created||'').localeCompare(b.created||'')).map(u=>{
     const me = ME && u.username===ME.username;
     const roleBtn = u.role==='admin'
       ? `<button onclick="setRole('${u.username}','user')" ${me?'disabled':''} class="text-[11px] border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40">일반으로</button>`
       : `<button onclick="setRole('${u.username}','admin')" class="text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-0.5 hover:bg-amber-50">관리자로</button>`;
     return `<tr class="border-b border-rose-50">
-      <td class="py-1.5 pr-2 font-mono font-bold text-[#D60051]">${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#fee2e2;color:#B91C1C">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#fef9c3;color:#a16207">임시PW</span>':''}</td>
+      <td class="py-1.5 pr-2 font-mono font-bold text-[#D70051]">${u.username}${me?' <span class="text-[10px] text-slate-400">(나)</span>':''}${u.resetReq?' <span class="chip" style="background:#F2F2F2;color:#D70051">재설정요청</span>':''}${u.tempPw?' <span class="chip" style="background:#F2F2F2;color:#8C6D2F">임시PW</span>':''}</td>
       <td class="py-1.5 pr-2 text-slate-700">${u.name}</td>
-      <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#fef3c7;color:#b45309;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
+      <td class="py-1.5 pr-2">${u.role==='admin'?'<span class="chip" style="background:#F2F2F2;color:#8C6D2F;font-weight:800">관리자</span>':'<span class="chip bg-slate-100 text-slate-500">일반</span>'}</td>
       <td class="py-1.5 pr-2">${statusChip(u.status)}</td>
       <td class="py-1.5 pr-2 text-slate-400 text-[11px]">${u.created||'-'}</td>
       <td class="py-1.5 pr-2 text-right whitespace-nowrap">
         ${u.status==='pending'?`<button onclick="approveUser('${u.username}')" class="text-[11px] font-bold text-emerald-700 mr-1">승인</button>`:''}
-        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#D60051] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
+        <button onclick="issueTempPw('${u.username}')" class="text-[11px] border border-rose-200 text-[#D70051] rounded px-2 py-0.5 hover:bg-rose-50 mr-1">PW재설정</button>
         ${roleBtn}
         <button onclick="deleteUser('${u.username}')" ${me?'disabled':''} class="text-[11px] text-red-600 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 ml-1 disabled:opacity-40">삭제</button>
       </td>
@@ -3378,7 +3258,7 @@ async function downloadData(kind){
   try{
     if(kind==='rec_csv'){
       const recs = idbAvailable()? await idbGetAll('recRecords') : [];
-      if(!recs.length){ log('다운로드할 누적 접수내역이 없습니다.','#B91C1C'); return; }
+      if(!recs.length){ log('다운로드할 누적 접수내역이 없습니다.','#D70051'); return; }
       const cols=['id','dt','vnum','vid','op','err','recv','term','field','repro','route','center','memo','inquiry'];
       const head=['접수번호','접수일시','차량번호','차량ID','사업자','오류유형','접수구분','단말기','현장처리','재현','노선','센터','처리내용','문의내용'];
       const csv=[head.join(',')].concat(recs.map(r=>cols.map(c=>csvCell(r[c])).join(','))).join('\n');
@@ -3387,7 +3267,7 @@ async function downloadData(kind){
       const recs = idbAvailable()? await idbGetAll('recRecords') : [];
       dl(`접수내역_${todayTag()}.json`, JSON.stringify(recs,null,2), 'json');
     } else if(kind==='ev_csv'){
-      if(!DAILY){ log('다운로드할 이벤트 로그가 없습니다.','#B91C1C'); return; }
+      if(!DAILY){ log('다운로드할 이벤트 로그가 없습니다.','#D70051'); return; }
       const head=['차량ID','차량번호','이벤트코드','이벤트내용','시각','이상여부'];
       const vidToVnum={}; for(const vn in KB.vehicles){ const vid=KB.vehicles[vn].vid; if(vid) vidToVnum[vid]=vn; }
       const rows=[head.join(',')];
@@ -3404,8 +3284,8 @@ async function downloadData(kind){
       const backup={ exportedAt:nowStamp(), recRecords:recs, evDays, updated:UPDATED, excluded:[...EXCLUDED], excludeReasons:EXC_REASONS };
       dl(`ATEC백업_${todayTag()}.json`, JSON.stringify(backup), 'json');
     }
-    log('✔ 다운로드를 시작했습니다.','#16A34A');
-  }catch(e){ log('다운로드 실패: '+e.message,'#B91C1C'); }
+    log('✔ 다운로드를 시작했습니다.','#5A666F');
+  }catch(e){ log('다운로드 실패: '+e.message,'#D70051'); }
 }
 
 /* ============ DATA DELETE (admin) ============ */
@@ -3417,13 +3297,13 @@ async function deleteData(kind){
     if(typeof window.__KB_DATA__!=='undefined'){ KB=window.__KB_DATA__; } else { try{ KB=await fetch('kb.json').then(r=>r.json()); }catch(e){} }
     renderStatus(); renderDash(); initDashControls(); initPreemptControls();
     updatePreemptBadge(); renderStorageStatus(STORED_RECS>0); renderUpdated();
-    log('✔ 접수내역을 삭제하고 기본 데이터로 되돌렸습니다.','#16A34A');
+    log('✔ 접수내역을 삭제하고 기본 데이터로 되돌렸습니다.','#5A666F');
   } else if(kind==='ev'){
     if(!confirm('누적된 이벤트 로그를 모두 삭제할까요? 되돌릴 수 없습니다.')) return;
     await idbClear('evDays'); DAILY=null; DAILY_AGG=null; UPDATED.ev=''; await saveUpdated2();
     populateDelEvDays(); renderStorageStatus(STORED_RECS>0); renderUpdated();
     if(CURTAB==='events') renderEvents();
-    log('✔ 이벤트 로그를 삭제했습니다.','#16A34A');
+    log('✔ 이벤트 로그를 삭제했습니다.','#5A666F');
   }
 }
 async function saveUpdated2(){ if(idbAvailable()){ try{ await idbBulkPut('meta',[{k:'updatedAt',v:UPDATED}]); }catch(e){} } }
@@ -3436,7 +3316,7 @@ async function populateDelEvDays(){
 async function deleteEvDay(){
   if(!isAdmin()){ alert('관리자만 삭제할 수 있습니다.'); return; }
   const sel=$('#del-evday'); const day=sel?sel.value:'';
-  if(!day){ log('삭제할 날짜를 선택하세요.','#B91C1C'); return; }
+  if(!day){ log('삭제할 날짜를 선택하세요.','#D70051'); return; }
   if(!confirm(`${day} 이벤트 로그를 삭제할까요?`)) return;
   await idbDelete('evDays', day);
   // reload DAILY
@@ -3445,7 +3325,7 @@ async function deleteEvDay(){
   else { DAILY=null; DAILY_AGG=null; }
   populateDelEvDays(); renderStorageStatus(STORED_RECS>0);
   if(CURTAB==='events') renderEvents();
-  log(`✔ ${day} 이벤트 로그를 삭제했습니다.`,'#16A34A');
+  log(`✔ ${day} 이벤트 로그를 삭제했습니다.`,'#5A666F');
 }
 
 async function resetStore(){
@@ -3461,8 +3341,8 @@ async function resetStore(){
     $('#ref-date').textContent=(KB.meta.ref_date||KB.meta.period||'-');
     renderStorageStatus(false); renderUpdated();
     setTab('dash');
-    log('✔ 초기화 완료 — 기본 데이터로 되돌렸습니다.','#16A34A');
-  }catch(e){ log('초기화 실패: '+e.message,'#B91C1C'); }
+    log('✔ 초기화 완료 — 기본 데이터로 되돌렸습니다.','#5A666F');
+  }catch(e){ log('초기화 실패: '+e.message,'#D70051'); }
 }
 
 /* ============ AI CHATBOT (BETA) — Powered by Gemini (무료) ============ */
@@ -3580,7 +3460,7 @@ function renderAISuggestions(){
     '재불량 위험이 높은 차량 알려줘',
     '동전처리장치 장애 처리 절차는?',
   ];
-  box.innerHTML = sugs.map(s=>`<button onclick="$('#ai-input').value='${s.replace(/'/g,"\\'")}'; $('#ai-input').focus();" class="text-[11.5px] bg-rose-50 hover:bg-rose-100 text-[#A00040] border border-rose-200 rounded-full px-3 py-1.5 font-semibold transition">${s}</button>`).join('');
+  box.innerHTML = sugs.map(s=>`<button onclick="$('#ai-input').value='${s.replace(/'/g,"\\'")}'; $('#ai-input').focus();" class="text-[11.5px] bg-rose-50 hover:bg-rose-100 text-[#111111] border border-rose-200 rounded-full px-3 py-1.5 font-semibold transition">${s}</button>`).join('');
 }
 
 function clearAIChat(){
@@ -3610,7 +3490,7 @@ function appendAIMsg(role, content){
   if(AI_MSGS.length===1){ box.innerHTML=''; }
   const isUser=role==='user';
   const html = `<div class="flex ${isUser?'justify-end':'justify-start'}">
-    <div class="ai-bubble ${isUser?'bg-[#A00040] text-white':'bg-rose-50 text-slate-800 border border-rose-100'} rounded-xl px-3.5 py-2.5 max-w-[85%] text-[13px] leading-relaxed break-words">
+    <div class="ai-bubble ${isUser?'bg-[#111111] text-white':'bg-rose-50 text-slate-800 border border-rose-100'} rounded-xl px-3.5 py-2.5 max-w-[85%] text-[13px] leading-relaxed break-words">
       <div class="text-[10px] opacity-70 mb-1 font-bold">${isUser?'🙋 나':'🤖 AI'}</div>
       <div>${mdLite(content)}</div>
     </div>
@@ -3928,7 +3808,7 @@ const HELP_CONTENT = {
     <div class="space-y-3">
       <p>이 시스템은 단말기 장애 데이터를 분석하여 <b>선제적 점검과 현장 처리</b>를 지원합니다.</p>
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#A00040] mb-1.5">화면 구성 (5개 탭)</div>
+        <div class="font-extrabold text-[#111111] mb-1.5">화면 구성 (5개 탭)</div>
         <ul class="list-disc pl-5 space-y-1 text-[12.5px]">
           <li><b>📊 대시보드</b>: 전체 장애 현황 — KPI, 차트, 채널·센터·기종 필터</li>
           <li><b>⚠ 선제 점검 대상</b>: 위험도 TOP 10 차량 + 맞춤 권장 + 매뉴얼 절차</li>
@@ -3938,7 +3818,7 @@ const HELP_CONTENT = {
         </ul>
       </div>
       <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#0E7490] mb-1.5">데이터 출처 표시</div>
+        <div class="font-extrabold text-[#5A666F] mb-1.5">데이터 출처 표시</div>
         <p class="text-[12px]">우측 상단 지식베이스 박스에 데이터 출처가 표시됩니다.</p>
         <ul class="list-disc pl-5 mt-1 text-[12px]">
           <li><b>☁ 클라우드</b>: 관리자가 게시한 최신 데이터 (모두가 같은 데이터를 봄)</li>
@@ -3950,7 +3830,7 @@ const HELP_CONTENT = {
     </div>`,
   dash: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">대시보드 필터 사용법</div>
+      <div class="font-extrabold text-[#111111] text-sm">대시보드 필터 사용법</div>
       <p>화면 상단의 타일을 클릭하면 해당 조건만 필터링됩니다. 여러 개를 조합할 수 있습니다.</p>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>접수구분</b>: 전화접수 / 시스템접수 / B/S처리 / 현장접수</li>
@@ -3965,10 +3845,10 @@ const HELP_CONTENT = {
     </div>`,
   preempt: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">선제 점검 대상 보는 법</div>
+      <div class="font-extrabold text-[#111111] text-sm">선제 점검 대상 보는 법</div>
       <p>위험도 점수 기준 상위 10대 차량을 보여줍니다. 대시보드 필터가 자동 적용됩니다.</p>
       <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#0E7490] mb-1">🔧 이 차량 맞춤 권장 (청록색)</div>
+        <div class="font-extrabold text-[#5A666F] mb-1">🔧 이 차량 맞춤 권장 (청록색)</div>
         <p class="text-[12px]">그 차량의 데이터를 분석한 맞춤 조언:</p>
         <ul class="list-disc pl-5 mt-1 text-[12px]">
           <li>당일 핵심 이벤트가 어느 부위에 집중되었는지</li>
@@ -3980,7 +3860,7 @@ const HELP_CONTENT = {
         <p class="text-[11px] text-slate-500 mt-1">→ 데이터가 갱신되면 자동으로 바뀝니다.</p>
       </div>
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#92400E] mb-1">📖 매뉴얼 절차 (노란색)</div>
+        <div class="font-extrabold text-[#8C6D2F] mb-1">📖 매뉴얼 절차 (노란색)</div>
         <p class="text-[12px]">B700/B710/B800 매뉴얼에서 발췌한 표준 트러블슈팅 절차:</p>
         <ul class="list-disc pl-5 mt-1 text-[12px]">
           <li>원인 설명</li>
@@ -3993,13 +3873,13 @@ const HELP_CONTENT = {
     </div>`,
   search: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">차량 검색 사용법</div>
+      <div class="font-extrabold text-[#111111] text-sm">차량 검색 사용법</div>
       <ol class="list-decimal pl-5 text-[12.5px] space-y-1">
         <li>차량번호 입력란에 번호를 입력합니다 (일부만 입력해도 자동완성).</li>
         <li>자동완성 목록에서 선택하거나 전체 번호 입력 후 Enter.</li>
         <li>검색 결과 화면 확인.</li>
       </ol>
-      <div class="font-extrabold text-[#A00040] text-sm mt-2">결과 화면 구성</div>
+      <div class="font-extrabold text-[#111111] text-sm mt-2">결과 화면 구성</div>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>기본정보</b>: 운수사·기종·노선·위험도 등급</li>
         <li><b>당일 이벤트 힌트</b>: 그 차량의 이상 신호 코드 (있는 경우)</li>
@@ -4014,7 +3894,7 @@ const HELP_CONTENT = {
     </div>`,
   events: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">이벤트 분석 화면</div>
+      <div class="font-extrabold text-[#111111] text-sm">이벤트 분석 화면</div>
       <p>차세대 마을버스 이벤트 로그(TrcnStaList_*.csv)의 분석 결과를 보여줍니다.</p>
       <ul class="list-disc pl-5 text-[12.5px] space-y-1">
         <li><b>이벤트 코드별 발생 건수</b>: 어떤 코드가 가장 많이 발생했는지</li>
@@ -4026,15 +3906,15 @@ const HELP_CONTENT = {
     </div>`,
   ai: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm flex items-center gap-2">🤖 AI 챗봇 (BETA)
+      <div class="font-extrabold text-[#111111] text-sm flex items-center gap-2">🤖 AI 챗봇 (BETA)
         <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span>
       </div>
       <p>단말기 시스템의 데이터(차량 이력·이벤트·맞춤 권장)를 바탕으로 <b>AI가 한국어로 답변</b>하는 챗봇입니다. Google Gemini 2.5 Flash 모델을 무료 등급으로 사용합니다.</p>
 
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#1D4ED8] mb-1.5">사용 준비 (관리자가 한 번만)</div>
+        <div class="font-extrabold text-[#5A666F] mb-1.5">사용 준비 (관리자가 한 번만)</div>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5">
-          <li>관리자가 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[#D60051] underline">aistudio.google.com/apikey</a>에서 Gemini API 키 발급 (무료, 결제 등록 불필요)</li>
+          <li>관리자가 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[#D70051] underline">aistudio.google.com/apikey</a>에서 Gemini API 키 발급 (무료, 결제 등록 불필요)</li>
           <li>단말기 시스템 → AI 챗봇 탭 → "🔑 공용 키 등록/변경" 클릭</li>
           <li>키 붙여넣기 → 확인 → 클라우드에 저장</li>
           <li><b>이후 모든 로그인 직원이 자동으로 사용 가능</b> — 개별 키 발급 불필요</li>
@@ -4042,7 +3922,7 @@ const HELP_CONTENT = {
       </div>
 
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#A00040] mb-1.5">질문하는 법</div>
+        <div class="font-extrabold text-[#111111] mb-1.5">질문하는 법</div>
         <ul class="list-disc pl-5 text-[12px] space-y-0.5">
           <li>화면 아래 입력창에 한국어로 자유롭게 질문</li>
           <li>또는 화면 중간의 분홍색 "빠른 질문" 버튼 클릭 — 자동으로 입력창에 채워짐</li>
@@ -4060,12 +3940,12 @@ const HELP_CONTENT = {
       </div>
 
       <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#15803D] mb-1">작동 원리 (RAG 방식)</div>
+        <div class="font-extrabold text-[#5A666F] mb-1">작동 원리 (RAG 방식)</div>
         <p class="text-[12px]">사용자가 질문하면 시스템이 KB에서 관련 데이터를 자동으로 추출(그 차량의 최근 이력·맞춤 권장·통계)하여 AI에게 함께 전송합니다. 전체 KB(8MB)를 보내지 않으므로 빠르고 무료 한도 내에서 작동합니다.</p>
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#92400E] mb-1">⚠ 주의사항</div>
+        <div class="font-extrabold text-[#8C6D2F] mb-1">⚠ 주의사항</div>
         <ul class="list-disc pl-5 text-[12px] space-y-0.5">
           <li>AI 답변은 100% 정확하지 않을 수 있습니다 (가끔 환각). 중요한 판단은 데이터를 직접 확인하세요.</li>
           <li>무료 등급: <b>분당 10건 · 일 500건</b> (회사 전체 합산). 초과 시 "잠시 후 다시" 안내.</li>
@@ -4075,10 +3955,10 @@ const HELP_CONTENT = {
     </div>`,
   admin: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">관리자 전용 기능</div>
+      <div class="font-extrabold text-[#111111] text-sm">관리자 전용 기능</div>
       <p class="text-[12px]">관리자(ysukim)로 로그인했을 때만 보이는 기능입니다.</p>
       <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#D60051] mb-1">📂 데이터 업로드</div>
+        <div class="font-extrabold text-[#D70051] mb-1">📂 데이터 업로드</div>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5">
           <li>대시보드 상단 "데이터 갱신" 영역 열기</li>
           <li>① 장애접수 (.xls) 파일 선택 → "확인 (적용)"</li>
@@ -4086,7 +3966,7 @@ const HELP_CONTENT = {
         </ol>
       </div>
       <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#0E7490] mb-1">☁ 클라우드 게시 (가장 중요)</div>
+        <div class="font-extrabold text-[#5A666F] mb-1">☁ 클라우드 게시 (가장 중요)</div>
         <p class="text-[12px]">업로드한 데이터를 모든 사용자에게 공유합니다.</p>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5 mt-1">
           <li>"☁ 지금 클라우드에 게시" 버튼 클릭</li>
@@ -4096,7 +3976,7 @@ const HELP_CONTENT = {
         <p class="text-[11px] text-slate-500 mt-1">→ 다른 사용자가 로그인하면 자동으로 이 데이터를 봅니다.</p>
       </div>
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#1D4ED8] mb-1">🔑 AI 챗봇 공용 키 관리 <span class="text-[10px] bg-blue-100 text-blue-700 rounded px-1 font-bold">NEW</span></div>
+        <div class="font-extrabold text-[#5A666F] mb-1">🔑 AI 챗봇 공용 키 관리 <span class="text-[10px] bg-blue-100 text-blue-700 rounded px-1 font-bold">NEW</span></div>
         <ul class="list-disc pl-5 text-[12px] mt-1">
           <li>AI 챗봇 탭 → "🔑 공용 키 등록/변경" — 새 키로 교체</li>
           <li>"🗑 공용 키 삭제" — 키 폐기 (모든 직원 챗봇 즉시 정지)</li>
@@ -4104,7 +3984,7 @@ const HELP_CONTENT = {
         </ul>
       </div>
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <div class="font-extrabold text-[#92400E] mb-1">👤 사용자 관리</div>
+        <div class="font-extrabold text-[#8C6D2F] mb-1">👤 사용자 관리</div>
         <p class="text-[12px]">우측 상단 "사용자 관리" 버튼 → 포털로 이동:</p>
         <ul class="list-disc pl-5 text-[12px] mt-1">
           <li>회원가입은 자동 승인 — 가입자가 자동 목록 표시</li>
@@ -4117,7 +3997,7 @@ const HELP_CONTENT = {
     </div>`,
   faq: `
     <div class="space-y-3">
-      <div class="font-extrabold text-[#A00040] text-sm">자주 묻는 질문</div>
+      <div class="font-extrabold text-[#111111] text-sm">자주 묻는 질문</div>
       ${[
         ['데이터가 안 보입니다.','관리자가 아직 클라우드에 게시하지 않았을 수 있습니다. 관리자에게 문의하세요.'],
         ['선제 점검 뱃지 숫자가 자꾸 바뀝니다.','대시보드 필터(채널·센터·기종·기간)에 맞춰 실시간으로 변합니다. 필터를 다 해제하면 전체 수가 보입니다.'],
@@ -4132,8 +4012,8 @@ const HELP_CONTENT = {
         ['(AI) 답변이 이상합니다.','AI가 가끔 환각을 일으킵니다. 항상 데이터를 직접 확인하세요.'],
         ['최근 접속일은 어떻게 보나요?','관리자 사용자 관리 화면에서 가입일 옆에 표시. "최근 접속일" 클릭하면 최근순 상위 5명만 보입니다.'],
       ].map(([q,a])=>`
-        <div class="border-l-4 border-[#D60051] pl-3 py-1">
-          <div class="font-bold text-[#A00040] text-[12.5px]">Q. ${q}</div>
+        <div class="border-l-4 border-[#D70051] pl-3 py-1">
+          <div class="font-bold text-[#111111] text-[12.5px]">Q. ${q}</div>
           <div class="text-[12px] text-slate-600 mt-0.5">A. ${a}</div>
         </div>`).join('')}
     </div>`,
@@ -4160,7 +4040,7 @@ initAuth();
 <!-- ============ HELP MODAL ============ -->
 <div id="help-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,.65)">
   <div class="bg-white rounded-2xl shadow-2xl max-w-[820px] w-full max-h-[90vh] flex flex-col">
-    <div class="flex items-center justify-between px-5 py-3 border-b border-rose-100" style="background:linear-gradient(135deg,#A00040,#D60051);color:#fff;border-radius:1rem 1rem 0 0">
+    <div class="flex items-center justify-between px-5 py-3" style="background:#111111;color:#fff">
       <div class="font-extrabold text-base">❓ 단말기 시스템 사용법</div>
       <button onclick="closeHelp()" class="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center text-sm">✕</button>
     </div>
@@ -4177,7 +4057,7 @@ initAuth();
     <div class="overflow-y-auto px-5 py-4 text-[13px] text-slate-700 leading-relaxed" id="help-body"></div>
     <div class="px-5 py-2.5 border-t border-rose-100 flex justify-between items-center text-[11px] text-slate-400">
       <span>ATEC Mobility · 단말기 시스템</span>
-      <a href="ATEC_매뉴얼_버스.docx" download class="text-[#D60051] font-bold hover:underline">📄 버스 매뉴얼(.docx) 다운로드</a>
+      <a href="ATEC_매뉴얼_버스.docx" download class="text-[#D70051] font-bold hover:underline">📄 버스 매뉴얼(.docx) 다운로드</a>
     </div>
   </div>
 </div>
