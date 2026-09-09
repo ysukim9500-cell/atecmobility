@@ -1043,6 +1043,46 @@ html.force-mobile .kv > div{ align-items:flex-start; }
 html.force-mobile .kv .v{ max-width:60%; }
 @media (max-width:767px){ html:not(.force-web) .logbk .hd .sub, html:not(.force-web) .hist .hd .sub{ flex-basis:100%; text-align:left; } }
 html.force-mobile .logbk .hd .sub, html.force-mobile .hist .hd .sub{ flex-basis:100%; text-align:left; }
+@media (max-width:767px){
+
+/* ── 모바일 문법 v6: 선제 점검 카드 (2열 표 · 격자 칩 · 치수 44/36/28) ── */
+  html:not(.force-web) #tabband{ background:transparent !important; border:0 !important; padding:0 !important; }
+  html:not(.force-web) #tabband > div{ padding:0 !important; }
+  html:not(.force-web) .pcard.mcard{ display:block !important; padding:14px 0 12px !important; }
+  html:not(.force-web) .mcard .p-main{ cursor:pointer; }
+  html:not(.force-web) .mc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  html:not(.force-web) .mc-top .p-v{ font-size:18px; font-weight:700; color:var(--ink); }
+  html:not(.force-web) .mc-top .p-num{ font-size:26px; font-weight:700; line-height:1; }
+  html:not(.force-web) .mc-sub{ font-size:13px; color:var(--gray); margin-top:2px; }
+  html:not(.force-web) .mc-kv{ display:grid; grid-template-columns:88px minmax(0,1fr); margin-top:10px; border-top:1px solid var(--ink); }
+  html:not(.force-web) .mc-kv .k{ font-size:13px; color:var(--gray); padding:7px 0; border-bottom:1px solid var(--line); }
+  html:not(.force-web) .mc-kv .v{ font-size:15px; color:var(--ink); padding:7px 0; border-bottom:1px solid var(--line); font-weight:500; overflow-wrap:anywhere; }
+  html:not(.force-web) .mc-chips{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px; }
+  html:not(.force-web) .mc-chips .chip{ height:28px; display:flex; align-items:center; justify-content:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px !important; padding:0 8px !important; }
+  html:not(.force-web) .mc-chips .chip.red{ grid-column:1 / -1; }
+  html:not(.force-web) .mc-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
+  html:not(.force-web) .mc-foot .p-lv{ font-size:13px; font-weight:700; }
+  html:not(.force-web) .mcard .p-x{ height:36px; padding:0 14px !important; font-size:13px !important; }
+}
+
+/* ── 모바일 문법 v6: 선제 점검 카드 (2열 표 · 격자 칩 · 치수 44/36/28) ── */
+html.force-mobile #tabband{ background:transparent !important; border:0 !important; padding:0 !important; }
+html.force-mobile #tabband > div{ padding:0 !important; }
+html.force-mobile .pcard.mcard{ display:block !important; padding:14px 0 12px !important; }
+html.force-mobile .mcard .p-main{ cursor:pointer; }
+html.force-mobile .mc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+html.force-mobile .mc-top .p-v{ font-size:18px; font-weight:700; color:var(--ink); }
+html.force-mobile .mc-top .p-num{ font-size:26px; font-weight:700; line-height:1; }
+html.force-mobile .mc-sub{ font-size:13px; color:var(--gray); margin-top:2px; }
+html.force-mobile .mc-kv{ display:grid; grid-template-columns:88px minmax(0,1fr); margin-top:10px; border-top:1px solid var(--ink); }
+html.force-mobile .mc-kv .k{ font-size:13px; color:var(--gray); padding:7px 0; border-bottom:1px solid var(--line); }
+html.force-mobile .mc-kv .v{ font-size:15px; color:var(--ink); padding:7px 0; border-bottom:1px solid var(--line); font-weight:500; overflow-wrap:anywhere; }
+html.force-mobile .mc-chips{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px; }
+html.force-mobile .mc-chips .chip{ height:28px; display:flex; align-items:center; justify-content:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px !important; padding:0 8px !important; }
+html.force-mobile .mc-chips .chip.red{ grid-column:1 / -1; }
+html.force-mobile .mc-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
+html.force-mobile .mc-foot .p-lv{ font-size:13px; font-weight:700; }
+html.force-mobile .mcard .p-x{ height:36px; padding:0 14px !important; font-size:13px !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -1820,9 +1860,10 @@ function isAdmin(){ return ME && ME.role==='admin'; }
 function renderUserBadge(){
   const b=$('#user-badge'); if(!b) return;
   // 시안: 이름 · 역할 뒤에 글자 링크만, 가는 세로선으로 구분 (버튼·onclick 은 그대로)
-  { const brand=b.parentElement && b.parentElement.querySelector('.flex.items-center.gap-4'); if(brand) brand.setAttribute('data-user', (ME?ME.name:'')+' '+(isAdmin()?'관리자':'일반')); }
+  { const brand=b.parentElement && b.parentElement.querySelector('.flex.items-center.gap-4'); if(brand) brand.setAttribute('data-user', ((ME?ME.name:'')===(isAdmin()?'관리자':'일반'))?(ME?ME.name:''):(ME?ME.name:'')+' '+(isAdmin()?'관리자':'일반')); }
   const adminBtn = isAdmin()?`<button onclick="gotoPortal()" class="ub-btn">사용자 관리</button>`:'';
-  b.innerHTML = `<span class="ub-name"><b>${ME?ME.name:''}</b> ${isAdmin()?'관리자':'일반'}</span>
+  const roleTxt=isAdmin()?'관리자':'일반'; const nameTxt=ME?ME.name:'';
+  b.innerHTML = `<span class="ub-name"><b>${nameTxt}</b>${nameTxt===roleTxt?'':' '+roleTxt}</span>
     <button onclick="showHelp()" class="ub-btn" title="사용법 도움말">도움말</button>
     ${adminBtn}
     <button onclick="promptChangePw(false)" class="ub-btn">비밀번호</button>
@@ -2727,6 +2768,8 @@ function buildSmartReco(p){
   return smartBlock + manualBlock;
 }
 function renderPreempt(){
+  // 모바일이면 문장 대신 2열 표·격자 칩으로 그린다 (데이터·동작은 같다)
+  const isM = document.documentElement.classList.contains('force-mobile') || (!document.documentElement.classList.contains('force-web') && window.matchMedia('(max-width:767px)').matches);
   const cen=$('#pf-center')?$('#pf-center').value:'';
   const showExcluded = $('#pf-showexcluded') && $('#pf-showexcluded').checked;
   $('#pf-exc-count') && ($('#pf-exc-count').textContent = EXCLUDED.size?`(${EXCLUDED.size})`:'');
@@ -2771,6 +2814,20 @@ function renderPreempt(){
           ${excInfo?`<div class="p-err">사유 <b style="color:var(--atec-ink)">${excInfo.reason}</b> <span>(${excInfo.at})</span></div>`:''}
         </div>
         <button onclick="restoreVeh('${p.v}',event)" class="p-x">복원</button>
+      </div>`;
+    }
+    if(isM){
+      const kv=[['총 접수',p.tot+'건'],['최근 30일',p.r30+'건'],['마지막 처리',p.ds<999?p.ds+'일 전':'-'],['주 장애',p.err||'-']];
+      if(p.last_err) kv.push(['최근 조치',`${p.last_err} → ${p.last_field||'-'}`]);
+      const chips=(p.core>0?[`<span class="chip ln red">핵심이벤트 ${p.core}건</span>`]:[]).concat(p.rs.slice(0,3).map(r=>`<span class="chip ln" title="${r}">${r}</span>`));
+      return `<div class="pcard mcard">
+        <div class="p-main" onclick="$('#q').value='${p.v}';doSearch('${p.v}')">
+          <div class="mc-top"><span class="p-v">${p.v}</span><span class="p-num" style="color:${scoreColor(p.sc)}">${p.sc}</span></div>
+          <div class="mc-sub">${p.op}${p.center?' · '+p.center:''}</div>
+          <div class="mc-kv">${kv.map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>
+          ${chips.length?`<div class="mc-chips">${chips.join('')}</div>`:''}
+        </div>
+        <div class="mc-foot"><span class="p-lv" style="color:${scoreColor(p.sc)}">#${i+1} · ${scoreLabel(p.sc)}</span><button onclick="excludeVeh('${p.v}',event)" title="선제 점검 대상에서 제외 (관리자)" class="p-x">✕ 제외</button></div>
       </div>`;
     }
     return `<div class="pcard">
