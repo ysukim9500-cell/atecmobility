@@ -77,6 +77,13 @@ footer.ci-foot{ background:var(--tint); padding:16px 24px !important; margin:32p
   footer.ci-foot{ margin:24px -14px 0 !important; padding:16px 14px !important; }
   main > .pt-2 > div:first-child{ font-size:20px !important; display:flex; align-items:center; gap:8px; }
   main > .pt-2 > div:first-child::before{ content:''; width:10px; height:10px; background:var(--red); flex:0 0 auto; }
+  /* v10: 360px 에서 '관리자 콘솔' 이 로그아웃과 겹치던 것 — 제목은 숨기고 이름 줄만 한 줄로 */
+  header{ gap:10px !important; }
+  header .tapbtn{ padding:0 10px !important; font-size:13px !important; }
+  header > a.tapbtn{ padding-left:0 !important; }
+  header > button.tapbtn{ padding-right:0 !important; }
+  header .atec-mark{ height:16px !important; }
+  header .min-w-0 > div:first-child{ display:none; }
 }
 </style>
 </head>

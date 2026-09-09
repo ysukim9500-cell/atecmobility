@@ -413,6 +413,10 @@ html.is-mobile .l-actions .btn-main{ height:44px; justify-content:center; }
 html.is-mobile .fpanel .fld, html.is-mobile #tab-list > .panel:first-child .fld{ height:40px; }
 html.is-mobile .fpanel .btn-main, html.is-mobile #tab-list > .panel:first-child .btn-main{ height:40px; }
 
+/* ── 모바일 공용 v10: 날짜 입력 잘림 제거 (달력 아이콘 숨김 · 가운데 정렬) ── */
+html.is-mobile input[type=date]::-webkit-calendar-picker-indicator{ display:none; -webkit-appearance:none; }
+html.is-mobile input[type=date]{ text-align:center; font-size:12.5px !important; padding-left:2px !important; padding-right:2px !important; }
+
 /* 통전망 전용 보정 */
 #tab-dash > .panel:first-child, #tab-faults > .panel:first-child, #tab-stock > .panel:first-child, #tab-repairs > .panel:first-child, #tab-terminals > .panel:first-child, #tab-equip > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
 #tab-dash > .panel:first-child .panel-head, #tab-faults > .panel:first-child .panel-head, #tab-stock > .panel:first-child .panel-head, #tab-repairs > .panel:first-child .panel-head, #tab-terminals > .panel:first-child .panel-head, #tab-equip > .panel:first-child .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }
