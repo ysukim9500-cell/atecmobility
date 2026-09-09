@@ -796,13 +796,14 @@ async function saveLogDiagnosis(vnum, vid){
 /* ===== 진단·처리 이력 + 재불량 분석 ===== */
 async function loadLogHistory(vnum){
   const box=document.getElementById('logbk-history'); if(!box) return;
+  if(box.parentElement) box.parentElement.style.display='';
   box.innerHTML='<span class="text-[12px] text-slate-400">이력 불러오는 중…</span>';
   try{
     const url=SB_URL+'/rest/v1/log_diagnoses?vehicle_no=eq.'+encodeURIComponent(vnum)+'&order=analyzed_at.desc,created_at.desc&limit=100';
     const r=await fetch(url,{headers:logSbHeaders()});
     if(!r.ok){ box.innerHTML='<span class="text-[12px] text-slate-400">이력 조회 불가(테이블 미생성일 수 있음).</span>'; return; }
     const rows=await r.json();
-    if(!rows.length){ box.innerHTML='<span class="text-[12px] text-slate-400">아직 저장된 진단·처리 이력이 없습니다.</span>'; return; }
+    if(!rows.length){ box.innerHTML=''; if(box.parentElement) box.parentElement.style.display='none'; return; }
     const asc=rows.slice().sort(function(a,b){ return (a.analyzed_at>b.analyzed_at?1:-1); });
     const recurByAction={};
     for(let i=0;i<asc.length;i++){

@@ -1298,6 +1298,27 @@ html.force-mobile #mm-links > *{ display:flex !important; align-items:center; ju
 html.force-mobile #mm-links > .mm-user, html.force-mobile #mm-links > .ub-name{ height:40px; color:var(--gray) !important; font-size:13px !important; border-top:0 !important; }
 html.force-mobile #mm-links > .ub-name b{ color:var(--ink); font-weight:700; margin-right:6px; }
 html.force-mobile body.mm-open{ overflow:hidden; }
+
+/* v15 정리 */
+.hist .tl-more{ display:none; } .hist.open .tl-more{ display:grid; }
+.hist .btn-more{ display:block; width:100%; height:40px; margin-top:4px; border:1px solid var(--line); background:#fff; color:var(--gray); font-size:13px; font-weight:500; }
+.logbk .lopt summary{ list-style:none; cursor:pointer; font-size:14px; font-weight:700; color:var(--gray); display:flex; justify-content:space-between; align-items:center; }
+.logbk .lopt summary::-webkit-details-marker{ display:none; }
+.logbk .lopt summary::after{ content:'＋'; font-weight:400; color:var(--gray); }
+.logbk .lopt[open] summary{ color:var(--ink); } .logbk .lopt[open] summary::after{ content:'－'; }
+.logbk .lopt summary .sub{ font-size:12px; font-weight:400; margin-left:6px; }
+.evdict > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--ink); padding:14px 0; border-top:1px solid var(--ink); }
+.evdict > summary::-webkit-details-marker{ display:none; }
+.evdict > summary #ev-count{ font-size:12px; font-weight:400; color:var(--gray); }
+.evdict > summary .evdict-more{ margin-left:auto; font-size:12px; font-weight:400; color:var(--gray); }
+.evdict[open] > summary .evdict-more{ display:none; }
+@media (max-width:767px){
+  html:not(.force-web) #tabs .tab-btn[data-tab="sn"], html:not(.force-web) #tabs .tab-btn[data-tab="events"]{ display:none !important; }
+  html:not(.force-web) .vgrid .errtypes{ display:none; }
+}
+html.force-mobile #tabs .tab-btn[data-tab="sn"], html.force-mobile #tabs .tab-btn[data-tab="events"]{ display:none !important; }
+html.force-mobile .vgrid .errtypes{ display:none; }
+#ev-summary:empty, #preempt-summary:empty{ display:none !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -1538,7 +1559,7 @@ html.force-mobile body.mm-open{ overflow:hidden; }
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="sec-title">센터별 위험도 상위 10대</h2>
-          <p class="sub max-w-2xl">장애접수 이력과 단말기 핵심 이벤트를 종합해 각 센터별 위험 상위 10대씩 고릅니다. 최근 7일 내 처리(접수)된 차량은 제외됩니다. 기준일 <span id="ref-date" class="font-semibold" style="color:var(--atec-ink)"></span></p>
+          <p class="sub max-w-2xl">기준일 <span id="ref-date" class="font-semibold" style="color:var(--atec-ink)"></span> · 최근 7일 내 처리된 차량은 제외</p>
         </div>
         <div id="preempt-summary" class="flex flex-wrap items-baseline"></div>
       </div>
@@ -1566,7 +1587,7 @@ html.force-mobile body.mm-open{ overflow:hidden; }
     <div class="flex items-center justify-between mb-2">
       <h2 class="sec-title">단말기(S/N) 조회 · 개체 이력 추적</h2>
     </div>
-    <p class="sub max-w-2xl" style="margin-bottom:12px">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
+    <p class="sub max-w-2xl" style="margin-bottom:12px">S/N 뒤 4자리로 조회하면 그 단말기가 거쳐 간 차량과 저장된 진단·처리 기록을 봅니다.</p>
     <div class="sec">
       <div class="flex gap-2">
         <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 뒤 4자리 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
@@ -1584,7 +1605,6 @@ html.force-mobile body.mm-open{ overflow:hidden; }
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="sec-title">이벤트 분석</h2>
-          <p class="sub max-w-2xl">단말기 이벤트코드 사전과, 업로드한 이벤트 로그의 <b>이상/단절 이벤트</b>를 분석합니다. 다발 차량을 선제 점검에 활용하세요.</p>
         </div>
         <div id="ev-summary" class="flex flex-wrap items-baseline"></div>
       </div>
@@ -1592,17 +1612,17 @@ html.force-mobile body.mm-open{ overflow:hidden; }
         <span class="flab">표시 범위</span>
         <button data-scope="core" class="scope-btn">핵심 이상 이벤트 <span class="opacity-70">(지정 33종)</span></button>
         <button data-scope="all" class="scope-btn">전체 이상 이벤트</button>
-        <span class="text-[11px] text-slate-400 ml-1">※ 핵심 = 통신 끊김·모뎀·CSAM·GPS·CPU 등 현장에서 중점 관리하는 이벤트</span>
       </div>
     </div>
 
     <!-- when daily log loaded: analysis -->
     <div id="ev-log-section"></div>
 
-    <!-- code dictionary -->
+    <!-- code dictionary (접이식) -->
+    <details class="evdict"><summary>이벤트코드 사전 <span id="ev-count"></span><span class="evdict-more">펼치기</span></summary>
     <div class="sec">
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <h3 class="text-xs font-extrabold text-[#111111]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
+        
         <input id="ev-q" type="text" placeholder="코드·내용 검색" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D70051]">
         <select id="ev-cat" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 분류</option></select>
         <select id="ev-sev" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 코드</option><option value="core">핵심만</option><option value="의심">이상만</option><option value="정상">정상만</option></select>
@@ -1618,6 +1638,7 @@ html.force-mobile body.mm-open{ overflow:hidden; }
         </table>
       </div>
     </div>
+    </details>
   </section>
 
   <!-- AI CHATBOT (BETA) -->
@@ -1625,21 +1646,20 @@ html.force-mobile body.mm-open{ overflow:hidden; }
     <div class="sec">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 class="sec-title flex items-center gap-2">🤖 AI 챗봇 <span class="text-[10px] bg-amber-300 text-amber-900 font-extrabold rounded px-1.5 py-0.5">BETA</span> <span class="text-[10px] bg-blue-100 text-blue-700 font-bold rounded px-1.5 py-0.5">Powered by Gemini · 무료</span></h2>
-          <p class="sub">차량 이력·이벤트·맞춤 권장 데이터를 바탕으로 AI가 답변합니다. 진단 참고용이며 최종 판단은 기사님이 하세요.</p>
+          <h2 class="sec-title flex items-center gap-2">AI 챗봇</h2>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span id="ai-key-status" class="text-[11px] font-bold text-slate-400">⏳ 키 확인 중…</span>
-          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#111111] hover:bg-[#111111] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">🔑 공용 키 등록/변경</button>
-          <button onclick="deletePublicAIKey()" id="ai-delete-key" data-admin class="text-[11px] border border-rose-300 text-rose-700 hover:bg-rose-50 rounded px-3 py-1.5 font-bold transition" style="display:none">🗑 공용 키 삭제</button>
-          <button onclick="clearAIChat()" class="text-[11px] border border-slate-300 hover:bg-slate-50 rounded px-3 py-1.5 font-bold transition">🗑 대화 초기화</button>
+          <span id="ai-key-status" class="text-[11px] font-bold text-slate-400">키 확인 중…</span>
+          <button onclick="setupAIKey()" data-admin class="text-[11px] bg-[#111111] hover:bg-[#111111] text-white rounded px-3 py-1.5 font-bold transition" style="display:none">공용 키 등록/변경</button>
+          <button onclick="deletePublicAIKey()" id="ai-delete-key" data-admin class="text-[11px] border border-rose-300 text-rose-700 hover:bg-rose-50 rounded px-3 py-1.5 font-bold transition" style="display:none">공용 키 삭제</button>
+          <button onclick="clearAIChat()" class="text-[11px] border border-slate-300 hover:bg-slate-50 rounded px-3 py-1.5 font-bold transition">대화 초기화</button>
         </div>
       </div>
     </div>
 
     <!-- 빠른 질문 예시 -->
     <div class="sec">
-      <div class="text-[12px] font-bold text-slate-600 mb-2">💡 이렇게 물어보세요</div>
+      <div class="text-[12px] font-bold text-slate-600 mb-2">이렇게 물어보세요</div>
       <div id="ai-suggest" class="flex flex-wrap gap-2"></div>
     </div>
 
@@ -1647,9 +1667,8 @@ html.force-mobile body.mm-open{ overflow:hidden; }
     <div class="bg-white border border-rose-100 rounded-xl shadow-sm flex flex-col" style="height:560px">
       <div id="ai-msgs" class="flex-1 overflow-y-auto p-4 space-y-3">
         <div class="text-center text-[12px] text-slate-400 py-8">
-          <div class="text-3xl mb-2">🤖</div>
-          <div class="font-bold text-slate-500 mb-1">AI 챗봇이 준비됐습니다</div>
-          <div>차량번호·증상·센터 등을 자유롭게 물어보세요</div>
+                    <div class="font-bold text-slate-500 mb-1">AI 챗봇이 준비됐습니다</div>
+          <div>차량번호나 증상을 물어보세요</div>
         </div>
       </div>
       <div class="border-t border-rose-100 p-3 flex gap-2">
@@ -2128,7 +2147,8 @@ function renderUserBadge(){
     <button onclick="promptChangePw(false)" class="ub-btn">비밀번호</button>
     <button onclick="gotoPortal()" class="ub-btn">포털</button>
     <button onclick="logout()" class="ub-btn">로그아웃</button>`;
-  const mm=$('#mm-links'); if(mm) mm.innerHTML = b.innerHTML;   // 모바일: 하단 '메뉴' 시트에 같은 단추
+  const mm=$('#mm-links'); if(mm){ mm.innerHTML = b.innerHTML;   // 모바일: 하단 '메뉴' 시트에 같은 단추
+    const nm=mm.querySelector('.ub-name'); (nm||mm).insertAdjacentHTML(nm?'afterend':'afterbegin', '<button type="button" class="ub-btn mm-tab" onclick="setTab(\'sn\')">단말기 조회</button><button type="button" class="ub-btn mm-tab" onclick="setTab(\'events\')">이벤트 분석</button>'); }
 }
 function toggleUserMenu(){ /* deprecated — buttons now always visible */ }
 document.addEventListener('click', e=>{
@@ -3105,7 +3125,7 @@ function renderPreempt(){
   const evChip = DAILY_AGG? miniStat('이벤트 반영','ON','#5A666F') : miniStat('이벤트','미반영','#5A666F');
   const fchips = (GF.ch?miniStat('채널 기준',GF.ch,'#5A666F'):'')+(GF.center?miniStat('센터',GF.center.replace('센터',''),'#5A666F'):'')+(GF.term?miniStat('기종',termShort(GF.term),'#5A666F'):'')+((GF.from||GF.to)?miniStat('기간',(GF.from||'처음').slice(5)+'~'+(GF.to||'끝').slice(5),'#5A666F'):'');
   $('#preempt-summary').innerHTML =
-    fchips+evChip+miniStat('위험 차량', active.length+'대','#111111')+miniStat('센터별 상위', list.length+'대','#D70051')+miniStat('높음',hi+'대','#D70051')+miniStat('제외',EXCLUDED.size+'대','#5A666F');
+    fchips+miniStat('위험 차량', active.length+'대','#111111')+miniStat('높음',hi+'대','#D70051');
 
   if(!list.length){ $('#preempt-list').innerHTML=`<div class="sub" style="padding:32px 0;text-align:center">${showExcluded?'제외 처리된 차량이 없습니다.':'해당 조건의 선제 점검 대상이 없습니다.'}</div>`; return; }
   $('#preempt-list').innerHTML = list.map((p,i)=>{
@@ -3121,7 +3141,7 @@ function renderPreempt(){
       </div>`;
     }
     if(isM){
-      const kv=[['총 접수',p.tot+'건'],['최근 30일',p.r30+'건'],['마지막 처리',p.ds<999?p.ds+'일 전':'-'],['주 장애',p.err||'-']];
+      const kv=[['주 장애',p.err||'-']];
       if(p.last_err) kv.push(['최근 조치',`${p.last_err} → ${p.last_field||'-'}`]);
       const chips=(p.core>0?[`<span class="chip ln red">핵심이벤트 ${p.core}건</span>`]:[]).concat(p.rs.slice(0,3).map(r=>`<span class="chip ln" title="${r}">${r}</span>`));
       return `<div class="pcard mcard">
@@ -3194,7 +3214,7 @@ function renderEvents(){
     const cats=[...new Set(codes.map(c=>E[c].cat).filter(Boolean))];
     catSel.innerHTML='<option value="">전체 분류</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
   }
-  let sum = miniStat('표시 범위', scopeLabel, EV_SCOPE==='core'?'#D70051':'#111111')+miniStat('핵심 코드', coreN+'종','#D70051')+miniStat('이상 코드', susN+'종','#8C6D2F');
+  let sum = '';
   if(DAILY_AGG){
     // count logged (scope) events
     let scopeRows=0; for(const c in DAILY_AGG.codeCount){ if(isLogged(c)) scopeRows+=DAILY_AGG.codeCount[c]; }
@@ -3327,24 +3347,20 @@ function renderVehicleNoFault(vnum, m){
     <!-- 로그백업 분석 (장애이력 없는 차량도 동일 제공) -->
     <div class="logbk">
       <div class="hd"><h3 class="h">단말기 로그백업 분석</h3><span class="sub">기기 안에서만 분석되고 원본은 저장되지 않습니다</span></div>
-      <p class="sub" style="margin-bottom:14px"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다.</p>
       <div class="lgrid">
         <div class="lbox">
-          <div class="t">① 통합단말기 백업</div>
-          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <div class="t">통합단말기 백업 폴더</div>
           <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full">
-          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <div class="sub" style="margin:8px 0 4px">아이폰은 폴더 대신 zip</div>
           <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full">
         </div>
-        <div class="lbox">
-          <div class="t">② 승하차단말기 백업 <span class="sub">(승차/하차1/하차2 중 문제 유닛)</span></div>
-          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
-          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full">
-          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+        <details class="lbox lopt">
+          <summary>승하차단말기 백업도 있으면 <span class="sub">(선택 · 원인 격리가 정확해짐)</span></summary>
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full" style="margin-top:8px">
+          <div class="sub" style="margin:8px 0 4px">아이폰은 폴더 대신 zip</div>
           <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full">
-        </div>
+        </details>
       </div>
-      <p class="sub" style="margin:12px 0">아이폰은 폴더 선택이 안 됩니다 — 백업 폴더를 zip으로 압축해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, 둘 다 올리면 원인 격리가 정확해집니다.</p>
       <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','')" class="btn-go">분석하기</button>
       <div id="logbk-iso" class="mt-3"></div>
       <div id="logbk-result" class="mt-3"></div>
@@ -3597,21 +3613,21 @@ function renderVehicle(vnum, veh){
           <div><span class="k">총 접수</span><span class="v">${items.length}건</span></div>
           <div><span class="k">최근 90일 접수</span><span class="v">${recent90}건</span></div>
           <div><span class="k">증상 재현</span><span class="v">${reproN}건 <small>${reproRate}%</small></span></div>
-          <div><span class="k">당일 이벤트</span><span class="v">${DAILY?evTotal+'건':'<small>로그 없음</small>'}</span></div>
+          ${DAILY?`<div><span class="k">당일 이벤트</span><span class="v">${evTotal}건</span></div>`:''}
           <div><span class="k">마지막 조치</span><span class="v" style="font-size:15px;font-weight:500">${lastFix}</span></div>
         </div>
       </div>
 
       <!-- 분포 · 당일 이벤트 · 차고지 -->
       <div class="vcol">
-        <div>
+        <div class="errtypes">
           <div class="hd"><h3 class="h">장애 유형</h3><span class="sub">전체 ${items.length}건</span></div>
           <div class="bars">${errBars||'<div class="sub">유형 정보 없음</div>'}</div>
         </div>
-        <div>
+        ${DAILY?`<div>
           <div class="hd"><h3 class="h">당일 이벤트</h3><span class="sub">${evSub}</span></div>
           <div class="lst">${evRows}</div>
-        </div>
+        </div>`:''}
         <div class="eta-sec">
           <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
           <div class="lst"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0">
@@ -3630,31 +3646,27 @@ function renderVehicle(vnum, veh){
       </div>
       <div class="hrow head"><span>날짜</span><span>접수</span><span>증상 → 조치</span><span>처리 내용</span><span>처리자</span></div>
       <div id="tl-body">
-        ${[...items].reverse().map(renderTL).join('')}
+        ${tlRows(items)}
       </div>
     </div>
 
     <!-- 로그백업 분석 -->
     <div class="logbk" style="margin-top:26px">
       <div class="hd"><h3 class="h">단말기 로그백업 분석</h3><span class="sub">기기 안에서만 분석되고 원본은 저장되지 않습니다</span></div>
-      <p class="sub" style="margin-bottom:14px"><b>통합단말기</b>와 <b>승하차단말기</b> 백업을 올리면 무슨 장애인지·어디를 점검할지 알려드립니다. 둘 다 올리면 <b>통합 / 승하차 / 케이블</b> 중 원인을 정확히 격리합니다.</p>
       <div class="lgrid">
         <div class="lbox">
-          <div class="t">① 통합단말기 백업</div>
-          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
+          <div class="t">통합단말기 백업 폴더</div>
           <input type="file" id="logbk-folder" webkitdirectory directory multiple class="block w-full">
-          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+          <div class="sub" style="margin:8px 0 4px">아이폰은 폴더 대신 zip</div>
           <input type="file" id="logbk-file" accept=".zip,application/zip" class="block w-full">
         </div>
-        <div class="lbox">
-          <div class="t">② 승하차단말기 백업 <span class="sub">(승차/하차1/하차2 중 문제 유닛)</span></div>
-          <div class="sub" style="margin-bottom:4px">폴더 (PC·안드로이드)</div>
-          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full">
-          <div class="sub" style="margin:8px 0 4px">또는 zip (아이폰)</div>
+        <details class="lbox lopt">
+          <summary>승하차단말기 백업도 있으면 <span class="sub">(선택 · 원인 격리가 정확해짐)</span></summary>
+          <input type="file" id="logbk2-folder" webkitdirectory directory multiple class="block w-full" style="margin-top:8px">
+          <div class="sub" style="margin:8px 0 4px">아이폰은 폴더 대신 zip</div>
           <input type="file" id="logbk2-file" accept=".zip,application/zip" class="block w-full">
-        </div>
+        </details>
       </div>
-      <p class="sub" style="margin:12px 0">아이폰은 폴더 선택이 안 됩니다 — 백업 폴더를 zip으로 압축해 'zip' 칸에 올리세요. 한쪽만 올려도 분석되고, 둘 다 올리면 원인 격리가 정확해집니다.</p>
       <button onclick="analyzeLogBackup('${vnum.replace(/'/g,"\\'")}','${(veh.vid||'').replace(/'/g,"\\'")}')" class="btn-go">분석하기</button>
       <div id="logbk-iso" class="mt-3"></div>
       <div id="logbk-result" class="mt-3"></div>
@@ -3674,6 +3686,12 @@ function renderVehicle(vnum, veh){
   if(typeof loadLogHistory==='function'){ try{ loadLogHistory(vnum); }catch(e){} }
 }
 const RECV_COLORS={'전화접수':'#D70051','시스템접수':'#5A666F','B/S처리':'#5A666F','현장접수':'#5A666F'};
+function tlRows(arr){
+  const rev=[...arr].reverse(), N=5;
+  if(rev.length<=N) return rev.map(renderTL).join('');
+  return rev.slice(0,N).map(renderTL).join('') + rev.slice(N).map(it=>renderTL(it).replace('class="hrow','class="hrow tl-more')).join('')
+    + `<button type="button" class="btn-more" onclick="this.closest('.hist').classList.add('open');this.remove()">이전 이력 ${rev.length-N}건 더 보기</button>`;
+}
 function recvFilterChips(items){
   const counts={}; items.forEach(it=>{ if(it.recv) counts[it.recv]=(counts[it.recv]||0)+1; });
   const order=['전화접수','시스템접수','B/S처리','현장접수'];
@@ -3695,7 +3713,7 @@ function toggleEvView(mode){
 function filterTL(recv){
   const items=window.__tlItems||[];
   const filtered = recv? items.filter(it=>it.recv===recv) : items;
-  $('#tl-body').innerHTML = filtered.length? [...filtered].reverse().map(renderTL).join('') : '<div class="sub" style="padding:16px 0;text-align:center">해당 접수구분 이력이 없습니다.</div>';
+  $('#tl-body').innerHTML = filtered.length? tlRows(filtered) : '<div class="sub" style="padding:16px 0;text-align:center">해당 접수구분 이력이 없습니다.</div>';
   $('#tl-count').textContent = filtered.length;
   document.querySelectorAll('.recv-chip').forEach(b=>{ b.classList.toggle('active', b.dataset.recv===recv); });
 }
@@ -4359,7 +4377,7 @@ function updateAIKeyStatus(){
     if(delBtn && isAdmin()) delBtn.style.display='';
   } else {
     el.textContent = isAdmin()
-      ? '⚠ 공용 키 미등록 — 아래 "🔑 공용 키 등록" 버튼을 눌러 등록하세요'
+      ? '⚠ 공용 키 미등록 — 아래 "공용 키 등록" 버튼을 눌러 등록하세요'
       : '⚠ 관리자가 AI 키를 아직 등록하지 않았습니다';
     el.className='text-[11px] font-bold text-amber-600';
     if(delBtn) delBtn.style.display='none';
@@ -4405,7 +4423,7 @@ async function initAI(){
     if(cached){ AI_KEY_CACHE=cached; }
   }catch(e){}
   // 3) 클라우드에서 공용 키 가져오기 (없으면 빈 문자열)
-  updateAIKeyStatus();   // "⏳ 키 확인 중…" 표시
+  updateAIKeyStatus();   // "키 확인 중…" 표시
   const cloudKey = await fetchPublicAIKey();
   if(cloudKey){ AI_KEY_CACHE=cloudKey; try{ sessionStorage.setItem(AI_KEY_NAME, cloudKey); }catch(e){} }
   updateAIKeyStatus();
@@ -4428,8 +4446,6 @@ function renderAISuggestions(){
     sampleVeh?`${sampleVeh}차량은 어떻게 처리하나요?`:'1234차량은 어떻게 처리하나요?',
     '최근 일주일 가장 많이 발생한 장애는?',
     '강동센터에서 자주 발생한 모듈 장애는?',
-    '재불량 위험이 높은 차량 알려줘',
-    '동전처리장치 장애 처리 절차는?',
   ];
   box.innerHTML = sugs.map(s=>`<button onclick="$('#ai-input').value='${s.replace(/'/g,"\\'")}'; $('#ai-input').focus();" class="text-[11.5px] bg-rose-50 hover:bg-rose-100 text-[#111111] border border-rose-200 rounded-full px-3 py-1.5 font-semibold transition">${s}</button>`).join('');
 }
@@ -4439,9 +4455,8 @@ function clearAIChat(){
   if(!confirm('AI 대화 내용을 모두 지우시겠습니까?')) return;
   AI_MSGS=[]; AI_HIST=[];
   $('#ai-msgs').innerHTML=`<div class="text-center text-[12px] text-slate-400 py-8">
-    <div class="text-3xl mb-2">🤖</div>
-    <div class="font-bold text-slate-500 mb-1">AI 챗봇이 준비됐습니다</div>
-    <div>차량번호·증상·센터 등을 자유롭게 물어보세요</div>
+        <div class="font-bold text-slate-500 mb-1">AI 챗봇이 준비됐습니다</div>
+    <div>차량번호나 증상을 물어보세요</div>
   </div>`;
 }
 
@@ -4683,7 +4698,7 @@ async function sendAI(){
   const key=getAIKey();
   if(!key){
     const msg = isAdmin()
-      ? '공용 AI 키를 먼저 등록해주세요. 위 "🔑 공용 키 등록" 버튼을 누르세요.'
+      ? '공용 AI 키를 먼저 등록해주세요. 위 "공용 키 등록" 버튼을 누르세요.'
       : '관리자가 아직 공용 AI 키를 등록하지 않았습니다. 관리자에게 요청해주세요.';
     alert(msg); return;
   }
@@ -4738,7 +4753,7 @@ async function sendAI(){
       if(res.status===400) msg+='요청 오류: '+parsed+'\n키 형식이 잘못됐을 수 있습니다.';
       else if(res.status===403){
         msg += isAdmin()
-          ? 'API 키가 잘못되었거나 권한이 없습니다. 관리자 권한으로 새 키를 발급하고 "🔑 공용 키 등록"으로 다시 등록하세요. https://aistudio.google.com/apikey'
+          ? 'API 키가 잘못되었거나 권한이 없습니다. 관리자 권한으로 새 키를 발급하고 "공용 키 등록"으로 다시 등록하세요. https://aistudio.google.com/apikey'
           : '공용 AI 키에 문제가 있습니다. 관리자에게 키 재등록을 요청해주세요.';
       }
       else if(res.status===429) msg+='무료 사용 한도 초과(분당·일일 한도)이거나 서버 혼잡입니다. 자동 재시도했지만 계속 실패했습니다. 1~2분 후 다시 시도하세요.';
@@ -4886,7 +4901,7 @@ const HELP_CONTENT = {
         <div class="font-extrabold text-[#5A666F] mb-1.5">사용 준비 (관리자가 한 번만)</div>
         <ol class="list-decimal pl-5 text-[12px] space-y-0.5">
           <li>관리자가 <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[#D70051] underline">aistudio.google.com/apikey</a>에서 Gemini API 키 발급 (무료, 결제 등록 불필요)</li>
-          <li>단말기 시스템 → AI 챗봇 탭 → "🔑 공용 키 등록/변경" 클릭</li>
+          <li>단말기 시스템 → AI 챗봇 탭 → "공용 키 등록/변경" 클릭</li>
           <li>키 붙여넣기 → 확인 → 클라우드에 저장</li>
           <li><b>이후 모든 로그인 직원이 자동으로 사용 가능</b> — 개별 키 발급 불필요</li>
         </ol>
@@ -4949,8 +4964,8 @@ const HELP_CONTENT = {
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <div class="font-extrabold text-[#5A666F] mb-1">🔑 AI 챗봇 공용 키 관리 <span class="text-[10px] bg-blue-100 text-blue-700 rounded px-1 font-bold">NEW</span></div>
         <ul class="list-disc pl-5 text-[12px] mt-1">
-          <li>AI 챗봇 탭 → "🔑 공용 키 등록/변경" — 새 키로 교체</li>
-          <li>"🗑 공용 키 삭제" — 키 폐기 (모든 직원 챗봇 즉시 정지)</li>
+          <li>AI 챗봇 탭 → "공용 키 등록/변경" — 새 키로 교체</li>
+          <li>"공용 키 삭제" — 키 폐기 (모든 직원 챗봇 즉시 정지)</li>
           <li>키는 클라우드 한 곳에만 저장되며, 일반 직원에게는 입력 UI 자체가 안 보임</li>
         </ul>
       </div>
