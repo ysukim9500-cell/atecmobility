@@ -386,6 +386,16 @@ html.is-mobile #tj-kpi .kpi .kpi-val{ font-size:24px !important; }
 html.is-mobile footer.ci-foot{ padding:16px 12px !important; }
 html.is-mobile .panel-head{ font-size:14px !important; }
 
+/* ── 모바일 v2: 하단 탭바는 불투명 흰색, 가로 스크롤 없이 한 화면 ── */
+html.is-mobile #tj-tabs{ background:#FFFFFF !important; border-top:1px solid var(--line) !important; box-shadow:0 -6px 16px rgba(17,17,17,.06) !important; }
+html.is-mobile #dim-tabs, html.is-mobile #tj-dim{ display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px !important; overflow:visible !important; flex-wrap:wrap !important; }
+html.is-mobile .dim-btn{ width:100%; justify-content:center; padding:0 6px !important; font-size:12.5px !important; height:36px; }
+html.is-mobile .form-actions{ margin-left:-12px !important; margin-right:-12px !important; background:#fff !important; }
+html.is-mobile input, html.is-mobile select, html.is-mobile textarea, html.is-mobile canvas{ max-width:100%; }
+html.is-mobile .rng-main input[type=date]{ min-width:0 !important; }
+html.is-mobile .panel-head{ flex-wrap:wrap; }
+html.is-mobile .panel-sub{ flex-basis:100%; margin-left:0; }
+
 /* 통전망 전용 보정 */
 #tab-dash > .panel:first-child, #tab-faults > .panel:first-child, #tab-stock > .panel:first-child, #tab-repairs > .panel:first-child, #tab-terminals > .panel:first-child, #tab-equip > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
 #tab-dash > .panel:first-child .panel-head, #tab-faults > .panel:first-child .panel-head, #tab-stock > .panel:first-child .panel-head, #tab-repairs > .panel:first-child .panel-head, #tab-terminals > .panel:first-child .panel-head, #tab-equip > .panel:first-child .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }

@@ -941,12 +941,30 @@ html.force-mobile #stat-cards{ padding:0 12px; }
 html.force-mobile #stat-cards .kpi:first-child{ padding-left:0 !important; }
 html.force-mobile .pcard .p-sc{ margin:-14px 0 -14px 0; }
 html.force-mobile footer.ci-foot{ margin-left:-12px; margin-right:-12px; padding:16px 12px !important; }
+
+/* ── 모바일 v4: 한 화면에 맞추기 ── */
+@media (max-width:767px){
+  html:not(.force-web) #searchwrap{ max-width:100%; min-width:0; }
+  html:not(.force-web) .searchbar{ min-width:0; }
+  html:not(.force-web) .searchbar input{ width:0; min-width:0; flex:1 1 0; }
+  html:not(.force-web) #tabs{ background:#FFFFFF !important; box-shadow:0 -6px 16px rgba(17,17,17,.06) !important; }
+  html:not(.force-web) input, html:not(.force-web) select, html:not(.force-web) textarea, html:not(.force-web) canvas{ max-width:100%; }
+  html:not(.force-web) .hrow, html:not(.force-web) .kv .v, html:not(.force-web) .step .t, html:not(.force-web) .p-err, html:not(.force-web) .evrow, html:not(.force-web) .vmeta{ overflow-wrap:anywhere; }
+  html:not(.force-web) #user-badge{ overflow:visible; }
+}
+html.force-mobile #searchwrap{ max-width:100%; min-width:0; }
+html.force-mobile .searchbar{ min-width:0; }
+html.force-mobile .searchbar input{ width:0; min-width:0; flex:1 1 0; }
+html.force-mobile #tabs{ background:#FFFFFF !important; box-shadow:0 -6px 16px rgba(17,17,17,.06) !important; }
+html.force-mobile input, html.force-mobile select, html.force-mobile textarea, html.force-mobile canvas{ max-width:100%; }
+html.force-mobile .hrow, html.force-mobile .kv .v, html.force-mobile .step .t, html.force-mobile .p-err, html.force-mobile .evrow, html.force-mobile .vmeta{ overflow-wrap:anywhere; }
+html.force-mobile #user-badge{ overflow:visible; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
 
 <!-- ============ CLOUD LOADER (ATEC CI) ============ -->
-<div id="cloud-loader" aria-hidden="true">
+<div id="cloud-loader" class="show" aria-hidden="true">
   <div class="cl-wrap">
     <div class="cl-logo-box">
       <div class="cl-ring"></div>
@@ -967,7 +985,7 @@ html.force-mobile footer.ci-foot{ margin-left:-12px; margin-right:-12px; padding
     </div>
     <div class="cl-title">클라우드에서 데이터를 받아오는 중</div>
     <div class="cl-subtitle">최신 장애접수·이벤트 로그를 불러옵니다</div>
-    <div id="cl-status" class="cl-status">초기화 중…</div>
+    <div id="cl-status" class="cl-status">로그인 확인 중…</div>
     <div class="cl-progress"><div id="cl-progress-bar" class="cl-progress-bar"></div></div>
     <div class="cl-steps">
       <span class="cl-step" data-step="check"><span class="cl-dot"></span> 확인</span>
@@ -1969,6 +1987,7 @@ function fmtCloudTime(iso){
   catch(e){ return iso||''; }
 }
 function afterLoad(usedStore){
+  CLOAD.hide();   // 자료 준비 끝 — 처음부터 떠 있던 로더를 내린다 (클라우드 단계가 이미 내렸으면 그대로)
   renderStatus(); renderDash();
   initDashControls();
   initPreemptControls();
@@ -3041,8 +3060,12 @@ function renderVehicle(vnum, veh){
   try{
     const E=ER(RECO_TERM);
     const rec = topErr && E[topErr];
+    // 조치가 아닌 처리 결과(접수취소·이상없음·미재현 등)는 '권장 조치'에 올리지 않는다
+    const NONACT=/접수s*취소|취소|이상s*없음|정상s*(확인|작동)?$|미재현|재현s*안s*됨|중복|해당s*없음|단순s*문의|문의s*응대|없음$/;
+    const isAct=(h)=>h && !NONACT.test(String(h).replace(/s+/g,' ').trim());
     if(rec && rec.handlings && rec.handlings.length){
-      let pool=rec.handlings.filter(x=>x.n>=5); if(pool.length<2) pool=rec.handlings.slice();
+      const acts=rec.handlings.filter(x=>isAct(x.h));
+      let pool=acts.filter(x=>x.n>=5); if(pool.length<2) pool=acts.slice();
       const byRate=pool.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n);
       const hs=byRate.slice(0,4);
       const best=byRate[0];
@@ -3054,7 +3077,7 @@ function renderVehicle(vnum, veh){
       }).join('');
       basis=`같은 유형 ${num(totN)}건에서 ${byRate.slice(0,3).map(x=>`${x.h} 뒤 재접수 ${x.rate}%`).join(', ')}였습니다.${best&&fieldCount[best.h]?` 이 차량은 ${best.h}을(를) 이미 ${fieldCount[best.h]}회 했습니다.`:''}`;
     } else {
-      const fb=Object.entries(fieldCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
+      const fb=Object.entries(fieldCount).filter(([h])=>isAct(h)).sort((a,b)=>b[1]-a[1]).slice(0,4);
       recoSub='이 차량에 적용한 조치';
       steps=fb.map((x,i)=>`<div class="step"><span class="n">${i+1}</span><div><div class="t">${x[0]}</div><div class="s">${x[1]}회 적용</div></div></div>`).join('') || `<div class="step"><span class="n">–</span><div class="t" style="color:var(--atec-gray)">권장할 조치 통계가 없습니다.</div></div>`;
       basis='';
