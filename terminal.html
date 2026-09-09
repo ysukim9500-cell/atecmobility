@@ -612,7 +612,7 @@ body{ font-size:15px; line-height:1.55; }
 .trow .r{ text-align:right; }
 
 /* ── 차량 검색 결과: 판정 · 권장 조치 · 분포 세 칸 + 접수 이력 표 ── */
-.vgrid{ display:grid; grid-template-columns:420px minmax(0,1fr) 360px; }
+.vgrid{ display:grid; grid-template-columns:420px minmax(0,1fr); }
 .vcol{ padding:26px 32px 24px; border-right:1px solid var(--line); min-width:0; display:flex; flex-direction:column; gap:22px; }
 .vcol:first-child{ padding-left:0; }
 .vcol:last-child{ border-right:0; padding-right:0; gap:26px; }
@@ -3317,10 +3317,6 @@ function renderVehicleNoFault(vnum, m){
         </div>
       </div>
       <div class="vcol">
-        <div class="hd"><h3 class="h">권장 현장 조치</h3><span class="sub">접수 이력 없음</span></div>
-        <div class="steps"><div class="step"><span class="n">1</span><div><div class="t">단말기 로그 백업을 올려 상태를 확인합니다.</div><div class="s">통합단말기와 승하차단말기 백업을 함께 올리면 원인을 격리합니다.</div></div></div></div>
-      </div>
-      <div class="vcol">
         <div class="eta-sec">
           <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
           <div class="lst"><div style="padding:10px 0" id="eta-box-nf" class="eta-box">${m.ct==='인천센터'?'인천 노선은 미지원':'—'}</div></div>
@@ -3606,14 +3602,6 @@ function renderVehicle(vnum, veh){
         </div>
       </div>
 
-      <!-- 권장 조치 -->
-      <div class="vcol">
-        <div class="hd"><h3 class="h">권장 현장 조치</h3><span class="sub">${recoSub}</span></div>
-        <div class="steps">${steps}</div>
-        ${basis?`<div><div style="font-size:13px;font-weight:500;color:var(--atec-ink)">이 조치를 권하는 근거</div><div class="sub" style="line-height:1.6;margin-top:6px">${basis}</div></div>`:''}
-        ${smartBlock}
-      </div>
-
       <!-- 분포 · 당일 이벤트 · 차고지 -->
       <div class="vcol">
         <div>
@@ -3640,7 +3628,7 @@ function renderVehicle(vnum, veh){
         <h3 class="h">접수 이력 <span class="sub">최신순 · <span id="tl-count">${items.length}</span>건</span></h3>
         <div class="flex flex-wrap items-center gap-1.5">${recvFilterChips(items)}</div>
       </div>
-      <div class="hrow head"><span>날짜</span><span>접수</span><span>장애 · 문의</span><span>처리 내용</span><span>처리자</span></div>
+      <div class="hrow head"><span>날짜</span><span>접수</span><span>증상 → 조치</span><span>처리 내용</span><span>처리자</span></div>
       <div id="tl-body">
         ${[...items].reverse().map(renderTL).join('')}
       </div>
@@ -3754,18 +3742,16 @@ function renderTL(it){
       <div class="mh-top"><span class="d">${it.date}</span><span class="who">${it.worker||''}</span></div>
       <div class="mh-chips"><span class="chip ln">${it.recv||'-'}</span>${it.repro?`<span class="chip ln ${it.repro==='재현'?'red':''}">${it.repro}</span>`:''}</div>
       <div class="mh-title"><b>${it.err||'(유형미상)'}</b>${it.field?` <span class="arr">→</span> ${it.field}`:''}</div>
-      ${more('inq', it.inquiry?escHtml(it.inquiry):'', '문의')}
       ${more('memo', it.memo?highlightMemo(it.memo):'', '처리')}
     </div>`;
   }
   // 접수 이력 한 줄: 날짜 · 접수 · 장애→조치(문의) · 처리내용 · 처리자
   const chips = `<span class="chip ln">${it.recv||'-'}</span>${it.repro?`<span class="chip ln ${it.repro==='재현'?'red':''}" style="margin-top:4px">${it.repro}</span>`:''}`;
-  const inquiry = it.inquiry? `<div class="inq">${escHtml(it.inquiry)}</div>`:'';
   const memo = it.memo? `<div class="memo">${highlightMemo(it.memo)}</div>`:'<span class="memo">-</span>';
   return `<div class="hrow">
     <span class="d">${it.date}</span>
     <span style="display:flex;flex-direction:column;align-items:flex-start">${chips}</span>
-    <span class="err"><b>${it.err||'(유형미상)'}</b>${it.field?` <span class="arr">→</span> ${it.field}`:''}${inquiry}</span>
+    <span class="err"><b>${it.err||'(유형미상)'}</b>${it.field?` <span class="arr">→</span> ${it.field}`:''}</span>
     ${memo}
     <span class="who">${it.worker||'-'}</span>
   </div>`;

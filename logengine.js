@@ -86,11 +86,12 @@ function verifyVehicle(vnum, vehicleId){
   return {checked:true, match:match, plateDigits:pd, vehicleId:vid};
 }
 function vehicleMatchBanner(vnum, vehicleId, kind){
+  if(typeof __lg4Css==='function') __lg4Css();
   var v=verifyVehicle(vnum, vehicleId);
   if(!v.checked) return '';
   var lbl = kind ? logEsc(kind)+' 백업 ' : '';   // "통합단말기 백업" / "승하차단말기 백업"
-  if(v.match) return '<div class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 mb-2">✅ <b>'+lbl+'차량 일치 확인</b> — 조회 차량('+logEsc(vnum)+')과 일치합니다.</div>';
-  return '<div class="text-[12px] font-bold text-[#B91C1C] bg-rose-50 border-2 border-rose-300 rounded-lg px-3 py-2 mb-2">⚠ <b>'+lbl+'차량 불일치 주의</b> — 조회한 차량은 <b>'+logEsc(vnum)+'</b>인데 이 '+(kind?logEsc(kind)+' ':'')+'백업의 차량ID는 <b>'+logEsc(vehicleId)+'</b>(끝 '+logEsc(v.vehicleId.slice(-6))+')로 <b>다른 차량</b>입니다. <b>'+(kind?logEsc(kind)+' ':'')+'백업 파일을 다시 확인하세요.</b></div>';
+  if(v.match) return '<div class="lg4 lg4-match"><b>'+lbl+'차량 일치 확인</b> — 조회 차량('+logEsc(vnum)+')과 일치합니다.</div>';
+  return '<div class="lg4 lg4-match bad"><b>'+lbl+'차량 불일치 주의</b> — 조회한 차량은 <b>'+logEsc(vnum)+'</b>인데 이 '+(kind?logEsc(kind)+' ':'')+'백업의 차량ID는 <b>'+logEsc(vehicleId)+'</b>(끝 '+logEsc(v.vehicleId.slice(-6))+')로 <b>다른 차량</b>입니다. <b>'+(kind?logEsc(kind)+' ':'')+'백업 파일을 다시 확인하세요.</b></div>';
 }
 
 /* ===== 파서 ===== */
@@ -639,7 +640,7 @@ function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, mod
   const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad)+renderModuleLinks(moduleDiag);
   if(!dg.findings.length && !extra){
     box.innerHTML=head+'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 통신 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">로그상 승하차·표출기·모뎀 등 통신 이상이 잡히지 않았습니다(정상 범위).</div></div>'
-      +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="w-full text-[12px] font-bold text-white rounded-lg py-2 mt-2 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">🤖 로그+이력+S/N 종합 AI 분석</button>'
+      +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
       +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
     showActionCard(vnum, vid, null);
     if(dg.sn&&dg.sn!=='단말기') loadSnHistory(dg.sn,'logbk-snhist');
@@ -668,7 +669,7 @@ function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, mod
       +parts+'</div>';
   }
   box.innerHTML=head+(dg.findings.length?'':'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-[12px] text-emerald-700 mb-2">🟢 통신 이벤트는 정상 범위입니다 — 아래 부팅/전원·GPS 항목을 확인하세요.</div>')+rows+extra
-    +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="w-full text-[12px] font-bold text-white rounded-lg py-2 mt-1 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">🤖 로그+이력+S/N 종합 AI 분석</button>'
+    +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
     +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
   showActionCard(vnum, vid, dg.findings[0]);
   if(dg.sn&&dg.sn!=='단말기') loadSnHistory(dg.sn,'logbk-snhist');
@@ -679,11 +680,11 @@ function showActionCard(vnum, vid, topFinding){
   const card=document.getElementById('logbk-action'); if(!card) return;
   const preErr = topFinding ? (GROUP_TO_ERRTYPE[topFinding.group]||"기타") : "";
   card.style.display='';
-  card.innerHTML='<h3 class="text-xs font-extrabold text-[#7A0B3C] mb-2">📝 처리 기록 (재불량 추적용 누적)</h3>'
+  card.innerHTML='<h3 class="text-xs font-extrabold text-[#111111] mb-2">처리 기록 (재불량 추적용 누적)</h3>'
     +'<div class="space-y-2">'
     + comboHtml('logbk-err','오류유형', preErr)
     + comboHtml('logbk-act','처리유형(어떤 조치를 했나요)', '')
-    +'<button onclick="saveLogDiagnosis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="w-full text-[13px] font-bold text-white rounded-lg py-2" style="background:var(--atec-magenta)">💾 진단·처리 저장</button>'
+    +'<button onclick="saveLogDiagnosis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="w-full text-[13px] font-bold text-white rounded-lg py-2" style="background:var(--atec-magenta)">진단·처리 저장</button>'
     +'<div id="logbk-save-msg" class="text-[11px] text-center min-h-[16px]"></div>'
     +'</div>';
   setupCombo('logbk-err', ERROR_TYPES);
@@ -694,8 +695,8 @@ function showActionCard(vnum, vid, topFinding){
 function comboHtml(id, label, val){
   return '<div class="relative">'
     +'<label class="text-[11px] font-semibold text-slate-500">'+logEsc(label)+'</label>'
-    +'<input id="'+id+'" type="text" autocomplete="off" value="'+logEsc(val||'')+'" placeholder="입력 또는 선택 (한 글자만 쳐도 검색)" class="w-full mt-0.5 text-[12px] border border-rose-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#C2185B]">'
-    +'<div id="'+id+'-list" class="hidden absolute z-30 left-0 right-0 mt-0.5 bg-white border border-rose-200 rounded-lg shadow-lg max-h-44 overflow-y-auto"></div>'
+    +'<input id="'+id+'" type="text" autocomplete="off" value="'+logEsc(val||'')+'" placeholder="입력 또는 선택 (한 글자만 쳐도 검색)" class="w-full mt-0.5 text-[12px] border border-[#D9D9D9] rounded-lg px-2.5 py-1.5 outline-none focus:border-[#D70051]">'
+    +'<div id="'+id+'-list" class="hidden absolute z-30 left-0 right-0 mt-0.5 bg-white border border-[#D9D9D9] rounded-lg shadow-lg max-h-44 overflow-y-auto"></div>'
     +'</div>';
 }
 function logChosung(str){
@@ -896,7 +897,7 @@ async function loadSnHistory(sn, elId){
     const r=await fetch(url,{headers:logSbHeaders()});
     if(!r.ok) return;
     const rows=await r.json();
-    if(!rows.length){ box.innerHTML='<div class="text-[11px] text-slate-400">🔧 이 단말기(S/N '+logEsc(sn)+') 과거 이력 없음.</div>'; return; }
+    if(!rows.length){ box.innerHTML='<div class="text-[11px] text-slate-400">이 단말기(S/N '+logEsc(sn)+') 과거 이력 없음.</div>'; return; }
     const cur=(window.__lastDiag&&window.__lastDiag.findings&&window.__lastDiag.findings[0])?window.__lastDiag.findings[0].group:'';
     const repeated=cur && rows.some(function(x){ return (x.faults||[]).some(function(f){ return f.group===cur; }); });
     let tl='';
@@ -907,7 +908,7 @@ async function loadSnHistory(sn, elId){
         +'<div class="text-[10px] text-slate-500">조치: '+logEsc(x.action_type||'-')+'</div></div></div>';
     }
     box.innerHTML='<div class="bg-indigo-50/60 border border-indigo-100 rounded-lg p-3">'
-      +'<div class="text-[12px] font-extrabold text-[#3730A3] mb-1">🔧 이 단말기(S/N '+logEsc(sn)+') 과거 이력 '+rows.length+'건</div>'
+      +'<div class="text-[12px] font-extrabold text-[#3730A3] mb-1">이 단말기(S/N '+logEsc(sn)+') 과거 이력 '+rows.length+'건</div>'
       +(repeated?'<div class="text-[11px] text-[#B91C1C] font-bold mb-1">⚠ 전에도 같은 장애가 있었습니다 — 수리 미흡 가능성, 점검 강화 권장</div>':'')
       +tl+'</div>';
   }catch(e){}
@@ -922,12 +923,12 @@ async function aiLogAnalysis(vnum, vid){
   // 공용 키 확보: 메모리 캐시에 없으면(=AI 탭 미방문) 클라우드에서 직접 로드
   let aikey = (typeof getAIKey==='function') ? getAIKey() : '';
   if(!aikey && typeof fetchPublicAIKey==='function'){
-    out.innerHTML='<span class="text-[12px] text-slate-500">🔑 AI 공용 키 확인 중…</span>';
+    out.innerHTML='<span class="text-[12px] text-slate-500">AI 공용 키 확인 중…</span>';
     try{ aikey = await fetchPublicAIKey(); }catch(e){ aikey=''; }
     if(aikey){ if(typeof setAIKey==='function') setAIKey(aikey); else { try{ AI_KEY_CACHE=aikey; }catch(e){} } }
   }
   if(!aikey){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 공용 키가 설정되지 않았습니다(관리자에게 등록 요청).</span>'; return; }
-  out.innerHTML='<span class="text-[12px] text-slate-500">🤖 로그·이력·S/N 종합 분석 중…</span>';
+  out.innerHTML='<span class="text-[12px] text-slate-500">로그·이력·S/N 종합 분석 중…</span>';
   try{
     const d=window.__lastDiag||{};
     let ctx='[현재 로그 진단]\n차량 '+vnum+' / '+(d.model||'')+' S/N '+(d.sn||'')+' / 진단일 '+(d.analyzedAt||'')+'\n';
@@ -985,9 +986,9 @@ async function aiLogAnalysis(vnum, vid){
     // AI가 혹시 넣은 말미 면책문구(또는 잘린 조각) 제거 → 면책은 코드에서 고정 추가(절대 안 잘림)
     ans=ans.replace(/\n*\s*[⚠※]?\s*\(?주의\)?\s*[:\-—]*\s*AI[\s\S]*$/,'').replace(/\n*\s*[⚠※][\s\S]*기사님[\s\S]*$/,'').trim();
     const html=logEsc(ans).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
-    const trunc=truncated?'<div class="text-[10px] text-slate-400 mt-1">(응답이 길어 일부 생략 — 핵심만 표시)</div>':'';
-    const footer='<div class="text-[11px] font-semibold text-amber-700 mt-2 pt-2" style="border-top:1px dashed #c7d2fe">⚠ AI 추정입니다 — 최종 판단은 기사님이 현장 확인 후 결정하세요.</div>';
-    out.innerHTML='<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12.5px] text-slate-700 leading-relaxed"><div class="text-[11px] font-bold text-blue-700 mb-1">🤖 AI 종합 분석</div>'+html+trunc+footer+'</div>';
+    const trunc=truncated?'<div style="font-size:10.5px;color:var(--gray,#5A666F);margin-top:4px">(응답이 길어 일부 생략 — 핵심만 표시)</div>':'';
+    const footer='<div style="font-size:11px;color:var(--gray,#5A666F);margin-top:10px;padding-top:8px;border-top:1px solid var(--line,#D9D9D9)">AI 추정입니다 — 최종 판단은 기사님이 현장 확인 후 결정하세요.</div>';
+    out.innerHTML='<div class="lg4" style="background:var(--tint,#F6F6F7);border-left:3px solid var(--ink,#111111);padding:12px 14px;font-size:12.5px;color:var(--ink,#111111);line-height:1.6"><div style="font-size:11px;font-weight:700;color:var(--gray,#5A666F);margin-bottom:4px">AI 종합 분석</div>'+html+trunc+footer+'</div>';
   }catch(e){ out.innerHTML='<span class="text-[12px] text-rose-600">AI 분석 오류: '+logEsc(e.message||e)+'</span>'; }
 }
 
@@ -1048,7 +1049,7 @@ function snCardHtml(sn, rows){
   const acts=Object.keys(actCnt).sort(function(a,b){return actCnt[b]-actCnt[a];});
 
   let h='<div class="border border-rose-100 rounded-xl p-4" style="background:#fff7fa">';
-  h+='<div class="flex items-center gap-2 flex-wrap mb-1"><span class="text-xl font-extrabold text-[#7A0B3C]">S/N '+logEsc(sn)+'</span><span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#7C3AED">'+model+'</span>';
+  h+='<div class="flex items-center gap-2 flex-wrap mb-1"><span class="text-xl font-extrabold text-[#7A0B3C]">S/N '+logEsc(sn)+'</span><span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#111111">'+model+'</span>';
   if(recur>0) h+='<span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#B91C1C">재불량 '+recur+'회</span>';
   if(nVeh>1) h+='<span class="text-[11px] font-bold text-white rounded px-2 py-0.5" style="background:#0891B2">이설 '+(nVeh-1)+'회</span>';
   h+='</div>';
@@ -1101,7 +1102,7 @@ async function loadBadTerminals(){
   for(let i=0;i<top.length;i++){ const t=top[i]; const col=t.recur>=3?'#B91C1C':t.recur>=1?'#D81B60':'#64748b';
     h+='<button onclick="snPick(\''+(''+t.sn).replace(/\x27/g,"\\\x27")+'\')" class="text-left bg-white border border-rose-100 rounded-lg px-3 py-2 hover:bg-rose-50 transition flex items-center gap-2">'
       +'<span class="text-[12px] font-extrabold text-slate-400 w-5">'+(i+1)+'</span>'
-      +'<div class="flex-1 min-w-0"><div class="text-[13px] font-bold text-slate-800">S/N '+logEsc(t.sn)+' <span class="text-[10px] font-bold text-white rounded px-1" style="background:#7C3AED">'+t.model+'</span></div>'
+      +'<div class="flex-1 min-w-0"><div class="text-[13px] font-bold text-slate-800">S/N '+logEsc(t.sn)+' <span class="text-[10px] font-bold text-white rounded px-1" style="background:#111111">'+t.model+'</span></div>'
       +'<div class="text-[11px] text-slate-500">진단 '+t.n+'건 · 장착 '+t.nVeh+'대'+(t.last?' · 최근 '+t.last:'')+'</div></div>'
       +'<span class="text-[11px] font-bold text-white rounded-md px-2 py-1 shrink-0" style="background:'+col+'">재불량 '+t.recur+'</span>'
       +'</button>';
@@ -1195,78 +1196,83 @@ function __v3Icon(f){
   if(c==='EVT_GROUP'){ if(n.indexOf('승하차')>=0) return '🚏'; if(n.indexOf('표출기')>=0) return '🖥️'; if(n.indexOf('전원')>=0) return '🔌'; if(n.indexOf('GPS')>=0) return '🛰️'; return '📋'; }
   return '🔧';
 }
-/* ── 종합 판정 배너 ── */
+/* ── v4 표시: 사이트 CI(레드·그레이·잉크) 문법 · 가장 위험한 항목 하나만 크게, 나머지는 접어 둠 ── */
+var __LG4_CSS='.lg4{--lg-red:var(--red,#D70051);--lg-gold:var(--atec-gold,#8C6D2F);--lg-ink:var(--ink,#111111);--lg-gray:var(--gray,#5A666F);--lg-line:var(--line,#D9D9D9);--lg-tint:var(--tint,#F6F6F7);--lg-rose:var(--rose,#FBF1F4);--lg-sev:var(--lg-gray);word-break:keep-all}'
++'.lg4.core{--lg-sev:var(--lg-red)}.lg4.warn{--lg-sev:var(--lg-gold)}.lg4.ok{--lg-sev:var(--lg-gray)}.lg4.nodata{--lg-sev:#9AA3AA}'
++'.lg4-match{font-size:12px;color:var(--lg-gray);background:var(--lg-tint);border-left:3px solid var(--lg-gray);padding:8px 12px;margin-bottom:10px;line-height:1.5}'
++'.lg4-match.bad{color:var(--lg-red);background:var(--lg-rose);border-left-color:var(--lg-red);font-weight:700}'
++'.lg4-banner{background:#fff;border:1px solid var(--lg-line);border-top:3px solid var(--lg-sev);padding:14px 16px 16px;margin-bottom:10px}'
++'.lg4-lbl{font-size:11px;color:var(--lg-gray);font-weight:600;letter-spacing:.2px}.lg4-lbl b{color:var(--lg-sev);font-weight:700}'
++'.lg4-head{font-size:19px;font-weight:700;color:var(--lg-ink);line-height:1.3;margin-top:4px;letter-spacing:-.01em}'
++'.lg4-sub{font-size:12.5px;color:var(--lg-gray);margin-top:6px;line-height:1.55}.lg4-sub ul{margin:0;padding-left:16px}.lg4-sub li{margin-top:2px}'
++'.lg4-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.lg4-tag{font-size:11px;color:var(--lg-gray);border:1px solid var(--lg-line);background:#fff;padding:2px 8px;line-height:1.5}'
++'.lg4-now{margin-top:14px;background:var(--lg-tint);border-left:3px solid var(--lg-sev);padding:10px 12px;font-size:14px;font-weight:700;color:var(--lg-ink);line-height:1.5}.lg4-now b{display:block;font-size:11px;color:var(--lg-sev);font-weight:700;margin-bottom:2px}'
++'.lg4-k{font-size:11px;color:var(--lg-gray);font-weight:700;margin-top:14px}'
++'.lg4-evi{margin-top:6px;border-top:1px solid var(--lg-line);padding-top:6px}.lg4-evi-i{font-size:12.5px;color:var(--lg-ink);line-height:1.65;display:flex;gap:8px}.lg4-evi-i:before{content:"";flex:none;width:4px;height:4px;background:var(--lg-sev);margin-top:9px}.lg4-evi-s{font-size:10.5px;color:var(--lg-gray);margin-top:4px}'
++'.lg4-step{display:flex;gap:8px;align-items:flex-start;margin-top:6px}.lg4-n{flex:none;width:20px;height:20px;background:var(--lg-tint);color:var(--lg-gray);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}.lg4-step.first .lg4-n{background:var(--lg-ink);color:#fff}'
++'.lg4-st{font-size:12.5px;color:var(--lg-ink);line-height:1.6}.lg4-step.first .lg4-st{font-weight:700}'
++'.lg4-parts{margin-top:12px;font-size:11px;color:var(--lg-gray);display:flex;gap:4px;flex-wrap:wrap;align-items:center}.lg4-part{background:var(--lg-rose);color:var(--lg-red);padding:2px 8px;font-size:11px;font-weight:600;line-height:1.5}'
++'.lg4-note{font-size:11.5px;color:var(--lg-gold);margin-top:8px;line-height:1.5}'
++'.lg4-more{border:1px solid var(--lg-line);background:#fff;margin-bottom:10px}.lg4-more summary{list-style:none;cursor:pointer;padding:9px 14px;font-size:12px;color:var(--lg-gray);display:flex;justify-content:space-between;align-items:center}.lg4-more summary::-webkit-details-marker{display:none}.lg4-more summary:after{content:"펼치기";font-size:11px}.lg4-more[open] summary:after{content:"접기"}'
++'.lg4-row{padding:9px 14px;border-top:1px solid var(--lg-line);font-size:12.5px;color:var(--lg-ink);line-height:1.55}.lg4-row .lg4-sev{margin-right:6px}.lg4-row small{display:block;color:var(--lg-gray);font-size:11.5px;margin-top:2px}'
++'.lg4-sev{font-size:10.5px;font-weight:700;color:#fff;background:var(--lg-sev);padding:1px 7px;line-height:1.6}.lg4-row.core .lg4-sev{background:var(--lg-red)}.lg4-row.warn .lg4-sev{background:var(--lg-gold)}'
++'.lg4-ai{display:block;width:100%;background:var(--lg-ink);color:#fff;font-size:13px;font-weight:700;padding:11px 12px;margin-top:6px;border:0;border-radius:0;text-align:center;cursor:pointer}.lg4-ai:active{opacity:.85}';
+function __lg4Css(){ if(document.getElementById('lg4-css')) return; var st=document.createElement('style'); st.id='lg4-css'; st.textContent=__LG4_CSS; document.head.appendChild(st); }
+function __lg4Parts(arr, label){ if(!arr||!arr.length) return ''; return '<div class="lg4-parts"><span>'+(label||'준비 부품')+'</span>'+arr.map(function(p){return '<span class="lg4-part">'+__v3Esc(p)+'</span>';}).join('')+'</div>'; }
+function __lg4Top(r){ var F=r.findings||[]; if(!F.length) return null; var s=r.summary||{}; var t=null; if(s.topName) t=F.filter(function(f){return f.name===s.topName;})[0]; if(!t) t=F.filter(function(f){return f.severity==='core';})[0]; return t||F[0]; }
+/* ── 종합 판정 배너: 판정 → 지금 바로 → 근거 → 점검 순서 → 준비 부품 ── */
 function __v3Banner(r, vnum){
-  var s=r.summary||{}, sev=r.severity;
-  var TH={ core:{bg:'linear-gradient(135deg,#7F1D1D,#B91C1C)',lamp:'🔴',label:'핵심 장애'},
-           warn:{bg:'linear-gradient(135deg,#92400E,#D97706)',lamp:'🟡',label:'점검 필요'},
-           ok:{bg:'linear-gradient(135deg,#065F46,#16A34A)',lamp:'🟢',label:'정상'},
-           nodata:{bg:'linear-gradient(135deg,#374151,#6B7280)',lamp:'⚪',label:'판독 불가'} }[sev];
+  __lg4Css();
+  var s=r.summary||{}, sev=r.severity, top=__lg4Top(r);
+  var TH={ core:{label:'핵심 장애'}, warn:{label:'점검 필요'}, ok:{label:'정상'}, nodata:{label:'판독 불가'} }[sev]||{label:'판정'};
   var banner=(typeof vehicleMatchBanner==='function')?vehicleMatchBanner(vnum, r.vehicleId, '단말기'):'';
-  var h=banner+'<div style="background:'+TH.bg+';border-radius:14px;padding:14px 16px;color:#fff;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,.15)">';
-  h+='<div style="display:flex;align-items:center;gap:12px">'
-    +'<div style="font-size:34px;line-height:1">'+TH.lamp+'</div>'
-    +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:11px;opacity:.85;font-weight:700;letter-spacing:.5px">종합 판정 · '+TH.label+(s.counts?(' (핵심 '+s.counts.core+'·주의 '+s.counts.warn+')'):'')+'</div>'
-      +'<div style="font-size:16px;font-weight:800;margin-top:2px">'+__v3Esc(s.headline||'')+'</div>'
-      +'<div style="font-size:12px;opacity:.92;margin-top:3px">'+__v3Esc(s.sub||'')+'</div>'
-    +'</div></div>';
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:11px">'
-    +'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">'+__v3Esc(r.model||'-')+(r.sn?' · '+__v3Esc(r.sn):'')+'</span>'
-    +(r.vehicleId?'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">차량 '+__v3Esc(r.vehicleId)+'</span>':'')
-    +(r.swOk?'<span style="background:rgba(255,255,255,.16);border-radius:8px;padding:3px 9px">OS 최신 — SW 재설치 불필요</span>':'')
+  var h=banner+'<div class="lg4 lg4-banner '+__v3Esc(sev||'')+'">';
+  h+='<div class="lg4-lbl">종합 판정 · <b>'+TH.label+'</b>'+(s.counts?(' · 핵심 '+s.counts.core+' · 주의 '+s.counts.warn):'')+'</div>'
+    +'<div class="lg4-head">'+__v3Esc(s.headline||'')+'</div>'
+    +(s.sub?'<div class="lg4-sub">'+__v3Esc(s.sub)+'</div>':'');
+  h+='<div class="lg4-tags">'
+    +'<span class="lg4-tag">'+__v3Esc(r.model||'-')+(r.sn?' · '+__v3Esc(r.sn):'')+'</span>'
+    +(r.vehicleId?'<span class="lg4-tag">차량 '+__v3Esc(r.vehicleId)+'</span>':'')
+    +(r.swOk?'<span class="lg4-tag">OS 최신 · SW 재설치 불필요</span>':'')
     +'</div>';
-  if(s.firstStep) h+='<div style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 12px;margin-top:10px;font-size:13px"><b>👉 지금 바로:</b> '+__v3Esc(s.firstStep)+'</div>';
-  if(s.parts&&s.parts.length) h+='<div style="margin-top:8px;font-size:12px"><b>🎒 준비 부품:</b> '+s.parts.map(__v3Esc).join(' · ')+'</div>';
+  if(s.firstStep) h+='<div class="lg4-now"><b>지금 바로</b>'+__v3Esc(s.firstStep)+'</div>';
+  if(top){
+    if(top.evidence) h+='<div class="lg4-k">근거 · 로그 수치'+(top.confidence==='high'&&top.sources?' · 교차확인 '+top.sources.length+'곳':'')+'</div><div class="lg4-evi">'
+      +String(top.evidence).split(' · ').map(function(x){return '<div class="lg4-evi-i"><span>'+__v3Esc(x)+'</span></div>';}).join('')
+      +((top.sources&&top.sources.length)?'<div class="lg4-evi-s">근거 출처 '+__v3Esc(top.sources.join(', '))+'</div>':'')+'</div>';
+    var steps=String(top.action||'').split(' → ').filter(Boolean);
+    if(steps.length>1) h+='<div class="lg4-k">점검 순서</div>'+steps.map(function(st,i){ return '<div class="lg4-step'+(i===0?' first':'')+'"><span class="lg4-n">'+(i+1)+'</span><span class="lg4-st">'+__v3Esc(st)+'</span></div>'; }).join('');
+    h+=__lg4Parts((top.parts&&top.parts.length)?top.parts:s.parts);
+    if(top.note) h+='<div class="lg4-note">※ '+__v3Esc(top.note)+'</div>';
+  } else h+=__lg4Parts(s.parts);
   h+='</div>';
   return h;
 }
-/* ── 개별 판정 카드 ── */
+/* ── 나머지 신호: 한 줄씩 접어 둠 ── */
 function __v3CardHtml(r, vnum){
   var h=__v3Banner(r, vnum);
   if(r.severity==='nodata' || !r.findings.length) return h;
-  r.findings.forEach(function(f,idx){
-    var core=(f.severity==='core');
-    var col=core?'#B91C1C':'#B45309';
-    var steps=String(f.action||'').split(' → ');
-    var stepHtml=steps.map(function(st,i){
-      return '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:'+(i?'5px':'0')+'">'
-        +'<span style="min-width:20px;height:20px;border-radius:50%;background:'+(i===0?col:'#E5E7EB')+';color:'+(i===0?'#fff':'#374151')+';font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">'+(i+1)+'</span>'
-        +'<span style="font-size:12.5px;color:#1F2937;'+(i===0?'font-weight:700':'')+'">'+__v3Esc(st)+'</span></div>';
-    }).join('');
-    var evid=String(f.evidence||'').split(' · ').map(function(x){return '<li>'+__v3Esc(x)+'</li>';}).join('');
-    h+='<div style="background:#fff;border:1px solid '+(core?'#FECACA':'#FDE68A')+';border-left:5px solid '+col+';border-radius:12px;padding:12px 14px;margin-bottom:8px">'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<span style="font-size:20px">'+__v3Icon(f)+'</span>'
-        +'<div style="flex:1"><span style="font-size:13.5px;font-weight:800;color:'+col+'">['+(core?'핵심':'주의')+'] '+__v3Esc(f.name)+'</span>'
-        +(f.confidence==='high'?' <span style="font-size:10px;background:#DBEAFE;color:#1E40AF;border-radius:6px;padding:1px 7px;font-weight:700">교차확인 '+f.sources.length+'곳</span>':'')
-        +'</div></div>'
-      +(f.plain?'<div style="font-size:12.5px;color:#374151;margin-top:6px;background:'+(core?'#FEF2F2':'#FFFBEB')+';border-radius:8px;padding:8px 10px">'+__v3Esc(f.plain)+'</div>':'')
-      +(f.evidence?'<div style="background:#F1F6FE;border-left:3px solid #3B82F6;border-radius:0 6px 6px 0;padding:7px 10px;margin-top:8px">'
-        +'<div style="font-size:11px;color:#1D4ED8;font-weight:700;margin-bottom:2px">📊 판단 근거 (로그 수치)</div>'
-        +String(f.evidence).split(' · ').map(function(x){return '<div style="font-size:12px;color:#1F2937;line-height:1.6">· '+__v3Esc(x)+'</div>';}).join('')
-        +((f.sources&&f.sources.length)?'<div style="font-size:10.5px;color:#6B7280;margin-top:3px">근거 출처: '+__v3Esc(f.sources.join(', '))+'</div>':'')
-        +'</div>':'')
-      +'<div style="font-size:11px;color:#6B7280;margin-top:9px;font-weight:700">✅ 점검 순서</div>'
-      +'<div style="margin-top:5px">'+stepHtml+'</div>'
-      +(f.parts&&f.parts.length?'<div style="margin-top:8px;font-size:11px;color:#6B7280">점검 부품: '+f.parts.map(function(p){return '<span style="background:#FEE2E2;color:#B91C1C;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;margin-right:3px">'+__v3Esc(p)+'</span>';}).join('')+'</div>':'')
-      +(f.note?'<div style="font-size:11px;color:#92400E;margin-top:7px">⚠ '+__v3Esc(f.note)+'</div>':'')
-      +'</div>';
+  var top=__lg4Top(r), rest=r.findings.filter(function(f){return f!==top;});
+  if(!rest.length) return h;
+  h+='<details class="lg4 lg4-more"><summary>그 밖의 신호 '+rest.length+'건 (참고)</summary>';
+  rest.forEach(function(f){
+    var core=(f.severity==='core'), first=String(f.action||'').split(' → ')[0]||'';
+    h+='<div class="lg4-row '+(core?'core':'warn')+'"><span class="lg4-sev">'+(core?'핵심':'주의')+'</span>'+__v3Esc(f.name)
+      +(f.evidence?'<small>근거 '+__v3Esc(String(f.evidence).split(' · ')[0])+(first?' · 조치 '+__v3Esc(first):'')+'</small>':'')+'</div>';
   });
+  h+='</details>';
   return h;
 }
 
 function __v3IsoCard(iso){
-  var TH={core:{bg:'linear-gradient(135deg,#4C1D95,#7C3AED)',lamp:'🔗'},
-          warn:{bg:'linear-gradient(135deg,#5B21B6,#8B5CF6)',lamp:'🔗'},
-          ok:{bg:'linear-gradient(135deg,#065F46,#16A34A)',lamp:'🔗'}}[iso.severity]||{bg:'linear-gradient(135deg,#4C1D95,#7C3AED)',lamp:'🔗'};
-  var h='<div style="background:'+TH.bg+';border-radius:14px;padding:14px 16px;color:#fff;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,.18)">';
-  h+='<div style="font-size:11px;opacity:.85;font-weight:700;letter-spacing:.5px">'+TH.lamp+' 원인 격리 판정 — 통합+승하차 교차 분석'+(iso.confidence==='high'?' · 교차확증됨':'')+'</div>';
-  h+='<div style="font-size:17px;font-weight:800;margin-top:3px">'+__v3Esc(iso.verdict)+'</div>';
-  h+='<ul style="font-size:12px;opacity:.94;margin:7px 0 0;padding-left:17px">'
-    +iso.reasons.map(function(r){return '<li style="margin-top:2px">'+__v3Esc(r)+'</li>';}).join('')+'</ul>';
-  if(iso.action) h+='<div style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 12px;margin-top:10px;font-size:13px"><b>👉 점검:</b> '+__v3Esc(iso.action)+'</div>';
-  if(iso.parts&&iso.parts.length) h+='<div style="margin-top:8px;font-size:12px"><b>🎒 준비 부품:</b> '+iso.parts.map(__v3Esc).join(' · ')+'</div>';
+  __lg4Css();
+  var sev=({core:'core',warn:'warn',ok:'ok'})[iso.severity]||'core';
+  var h='<div class="lg4 lg4-banner '+sev+'">';
+  h+='<div class="lg4-lbl">원인 격리 판정 · <b>통합 + 승하차 교차 분석</b>'+(iso.confidence==='high'?' · 교차확증됨':'')+'</div>';
+  h+='<div class="lg4-head">'+__v3Esc(iso.verdict)+'</div>';
+  h+='<div class="lg4-sub"><ul>'+iso.reasons.map(function(r){return '<li>'+__v3Esc(r)+'</li>';}).join('')+'</ul></div>';
+  if(iso.action) h+='<div class="lg4-now"><b>점검</b>'+__v3Esc(iso.action)+'</div>';
+  h+=__lg4Parts(iso.parts);
   h+='</div>';
   return h;
 }
@@ -1301,7 +1307,7 @@ async function runV3Overlay(vnum, vid){
     }
   }catch(e){}
   var vnE=(''+(vnum||'')).replace(/'/g,"\\'"), vidE=(''+(vid||'')).replace(/'/g,"\\'");
-  html+='<button onclick="aiLogAnalysis(\''+vnE+'\',\''+vidE+'\')" class="w-full text-[12px] font-bold text-white rounded-lg py-2 mt-1 hover:brightness-110 active:scale-95 transition" style="background:linear-gradient(135deg,#2563EB,#1D4ED8)">🤖 로그+이력+S/N 종합 AI 분석</button>'
+  html+='<button onclick="aiLogAnalysis(\''+vnE+'\',\''+vidE+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
     +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
   box.innerHTML=html;
   var isoBox=document.getElementById('logbk-iso'); if(isoBox) isoBox.innerHTML='';
