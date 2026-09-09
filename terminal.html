@@ -1189,6 +1189,38 @@ html.force-mobile #events #ev-cat, html.force-mobile #events #ev-sev{ height:44p
 html.force-mobile #events table thead{ display:none; }
 @media (max-width:767px){ html:not(.force-web) #events .scope-btn .opacity-70{ display:none; } html:not(.force-web) #events .scope-btn{ white-space:nowrap; } }
 html.force-mobile #events .scope-btn .opacity-70{ display:none; } html.force-mobile #events .scope-btn{ white-space:nowrap; }
+@media (max-width:767px){
+
+/* ── 모바일 문법 v9: 대시보드 필터 띠 얇게 ── */
+  html:not(.force-web) #dash .fbar{ padding:8px 12px; gap:6px 5px; }
+  html:not(.force-web) #dash .fbar .fgw{ display:grid; grid-template-columns:34px minmax(0,1fr); column-gap:8px; align-items:start; width:100%; padding:4px 0; }
+  html:not(.force-web) #dash .fbar .fgw .flab{ display:block; width:auto; margin:0; padding-top:8px; font-size:12px; line-height:1; }
+  html:not(.force-web) #dash .fbar .fgrp{ display:flex !important; flex-wrap:wrap; gap:5px; }
+  html:not(.force-web) #dash .ctile{ flex-direction:row; height:32px !important; min-height:0 !important; padding:0 9px !important; gap:5px !important; }
+  html:not(.force-web) #dash .ctile .ct-name{ font-size:12.5px !important; }
+  html:not(.force-web) #dash .ctile .ct-num{ font-size:11px !important; }
+  html:not(.force-web) #dash .fbar > .flab{ width:34px; margin:0 8px 0 0; font-size:12px; }
+  html:not(.force-web) #dash .fbar .flab[style]{ display:none; }
+  html:not(.force-web) #dash .fbar .fdate{ height:34px !important; font-size:12.5px; padding:0 8px; flex:1 1 38%; min-width:120px; }
+  html:not(.force-web) #dash .fbar .fgo{ order:1; height:32px; min-height:0 !important; padding:0 12px; font-size:12.5px; flex:0 0 auto; }
+  html:not(.force-web) #dash .fbar .qd-btn{ order:2; height:32px; min-height:0 !important; flex:1 1 18%; font-size:12px !important; padding:0 4px !important; white-space:nowrap; }
+  html:not(.force-web) #dash > .fbar:first-child{ margin-top:12px; }
+}
+
+/* ── 모바일 문법 v9: 대시보드 필터 띠 얇게 ── */
+html.force-mobile #dash .fbar{ padding:8px 12px; gap:6px 5px; }
+html.force-mobile #dash .fbar .fgw{ display:grid; grid-template-columns:34px minmax(0,1fr); column-gap:8px; align-items:start; width:100%; padding:4px 0; }
+html.force-mobile #dash .fbar .fgw .flab{ display:block; width:auto; margin:0; padding-top:8px; font-size:12px; line-height:1; }
+html.force-mobile #dash .fbar .fgrp{ display:flex !important; flex-wrap:wrap; gap:5px; }
+html.force-mobile #dash .ctile{ flex-direction:row; height:32px !important; min-height:0 !important; padding:0 9px !important; gap:5px !important; }
+html.force-mobile #dash .ctile .ct-name{ font-size:12.5px !important; }
+html.force-mobile #dash .ctile .ct-num{ font-size:11px !important; }
+html.force-mobile #dash .fbar > .flab{ width:34px; margin:0 8px 0 0; font-size:12px; }
+html.force-mobile #dash .fbar .flab[style]{ display:none; }
+html.force-mobile #dash .fbar .fdate{ height:34px !important; font-size:12.5px; padding:0 8px; flex:1 1 38%; min-width:120px; }
+html.force-mobile #dash .fbar .fgo{ order:1; height:32px; min-height:0 !important; padding:0 12px; font-size:12.5px; flex:0 0 auto; }
+html.force-mobile #dash .fbar .qd-btn{ order:2; height:32px; min-height:0 !important; flex:1 1 18%; font-size:12px !important; padding:0 4px !important; white-space:nowrap; }
+html.force-mobile #dash > .fbar:first-child{ margin-top:12px; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
