@@ -1814,6 +1814,39 @@ async function cloudGetBig(key){
   let obj; try{ obj=JSON.parse(str); }catch(e){ throw new Error('데이터 복원 실패'); }
   return {payload:obj, updated_at:meta.updated_at, updated_by:meta.updated_by, stamp:info.stamp||meta.updated_at};
 }
+// 여러 key 의 메타를 한 요청으로 (kb·daily) — {key:{chunks, stamp, updated_at, updated_by}}
+async function cloudGetMetas(keys){
+  const inList = keys.map(k=>`"${k}"`).join(',');
+  const url=`${SB_URL}/rest/v1/${SB_TABLE}?key=in.(${encodeURIComponent(inList)})&select=key,payload,updated_at,updated_by`;
+  const r=await fetch(url,{headers:sbHeaders()});
+  if(!r.ok) throw new Error('cloud metas '+r.status);
+  const rows=await r.json(); const out={};
+  for(const x of rows){
+    let info; try{ info=JSON.parse(x.payload); }catch(e){ continue; }
+    if(!info || !info.chunks) continue;
+    out[x.key]={chunks:info.chunks, stamp:info.stamp||x.updated_at, updated_at:x.updated_at, updated_by:x.updated_by};
+  }
+  return out;
+}
+// 메타에 적힌 조각들을 한꺼번에 내려받아 합친다 — 12개씩 묶어 병렬, 진행률 콜백(40→85%)
+async function cloudDownload(metas, onProgress){
+  const want=[], spec={};
+  for(const key of ['kb','daily']){ const m=metas[key]; if(!m || !m.chunks) continue; spec[key]=m.chunks; for(let i=0;i<m.chunks;i++) want.push(`${key}#${i}`); }
+  if(!want.length) return {kb:null, daily:null};
+  const groups=[]; for(let i=0;i<want.length;i+=12) groups.push(want.slice(i,i+12));
+  const map={}; let done=0;
+  await Promise.all(groups.map(async g=>{
+    const inList=g.map(k=>`"${k}"`).join(',');
+    const url=`${SB_URL}/rest/v1/${SB_TABLE}?key=in.(${encodeURIComponent(inList)})&select=key,payload`;
+    const r=await fetch(url,{headers:sbHeaders()});
+    if(!r.ok) throw new Error('cloud get chunks '+r.status);
+    const rows=await r.json(); rows.forEach(x=>{ map[x.key]=x.payload; });
+    done++; if(onProgress) onProgress(40+Math.round(done/groups.length*45));
+  }));
+  const join=(key)=>{ const n=spec[key]; if(!n) return null; let s=''; for(let i=0;i<n;i++){ const p=map[`${key}#${i}`]; if(p==null) throw new Error('조각 누락 '+key+'#'+i); s+=p; } try{ return JSON.parse(s); }catch(e){ throw new Error('데이터 복원 실패 '+key); } };
+  const kb=join('kb'); let daily=null; try{ daily=join('daily'); }catch(e){ console.warn(e); }
+  return {kb, daily};
+}
 // 메타만 빠르게 조회 (변경 여부 확인용)
 async function cloudGetStamp(key){
   const meta=await cloudGetRow(key);
@@ -2118,12 +2151,12 @@ document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>
 /* ============ LOAD ============ */
 let STORED_RECS=0;   // count of accumulated records in IndexedDB
 async function boot(){
+  // 0) 클라우드 게시 정보(kb·daily 메타)는 시작하자마자 요청해 둔다 — 아래 IndexedDB 읽기와 동시에 진행
+  const earlyMetas = cloudAvailable() ? cloudGetMetas(['kb','daily']).catch(()=>null) : Promise.resolve(null);
   // 1) events dictionary: embedded data first, else fetch file
   if(typeof window.__EVENTS_DATA__!=='undefined'){ EVENTS=window.__EVENTS_DATA__; }
   else { try{ EVENTS = await fetch('events.json').then(r=>r.json()); }catch(e){ EVENTS={}; } }
-  await loadExcluded();
-  await loadExcReasons();
-  await loadUpdated();
+  await Promise.all([loadExcluded(), loadExcReasons(), loadUpdated()]);
   // 2) try accumulated records from IndexedDB
   let usedStore=false;
   let localKBSnapshot=null;  // 로컬 IDB로 빌드한 KB를 백업 (클라우드 덮어쓰기 방지용)
@@ -2149,8 +2182,9 @@ async function boot(){
       catch(e){ KB={meta:{records:0,vehicles:0,period:'-'},err_reco:{},handling_stats:{},vehicles:{},preempt:[],dash:{}}; $('#kb-meta').classList.add('text-amber-200'); }
     }
   }
-  // 4) 클라우드(관리자 게시) 데이터가 있으면 우선 적용 — 모두가 같은 최신 데이터를 봄
-  await loadFromCloud();
+  // 4) 클라우드(관리자 게시) 데이터가 있으면 우선 적용 — 캐시가 있으면 먼저 그리고, 최신 여부는 뒤에서 확인
+  LOCAL_KB_SNAPSHOT = localKBSnapshot;
+  await loadFromCloud({metas: earlyMetas});
   // 4-1) 로컬 IDB가 클라우드보다 더 새로운 데이터를 가지고 있으면 로컬 우선 (사용자가 새 XLS를 올린 경우)
   if(localKBSnapshot && localKBSnapshot.meta && localKBSnapshot.meta.ref_date){
     const cloudRef = (KB && KB.meta && KB.meta.ref_date) || '';
@@ -2204,43 +2238,72 @@ const CLOAD = {
   clearSteps(){ document.querySelectorAll('#cloud-loader .cl-step').forEach(s=>s.classList.remove('active','done')); },
 };
 
-/* 클라우드에서 관리자가 게시한 KB/이벤트를 불러와 적용 (캐시 + 병렬) */
+/* 클라우드에서 관리자가 게시한 KB/이벤트를 불러와 적용
+   — 캐시 우선: 로컬 캐시가 있으면 바로 적용해 화면부터 그리고, 게시 정보는 뒤에서 비교해 바뀐 경우만 내려받아 조용히 갱신
+   — 요청 최소화: 메타 2개를 한 요청으로, 조각들은 12개씩 묶어 병렬로                                              */
+let LOCAL_KB_SNAPSHOT=null;   // 로컬 IDB 로 만든 KB (클라우드보다 새로우면 클라우드로 덮지 않는다)
+function metaInfo(m){ return m ? {updated_at:m.updated_at, updated_by:m.updated_by} : null; }
+function applyCloudInfo(info){ if(!info) return; CLOUD_INFO={updated_at:info.updated_at, updated_by:info.updated_by}; UPDATED.cloud=fmtCloudTime(info.updated_at); }
+function applyCloudData(kb, daily, info){
+  KB = kb;
+  if(daily && Object.keys(daily).length){ DAILY=daily; buildDailyAgg(); }
+  else { DAILY=null; DAILY_AGG=null; }
+  applyCloudInfo(info);
+}
+function cloudBeatsLocal(kb){
+  const L=LOCAL_KB_SNAPSHOT; if(!(L && L.meta && L.meta.ref_date)) return true;
+  const c=(kb && kb.meta && kb.meta.ref_date)||'', cr=(kb && kb.meta && kb.meta.records)||0;
+  return !(L.meta.ref_date > c || (L.meta.ref_date === c && L.meta.records > cr));
+}
+function rerenderAfterCloud(){
+  try{
+    renderStatus(); renderDash(); updatePreemptBadge(); renderUpdated();
+    const rd=$('#ref-date'); if(rd) rd.textContent=(KB.meta.ref_date||KB.meta.period||'-');
+    if(CURTAB==='preempt') renderPreempt(); else if(CURTAB==='events') renderEvents();
+  }catch(e){ console.warn('rerender after cloud', e); }
+}
+function cloudNotice(msg){
+  let t=document.getElementById('cloud-notice');
+  if(!t){ t=document.createElement('div'); t.id='cloud-notice'; t.style.cssText='position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#111111;color:#fff;font-size:13px;padding:10px 16px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1'; clearTimeout(t._t); t._t=setTimeout(()=>{ t.style.opacity='0'; }, 3500);
+}
 async function loadFromCloud(opts){
   if(!cloudAvailable()) return;
-  const showUI = !(opts && opts.silent);
+  opts=opts||{};
+  const showUI = !opts.silent;
   if(showUI) CLOAD.show('클라우드 연결 중…');
   try{
-    // 1) 게시 시각(stamp) 확인
-    if(showUI){ CLOAD.set('게시 정보 확인 중…','check'); CLOAD.setProgress(15); }
-    const stampInfo = await cloudGetStamp('kb');
-    if(!stampInfo){ if(showUI) CLOAD.hide(); return; }
-    if(showUI) CLOAD.doneStep('check');
-    // 2) 로컬 캐시 비교
-    if(showUI){ CLOAD.set('로컬 캐시 확인 중…','cache'); CLOAD.setProgress(30); }
-    const cached = await loadCloudCache();
-    if(cached && cached.stamp===stampInfo.stamp && cached.kb){
-      KB = cached.kb;
-      DAILY = (cached.daily && Object.keys(cached.daily).length)? cached.daily : null;
-      if(DAILY) buildDailyAgg(); else DAILY_AGG=null;
-      CLOUD_INFO = {updated_at:stampInfo.updated_at, updated_by:stampInfo.updated_by};
-      UPDATED.cloud = fmtCloudTime(stampInfo.updated_at);
-      if(showUI){ CLOAD.doneStep('cache'); CLOAD.set('캐시 사용 — 변경 없음','apply'); CLOAD.setProgress(95); CLOAD.hide(); }
+    // 1) 캐시 우선 — 있으면 바로 적용하고 로더를 내린다
+    const cached = opts.force ? null : await loadCloudCache();
+    if(cached && cached.kb){
+      applyCloudData(cached.kb, cached.daily, cached.info||null);
+      if(showUI){ CLOAD.doneStep('check'); CLOAD.doneStep('cache'); CLOAD.doneStep('kb'); CLOAD.doneStep('events'); CLOAD.set('캐시 적용 — 최신 여부는 뒤에서 확인','apply'); CLOAD.setProgress(95); CLOAD.hide(); }
+      (async()=>{
+        try{
+          const metas = await (opts.metas || cloudGetMetas(['kb','daily']));
+          if(!metas || !metas.kb) return;
+          if(metas.kb.stamp===cached.stamp){ applyCloudInfo(metaInfo(metas.kb)); try{ renderUpdated(); }catch(e){} return; }
+          const {kb, daily} = await cloudDownload(metas);
+          if(!kb) return;
+          saveCloudCache(metas.kb.stamp, kb, daily, metaInfo(metas.kb)).catch(()=>{});
+          if(!cloudBeatsLocal(kb)) return;                       // 로컬이 더 새로우면 화면은 그대로
+          applyCloudData(kb, daily, metaInfo(metas.kb));
+          rerenderAfterCloud();
+          cloudNotice('최신 게시 자료를 적용했습니다 · '+UPDATED.cloud);
+        }catch(e){ console.warn('cloud refresh failed', e); }
+      })();
       return;
     }
-    if(showUI){ CLOAD.doneStep('cache'); }
-    // 3) 변경 → kb + daily 병렬 다운로드 (진행률은 가상 진행)
-    if(showUI){ CLOAD.set('장애접수 데이터 다운로드 중…','kb'); CLOAD.setProgress(45); }
-    const kbPromise = cloudGetBig('kb').then(r=>{ if(showUI){ CLOAD.doneStep('kb'); CLOAD.set('이벤트 로그 다운로드 중…','events'); CLOAD.setProgress(75);} return r; });
-    const dPromise = cloudGetBig('daily').catch(()=>null);
-    const [kbRow, dRow] = await Promise.all([ kbPromise, dPromise ]);
-    if(showUI){ CLOAD.doneStep('events'); CLOAD.set('데이터 적용 중…','apply'); CLOAD.setProgress(90); }
-    if(kbRow && kbRow.payload){
-      KB = kbRow.payload;
-      CLOUD_INFO = {updated_at:kbRow.updated_at, updated_by:kbRow.updated_by};
-      if(dRow && dRow.payload && Object.keys(dRow.payload).length){ DAILY=dRow.payload; buildDailyAgg(); }
-      else { DAILY=null; DAILY_AGG=null; }
-      UPDATED.cloud = fmtCloudTime(kbRow.updated_at);
-      await saveCloudCache(stampInfo.stamp, KB, DAILY);
+    // 2) 캐시 없음(또는 강제) — 게시 정보 → 조각 내려받기
+    if(showUI){ CLOAD.set('게시 정보 확인 중…','check'); CLOAD.setProgress(15); }
+    const metas = await (opts.metas || cloudGetMetas(['kb','daily']));
+    if(!metas || !metas.kb){ if(showUI) CLOAD.hide(); return; }
+    if(showUI){ CLOAD.doneStep('check'); CLOAD.doneStep('cache'); CLOAD.set('데이터 내려받는 중…','kb'); CLOAD.setProgress(40); }
+    const {kb, daily} = await cloudDownload(metas, showUI ? (pct)=>CLOAD.setProgress(pct) : null);
+    if(showUI){ CLOAD.doneStep('kb'); CLOAD.doneStep('events'); CLOAD.set('데이터 적용 중…','apply'); CLOAD.setProgress(90); }
+    if(kb){
+      applyCloudData(kb, daily, metaInfo(metas.kb));
+      saveCloudCache(metas.kb.stamp, kb, daily, metaInfo(metas.kb)).catch(()=>{});   // 저장은 기다리지 않는다
     }
     if(showUI){ CLOAD.doneStep('apply'); CLOAD.set('완료','apply'); CLOAD.hide(); }
   }catch(e){
@@ -2249,9 +2312,9 @@ async function loadFromCloud(opts){
   }
 }
 /* 클라우드 데이터 로컬 캐시 (IndexedDB meta 스토어 활용) */
-async function saveCloudCache(stamp, kb, daily){
+async function saveCloudCache(stamp, kb, daily, info){
   if(!idbAvailable()) return;
-  try{ await idbBulkPut('meta',[{k:'cloudCache', v:{stamp, kb, daily:daily||null}}]); }catch(e){ console.warn('cache save failed', e); }
+  try{ await idbBulkPut('meta',[{k:'cloudCache', v:{stamp, kb, daily:daily||null, info:info||null}}]); }catch(e){ console.warn('cache save failed', e); }
 }
 async function loadCloudCache(){
   if(!idbAvailable()) return null;
@@ -2483,7 +2546,10 @@ function computeDashView(){
   const month_recv={}, err_total={}, center={}, term={}, handling={};
   const center_veh={};                       // 센터별 차량 집합 (시안의 '차량' 열)
   let records=0; const vehSet=new Set();
-  // for repeat rate within filtered set
+  // KPI 기준 채널: 채널 칩을 고르면 그 채널, 아니면 전화 접수 (총 접수·해당 차량·재접수율·위험 차량)
+  const kpiCh = GF.ch || '전화접수';
+  let kpiRecords=0; const kpiVehSet=new Set();
+  // for repeat rate within KPI channel set
   const byVehFiltered={};
   for(const v in KB.vehicles){
     let hasItem=false;
@@ -2495,7 +2561,7 @@ function computeDashView(){
       if(it.err) err_total[it.err]=(err_total[it.err]||0)+1;
       if(it.center){ center[it.center]=(center[it.center]||0)+1; (center_veh[it.center]=center_veh[it.center]||new Set()).add(v); }
       if(it.term) term[it.term]=(term[it.term]||0)+1;
-      (byVehFiltered[v]=byVehFiltered[v]||[]).push(it);
+      if(it.recv===kpiCh){ kpiRecords++; kpiVehSet.add(v); (byVehFiltered[v]=byVehFiltered[v]||[]).push(it); }
     }
     if(hasItem) vehSet.add(v);
   }
@@ -2512,7 +2578,7 @@ function computeDashView(){
   }
   const repeatRate = hTot? Math.round(hRep/hTot*1000)/10 : 0;
   const centerVeh={}; for(const k in center_veh) centerVeh[k]=center_veh[k].size;
-  return {records, vehicles:vehSet.size, month_recv, err_total, center, term, repeatRate, centerVeh, hTot};
+  return {records, vehicles:vehSet.size, month_recv, err_total, center, term, repeatRate, centerVeh, hTot, kpiCh, kpiRecords, kpiVehicles:kpiVehSet.size};
 }
 function renderDash(){
   const active = gfActive();
@@ -2522,10 +2588,10 @@ function renderDash(){
   const vehN = view.vehicles;
   const subTxt = active ? '필터 적용 기준' : '전체 누적';
 
-  // 위험 차량: 선제점검과 같은 계산(채널·센터·기간 필터 반영), 위험도 70 이상
+  // 위험 차량: 선제점검과 같은 계산(KPI 채널·센터·기간 필터 반영), 위험도 70 이상
   let riskAll=[], riskTop=0;
   try{
-    const all=computePreempt(GF.ch||'');
+    const all=computePreempt(view.kpiCh);
     const gfHas = gfActive() ? (v=>vehMatches(v)) : (()=>true);
     const act=all.filter(p=>!EXCLUDED.has(p.v) && gfHas(p.v));
     riskAll=act.filter(p=>p.sc>=70);
@@ -2538,11 +2604,12 @@ function renderDash(){
   const chShort={'전화접수':'전화','시스템접수':'시스템','B/S처리':'B/S','현장접수':'현장'};
   const chLine = recordsN? chOrder.filter(ch=>chTot[ch]).slice(0,3).map(ch=>`${chShort[ch]} ${Math.round(chTot[ch]/recordsN*100)}%`).join(', ') : subTxt;
 
+  const chName = chShort[view.kpiCh]||view.kpiCh;   // KPI 4개는 전화 접수 기준(채널 칩을 고르면 그 채널)
   const cards = [
-    ['총 접수', num(recordsN), '건', '', chLine||subTxt],
-    ['해당 차량', num(vehN), '대', '', active?'필터 발생 차량':'검색 가능 대수'],
-    ['30일 재접수율', String(view.repeatRate), '%', '', `처리 뒤 30일 안에 다시 접수된 비율 · 조치 ${num(view.hTot)}건`],
-    ['위험 차량', num(riskAll.length), '대', 'red', `위험도 70 이상 · 선제 점검 상위 ${num(riskTop)}대`],
+    ['총 접수', num(view.kpiRecords), '건', '', `${chName} 접수 기준 · 전 채널 ${num(recordsN)}건${active?' · 필터 적용':''}`],
+    ['해당 차량', num(view.kpiVehicles), '대', '', `${chName} 접수가 있는 차량`],
+    ['30일 재접수율', String(view.repeatRate), '%', '', `${chName} 접수 처리 뒤 30일 안 재접수 · 조치 ${num(view.hTot)}건`],
+    ['위험 차량', num(riskAll.length), '대', 'red', `${chName} 접수 기준 · 위험도 70 이상 · 선제 점검 상위 ${num(riskTop)}대`],
   ];
   $('#stat-cards').innerHTML = cards.map(c=>`
     <div class="kpi">
@@ -3127,10 +3194,10 @@ function initEventControls(){
 
 /* ====== 전체 차량 마스터 (장애이력 없는 차량까지 검색) ====== */
 let VM = (typeof window!=='undefined' && window.__VEH_MASTER__) ? window.__VEH_MASTER__ : {};
-const MODEL_LABEL = {B800:'서울시내버스(B800)', B700:'서울시내버스(B700)', B710:'서울마을버스(B710)', B620:'공항버스(B620)'};
+const MODEL_LABEL = {B800:'서울시내버스(B800)', B700:'서울시내버스(B700)', B710:'서울마을버스(B710)', B620:'공항버스(B620)', B820:'인천시내버스(B820)'};
 async function loadVehicleMaster(){
   if(VM && Object.keys(VM).length) return;
-  try{ const r=await fetch('vehicles.json',{cache:'force-cache'}); if(r.ok){ VM=await r.json(); console.log('[veh-master] loaded', Object.keys(VM).length); } }
+  try{ const r=await fetch('vehicles.json?v=20260909',{cache:'force-cache'}); if(r.ok){ VM=await r.json(); console.log('[veh-master] loaded', Object.keys(VM).length); } }
   catch(e){ console.warn('vehicle master load skip', e); }
 }
 function suggestMeta(m){
@@ -3148,7 +3215,7 @@ function renderVehicleNoFault(vnum, m){
       <div class="vcol">
         <div>
           <div class="vnum">${escHtml(vnum)}</div>
-          <div class="vmeta"><span>${escHtml(m.op||'-')}</span><span>${escHtml(modelLabel)}</span>${rt?`<span>${escHtml(rt)}</span>`:''}<span>${escHtml(m.ct||'-')}</span></div>
+          <div class="vmeta"><span>${escHtml(m.op||'-')}</span><span>${escHtml(modelLabel)}</span>${rt?`<span>${escHtml(rt)}</span>`:''}<span>${escHtml(m.ct||'-')}</span>${m.dp?`<span>${escHtml(m.dp)}</span>`:''}</div>
         </div>
         <div class="vjudge">
           <div class="mark"></div>
@@ -3169,7 +3236,7 @@ function renderVehicleNoFault(vnum, m){
       <div class="vcol">
         <div>
           <div class="hd"><h3 class="h">차고지 도착</h3><span class="sub">종점 실시간</span></div>
-          <div class="lst"><div style="padding:10px 0" id="eta-box-nf" class="eta-box">—</div></div>
+          <div class="lst"><div style="padding:10px 0" id="eta-box-nf" class="eta-box">${m.ct==='인천센터'?'인천 노선은 미지원':'—'}</div></div>
         </div>
       </div>
     </div>
@@ -3207,7 +3274,7 @@ function renderVehicleNoFault(vnum, m){
   </div>`;
   $('#result').innerHTML = html;
   window.__tlItems = [];
-  if(rt){ try{ loadDepotEta(vnum, rt, 'eta-box-nf'); }catch(e){} }
+  if(rt && m.ct!=='인천센터'){ try{ loadDepotEta(vnum, rt, 'eta-box-nf'); }catch(e){} }   // 인천은 서울 ETA 미지원
   if(typeof loadLogHistory==='function'){ try{ loadLogHistory(vnum); }catch(e){} }
 }
 loadVehicleMaster();
@@ -3715,7 +3782,7 @@ async function refreshFromCloud(){
   if(!cloudAvailable()){ alert('클라우드 설정이 없습니다.'); return; }
   log('클라우드에서 최신 데이터 불러오는 중…');
   try{
-    await loadFromCloud();
+    await loadFromCloud({force:true});
     updatePreemptBadge();
     renderStatus(); renderDash(); renderCloudStatus();
     if(CURTAB==='preempt') renderPreempt();
