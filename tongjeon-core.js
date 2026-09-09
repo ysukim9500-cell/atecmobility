@@ -176,6 +176,7 @@ window.TJ = (function () {
   var RENDER = {};
   function registerTab(name, fn) { RENDER[name] = fn; }
   function tab(name) {
+    if (name === 'menu') { if (window.toggleMobileMenu) toggleMobileMenu(); return; }   // 하단 탭 '메뉴' 는 시트를 연다
     CUR = name;
     var btns = document.querySelectorAll('#tj-tabs .rtab');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].dataset.tab === name);
@@ -202,6 +203,8 @@ window.TJ = (function () {
       (profile.role === 'admin' ? '<span class="text-[10px] bg-amber-300 text-amber-900 font-bold rounded px-1.5 py-0.5">관리자</span>' : '') +
       '<a href="index.html" class="ml-1 text-[11px]">포털</a>' +
       '<button onclick="TJ.logout()" class="ml-1 text-[11px]">로그아웃</button>';
+    var mm = document.getElementById('mm-links');
+    if (mm) mm.innerHTML = '<span class="mm-user">' + esc(profile.name) + (profile.role === 'admin' ? ' · 관리자' : '') + '</span><a href="index.html">포털</a><button type="button" onclick="TJ.logout()">로그아웃</button>';
 
     document.querySelectorAll('#tj-tabs .rtab[data-tab]').forEach(function (b) {
       b.addEventListener('click', function () { tab(b.dataset.tab); });

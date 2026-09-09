@@ -1233,7 +1233,6 @@ html.force-mobile #dash > .fbar:first-child{ margin-top:12px; }
 html.force-mobile input[type=date]::-webkit-calendar-picker-indicator{ display:none; -webkit-appearance:none; }
 html.force-mobile input[type=date]{ text-align:center; padding-left:4px !important; padding-right:4px !important; }
 html.force-mobile .mc-chips .chip{ height:auto !important; min-height:28px; white-space:normal; line-height:1.3; padding:4px 8px !important; text-align:center; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
-#foot-links{ display:none; }
 .kpi .kpi-subs{ display:none; }
 @media (max-width:767px){
 
@@ -1243,9 +1242,6 @@ html.force-mobile .mc-chips .chip{ height:auto !important; min-height:28px; whit
   html:not(.force-web) #dash .ctile .ct-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   html:not(.force-web) #user-badge{ display:none !important; }
   html:not(.force-web) .atec-header > div{ padding:10px 14px !important; }
-  html:not(.force-web) #foot-links{ display:flex; justify-content:space-between; align-items:center; width:100%; order:9; border-top:1px solid var(--line); margin-top:10px; padding-top:10px; }
-  html:not(.force-web) #foot-links .ub-name{ display:none; }
-  html:not(.force-web) #foot-links button{ border:0 !important; background:transparent; padding:4px 0 !important; font-size:12.5px !important; color:var(--gray); min-height:0 !important; flex:1 1 0; text-align:center; }
   html:not(.force-web) #stat-cards{ padding:0 12px; }
   html:not(.force-web) .kpi{ padding:10px 12px 9px !important; }
   html:not(.force-web) .kpi .kpi-label{ font-size:11.5px; }
@@ -1262,9 +1258,6 @@ html.force-mobile #dash .ctile{ justify-content:center; padding:0 6px !important
 html.force-mobile #dash .ctile .ct-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 html.force-mobile #user-badge{ display:none !important; }
 html.force-mobile .atec-header > div{ padding:10px 14px !important; }
-html.force-mobile #foot-links{ display:flex; justify-content:space-between; align-items:center; width:100%; order:9; border-top:1px solid var(--line); margin-top:10px; padding-top:10px; }
-html.force-mobile #foot-links .ub-name{ display:none; }
-html.force-mobile #foot-links button{ border:0 !important; background:transparent; padding:4px 0 !important; font-size:12.5px !important; color:var(--gray); min-height:0 !important; flex:1 1 0; text-align:center; }
 html.force-mobile #stat-cards{ padding:0 12px; }
 html.force-mobile .kpi{ padding:10px 12px 9px !important; }
 html.force-mobile .kpi .kpi-label{ font-size:11.5px; }
@@ -1273,6 +1266,38 @@ html.force-mobile .kpi .kpi-val small{ font-size:12px; margin-left:3px; }
 html.force-mobile .kpi .kpi-sub{ display:none; }
 html.force-mobile .kpi .kpi-subs{ display:block; font-size:11px; color:var(--gray); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
 html.force-mobile .vgrid .vcol:first-child .eta-sec{ padding:12px 0 0; border-top:1px solid var(--rose2); }
+
+/* AI 공용 키 (관리자 보기) */
+.ai-key-btn{ border:1px solid var(--soft) !important; background:#fff !important; color:var(--gray) !important; padding:1px 7px !important; font-size:11px !important; font-weight:400 !important; margin-left:4px; min-height:0 !important; border-radius:0 !important; }
+.ai-key-btn:hover{ border-color:var(--ink) !important; color:var(--ink) !important; }
+#ai-key-txt{ font-family:ui-monospace, Menlo, Consolas, monospace; font-weight:400; color:var(--ink); word-break:break-all; }
+#tabs .tab-btn.is-menu{ display:none !important; }
+#mobile-menu{ display:none; }
+.tab-btn.is-menu{ display:flex !important; }
+@media (max-width:767px){
+  html:not(.force-web) #tabs .tab-btn.is-menu{ display:flex !important; }
+  html:not(.force-web) #mobile-menu.mm{ display:flex; position:fixed; inset:0; z-index:70; background:rgba(17,17,17,.42); align-items:flex-end; }
+  html:not(.force-web) #mobile-menu.mm.hidden{ display:none !important; }
+  html:not(.force-web) .mm-sheet{ width:100%; background:#FFFFFF; border-top:2px solid var(--red); padding:0 16px calc(76px + env(safe-area-inset-bottom, 0px)); max-height:80vh; overflow:auto; }
+  html:not(.force-web) .mm-head{ display:flex; align-items:center; justify-content:space-between; height:48px; font-size:15px; font-weight:700; color:var(--ink); }
+  html:not(.force-web) .mm-close{ border:0 !important; background:transparent !important; color:var(--gray) !important; font-size:13px !important; font-weight:400 !important; padding:0 !important; min-height:0 !important; }
+  html:not(.force-web) #mm-links{ display:flex; flex-direction:column; }
+  html:not(.force-web) #mm-links > *{ display:flex !important; align-items:center; justify-content:flex-start !important; width:100%; height:48px; margin:0 !important; padding:0 !important; border:0 !important; border-top:1px solid var(--line) !important; border-radius:0 !important; background:transparent !important; color:var(--ink) !important; font-size:15px !important; font-weight:400 !important; text-decoration:none !important; text-align:left; box-shadow:none !important; }
+  html:not(.force-web) #mm-links > .mm-user,   html:not(.force-web) #mm-links > .ub-name{ height:40px; color:var(--gray) !important; font-size:13px !important; border-top:0 !important; }
+  html:not(.force-web) #mm-links > .ub-name b{ color:var(--ink); font-weight:700; margin-right:6px; }
+  html:not(.force-web) body.mm-open{ overflow:hidden; }
+}
+html.force-mobile #tabs .tab-btn.is-menu{ display:flex !important; }
+html.force-mobile #mobile-menu.mm{ display:flex; position:fixed; inset:0; z-index:70; background:rgba(17,17,17,.42); align-items:flex-end; }
+html.force-mobile #mobile-menu.mm.hidden{ display:none !important; }
+html.force-mobile .mm-sheet{ width:100%; background:#FFFFFF; border-top:2px solid var(--red); padding:0 16px calc(76px + env(safe-area-inset-bottom, 0px)); max-height:80vh; overflow:auto; }
+html.force-mobile .mm-head{ display:flex; align-items:center; justify-content:space-between; height:48px; font-size:15px; font-weight:700; color:var(--ink); }
+html.force-mobile .mm-close{ border:0 !important; background:transparent !important; color:var(--gray) !important; font-size:13px !important; font-weight:400 !important; padding:0 !important; min-height:0 !important; }
+html.force-mobile #mm-links{ display:flex; flex-direction:column; }
+html.force-mobile #mm-links > *{ display:flex !important; align-items:center; justify-content:flex-start !important; width:100%; height:48px; margin:0 !important; padding:0 !important; border:0 !important; border-top:1px solid var(--line) !important; border-radius:0 !important; background:transparent !important; color:var(--ink) !important; font-size:15px !important; font-weight:400 !important; text-decoration:none !important; text-align:left; box-shadow:none !important; }
+html.force-mobile #mm-links > .mm-user, html.force-mobile #mm-links > .ub-name{ height:40px; color:var(--gray) !important; font-size:13px !important; border-top:0 !important; }
+html.force-mobile #mm-links > .ub-name b{ color:var(--ink); font-weight:700; margin-right:6px; }
+html.force-mobile body.mm-open{ overflow:hidden; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -1411,6 +1436,10 @@ html.force-mobile .vgrid .vcol:first-child .eta-sec{ padding:12px 0 0; border-to
     <button id="tab-admin" data-tab="admin" data-admin class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5" style="display:none">
       <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span class="tab-full">사용자 관리</span><span class="tab-short">사용자</span> <span id="admin-badge" class="tab-badge hidden"></span>
+    </button>
+    <button data-tab="menu" type="button" class="tab-btn text-[13px] font-bold transition flex items-center gap-1.5 is-menu" title="메뉴">
+      <svg class="tab-ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span class="tab-full">메뉴</span><span class="tab-short">메뉴</span>
     </button>
   </nav>
   </div>
@@ -1742,8 +1771,14 @@ html.force-mobile .vgrid .vcol:first-child .eta-sec{ padding:12px 0 0; border-to
   <footer class="ci-foot mt-8 py-4 flex items-center justify-between gap-4 flex-wrap">
     <div>ATEC 에이텍모빌리티 · 단말기 현장처리 판정 시스템 · 데이터는 브라우저 내에서만 처리됩니다</div>
     <div class="font-medium">정도 · 혁신 · 협업</div>
-    <div id="foot-links"></div>
   </footer>
+</div>
+<!-- 모바일 메뉴 시트: 하단 탭 "메뉴" 를 누르면 뜬다 -->
+<div id="mobile-menu" class="mm hidden" onclick="if(event.target===this) toggleMobileMenu(false)">
+  <div class="mm-sheet" role="dialog" aria-label="메뉴">
+    <div class="mm-head"><span>메뉴</span><button type="button" class="mm-close" onclick="toggleMobileMenu(false)">닫기</button></div>
+    <div id="mm-links"></div>
+  </div>
 </div>
 </div><!-- /app-root -->
 
@@ -2093,7 +2128,7 @@ function renderUserBadge(){
     <button onclick="promptChangePw(false)" class="ub-btn">비밀번호</button>
     <button onclick="gotoPortal()" class="ub-btn">포털</button>
     <button onclick="logout()" class="ub-btn">로그아웃</button>`;
-  const fl=$('#foot-links'); if(fl) fl.innerHTML = b.innerHTML;   // 모바일: 머리글 대신 푸터에 표시
+  const mm=$('#mm-links'); if(mm) mm.innerHTML = b.innerHTML;   // 모바일: 하단 '메뉴' 시트에 같은 단추
 }
 function toggleUserMenu(){ /* deprecated — buttons now always visible */ }
 document.addEventListener('click', e=>{
@@ -2171,7 +2206,16 @@ async function loadInspectedBackups(){
 }
 
 /* ============ TABS ============ */
+function toggleMobileMenu(on){
+  const m=document.getElementById('mobile-menu'); if(!m) return;
+  const show = (on===undefined) ? m.classList.contains('hidden') : !!on;
+  m.classList.toggle('hidden', !show);
+  document.body.classList.toggle('mm-open', show);
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') toggleMobileMenu(false); });
+document.addEventListener('click', e=>{ const t=e.target.closest('#mm-links a, #mm-links button'); if(t) setTimeout(()=>toggleMobileMenu(false), 50); });
 function setTab(t){
+  if(t==='menu'){ toggleMobileMenu(); return; }   // 하단 탭 '메뉴' 는 화면 전환이 아니라 시트를 연다
   if(t==='admin' && !isAdmin()) t='dash';
   CURTAB=t;
   { const tt=$('#ci-title-text'); if(tt) tt.textContent={dash:'대시보드',preempt:'선제 점검 대상',search:'차량 검색',sn:'단말기 조회',events:'이벤트 분석',ai:'AI 챗봇',admin:'사용자 관리'}[t]||''; }
@@ -4321,9 +4365,10 @@ function updateAIKeyStatus(){
   const k=getAIKey();
   const delBtn=$('#ai-delete-key');
   if(k){
-    el.textContent = isAdmin()
-      ? `✓ 공용 키 활성 (관리자: ${k.slice(0,8)}…)`
-      : '✓ AI 챗봇 사용 가능';
+    if(isAdmin()){
+      // 관리자: 앞 8자만 보이고, '키 보기' 로 전체를 볼 수 있다 (복사 가능)
+      el.innerHTML = `✓ 공용 키 활성 · <span id="ai-key-txt" data-full="${escHtml(k)}" data-shown="0">${escHtml(k.slice(0,8))}…</span><button type="button" class="ai-key-btn" id="ai-key-eye" onclick="toggleAIKeyReveal()">키 보기</button><button type="button" class="ai-key-btn" onclick="copyAIKey()">복사</button>`;
+    } else el.textContent = '✓ AI 챗봇 사용 가능';
     el.className='text-[11px] font-bold text-emerald-600';
     if(delBtn && isAdmin()) delBtn.style.display='';
   } else {
@@ -4335,6 +4380,18 @@ function updateAIKeyStatus(){
   }
 }
 
+function toggleAIKeyReveal(){
+  const t=$('#ai-key-txt'), b=$('#ai-key-eye'); if(!t) return;
+  const show = t.dataset.shown!=='1';
+  t.textContent = show ? t.dataset.full : (t.dataset.full.slice(0,8)+'…');
+  t.dataset.shown = show?'1':'0'; if(b) b.textContent = show?'숨기기':'키 보기';
+}
+function copyAIKey(){
+  const k=getAIKey(); if(!k) return;
+  const done=()=>alert('공용 키를 복사했습니다.');
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(k).then(done, ()=>prompt('복사가 막혀 있습니다. 직접 복사하세요:', k));
+  else prompt('직접 복사하세요:', k);
+}
 function setupAIKey(){
   if(!isAdmin()){ alert('관리자만 공용 키를 등록할 수 있습니다.'); return; }
   const cur=getAIKey();

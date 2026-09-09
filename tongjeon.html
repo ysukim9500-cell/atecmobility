@@ -417,6 +417,25 @@ html.is-mobile .fpanel .btn-main, html.is-mobile #tab-list > .panel:first-child 
 html.is-mobile input[type=date]::-webkit-calendar-picker-indicator{ display:none; -webkit-appearance:none; }
 html.is-mobile input[type=date]{ text-align:center; font-size:12.5px !important; padding-left:2px !important; padding-right:2px !important; }
 
+/* ── 모바일 메뉴 탭 + 시트 (공용 문법) ── */
+#tj-tabs .rtab.is-menu{ display:none !important; }
+#mobile-menu{ display:none; }
+html.is-mobile #tj-tabs .rtab.is-menu{ display:flex !important; }
+html.is-mobile #mobile-menu.mm{ display:flex; position:fixed; inset:0; z-index:70; background:rgba(17,17,17,.42); align-items:flex-end; }
+html.is-mobile #mobile-menu.mm.hidden{ display:none !important; }
+html.is-mobile .mm-sheet{ width:100%; background:#FFFFFF; border-top:2px solid var(--red); padding:0 16px calc(76px + env(safe-area-inset-bottom, 0px)); max-height:80vh; overflow:auto; }
+html.is-mobile .mm-head{ display:flex; align-items:center; justify-content:space-between; height:48px; font-size:15px; font-weight:700; color:var(--ink); }
+html.is-mobile .mm-close{ border:0 !important; background:transparent !important; color:var(--gray) !important; font-size:13px !important; font-weight:400 !important; padding:0 !important; min-height:0 !important; }
+html.is-mobile #mm-links{ display:flex; flex-direction:column; }
+html.is-mobile #mm-links > *{ display:flex !important; align-items:center; justify-content:flex-start !important; width:100%; height:48px; margin:0 !important; padding:0 !important; border:0 !important; border-top:1px solid var(--line) !important; border-radius:0 !important; background:transparent !important; color:var(--ink) !important; font-size:15px !important; font-weight:400 !important; text-decoration:none !important; text-align:left; box-shadow:none !important; }
+html.is-mobile #mm-links > .mm-user, html.is-mobile #mm-links > .ub-name{ height:40px; color:var(--gray) !important; font-size:13px !important; border-top:0 !important; }
+html.is-mobile #mm-links > .ub-name b{ color:var(--ink); font-weight:700; margin-right:6px; }
+html.is-mobile body.mm-open{ overflow:hidden; }
+
+/* ── 모바일 v12b: 머리글의 사용자 링크 줄은 숨긴다(하단 메뉴 시트로 이동) ── */
+html.is-mobile #tj-user{ display:none !important; }
+html.is-mobile header .tj-wrap{ padding-bottom:8px !important; }
+
 /* 통전망 전용 보정 */
 #tab-dash > .panel:first-child, #tab-faults > .panel:first-child, #tab-stock > .panel:first-child, #tab-repairs > .panel:first-child, #tab-terminals > .panel:first-child, #tab-equip > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
 #tab-dash > .panel:first-child .panel-head, #tab-faults > .panel:first-child .panel-head, #tab-stock > .panel:first-child .panel-head, #tab-repairs > .panel:first-child .panel-head, #tab-terminals > .panel:first-child .panel-head, #tab-equip > .panel:first-child .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }
@@ -499,6 +518,10 @@ html.is-mobile .m-list .rtbl th.m-keep, html.is-mobile .m-list .rtbl td.m-keep{ 
       <svg class="rtab-ico" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>
       <span class="rtab-short">더보기</span>
     </button>
+    <button data-tab="menu" type="button" class="rtab is-menu" title="메뉴">
+      <svg class="rtab-ico" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span class="rtab-full">메뉴</span><span class="rtab-short">메뉴</span>
+    </button>
   </nav>
 </div></div>
 
@@ -523,6 +546,14 @@ html.is-mobile .m-list .rtbl th.m-keep, html.is-mobile .m-list .rtbl td.m-keep{ 
   <div class="font-medium">정도 · 혁신 · 협업</div>
 </div>
 </footer>
+<!-- 모바일 메뉴 시트: 하단 탭 "메뉴" 를 누르면 뜬다 -->
+<div id="mobile-menu" class="mm hidden" onclick="if(event.target===this) toggleMobileMenu(false)">
+  <div class="mm-sheet" role="dialog" aria-label="메뉴">
+    <div class="mm-head"><span>메뉴</span><button type="button" class="mm-close" onclick="toggleMobileMenu(false)">닫기</button></div>
+    <div id="mm-links"></div>
+  </div>
+</div>
+
 
 <!-- 모바일 상세·더보기 시트 -->
 <div id="tj-sheet"><div class="sheet"><div class="grab"></div>
@@ -540,6 +571,16 @@ html.is-mobile .m-list .rtbl th.m-keep, html.is-mobile .m-list .rtbl td.m-keep{ 
 <script>
 /* 진입 가드: 토큰과 권한을 서버에 확인한 뒤에만 화면을 띄운다 */
 AtecAuth.requireAuth('tongjeon').then(function (p) { TJ.boot(p); }).catch(function () {});
+</script>
+<script>
+function toggleMobileMenu(on){
+  const m=document.getElementById('mobile-menu'); if(!m) return;
+  const show = (on===undefined) ? m.classList.contains('hidden') : !!on;
+  m.classList.toggle('hidden', !show);
+  document.body.classList.toggle('mm-open', show);
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') toggleMobileMenu(false); });
+document.addEventListener('click', e=>{ const t=e.target.closest('#mm-links a, #mm-links button'); if(t) setTimeout(()=>toggleMobileMenu(false), 50); });
 </script>
 </body>
 </html>
