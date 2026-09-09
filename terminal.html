@@ -959,6 +959,90 @@ html.force-mobile #tabs{ background:#FFFFFF !important; box-shadow:0 -6px 16px r
 html.force-mobile input, html.force-mobile select, html.force-mobile textarea, html.force-mobile canvas{ max-width:100%; }
 html.force-mobile .hrow, html.force-mobile .kv .v, html.force-mobile .step .t, html.force-mobile .p-err, html.force-mobile .evrow, html.force-mobile .vmeta{ overflow-wrap:anywhere; }
 html.force-mobile #user-badge{ overflow:visible; }
+@media (max-width:767px){
+
+/* ── 모바일 v5: 줄바꿈 규칙 정리 — 제목은 한 줄, 설명은 아래로, 표는 카드로 ── */
+  html:not(.force-web) .hd{ flex-wrap:wrap; align-items:baseline; row-gap:2px; }
+  html:not(.force-web) .hd .h,   html:not(.force-web) .hd h3{ white-space:nowrap; }
+  html:not(.force-web) .hd .sub{ flex:1 1 150px; min-width:0; text-align:right; }
+  html:not(.force-web) .hd .sub:not(:only-child){ text-align:right; }
+/* 접수 이력: 날짜·처리자 / 칩 / 장애→조치 + 문의 / 처리 */
+  html:not(.force-web) .hrow{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"d who" "chips chips" "err err" "memo memo"; gap:6px 10px; padding:12px 0; }
+  html:not(.force-web) .hrow .d{ grid-area:d; font-size:13px; color:var(--gray); }
+  html:not(.force-web) .hrow .who{ grid-area:who; font-size:12.5px; color:var(--gray); text-align:right; }
+  html:not(.force-web) .hrow > span:nth-child(2){ grid-area:chips; flex-direction:row !important; flex-wrap:wrap; gap:6px; }
+  html:not(.force-web) .hrow > span:nth-child(2) .chip{ margin-top:0 !important; }
+  html:not(.force-web) .hrow .err{ grid-area:err; font-size:14.5px; }
+  html:not(.force-web) .hrow .err b{ font-weight:700; }
+  html:not(.force-web) .hrow .inq{ background:var(--tint); padding:8px 10px; margin-top:8px; font-size:13px; line-height:1.55; }
+  html:not(.force-web) .hrow .inq::before{ content:'문의'; display:block; font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
+  html:not(.force-web) .hrow .memo{ grid-area:memo; background:var(--rose); padding:8px 10px; font-size:13px; line-height:1.55; color:var(--ink); }
+  html:not(.force-web) .hrow .memo::before{ content:'처리'; display:block; font-size:11.5px; font-weight:700; color:var(--red); margin-bottom:2px; }
+/* 당일 이벤트: 시각 · 코드 · 횟수 / 내용 */
+  html:not(.force-web) .evrow{ grid-template-columns:auto auto minmax(0,1fr); grid-template-areas:"tm cd n" "t t t"; gap:2px 10px; padding:10px 0; }
+  html:not(.force-web) .evrow .tm{ grid-area:tm; white-space:nowrap; }
+  html:not(.force-web) .evrow .cd{ grid-area:cd; }
+  html:not(.force-web) .evrow .n{ grid-area:n; text-align:right; white-space:nowrap; }
+  html:not(.force-web) .evrow > span:nth-child(3){ grid-area:t; font-size:14px; }
+/* 막대 목록: 이름 한 줄, 막대 + 숫자 한 줄 */
+  html:not(.force-web) .bar-row{ grid-template-columns:minmax(0,1fr) 48px; grid-template-areas:"nm b" "bar bar"; gap:4px 10px; padding:2px 0; }
+  html:not(.force-web) .bar-row .nm{ grid-area:nm; white-space:normal; overflow:visible; text-overflow:clip; }
+  html:not(.force-web) .bar-row .bar{ grid-area:bar; }
+  html:not(.force-web) .bar-row b{ grid-area:b; }
+/* 차고지 도착: 글 아래에 단추 */
+  html:not(.force-web) .lst > div:has(> .btn-red){ flex-direction:column; align-items:stretch; gap:10px; }
+  html:not(.force-web) .btn-red{ width:100%; height:40px; }
+/* 로그백업 파일 입력: 테두리 상자로 */
+  html:not(.force-web) .logbk .lbox .t{ font-size:15px; }
+  html:not(.force-web) .logbk input[type=file]{ width:100%; border:1px solid var(--soft); padding:8px 10px; font-size:13px; background:#fff; }
+  html:not(.force-web) .logbk input[type=file]::file-selector-button{ padding:6px 12px; }
+  html:not(.force-web) .logbk .sub{ font-size:12.5px; }
+/* 판정 칸 수치: 값이 길면 오른쪽 정렬 유지하며 줄바꿈 */
+  html:not(.force-web) .kv > div{ align-items:flex-start; }
+  html:not(.force-web) .kv .v{ max-width:60%; }
+}
+
+/* ── 모바일 v5: 줄바꿈 규칙 정리 — 제목은 한 줄, 설명은 아래로, 표는 카드로 ── */
+html.force-mobile .hd{ flex-wrap:wrap; align-items:baseline; row-gap:2px; }
+html.force-mobile .hd .h, html.force-mobile .hd h3{ white-space:nowrap; }
+html.force-mobile .hd .sub{ flex:1 1 150px; min-width:0; text-align:right; }
+html.force-mobile .hd .sub:not(:only-child){ text-align:right; }
+/* 접수 이력: 날짜·처리자 / 칩 / 장애→조치 + 문의 / 처리 */
+html.force-mobile .hrow{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"d who" "chips chips" "err err" "memo memo"; gap:6px 10px; padding:12px 0; }
+html.force-mobile .hrow .d{ grid-area:d; font-size:13px; color:var(--gray); }
+html.force-mobile .hrow .who{ grid-area:who; font-size:12.5px; color:var(--gray); text-align:right; }
+html.force-mobile .hrow > span:nth-child(2){ grid-area:chips; flex-direction:row !important; flex-wrap:wrap; gap:6px; }
+html.force-mobile .hrow > span:nth-child(2) .chip{ margin-top:0 !important; }
+html.force-mobile .hrow .err{ grid-area:err; font-size:14.5px; }
+html.force-mobile .hrow .err b{ font-weight:700; }
+html.force-mobile .hrow .inq{ background:var(--tint); padding:8px 10px; margin-top:8px; font-size:13px; line-height:1.55; }
+html.force-mobile .hrow .inq::before{ content:'문의'; display:block; font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
+html.force-mobile .hrow .memo{ grid-area:memo; background:var(--rose); padding:8px 10px; font-size:13px; line-height:1.55; color:var(--ink); }
+html.force-mobile .hrow .memo::before{ content:'처리'; display:block; font-size:11.5px; font-weight:700; color:var(--red); margin-bottom:2px; }
+/* 당일 이벤트: 시각 · 코드 · 횟수 / 내용 */
+html.force-mobile .evrow{ grid-template-columns:auto auto minmax(0,1fr); grid-template-areas:"tm cd n" "t t t"; gap:2px 10px; padding:10px 0; }
+html.force-mobile .evrow .tm{ grid-area:tm; white-space:nowrap; }
+html.force-mobile .evrow .cd{ grid-area:cd; }
+html.force-mobile .evrow .n{ grid-area:n; text-align:right; white-space:nowrap; }
+html.force-mobile .evrow > span:nth-child(3){ grid-area:t; font-size:14px; }
+/* 막대 목록: 이름 한 줄, 막대 + 숫자 한 줄 */
+html.force-mobile .bar-row{ grid-template-columns:minmax(0,1fr) 48px; grid-template-areas:"nm b" "bar bar"; gap:4px 10px; padding:2px 0; }
+html.force-mobile .bar-row .nm{ grid-area:nm; white-space:normal; overflow:visible; text-overflow:clip; }
+html.force-mobile .bar-row .bar{ grid-area:bar; }
+html.force-mobile .bar-row b{ grid-area:b; }
+/* 차고지 도착: 글 아래에 단추 */
+html.force-mobile .lst > div:has(> .btn-red){ flex-direction:column; align-items:stretch; gap:10px; }
+html.force-mobile .btn-red{ width:100%; height:40px; }
+/* 로그백업 파일 입력: 테두리 상자로 */
+html.force-mobile .logbk .lbox .t{ font-size:15px; }
+html.force-mobile .logbk input[type=file]{ width:100%; border:1px solid var(--soft); padding:8px 10px; font-size:13px; background:#fff; }
+html.force-mobile .logbk input[type=file]::file-selector-button{ padding:6px 12px; }
+html.force-mobile .logbk .sub{ font-size:12.5px; }
+/* 판정 칸 수치: 값이 길면 오른쪽 정렬 유지하며 줄바꿈 */
+html.force-mobile .kv > div{ align-items:flex-start; }
+html.force-mobile .kv .v{ max-width:60%; }
+@media (max-width:767px){ html:not(.force-web) .logbk .hd .sub, html:not(.force-web) .hist .hd .sub{ flex-basis:100%; text-align:left; } }
+html.force-mobile .logbk .hd .sub, html.force-mobile .hist .hd .sub{ flex-basis:100%; text-align:left; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
