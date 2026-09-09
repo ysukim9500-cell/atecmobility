@@ -1188,6 +1188,7 @@ function drawDimChart(F){
   const m={}; F.forEach(f=>{ let k=f[key]; if(key==='line'){ k=lineKey(f); } k=k||'(미입력)'; m[k]=(m[k]||0)+1; });
   const entries=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,12);
   $('#dim-title').textContent=DIM_LABEL[key];
+  { const box=$('#rch-dim').parentElement; if(box && document.documentElement.classList.contains('is-mobile')) box.style.setProperty('height', Math.max(230, entries.length*30+44)+'px', 'important'); }
   if(charts.dim) charts.dim.destroy();
   const isLine = key==='line';
   charts.dim=new Chart($('#rch-dim'),{type:'bar',

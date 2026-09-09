@@ -204,6 +204,13 @@ html.force-mobile #user-badge button, html.force-mobile #user-badge .ub-btn{ bor
 html.force-mobile #app-root > .max-w-\[1280px\]{ padding:12px 12px 0 !important; }
 html.force-mobile #launcher-grid{ grid-template-columns:1fr; }
 html.force-mobile .launch3{ border-right:0 !important; padding:18px 0 16px !important; }
+@media (max-width:767px){
+  #app-root header > div > .flex.items-center.gap-3 > span, #app-root header > div > .flex.items-center.gap-3 > .w-px{ display:none; }
+  #user-badge svg{ display:none; }
+  #user-badge > span:first-of-type{ font-weight:700 !important; color:var(--ink) !important; padding-right:4px !important; }
+  #user-badge > span:nth-of-type(2){ padding:0 !important; }
+  #user-badge button, #user-badge .ub-btn, #user-badge a{ flex:0 0 auto; }
+}
 /* 로그인 전 소개 화면: 바탕만 흰색으로, 나머지는 그대로 */
 #auth-overlay{ background:#FFFFFF !important; }
 </style>
@@ -851,11 +858,11 @@ function renderUserBadge(){
   const b=$('#user-badge'); if(!b) return;
   const roleChip = isAdmin()? '<span class="bg-amber-400 text-amber-900 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ml-1">관리자</span>' : '<span class="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-bold ml-1">일반</span>';
   b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="shrink-0"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <span class="font-bold truncate max-w-[120px]">${ME?ME.name:''}</span>${roleChip}
-    ${isAdmin()? '<a href="admin.html" class="ub-btn ml-1 bg-amber-400 text-amber-900 hover:bg-amber-300 rounded px-2 py-1 text-[11px] font-extrabold transition" title="관리자 콘솔">⚙ 관리자</a>':''}
-    <button onclick="showHelp()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition" title="사용법 도움말">❓ 도움말</button>
-    <button onclick="promptChangePw(false)" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🔑 비밀번호</button>
-    <button onclick="logout()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">🚪 로그아웃</button>`;
+    <span class="font-bold">${ME?ME.name:''}</span>${roleChip}
+    ${isAdmin()? '<a href="admin.html" class="ub-btn ml-1 bg-amber-400 text-amber-900 hover:bg-amber-300 rounded px-2 py-1 text-[11px] font-extrabold transition" title="관리자 콘솔">관리자 콘솔</a>':''}
+    <button onclick="showHelp()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition" title="사용법 도움말">도움말</button>
+    <button onclick="promptChangePw(false)" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">비밀번호</button>
+    <button onclick="logout()" class="ub-btn ml-1 bg-white/15 hover:bg-white/30 rounded px-2 py-1 text-[11px] font-bold transition">로그아웃</button>`;
 }
 function applyRoleVisibility(){ document.querySelectorAll('[data-admin]').forEach(el=>{ el.style.display = isAdmin()? '' : 'none'; }); applyPermVisibility(); }
 

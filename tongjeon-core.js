@@ -185,6 +185,8 @@ window.TJ = (function () {
     if (ss) ss.textContent = { dash: '기간을 고르면 아래 전체가 함께 바뀝니다.', faults: '터미널 장애를 접수하고 처리 내역과 사용 자재를 기록합니다.', stock: '거점별 자재 재고를 양품·불량·외주로 봅니다.', repairs: '불량품 입고 → 수리 → 양품 복귀를 추적합니다.', equip: '터미널을 고르면 구축 장비와 예비품을 보여줍니다.', terminals: '터미널 명부와 다른 표기를 관리합니다.' }[name] || '';
     var ss = document.getElementById('ci-sub');
     if (ss) ss.textContent = { dash: '기간을 고르면 아래 전체가 함께 바뀝니다.', faults: '터미널 장애를 접수하고 처리 내역과 사용 자재를 기록합니다.', stock: '거점별 자재 재고를 양품·불량·외주로 봅니다.', repairs: '불량품 입고 → 수리 → 양품 복귀를 추적합니다.', equip: '터미널을 고르면 구축 장비와 예비품을 보여줍니다.', terminals: '터미널 명부와 다른 표기를 관리합니다.' }[name] || '';
+    var ss = document.getElementById('ci-sub');
+    if (ss) ss.textContent = { dash: '기간을 고르면 아래 전체가 함께 바뀝니다.', faults: '터미널 장애를 접수하고 처리 내역과 사용 자재를 기록합니다.', stock: '거점별 자재 재고를 양품·불량·외주로 봅니다.', repairs: '불량품 입고 → 수리 → 양품 복귀를 추적합니다.', equip: '터미널을 고르면 구축 장비와 예비품을 보여줍니다.', terminals: '터미널 명부와 다른 표기를 관리합니다.' }[name] || '';
     ['dash', 'faults', 'stock', 'repairs', 'equip', 'terminals'].forEach(function (t) {
       document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
