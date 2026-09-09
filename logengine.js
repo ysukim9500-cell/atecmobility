@@ -640,7 +640,7 @@ function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, mod
   const extra=renderExtraCards(bootDiag, gpsDiag)+renderIntegratedSeungha(integSeungha, selfBad)+renderModuleLinks(moduleDiag);
   if(!dg.findings.length && !extra){
     box.innerHTML=head+'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[13px] text-emerald-700"><b>🟢 통신 장애 신호가 없습니다.</b><div class="text-[11px] mt-1">로그상 승하차·표출기·모뎀 등 통신 이상이 잡히지 않았습니다(정상 범위).</div></div>'
-      +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
+      +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai"><svg class="lg4-ai-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.55 5.6 4.4 9.45 10 10-5.6.55-9.45 4.4-10 10-.55-5.6-4.4-9.45-10-10 5.6-.55 9.45-4.4 10-10z"/></svg>로그 · 이력 · S/N 종합 AI 분석</button>'
       +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
     showActionCard(vnum, vid, null);
     if(dg.sn&&dg.sn!=='단말기') loadSnHistory(dg.sn,'logbk-snhist');
@@ -669,7 +669,7 @@ function renderDiag(dg, vnum, vid, bootDiag, gpsDiag, integSeungha, selfBad, mod
       +parts+'</div>';
   }
   box.innerHTML=head+(dg.findings.length?'':'<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-[12px] text-emerald-700 mb-2">🟢 통신 이벤트는 정상 범위입니다 — 아래 부팅/전원·GPS 항목을 확인하세요.</div>')+rows+extra
-    +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
+    +'<button onclick="aiLogAnalysis(\''+(''+vnum).replace(/'/g,"\\'")+'\',\''+(''+(vid||'')).replace(/'/g,"\\'")+'\')" class="lg4 lg4-ai"><svg class="lg4-ai-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.55 5.6 4.4 9.45 10 10-5.6.55-9.45 4.4-10 10-.55-5.6-4.4-9.45-10-10 5.6-.55 9.45-4.4 10-10z"/></svg>로그 · 이력 · S/N 종합 AI 분석</button>'
     +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
   showActionCard(vnum, vid, dg.findings[0]);
   if(dg.sn&&dg.sn!=='단말기') loadSnHistory(dg.sn,'logbk-snhist');
@@ -1217,7 +1217,7 @@ var __LG4_CSS='.lg4{--lg-red:var(--red,#D70051);--lg-gold:var(--atec-gold,#8C6D2
 +'.lg4-more{border:1px solid var(--lg-line);background:#fff;margin-bottom:10px}.lg4-more summary{list-style:none;cursor:pointer;padding:9px 14px;font-size:12px;color:var(--lg-gray);display:flex;justify-content:space-between;align-items:center}.lg4-more summary::-webkit-details-marker{display:none}.lg4-more summary:after{content:"펼치기";font-size:11px}.lg4-more[open] summary:after{content:"접기"}'
 +'.lg4-row{padding:9px 14px;border-top:1px solid var(--lg-line);font-size:12.5px;color:var(--lg-ink);line-height:1.55}.lg4-row .lg4-sev{margin-right:6px}.lg4-row small{display:block;color:var(--lg-gray);font-size:11.5px;margin-top:2px}'
 +'.lg4-sev{font-size:10.5px;font-weight:700;color:#fff;background:var(--lg-sev);padding:1px 7px;line-height:1.6}.lg4-row.core .lg4-sev{background:var(--lg-red)}.lg4-row.warn .lg4-sev{background:var(--lg-gold)}'
-+'.lg4-ai{display:block;width:100%;background:var(--lg-ink);color:#fff;font-size:13px;font-weight:700;padding:11px 12px;margin-top:6px;border:0;border-radius:0;text-align:center;cursor:pointer}.lg4-ai:active{opacity:.85}';
++'.lg4-ai{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(90deg,#4285F4 0%,#9B72CB 55%,#D96570 100%);color:#fff;font-size:13px;font-weight:700;padding:11px 12px;margin-top:6px;border:0;border-radius:0;text-align:center;cursor:pointer;letter-spacing:.01em}.lg4-ai:hover{filter:brightness(1.06)}.lg4-ai:active{opacity:.85}.lg4-ai-ico{flex:none;width:16px;height:16px;fill:#fff}';
 function __lg4Css(){ if(document.getElementById('lg4-css')) return; var st=document.createElement('style'); st.id='lg4-css'; st.textContent=__LG4_CSS; document.head.appendChild(st); }
 function __lg4Parts(arr, label){ if(!arr||!arr.length) return ''; return '<div class="lg4-parts"><span>'+(label||'준비 부품')+'</span>'+arr.map(function(p){return '<span class="lg4-part">'+__v3Esc(p)+'</span>';}).join('')+'</div>'; }
 function __lg4Top(r){ var F=r.findings||[]; if(!F.length) return null; var s=r.summary||{}; var t=null; if(s.topName) t=F.filter(function(f){return f.name===s.topName;})[0]; if(!t) t=F.filter(function(f){return f.severity==='core';})[0]; return t||F[0]; }
@@ -1308,7 +1308,7 @@ async function runV3Overlay(vnum, vid){
     }
   }catch(e){}
   var vnE=(''+(vnum||'')).replace(/'/g,"\\'"), vidE=(''+(vid||'')).replace(/'/g,"\\'");
-  html+='<button onclick="aiLogAnalysis(\''+vnE+'\',\''+vidE+'\')" class="lg4 lg4-ai">로그 · 이력 · S/N 종합 AI 분석</button>'
+  html+='<button onclick="aiLogAnalysis(\''+vnE+'\',\''+vidE+'\')" class="lg4 lg4-ai"><svg class="lg4-ai-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.55 5.6 4.4 9.45 10 10-5.6.55-9.45 4.4-10 10-.55-5.6-4.4-9.45-10-10 5.6-.55 9.45-4.4 10-10z"/></svg>로그 · 이력 · S/N 종합 AI 분석</button>'
     +'<div id="logbk-ai" class="mt-2"></div><div id="logbk-snhist" class="mt-3"></div>';
   box.innerHTML=html;
   var isoBox=document.getElementById('logbk-iso'); if(isoBox) isoBox.innerHTML='';
