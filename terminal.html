@@ -3787,6 +3787,7 @@ function buildKB(rows){
 
 /* Build full KB (vehicles, reco, stats, dash, preempt) from normalized records */
 function buildKBfromRecords(records){
+  records.forEach(r=>{ if(/B820/.test(''+(r.term||''))) r.center='인천센터'; });   // B820 = 인천센터 (사용자 지정)
   const p2=n=>(''+n).padStart(2,'0');
   const pdate=dt=>{ const s=dt||''; if(s.length<8)return null;
     const d=new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8),+s.slice(8,10)||0,+s.slice(10,12)||0); return isNaN(d)?null:d; };
