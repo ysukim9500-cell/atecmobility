@@ -1343,7 +1343,7 @@ html.force-mobile #events .scope-btn .opacity-70{ display:none; } html.force-mob
     <div id="searchwrap">
       <div class="searchbar bg-white flex items-center">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-[#5A666F]"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 · 뒷자리만 입력해도 됩니다" class="flex-1 min-w-0 outline-none bg-transparent placeholder:text-slate-400">
+        <input id="q" type="text" autocomplete="off" inputmode="search" placeholder="차량번호 · 뒷자리 가능" class="flex-1 min-w-0 outline-none bg-transparent placeholder:text-slate-400">
         <button onclick="document.getElementById('q').value='';doSearch('')" class="text-slate-400 hover:text-slate-600 text-sm" style="min-height:0">✕</button>
       </div>
       <button type="button" class="search-go" onclick="(function(){var m=matchVehicles(document.getElementById('q').value.trim());if(m[0]){document.getElementById('q').value=m[0];doSearch(m[0]);}})()">검색</button>
@@ -1456,7 +1456,7 @@ html.force-mobile #events .scope-btn .opacity-70{ display:none; } html.force-mob
     <p class="sub max-w-2xl" style="margin-bottom:12px">통합단말기(MCU)는 차량 사이를 옮겨다닙니다. <b>S/N(개체) 기준</b>으로 보면 어느 차량을 거치든 같은 장애가 반복되는 <b>불량 단말기</b>가 드러납니다. 로그 진단·처리 이력은 <b>백업 분석 후 저장된 기록</b>에서 가져옵니다.</p>
     <div class="sec">
       <div class="flex gap-2">
-        <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 입력 — 뒤 4자리만 쳐도 됩니다 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
+        <input id="sn-q" type="text" inputmode="numeric" placeholder="S/N 뒤 4자리 (예: 1178)" onkeydown="if(event.key==='Enter')snSearch()"
           class="flex-1 text-[14px] border border-rose-200 rounded-lg px-3 py-2.5 outline-none focus:border-[#D70051]">
         <button onclick="snSearch()" class="text-[13px] font-bold text-white rounded-lg px-4 py-2.5 hover:brightness-110 active:scale-95 transition" style="background:#D70051">조회</button>
       </div>
@@ -1490,7 +1490,7 @@ html.force-mobile #events .scope-btn .opacity-70{ display:none; } html.force-mob
     <div class="sec">
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <h3 class="text-xs font-extrabold text-[#111111]">이벤트코드 사전 <span id="ev-count" class="text-slate-400 font-medium"></span></h3>
-        <input id="ev-q" type="text" placeholder="코드/내용 검색 (예: 통신, 1010)" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D70051]">
+        <input id="ev-q" type="text" placeholder="코드·내용 검색" class="ml-auto text-[12px] border border-rose-200 rounded-md px-2.5 py-1 outline-none w-48 focus:border-[#D70051]">
         <select id="ev-cat" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 분류</option></select>
         <select id="ev-sev" class="text-[12px] border border-rose-200 rounded-md px-2 py-1 outline-none"><option value="">전체 코드</option><option value="core">핵심만</option><option value="의심">이상만</option><option value="정상">정상만</option></select>
       </div>
