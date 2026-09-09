@@ -1153,6 +1153,42 @@ html.force-mobile #preempt-summary, html.force-mobile #ev-summary{ display:grid 
 html.force-mobile .ms{ padding:2px 0 !important; border-left:0 !important; display:flex; justify-content:space-between; }
 @media (max-width:767px){ html:not(.force-web) .mhist .inq::before, html:not(.force-web) .mhist .memo::before{ content:none !important; } html:not(.force-web) .mhist .mbox{ grid-area:auto; margin-top:8px !important; padding:10px 12px !important; } html:not(.force-web) #preempt-summary, html:not(.force-web) #ev-summary{ gap:4px 16px !important; } html:not(.force-web) .ms .ms-v{ text-align:right; } html:not(.force-web) .overflow-x-auto table td{ padding:4px 0 !important; font-size:12.5px !important; } html:not(.force-web) .overflow-x-auto table tr{ padding:8px 0 !important; } }
 html.force-mobile .mhist .inq::before, html.force-mobile .mhist .memo::before{ content:none !important; } html.force-mobile .mhist .mbox{ grid-area:auto; margin-top:8px !important; padding:10px 12px !important; } html.force-mobile #preempt-summary, html.force-mobile #ev-summary{ gap:4px 16px !important; } html.force-mobile .ms .ms-v{ text-align:right; } html.force-mobile .overflow-x-auto table td{ padding:4px 0 !important; font-size:12.5px !important; } html.force-mobile .overflow-x-auto table tr{ padding:8px 0 !important; }
+@media (max-width:767px){
+
+/* ── 모바일 문법 v8: 이벤트 사전 카드 · 이벤트 검색 줄 격자 ── */
+  html:not(.force-web) #ev-table tr.mevr{ display:block; border:0 !important; border-bottom:1px solid var(--line) !important; padding:0 !important; margin:0 !important; background:#fff; }
+  html:not(.force-web) #ev-table td.mev{ display:block !important; padding:12px 0 !important; text-align:left !important; border:0 !important; }
+  html:not(.force-web) #ev-table td.mev::before{ content:none !important; }
+  html:not(.force-web) .mev-top{ display:flex; align-items:center; gap:6px; }
+  html:not(.force-web) .mev-code{ font-size:16px; font-weight:700; color:var(--red); margin-right:2px; }
+  html:not(.force-web) .mev-top .chip{ height:24px; padding:0 8px !important; font-size:12px !important; }
+  html:not(.force-web) .mev-n{ margin-left:auto; font-size:12.5px; color:var(--gray); }
+  html:not(.force-web) .mev-t{ font-size:15px; color:var(--ink); margin-top:6px; line-height:1.45; }
+  html:not(.force-web) .mev-sub{ font-size:13px; color:var(--gray); margin-top:4px; }
+  html:not(.force-web) #events .flex.flex-wrap.items-center.gap-2.mb-3{ display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+  html:not(.force-web) #events .flex.flex-wrap.items-center.gap-2.mb-3 > h3{ grid-column:1 / -1; }
+  html:not(.force-web) #events #ev-q{ grid-column:1 / -1; margin-left:0 !important; width:100% !important; height:44px; padding:0 12px !important; font-size:15px !important; }
+  html:not(.force-web) #events #ev-cat,   html:not(.force-web) #events #ev-sev{ height:44px; padding:0 10px !important; font-size:15px !important; }
+  html:not(.force-web) #events table thead{ display:none; }
+}
+
+/* ── 모바일 문법 v8: 이벤트 사전 카드 · 이벤트 검색 줄 격자 ── */
+html.force-mobile #ev-table tr.mevr{ display:block; border:0 !important; border-bottom:1px solid var(--line) !important; padding:0 !important; margin:0 !important; background:#fff; }
+html.force-mobile #ev-table td.mev{ display:block !important; padding:12px 0 !important; text-align:left !important; border:0 !important; }
+html.force-mobile #ev-table td.mev::before{ content:none !important; }
+html.force-mobile .mev-top{ display:flex; align-items:center; gap:6px; }
+html.force-mobile .mev-code{ font-size:16px; font-weight:700; color:var(--red); margin-right:2px; }
+html.force-mobile .mev-top .chip{ height:24px; padding:0 8px !important; font-size:12px !important; }
+html.force-mobile .mev-n{ margin-left:auto; font-size:12.5px; color:var(--gray); }
+html.force-mobile .mev-t{ font-size:15px; color:var(--ink); margin-top:6px; line-height:1.45; }
+html.force-mobile .mev-sub{ font-size:13px; color:var(--gray); margin-top:4px; }
+html.force-mobile #events .flex.flex-wrap.items-center.gap-2.mb-3{ display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+html.force-mobile #events .flex.flex-wrap.items-center.gap-2.mb-3 > h3{ grid-column:1 / -1; }
+html.force-mobile #events #ev-q{ grid-column:1 / -1; margin-left:0 !important; width:100% !important; height:44px; padding:0 12px !important; font-size:15px !important; }
+html.force-mobile #events #ev-cat, html.force-mobile #events #ev-sev{ height:44px; padding:0 10px !important; font-size:15px !important; }
+html.force-mobile #events table thead{ display:none; }
+@media (max-width:767px){ html:not(.force-web) #events .scope-btn .opacity-70{ display:none; } html:not(.force-web) #events .scope-btn{ white-space:nowrap; } }
+html.force-mobile #events .scope-btn .opacity-70{ display:none; } html.force-mobile #events .scope-btn{ white-space:nowrap; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -3017,8 +3053,16 @@ function renderEvTable(){
   else if(sev==='정상') rows=rows.filter(([c,o])=>o.sev==='정상');
   if(DAILY_AGG) rows.sort((a,b)=>(DAILY_AGG.codeCount[b[0]]||0)-(DAILY_AGG.codeCount[a[0]]||0));
   else rows.sort((a,b)=>{ const ca=a[1].core?0:1, cb=b[1].core?0:1; return ca-cb || a[0].localeCompare(b[0]); });
+  const isM = document.documentElement.classList.contains('force-mobile') || (!document.documentElement.classList.contains('force-web') && window.matchMedia('(max-width:767px)').matches);
   $('#ev-table').innerHTML = rows.slice(0,250).map(([c,o])=>{
     const cnt=DAILY_AGG?(DAILY_AGG.codeCount[c]||0):'';
+    if(isM){
+      return `<tr class="mevr"><td class="mev" colspan="6">
+        <div class="mev-top"><span class="mev-code">${c}</span>${o.core?'<span class="chip ln red">핵심</span>':''}<span class="chip ln ${o.sev==='의심'?'red':''}">${o.sev==='의심'?'이상':'정상'}</span><span class="mev-n">${DAILY_AGG?'발생 '+num(cnt):''}</span></div>
+        <div class="mev-t">${o.t||'-'}</div>
+        <div class="mev-sub">${o.dev||o.d||''}${o.cat?' · '+o.cat:''}</div>
+      </td></tr>`;
+    }
     const coreChip = o.core?'<span class="chip" style="background:#F2F2F2;color:#D70051;font-weight:800">핵심</span> ':'';
     const sevChip=o.sev==='의심'?'<span class="chip" style="background:#F2F2F2;color:#D70051">이상</span>':'<span class="chip" style="background:#F2F2F2;color:#5A666F">정상</span>';
     return `<tr class="border-b border-rose-50 hover:bg-rose-50/50 ${o.core?'bg-rose-50/30':''}">
