@@ -2377,7 +2377,7 @@ function centerCounts(){
   return {c,total};
 }
 /* 단말기 기종(term) 카운트 — 다른 활성 필터 반영 */
-function termShort(t){ const m=(''+t).match(/B7\d0|B800/); return m?m[0]:(''+t).slice(0,8); }
+function termShort(t){ const m=(''+t).match(/B7\d0|B8\d0/); return m?m[0]:(''+t).slice(0,8); }
 function termCounts(){
   const c={}; let total=0;
   for(const v in KB.vehicles) for(const it of KB.vehicles[v].items){
@@ -3572,7 +3572,7 @@ function highlightMemo(t){
 
 /* helpers */
 function miniStat(label,val,col){ return `<span class="ms"><span class="ms-k">${label}</span><b class="ms-v" style="color:${col}">${val}</b></span>`; }
-function short(t){ if(!t)return '-'; const m=t.match(/B7\d0|B800/); return m?m[0]:t.slice(0,8); }
+function short(t){ if(!t)return '-'; const m=t.match(/B7\d0|B8\d0/); return m?m[0]:t.slice(0,8); }
 function daysAgo(dstr){ const d=new Date(dstr.replace(' ','T')); return Math.floor((Date.now()-d)/864e5); }
 function riskLevel(total, recent, repro){
   if(total>=10 || recent>=4) return {label:'재불량 다발', color:'#D70051', bg:'bg-red-50 text-red-800 border border-red-200', note:''};
