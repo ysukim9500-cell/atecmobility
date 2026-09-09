@@ -460,6 +460,38 @@ html.is-mobile body.mm-open{ overflow:hidden; }
 html.is-mobile #rail-user{ display:none !important; }
 html.is-mobile header .rail-wrap{ padding-bottom:8px !important; }
 
+/* ── 로딩 화면 (공용) ── */
+#app-loader{ position:fixed; inset:0; z-index:9999; background:#FFFFFF; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .4s ease; }
+#app-loader.show{ opacity:1; pointer-events:auto; }
+#app-loader .cl-wrap{ position:relative; text-align:center; color:#111111; padding:20px; max-width:90%; }
+#app-loader .cl-logo-box{ position:relative; width:180px; height:180px; margin:0 auto 32px; display:flex; align-items:center; justify-content:center; }
+#app-loader .cl-ring{ position:absolute; inset:0; border-radius:50%; border:2px solid #D9D9D9; border-top-color:#D70051; animation:cl-spin 1.4s linear infinite; }
+#app-loader .cl-ring.r2{ inset:14px; border:1px solid #D9D9D9; border-bottom-color:#5A666F; animation:cl-spin 2.2s linear infinite reverse; }
+@keyframes cl-spin{ to{ transform:rotate(360deg); } }
+#app-loader .cl-logo{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; width:128px; height:128px; border-radius:50%; background:#fff; border:1px solid #D9D9D9; }
+#app-loader .cl-mark{ width:84px; height:auto; display:block; }
+#app-loader .cl-bus{ margin-top:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; background:#F2F2F2; }
+#app-loader .cl-cloud-icon{ position:absolute; top:-8px; right:-8px; width:42px; height:42px; background:#fff; border:1px solid #D9D9D9; border-radius:50%; display:flex; align-items:center; justify-content:center; animation:cl-bob 2.6s ease-in-out infinite; }
+@keyframes cl-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+#app-loader .cl-title{ font-size:22px; font-weight:700; letter-spacing:-.3px; margin-bottom:8px; color:#111111; }
+#app-loader .cl-subtitle{ font-size:13px; font-weight:400; color:#5A666F; margin-bottom:24px; }
+#app-loader .cl-status{ display:inline-block; font-size:13px; font-weight:500; background:#fff; border:1px solid #D9D9D9; padding:8px 18px; min-width:240px; color:#111111; transition:all .3s ease; }
+#app-loader .cl-progress{ margin-top:18px; width:240px; height:4px; background:#EDEDED; overflow:hidden; margin-left:auto; margin-right:auto; }
+#app-loader .cl-progress-bar{ height:100%; background:#D70051; width:0%; transition:width .5s ease; }
+#app-loader .cl-steps{ margin-top:20px; display:flex; gap:6px; justify-content:center; font-size:11px; font-weight:500; color:#5A666F; }
+#app-loader .cl-step{ display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:#fff; border:1px solid #D9D9D9; transition:all .3s ease; }
+#app-loader .cl-step.active{ border-color:#111111; color:#111111; }
+#app-loader .cl-step.done{ border-color:#5A666F; color:#5A666F; }
+#app-loader .cl-dot{ width:6px; height:6px; background:#D9D9D9; }
+#app-loader .cl-step.active .cl-dot{ background:#D70051; animation:cl-blink 1s ease-in-out infinite; }
+#app-loader .cl-step.done .cl-dot{ background:#5A666F; }
+@keyframes cl-blink{ 0%,100%{opacity:1} 50%{opacity:.3} }
+@media (max-width:480px){
+  #app-loader .cl-logo-box{ width:150px; height:150px; margin-bottom:24px; } #app-loader .cl-logo{ width:108px; height:108px; } #app-loader .cl-mark{ width:70px; }
+  #app-loader .cl-title{ font-size:18px; } #app-loader .cl-subtitle{ font-size:12px; margin-bottom:18px; } #app-loader .cl-status{ font-size:12px; min-width:200px; padding:7px 14px; }
+  #app-loader .cl-progress{ width:200px; } #app-loader .cl-steps{ font-size:10px; gap:4px; } #app-loader .cl-step{ padding:2px 7px; }
+}
+
 /* rail 전용 보정 */
 #tab-list > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
 #tab-list > .panel:first-child .fld{ height:32px; padding:0 10px !important; font-size:13px !important; background:#fff; }
@@ -475,6 +507,48 @@ html.is-mobile .rng-main .btn-main{ height:44px; }
 </style>
 </head>
 <body>
+<!-- 로딩 화면: 로그인 확인 → 자료 불러오기 → 화면 그리기 -->
+<div id="app-loader" class="show" aria-hidden="true">
+  <div class="cl-wrap">
+    <div class="cl-logo-box">
+      <div class="cl-ring"></div>
+      <div class="cl-ring r2"></div>
+      <div class="cl-logo">
+        <img src="assets/atec-logo-stack.png" alt="ATEC 에이텍모빌리티" class="cl-mark">
+        <div class="cl-bus" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 16V7a3 3 0 013-3h10a3 3 0 013 3v9M4 16h16M5 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M16 18v1a1 1 0 001 1h1a1 1 0 001-1v-1M6.5 13a1 1 0 100-2 1 1 0 000 2zM17.5 13a1 1 0 100-2 1 1 0 000 2z" stroke="#5A666F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="cl-cloud-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 18a5 5 0 110-10 6 6 0 0111.7 1.5A4.5 4.5 0 0118 18H7z" fill="#D70051"/></svg>
+      </div>
+    </div>
+    <div class="cl-title">교통카드 키오스크 자료를 불러오는 중</div>
+    <div class="cl-subtitle">최신 장애 접수와 역·장비 정보를 불러옵니다</div>
+    <div id="cl-status" class="cl-status">로그인 확인 중…</div>
+    <div class="cl-progress"><div id="cl-progress-bar" class="cl-progress-bar" style="width:8%"></div></div>
+    <div class="cl-steps">
+      <span class="cl-step active" data-step="auth"><span class="cl-dot"></span> 로그인</span>
+      <span class="cl-step" data-step="data"><span class="cl-dot"></span> 자료</span>
+      <span class="cl-step" data-step="apply"><span class="cl-dot"></span> 화면</span>
+    </div>
+  </div>
+</div>
+<script>
+window.ALOAD = (function(){
+  var el=null, st=null, bar=null, timer=null;
+  function q(){ el=el||document.getElementById('app-loader'); st=st||document.getElementById('cl-status'); bar=bar||document.getElementById('cl-progress-bar'); return !!el; }
+  function step(name, done){ document.querySelectorAll('#app-loader .cl-step').forEach(function(s){ var n=s.dataset.step; if(n===name){ s.classList.toggle('active', !done); s.classList.toggle('done', !!done); } }); }
+  var api = {
+    set: function(msg, name, pct){ if(!q()) return; if(msg) st.textContent=msg; if(name) step(name,false); if(pct!=null) bar.style.width=pct+'%'; },
+    done: function(name){ if(!q()) return; step(name,true); },
+    hide: function(){ if(!q()) return; bar.style.width='100%'; clearTimeout(timer); timer=setTimeout(function(){ el.classList.remove('show'); }, 400); }
+  };
+  setTimeout(function(){ if(q() && el.classList.contains('show')){ api.set('응답이 느립니다 — 화면을 먼저 엽니다'); api.hide(); } }, 20000);   // 안전장치
+  return api;
+})();
+</script>
+
 
 <!-- HEADER -->
 <header class="bg-white border-b" style="border-color:#D9D9D9">
@@ -901,6 +975,7 @@ async function publishRailSummary(){
 
 /* ===== boot ===== */
 async function boot(){
+  if(window.ALOAD){ ALOAD.done('auth'); ALOAD.set('장애 자료 불러오는 중…','data',35); }
   // user badge
   if(sess){
     $('#rail-user').innerHTML = `<span class="font-semibold">${sess.name||sess.username}</span>`
@@ -921,12 +996,14 @@ async function boot(){
 
   // load user-entered faults from cloud (shared across users)
   $('#rail-meta').innerHTML='<div class="font-bold">클라우드 동기화 중…</div>';
+  if(window.ALOAD) ALOAD.set('클라우드 동기화 중…','data',55);
   await loadUserFaultsFromCloud();
   // fallback: if cloud empty/unavailable, use local backup
   if((!USER_FAULTS || !USER_FAULTS.length)){
     try{ if(typeof idbKeyval!=='undefined'){ const local=await idbKeyval.get('rail_user_faults'); if(Array.isArray(local)) USER_FAULTS=local; } }catch(e){}
   }
   rebuildFaults();
+  if(window.ALOAD){ ALOAD.done('data'); ALOAD.set('화면 그리는 중…','apply',85); }
 
   fillDatalists();
   populateFilters();
@@ -935,6 +1012,7 @@ async function boot(){
   renderList();
   updateMeta();
   try{ renderDash(); }catch(e){ console.error('dash render', e); }
+  if(window.ALOAD){ ALOAD.done('apply'); ALOAD.hide(); }
   publishRailSummary();   // 로그인 화면 요약 갱신
 }
 

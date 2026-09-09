@@ -197,6 +197,7 @@ window.TJ = (function () {
   function boot(profile) {
     SB = AtecAuth.SB_URL;
     ME = profile;
+    if (window.ALOAD) { ALOAD.done('auth'); ALOAD.set('마스터 불러오는 중…', 'data', 40); }
 
     document.getElementById('tj-user').innerHTML =
       '<span class="font-semibold">' + esc(profile.name) + '</span>' +
@@ -230,10 +231,13 @@ window.TJ = (function () {
         document.getElementById('tj-meta').innerHTML =
           '<div class="font-bold">장애 ' + num(c[0]) + '건 · 터미널 ' + num(cache.terminals.length) + '개</div>' +
           '<div class="mt-0.5" style="color:#5A666F">미처리 ' + num(c[1]) + '건</div>';
+        if (window.ALOAD) { ALOAD.done('data'); ALOAD.set('화면 그리는 중…', 'apply', 88); }
         tab('dash');
+        if (window.ALOAD) { ALOAD.done('apply'); ALOAD.hide(); }
       })
       .catch(function (e) {
         console.error(e);
+        if (window.ALOAD) ALOAD.hide();
         document.getElementById('tj-meta').innerHTML = '<div class="font-bold">데이터를 불러오지 못했습니다</div>';
         toast('데이터를 불러오지 못했습니다. 새로고침해 주세요.', false);
       });
