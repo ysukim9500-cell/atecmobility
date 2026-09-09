@@ -396,6 +396,23 @@ html.is-mobile .rng-main input[type=date]{ min-width:0 !important; }
 html.is-mobile .panel-head{ flex-wrap:wrap; }
 html.is-mobile .panel-sub{ flex-basis:100%; margin-left:0; }
 
+/* ── 모바일 문법 v7 (공용): 필터 줄을 격자로 ── */
+html.is-mobile .fpanel .flt-grid, html.is-mobile #tab-faults .flt-grid{ grid-template-columns:1fr 1fr !important; }
+html.is-mobile .rng-quick .btn-ghost{ height:40px; justify-content:center; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2{ display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2 > input, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2 > input, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2 > input, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2 > input{ grid-column:1 / -1; max-width:none !important; height:44px !important; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2 > select, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2 > select, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2 > select, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2 > select{ width:100% !important; height:44px !important; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2 > button, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2 > button, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2 > button, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2 > button{ height:44px !important; justify-content:center; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2 > span, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2 > span, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2 > span, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2 > span{ grid-column:1 / -1; text-align:right; }
+html.is-mobile #tab-faults > .panel:first-child > .flex.items-center.gap-2 > label, html.is-mobile #tab-stock > .panel:first-child > .flex.items-center.gap-2 > label, html.is-mobile #tab-terminals > .panel:first-child > .flex.items-center.gap-2 > label, html.is-mobile #tab-repairs > .panel:first-child > .flex.items-center.gap-2 > label{ grid-column:1 / -1; }
+html.is-mobile #tab-list > .panel:first-child .flex.items-center.gap-2.flex-wrap.flex-1{ display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+html.is-mobile #tab-list > .panel:first-child #l-search{ grid-column:1 / -1; height:44px !important; }
+html.is-mobile #tab-list > .panel:first-child #l-line, html.is-mobile #tab-list > .panel:first-child #l-module{ width:100% !important; height:44px !important; }
+html.is-mobile .l-actions{ display:grid !important; grid-template-columns:auto 1fr; gap:8px; align-items:center; }
+html.is-mobile .l-actions .btn-main{ height:44px; justify-content:center; }
+html.is-mobile .fpanel .fld, html.is-mobile #tab-list > .panel:first-child .fld{ height:40px; }
+html.is-mobile .fpanel .btn-main, html.is-mobile #tab-list > .panel:first-child .btn-main{ height:40px; }
+
 /* 통전망 전용 보정 */
 #tab-dash > .panel:first-child, #tab-faults > .panel:first-child, #tab-stock > .panel:first-child, #tab-repairs > .panel:first-child, #tab-terminals > .panel:first-child, #tab-equip > .panel:first-child{ background:var(--tint) !important; padding:14px 16px 12px !important; margin-top:16px !important; }
 #tab-dash > .panel:first-child .panel-head, #tab-faults > .panel:first-child .panel-head, #tab-stock > .panel:first-child .panel-head, #tab-repairs > .panel:first-child .panel-head, #tab-terminals > .panel:first-child .panel-head, #tab-equip > .panel:first-child .panel-head{ border-bottom:0; padding-bottom:0; margin-bottom:8px; font-size:14px !important; }

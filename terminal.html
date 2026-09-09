@@ -1083,6 +1083,76 @@ html.force-mobile .mc-chips .chip.red{ grid-column:1 / -1; }
 html.force-mobile .mc-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
 html.force-mobile .mc-foot .p-lv{ font-size:13px; font-weight:700; }
 html.force-mobile .mcard .p-x{ height:36px; padding:0 14px !important; font-size:13px !important; }
+@media (max-width:767px){
+
+/* ── 모바일 문법 v7: 접수 이력 카드 · 필터 격자 ── */
+  html:not(.force-web) .hrow.mhist{ display:block; padding:14px 0; }
+  html:not(.force-web) .mh-top{ display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--gray); }
+  html:not(.force-web) .mh-chips{ display:flex; gap:6px; margin-top:6px; }
+  html:not(.force-web) .mh-chips .chip{ height:28px; padding:0 10px !important; font-size:12.5px !important; }
+  html:not(.force-web) .mh-title{ font-size:15px; margin-top:8px; color:var(--ink); }
+  html:not(.force-web) .mh-title b{ font-weight:700; }
+  html:not(.force-web) .mh-title .arr{ color:var(--gray); }
+  html:not(.force-web) .mbox{ margin-top:8px; padding:10px 12px; background:var(--tint); }
+  html:not(.force-web) .mbox.memo{ background:var(--rose); }
+  html:not(.force-web) .mbox-k{ font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
+  html:not(.force-web) .mbox.memo .mbox-k{ color:var(--red); }
+  html:not(.force-web) .mbox-t{ font-size:13px; line-height:1.55; color:var(--ink); white-space:pre-line; overflow-wrap:anywhere; }
+  html:not(.force-web) .mbox-t.clamp{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  html:not(.force-web) .mbox-more{ margin-top:4px; font-size:12.5px; color:var(--gray); text-decoration:underline; min-height:28px !important; padding:0 !important; background:transparent; }
+  html:not(.force-web) .fbar .fgw{ display:block; width:100%; }
+  html:not(.force-web) .fbar .fgw .flab{ display:block; width:100%; margin:8px 0 6px; }
+  html:not(.force-web) .fbar .fgrp{ display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  html:not(.force-web) .ctile{ flex-direction:column; height:auto !important; padding:7px 6px !important; gap:2px !important; min-width:0; justify-content:center; }
+  html:not(.force-web) .ctile .ct-name{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px !important; }
+  html:not(.force-web) .ctile .ct-num{ font-size:11.5px !important; }
+  html:not(.force-web) .fsep{ display:none; }
+  html:not(.force-web) .fbar .fdate{ flex:1 1 0; min-width:0; height:40px !important; }
+  html:not(.force-web) .fbar .fgo{ height:40px; padding:0 16px; }
+  html:not(.force-web) .fbar .qd-btn{ height:36px; flex:1 1 calc(25% - 6px); justify-content:center; }
+  html:not(.force-web) #preempt .fbar .pf-btn{ flex:1 1 calc(50% - 6px); justify-content:center; height:36px; }
+  html:not(.force-web) #preempt .fbar label{ width:100%; margin:6px 0 0 !important; }
+  html:not(.force-web) #preempt .fbar .flab[style]{ margin-left:0 !important; width:100%; }
+  html:not(.force-web) #preempt .fbar #pf-center{ width:100%; height:40px; }
+  html:not(.force-web) #events .fbar .scope-btn{ flex:1 1 calc(50% - 6px); justify-content:center; height:36px; white-space:normal; line-height:1.2; }
+  html:not(.force-web) #preempt-summary,   html:not(.force-web) #ev-summary{ display:grid !important; grid-template-columns:1fr 1fr; gap:4px 0; width:100%; margin-top:8px; }
+  html:not(.force-web) .ms{ padding:2px 0 !important; border-left:0 !important; display:flex; justify-content:space-between; }
+}
+
+/* ── 모바일 문법 v7: 접수 이력 카드 · 필터 격자 ── */
+html.force-mobile .hrow.mhist{ display:block; padding:14px 0; }
+html.force-mobile .mh-top{ display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--gray); }
+html.force-mobile .mh-chips{ display:flex; gap:6px; margin-top:6px; }
+html.force-mobile .mh-chips .chip{ height:28px; padding:0 10px !important; font-size:12.5px !important; }
+html.force-mobile .mh-title{ font-size:15px; margin-top:8px; color:var(--ink); }
+html.force-mobile .mh-title b{ font-weight:700; }
+html.force-mobile .mh-title .arr{ color:var(--gray); }
+html.force-mobile .mbox{ margin-top:8px; padding:10px 12px; background:var(--tint); }
+html.force-mobile .mbox.memo{ background:var(--rose); }
+html.force-mobile .mbox-k{ font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
+html.force-mobile .mbox.memo .mbox-k{ color:var(--red); }
+html.force-mobile .mbox-t{ font-size:13px; line-height:1.55; color:var(--ink); white-space:pre-line; overflow-wrap:anywhere; }
+html.force-mobile .mbox-t.clamp{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+html.force-mobile .mbox-more{ margin-top:4px; font-size:12.5px; color:var(--gray); text-decoration:underline; min-height:28px !important; padding:0 !important; background:transparent; }
+html.force-mobile .fbar .fgw{ display:block; width:100%; }
+html.force-mobile .fbar .fgw .flab{ display:block; width:100%; margin:8px 0 6px; }
+html.force-mobile .fbar .fgrp{ display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+html.force-mobile .ctile{ flex-direction:column; height:auto !important; padding:7px 6px !important; gap:2px !important; min-width:0; justify-content:center; }
+html.force-mobile .ctile .ct-name{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px !important; }
+html.force-mobile .ctile .ct-num{ font-size:11.5px !important; }
+html.force-mobile .fsep{ display:none; }
+html.force-mobile .fbar .fdate{ flex:1 1 0; min-width:0; height:40px !important; }
+html.force-mobile .fbar .fgo{ height:40px; padding:0 16px; }
+html.force-mobile .fbar .qd-btn{ height:36px; flex:1 1 calc(25% - 6px); justify-content:center; }
+html.force-mobile #preempt .fbar .pf-btn{ flex:1 1 calc(50% - 6px); justify-content:center; height:36px; }
+html.force-mobile #preempt .fbar label{ width:100%; margin:6px 0 0 !important; }
+html.force-mobile #preempt .fbar .flab[style]{ margin-left:0 !important; width:100%; }
+html.force-mobile #preempt .fbar #pf-center{ width:100%; height:40px; }
+html.force-mobile #events .fbar .scope-btn{ flex:1 1 calc(50% - 6px); justify-content:center; height:36px; white-space:normal; line-height:1.2; }
+html.force-mobile #preempt-summary, html.force-mobile #ev-summary{ display:grid !important; grid-template-columns:1fr 1fr; gap:4px 0; width:100%; margin-top:8px; }
+html.force-mobile .ms{ padding:2px 0 !important; border-left:0 !important; display:flex; justify-content:space-between; }
+@media (max-width:767px){ html:not(.force-web) .mhist .inq::before, html:not(.force-web) .mhist .memo::before{ content:none !important; } html:not(.force-web) .mhist .mbox{ grid-area:auto; margin-top:8px !important; padding:10px 12px !important; } html:not(.force-web) #preempt-summary, html:not(.force-web) #ev-summary{ gap:4px 16px !important; } html:not(.force-web) .ms .ms-v{ text-align:right; } html:not(.force-web) .overflow-x-auto table td{ padding:4px 0 !important; font-size:12.5px !important; } html:not(.force-web) .overflow-x-auto table tr{ padding:8px 0 !important; } }
+html.force-mobile .mhist .inq::before, html.force-mobile .mhist .memo::before{ content:none !important; } html.force-mobile .mhist .mbox{ grid-area:auto; margin-top:8px !important; padding:10px 12px !important; } html.force-mobile #preempt-summary, html.force-mobile #ev-summary{ gap:4px 16px !important; } html.force-mobile .ms .ms-v{ text-align:right; } html.force-mobile .overflow-x-auto table td{ padding:4px 0 !important; font-size:12.5px !important; } html.force-mobile .overflow-x-auto table tr{ padding:8px 0 !important; }
 </style>
 </head>
 <body class="text-slate-800 min-h-screen" style="background:#FFFFFF">
@@ -3426,6 +3496,18 @@ function recoRow(i, name, rate, n){
 }
 
 function renderTL(it){
+  const isM = document.documentElement.classList.contains('force-mobile') || (!document.documentElement.classList.contains('force-web') && window.matchMedia('(max-width:767px)').matches);
+  if(isM){
+    // 모바일 카드: 날짜·처리자 / 칩 / 장애→조치 / 문의(3줄+더보기) / 처리(3줄+더보기)
+    const more = (cls, html, label) => html ? `<div class="mbox ${cls}"><div class="mbox-k">${label}</div><div class="mbox-t clamp">${html}</div><button type="button" class="mbox-more" onclick="var t=this.previousElementSibling;t.classList.toggle('clamp');this.textContent=t.classList.contains('clamp')?'더보기':'접기'">더보기</button></div>` : '';
+    return `<div class="hrow mhist">
+      <div class="mh-top"><span class="d">${it.date}</span><span class="who">${it.worker||''}</span></div>
+      <div class="mh-chips"><span class="chip ln">${it.recv||'-'}</span>${it.repro?`<span class="chip ln ${it.repro==='재현'?'red':''}">${it.repro}</span>`:''}</div>
+      <div class="mh-title"><b>${it.err||'(유형미상)'}</b>${it.field?` <span class="arr">→</span> ${it.field}`:''}</div>
+      ${more('inq', it.inquiry?escHtml(it.inquiry):'', '문의')}
+      ${more('memo', it.memo?highlightMemo(it.memo):'', '처리')}
+    </div>`;
+  }
   // 접수 이력 한 줄: 날짜 · 접수 · 장애→조치(문의) · 처리내용 · 처리자
   const chips = `<span class="chip ln">${it.recv||'-'}</span>${it.repro?`<span class="chip ln ${it.repro==='재현'?'red':''}" style="margin-top:4px">${it.repro}</span>`:''}`;
   const inquiry = it.inquiry? `<div class="inq">${escHtml(it.inquiry)}</div>`:'';
