@@ -338,6 +338,7 @@
     //    하이패스는 옛 주기 운행 객체를 가리킨 채 남아 반영 결과가 안 보였다.)
     FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all';
     HP = { groups: [], batch: '', busy: false, note: '' };
+    FILLS = {};                            // 주기가 바뀌면 구간 키가 의미를 잃는다
     var r = cycleRange(CYC.y, CYC.m);
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
@@ -831,8 +832,8 @@
       '<span class="dim" id="tfSum">정한 것 <b>' + n0(done) + '</b> / ' + n0(rows.length) + '건' +
       (sum ? ' · 합계 ' + won(sum) : '') + '</span>' +
       '<button class="btn" id="tfAllFree">남은 것 전부 「없음」</button>' +
-      '<button class="btn pri" id="tfSave"' + (done ? '' : ' disabled') + '>' +
-      n0(done) + '건 저장</button></div></section>';
+      '<button class="btn' + (done ? ' pri' : '') + '" id="tfSave"' +
+      (done ? '' : ' disabled') + '>' + n0(done) + '건 저장</button></div></section>';
 
     h += '<div class="panel"><div class="scroll tall" data-rows><table><thead><tr>' +
       '<th>구간</th><th class="n">건수</th><th>날짜</th><th class="n">통행료</th>' +
@@ -848,11 +849,12 @@
           '<td class="n" style="white-space:nowrap">' +
           '<button class="btn sm" data-tffree="' + i + '">없음</button> ' +
           '<input class="inp num" data-tfamt="' + i + '" inputmode="numeric" style="width:92px" ' +
-          'placeholder="' + (x.hint != null ? n0(x.hint) : '원') + '" value="' +
-          (v != null && v > 0 ? n0(v) : '') + '">' +
-          (x.hint != null ? ' <button class="btn sm" data-tfhint="' + i + '" ' +
-            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">' +
-            (x.hint === 0 ? '없음' : n0(x.hint) + '원') + '</button>' : '') +
+          'placeholder="' + (x.hint ? n0(x.hint) : '원') + '" value="' +
+          // 정한 줄은 0원도 숫자로 보여 준다 — 어디까지 했는지 눈에 보이게.
+          (v == null ? '' : n0(v)) + '">' +
+          (x.hint ? ' <button class="btn sm" data-tfhint="' + i + '" ' +
+            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">전에 ' +
+            n0(x.hint) + '원</button>' : '') +
           '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
 
@@ -862,13 +864,46 @@
   }
   var TF_GROUPS = [];
 
+  /** 한 줄만 제자리에서 고쳐 그린다 — 스크롤과 포커스를 지키려고. */
+  function tfPaintRow(i) {
+    var g = TF_GROUPS[i]; if (!g) return;
+    var v = FILLS[g.key];
+    var input = document.querySelector('[data-tfamt="' + i + '"]');
+    // 정한 줄은 0원도 숫자로 보여 준다 — 어디까지 했는지 눈에 보이게.
+    if (input) input.value = (v == null) ? '' : n0(v);
+    var tr = input && input.closest('tr');
+    if (tr) tr.className = (v == null) ? '' : 'tfdone';
+  }
+
+  /** 요약 줄과 저장 버튼만 고쳐 쓴다. */
+  function tfPaintSum() {
+    var done = 0, sum = 0, tot = 0;
+    TF_GROUPS.forEach(function (x) {
+      tot += x.rows.length;
+      if (FILLS[x.key] == null) return;
+      done += x.rows.length; sum += FILLS[x.key] * x.rows.length;
+    });
+    var lab = $('tfSum');
+    if (lab) lab.innerHTML = '정한 것 <b>' + n0(done) + '</b> / ' + n0(tot) + '건' +
+      (sum ? ' · 합계 ' + won(sum) : '');
+    var sb = $('tfSave');
+    if (sb) {
+      sb.disabled = !done;
+      sb.textContent = n0(done) + '건 저장';
+      // 못 누르는 버튼이 주 버튼처럼 보이면 안 눌린 게 고장으로 읽힌다.
+      sb.className = 'btn' + (done ? ' pri' : '');
+    }
+  }
+
   /** 묶음의 금액칸을 읽어 FILLS 에 반영한다(입력 도중에도 호출된다). */
   function tfRead() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-tfamt]'), function (el) {
       var i = +el.dataset.tfamt, k = TF_GROUPS[i] && TF_GROUPS[i].key;
       if (!k) return;
       var s = String(el.value || '').replace(/[^\d]/g, '');
-      if (s === '') { if (FILLS[k] !== 0) delete FILLS[k]; return; }
+      // 0원도 칸에 '0' 으로 적히므로, 빈 칸은 이제 '아직 안 정함' 이 맞다.
+      // (예전에는 0을 빈 칸으로 그려서, 지우면 0이 되살아나 되돌릴 수가 없었다.)
+      if (s === '') { delete FILLS[k]; return; }
       FILLS[k] = Number(s);
     });
   }
@@ -950,10 +985,10 @@
 
     h += sect('비밀번호 바꾸기', null, '',
       '<div class="panel" style="padding:20px"><div class="form">' +
-      frow('현재 비밀번호', '<input class="inp" type="password" id="pwCur" autocomplete="current-password">') +
-      frow('새 비밀번호', '<input class="inp" type="password" id="pwNew" autocomplete="new-password">',
+      frow('현재 비밀번호', '<input class="inp pw" type="password" id="pwCur" autocomplete="current-password">') +
+      frow('새 비밀번호', '<input class="inp pw" type="password" id="pwNew" autocomplete="new-password">',
         '4자 이상. <b>앱과 웹이 같은 비밀번호</b>를 씁니다 — 바꾸면 앱에서도 새 것으로 들어가셔야 합니다.') +
-      frow('새 비밀번호 확인', '<input class="inp" type="password" id="pwNew2" autocomplete="new-password">') +
+      frow('새 비밀번호 확인', '<input class="inp pw" type="password" id="pwNew2" autocomplete="new-password">') +
       '</div><div style="margin-top:14px;text-align:right">' +
       '<button class="btn pri" id="btnPwSave">비밀번호 바꾸기</button></div></div>');
     return h;
@@ -1593,7 +1628,7 @@
       '<th>방문처</th></tr></thead><tbody>';
     rows.forEach(function (t) {
       var place = t.visit_place || t.end_address || '';
-      h += '<tr class="clk' + (flags[t.id] ? ' flagged' : '') + '" data-trip="' + t.id + '">' +
+      h += '<tr class="clk' + (flags[t.id] ? ' flagged' : '') + '" tabindex="0" data-trip="' + t.id + '">' +
         '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' + hm(t.start_time) + '</span>' +
         (t.is_manual ? ' <span class="kind">수기</span>' : '') + '</td>' +
         (showWho ? '<td>' + esc(nameOf(t.username)) + '</td>' : '') +
@@ -1692,7 +1727,8 @@
     return h;
 
     function seg(k, label, n, warnish) {
-      if (!n && k !== 'all') return '';
+      // 고른 칩은 건수가 0이어도 남긴다 — 사라지면 왜 표가 비었는지 알 수 없다.
+      if (!n && k !== 'all' && FILT.chip !== k) return '';
       return '<button data-chip="' + k + '" class="' + (FILT.chip === k ? 'on' : '') +
         (warnish ? ' warnish' : '') + '">' + esc(label) +
         (n ? '<span class="c">' + n0(n) + '</span>' : '') + '</button>';
@@ -1851,7 +1887,9 @@
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
-    h += sect(isAll() ? '직원별' : '내 내역', rows.length + (isAll() ? '명' : '건'),
+    // 개인 범위에서 rows 는 사람 목록(늘 1명)이다. 건수는 운행 수로 적는다.
+    h += sect(isAll() ? '직원별' : '내 내역',
+      isAll() ? rows.length + '명' : n0(T.n) + '건',
       '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
         (isAll() ? '내 것 인쇄' : '인쇄용 출력') + '</button>' +
       '<button class="btn sm" id="btnCsv">' + ic('dl', 13) + 'CSV</button>', personTable(rows));
@@ -2521,7 +2559,7 @@
         plates.map(function (p) {
           var v = used[p], us = Object.keys(v.users);
           var multi = us.length > 1, wide = isFinite(v.min) && (v.max - v.min) > 10000;
-          return '<tr class="clk' + (multi || wide ? ' flagged' : '') + '" data-car="' + esc(p) + '">' +
+          return '<tr class="clk' + (multi || wide ? ' flagged' : '') + '" tabindex="0" data-car="' + esc(p) + '">' +
             '<td><span class="lead">' + esc(p) + '</span></td>' +
             '<td>' + esc(us.map(nameOf).join(', ')) + '</td>' +
             '<td class="n">' + n0(v.n) + '</td><td class="n">' + km(v.km) + '</td>' +
@@ -2904,7 +2942,7 @@
           return '<option value="' + esc(c) + '">' + esc(c) + '</option>';
         }).join('') + '<option value="__etc__">직접 입력…</option></select>' +
         '<input class="inp" id="cPlateEtc" placeholder="차량번호" style="margin-top:8px" hidden>'
-      : '<input class="inp" id="cPlateEtc" placeholder="예) 190호5283">');
+      : '<input class="inp" id="cPlateEtc" placeholder="예) 12가3456">');
     h += fld('날짜', '<input class="inp" type="date" id="cDate" value="' + dstr + '" min="' +
       ymd(r.lo) + '" max="' + ymd(r.hi - 1) + '">', '이번 마감주기 안에서만 넣을 수 있습니다');
     h += fld('시각', '<input class="inp num" type="time" id="cFrom" value="09:00" style="width:112px">' +
@@ -3077,7 +3115,13 @@
       });
   }
 
-  function closePanel() { $('panel').classList.remove('open'); }
+  var PANEL_FROM = null;                 // 패널을 연 버튼 — 닫을 때 그리로 돌려준다
+  function closePanel() {
+    $('panel').classList.remove('open');
+    // 안 돌려주면 포커스가 <body> 로 떨어져 키보드로 쓰던 자리를 잃는다.
+    if (PANEL_FROM && document.contains(PANEL_FROM)) { try { PANEL_FROM.focus(); } catch (e) {} }
+    PANEL_FROM = null;
+  }
 
   /* ══════════════════ 라우팅 ══════════════════ */
   // 개인 화면과 관리 화면이 같은 함수를 쓰고 범위만 다르다.
@@ -3152,7 +3196,8 @@
     //   남의 운행이 개인 화면에 그대로 남고(이름 칸은 사라져 남의 것인 줄도 모른다),
     //   '확정하기' 를 누르면 남의 운행에 통행료가 써진다.
     HP = { groups: [], batch: '', busy: false, note: '' };
-    FILLS = {};                   // 채우던 통행료도 화면이 바뀌면 의미가 없다
+    // ★ FILLS 는 여기서 버리지 않는다. 손으로 친 값이라, 하이패스를 잠깐 보러
+    //   갔다는 이유로 40칸을 날리면 안 된다. 주기가 바뀔 때만 버린다(loadAll).
     applyScope();
     document.body.classList.remove('nav-open');
     render();
@@ -3162,6 +3207,10 @@
   /* ══════════════════ 이벤트 ══════════════════ */
   document.addEventListener('click', function (e) {
     var el;
+    // 패널이 닫혀 있을 때 누른 것이 곧 '연 버튼' 이다(닫을 때 포커스를 돌려준다).
+    if (!$('panel').classList.contains('open')) {
+      PANEL_FROM = e.target.closest('button,a,[tabindex],tr.clk') || null;
+    }
     if (e.target.closest('[data-close]')) { closePanel(); return; }
     if ((el = e.target.closest('[data-v]'))) { go(el.dataset.v); return; }
     if ((el = e.target.closest('[data-chip]'))) { FILT.chip = el.dataset.chip; render(); return; }
@@ -3229,20 +3278,24 @@
     if ((el = e.target.closest('#btnPrintPaper'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#btnPwSave')) { savePassword(); return; }
     if ((el = e.target.closest('[data-addappr]'))) { addApprover(el.dataset.addappr); return; }
+    // ★ render() 를 부르지 않는다. 표를 다시 그리면 스크롤이 맨 위로 튀어
+    //   47줄짜리를 채우려면 매번 다시 내려가야 했다(하이패스 쪽과 같은 이유).
     if ((el = e.target.closest('[data-tffree]'))) {
       tfRead();
-      var gf = TF_GROUPS[+el.dataset.tffree]; if (gf) FILLS[gf.key] = 0;
-      render(); return;
+      var i1 = +el.dataset.tffree, gf = TF_GROUPS[i1];
+      if (gf) { FILLS[gf.key] = 0; tfPaintRow(i1); tfPaintSum(); }
+      return;
     }
     if ((el = e.target.closest('[data-tfhint]'))) {
       tfRead();
-      var gh = TF_GROUPS[+el.dataset.tfhint]; if (gh) FILLS[gh.key] = gh.hint;
-      render(); return;
+      var i2 = +el.dataset.tfhint, gh = TF_GROUPS[i2];
+      if (gh) { FILLS[gh.key] = gh.hint; tfPaintRow(i2); tfPaintSum(); }
+      return;
     }
     if (e.target.closest('#tfAllFree')) { openAllFree(); return; }
     if (e.target.closest('#btnAllFreeGo')) {
       TF_GROUPS.forEach(function (x) { if (FILLS[x.key] == null) FILLS[x.key] = 0; });
-      closePanel(); render(); return;
+      closePanel(); render(); return;      // 전부 바뀌므로 이때는 다시 그린다
     }
     if (e.target.closest('#tfSave')) { tfSave(); return; }
     if ((el = e.target.closest('[data-perm]'))) {
@@ -3340,18 +3393,12 @@
       return;
     }
     if (e.target.dataset && e.target.dataset.tfamt !== undefined) {
-      // 표를 다시 그리면 커서가 튄다 — 요약 줄과 저장 버튼만 고쳐 쓴다.
+      // 표를 다시 그리면 커서가 튄다 — 그 줄 표시와 요약 줄만 고쳐 쓴다.
       tfRead();
-      var d2 = 0, s2 = 0, tot = 0;
-      TF_GROUPS.forEach(function (x) {
-        tot += x.rows.length;
-        if (FILLS[x.key] == null) return;
-        d2 += x.rows.length; s2 += FILLS[x.key] * x.rows.length;
-      });
-      var lab = $('tfSum');
-      if (lab) lab.innerHTML = '정한 것 <b>' + n0(d2) + '</b> / ' + n0(tot) + '건' + (s2 ? ' · 합계 ' + won(s2) : '');
-      var sb = $('tfSave');
-      if (sb) { sb.disabled = !d2; sb.textContent = n0(d2) + '건 저장'; }
+      var tr2 = e.target.closest('tr');
+      var g2 = TF_GROUPS[+e.target.dataset.tfamt];
+      if (tr2) tr2.className = (g2 && FILLS[g2.key] != null) ? 'tfdone' : '';
+      tfPaintSum();
       return;
     }
     if (e.target.id !== 'qBox') return;
