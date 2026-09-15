@@ -695,8 +695,8 @@
       '</tr></thead><tbody>' +
       rows.map(function (x) {
         var u = USERS[x.u] || {}, g3 = safeGrade(x.score);
-        return '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '"' +
-          (x.score < 80 ? ' class="flagged"' : '') + '>' +
+        return '<tr class="clk' + (x.score < 80 ? ' flagged' : '') +
+          '" tabindex="0" data-person="' + esc(x.u) + '">' +
           '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
           '<td class="dim">' + esc(u.dept || '—') + '</td>' +
           '<td class="n total">' + n0(x.score) + '</td>' +
@@ -737,15 +737,18 @@
   function safeTripTable(rows) {
     if (!rows.length) return blank('평가한 운행이 없습니다.', null, 'list');
     return '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>날짜</th><th class="n">점수</th><th>구간</th><th class="n">과속</th>' +
+      '<th>날짜</th><th class="n">점수</th><th>구간</th><th>방문처</th><th class="n">과속</th>' +
       '<th class="n">급가감속</th><th class="n">최고</th></tr></thead><tbody>' +
       rows.map(function (t) {
         var sc = safeScore(t), g = safeGrade(sc);
+        // 운행일지 표와 같은 규칙 — 방문처가 비면 도착지로 대신한다.
+        var place = t.visit_place || t.end_address || '';
         return '<tr class="clk" tabindex="0" data-trip="' + esc(t.id) + '">' +
           '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
           hm(t.start_time) + (isNightTrip(t.start_time) ? ' 야간' : '') + '</span></td>' +
           '<td class="n total">' + n0(sc) + ' <span class="st ' + g[2] + '">' + g[1] + '</span></td>' +
           '<td class="dim">' + esc(dong(t.start_address)) + ' → ' + esc(dong(t.end_address)) + '</td>' +
+          '<td class="el" title="' + esc(place) + '">' + esc(place) + '</td>' +
           '<td class="n">' + (Number(t.overspeed_count) || 0) + '</td>' +
           '<td class="n">' + ((Number(t.rapid_accel_count) || 0) + (Number(t.rapid_decel_count) || 0)) + '</td>' +
           '<td class="n dim">' + n0(t.max_speed_kmh) + '</td></tr>';
@@ -836,14 +839,23 @@
       (done ? '' : ' disabled') + '>' + n0(done) + '건 저장</button></div></section>';
 
     h += '<div class="panel"><div class="scroll tall" data-rows><table><thead><tr>' +
-      '<th>구간</th><th class="n">건수</th><th>날짜</th><th class="n">통행료</th>' +
+      '<th>구간</th><th>방문처</th><th class="n">건수</th><th>날짜</th><th class="n">통행료</th>' +
       '</tr></thead><tbody>' +
       order.map(function (k, i) {
         var x = g[k], v = FILLS[k];
         var days = x.rows.slice(0, 5).map(function (t) { return md(t.start_time); }).join(', ') +
           (x.rows.length > 5 ? ' 외 ' + (x.rows.length - 5) + '일' : '');
+        // 묶음 안의 방문처를 모은다. 같은 구간이라도 간 곳이 여럿일 수 있다.
+        var pl = [];
+        x.rows.forEach(function (t) {
+          var v = (t.visit_place || '').trim();
+          if (v && pl.indexOf(v) < 0) pl.push(v);
+        });
+        var place = pl.length ? pl.slice(0, 3).join(', ') + (pl.length > 3 ? ' 외 ' + (pl.length - 3) : '') : '—';
         return '<tr' + (v != null ? ' class="tfdone"' : '') + '>' +
           '<td><span class="lead">' + esc(k) + '</span></td>' +
+          '<td class="el' + (pl.length ? '' : ' dim') + '" title="' + esc(pl.join(', ')) + '">' +
+          esc(place) + '</td>' +
           '<td class="n lead">' + n0(x.rows.length) + '</td>' +
           '<td class="dim">' + esc(days) + '</td>' +
           '<td class="n" style="white-space:nowrap">' +

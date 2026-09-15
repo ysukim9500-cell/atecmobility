@@ -1,7 +1,8 @@
 <!--
   ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
-  같이 올라가야 하는 것: driving-app.js · xlsx.js · hipass.js · brand/atec-lockup.png · brand/atec-mark.png
+  같이 올라가야 하는 것: driving-app.js · xlsx.js · hipass.js
+                        brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
 -->
 <!doctype html>
 <html lang="ko">
@@ -97,12 +98,21 @@ body.is-admin .navsec.adm{display:block}
 
 /* ── 로고 ────────────────────────────────────────────────────────────
    CI 원본 아트워크를 그대로 쓴다. 글꼴로 흉내 내지 않는다.
-   가로 비율은 원본 그대로 두고 높이만 지정한다.                     */
-.logo-mark{height:15px;width:auto}          /* ATEC 영문 기본형 (1242:273) */
+   가로 비율은 원본 그대로 두고 높이만 지정한다.
+
+   atec-driving.png 은 원본이 아니다. ATEC 로고타입은 시중 글꼴이 아니라
+   (후보 20종을 굵기·자간 바꿔가며 픽셀로 겹쳐 최고 69.9%, 전부 같은 대문자
+   높이에서 20% 좁았다) 장체로 따로 그린 아트워크다. 그래서 글꼴을 갖다
+   쓰지 않고, 원본에서 잰 수치(대문자 255 · 세로획 60 · 가로획 41 ·
+   둥근 글자 오버슈트 ±9 · 자간 32)로 DRIVING 을 같은 규칙으로 그렸다.
+   ATEC 부분은 원본 그대로 합성했고, DRIVING 은 CI 그레이다 — 가로형
+   로고가 'ATEC(레드) + 에이텍모빌리티(그레이)' 인 것과 같은 짜임이다.
+   ★ 공식 아트워크가 나오면 이 파일 하나만 갈아 끼우면 된다.
+   만든 스크립트: brand/make-driving-logo.mjs (brand/measure-logo.mjs 로 원본을 잰다)                          */
+.logo-mark{height:14px;width:auto}          /* ATEC DRIVING (3177:273) */
+.logo-mark.tiny{display:none}               /* 아주 좁은 화면용 ATEC 단독 */
 .logo-lockup{height:26px;width:auto}        /* ATEC mobility 가로형 (3481:315) */
-.appname{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
-.appname .div{width:1px;height:14px;background:var(--ink-200)}
-.appname .nm{font-size:14px;font-weight:500;color:var(--ink-600);letter-spacing:-.01em}
+.appname{display:inline-flex;align-items:center;white-space:nowrap}
 
 /* ═════════════════ 로그인 ═════════════════ */
 #login{min-height:100dvh;display:grid;place-items:center;padding:32px 22px}
@@ -608,7 +618,9 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
   aside a{height:45px}
   main{padding:18px 16px 64px}
   header.top{padding:0 12px;gap:9px}
-  .appname .div,.appname .nm{display:none}
+  /* 좁은 화면에서는 로고를 줄인다. 예전에는 한글 이름을 숨겨 'ATEC' 만
+     남겼는데, 이제 로고 한 덩어리라 숨길 조각이 없다 — 높이로 줄인다. */
+  .logo-mark{height:12px}
   .utxt{display:none}
   .cycle{padding:0 10px;gap:6px}
   .cycle .tag,.cycle .yr{display:none}
@@ -620,6 +632,13 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
   #panel .sheet{width:100%;top:auto;height:92dvh;border-radius:var(--r-lg) var(--r-lg) 0 0;
     animation:up .3s var(--ease)}
   @keyframes up{from{transform:translateY(32px);opacity:.55}to{transform:none;opacity:1}}
+}
+
+/* 작은 폰(≤430px)에서는 ATEC DRIVING 이 헤더를 밀어낸다(360px 에서 27px 넘침).
+   그 폭에서는 예전처럼 ATEC 단독 마크만 둔다. */
+@media (max-width:430px){
+  .logo-mark{display:none}
+  .logo-mark.tiny{display:block;height:13px}
 }
 </style>
 </head>
@@ -677,8 +696,8 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
     <button class="iconbtn" id="burger" aria-label="메뉴 열기">
       <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button>
     <span class="appname">
-      <img class="logo-mark" src="brand/atec-mark.png" alt="ATEC">
-      <span class="div"></span><span class="nm">운행일지</span>
+      <img class="logo-mark" src="brand/atec-driving.png" alt="ATEC Driving">
+      <img class="logo-mark tiny" src="brand/atec-mark.png" alt="ATEC">
     </span>
     <div class="sp"></div>
     <label class="cycle" id="cycleBox">
