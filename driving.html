@@ -328,7 +328,10 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 /* ── 슬라이드 패널 ──────────────────────────────────────────────── */
 #panel{position:fixed;inset:0;z-index:70;display:none}
 #panel.open{display:block}
-#panel .veil{position:absolute;inset:0;background:rgba(29,37,43,.36);animation:fade .2s}
+/* 가림막이 좌측 레일까지 덮어, 패널이 열린 채 메뉴를 누르면 첫 클릭은 패널만
+   닫히고 화면은 안 바뀌었다(두 번 눌러야 이동). 레일(248px)을 비켜 둔다. */
+#panel .veil{position:absolute;inset:0 0 0 var(--rail);background:rgba(29,37,43,.36);animation:fade .2s}
+@media (max-width:900px){ #panel .veil{inset:0} }
 #panel .sheet{position:absolute;top:0;right:0;bottom:0;width:min(468px,100%);background:var(--surface);
   box-shadow:var(--pop);display:flex;flex-direction:column;animation:slide .28s var(--ease)}
 @keyframes slide{from{transform:translateX(26px);opacity:.55}to{transform:none;opacity:1}}

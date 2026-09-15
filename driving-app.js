@@ -348,6 +348,11 @@
       // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
       fetchAll('/rest/v1/v_driving_people?select=*&order=name.asc')
     ]).then(function (out) {
+      // ★ 반드시 아무것도 대입하기 전에 버린다. 예전에는 아래 대입이 전부 끝난 뒤에
+      //   가드가 있어서, 늦게 온 응답이 데이터는 덮어쓰고 다시 그리기만 건너뛰었다.
+      //   그러면 머리띠는 8월분인데 숫자는 9월분인 화면이 된다(21일 마감에 서버가
+      //   느려질 때 정확히 터지는 조건).
+      if (seq !== LOAD_SEQ) return;
       ALL_TRIPS = out[0] || [];
       USERS = {}; (out[1] || []).forEach(function (u) { USERS[u.username] = u; });
       VEHICLES = out[2] || [];
@@ -360,7 +365,6 @@
       APPR = out[9] || [];
       LINES = {}; (out[10] || []).forEach(function (l) { LINES[l.dept] = l; });
       PEOPLE = {}; (out[11] || []).forEach(function (p) { PEOPLE[p.username] = p; });
-      if (seq !== LOAD_SEQ) return;          // 더 최근 요청이 있다 — 이 응답은 버린다
       LOADED = true; LOADING = false; AUDIT = null;
       applyScope();
       paintPills();
@@ -927,7 +931,8 @@
     var btn = '';
     if (!a || a.status === 'rejected' || a.status === 'withdrawn') {
       btn = '<button class="btn pri sm" id="btnOpenSubmit">' +
-        (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>';
+        (a && a.status === 'rejected' ? '다시 상신' : (isAll() ? '내 것 결재 상신' : '결재 상신')) +
+        '</button>';
     } else if (a.status === 'approved') {
       btn = '<button class="btn sm" id="btnApprPdf">' + ic('dl', 13) + '인쇄용 PDF</button>';
     } else if (canWithdraw) {
@@ -982,7 +987,19 @@
   /* ══════════════════ 운행일지 ══════════════════ */
   function tripTable(rows, opt) {
     opt = opt || {};
-    if (!rows.length) return blank('조건에 맞는 운행이 없습니다.', '필터를 바꿔 보세요.', 'list');
+    if (!rows.length) {
+      // 필터를 안 걸었는데 '필터를 바꿔 보세요' 라고 하면 사용자가 헤맨다.
+      var on = [];
+      if (FILT.who) on.push(nameOf(FILT.who) + ' 님');
+      if (FILT.car) on.push(FILT.car);
+      if (FILT.q) on.push('"' + FILT.q + '" 검색');
+      if (FILT.chip && FILT.chip !== 'all') on.push('점검 항목');
+      return blank(
+        on.length ? on.join(' · ') + ' 조건에 맞는 운행이 없습니다.' : '이 기간에 운행 기록이 없습니다.',
+        on.length ? '아래 전체 보기로 조건을 풀 수 있습니다.' : null, 'list') +
+        (on.length ? '<div style="text-align:center;margin-top:-10px;padding-bottom:18px">' +
+          '<button class="btn sm" id="btnClearFilt">전체 보기</button></div>' : '');
+    }
     var flags = flaggedIds();
     var showWho = isAll() && !opt.compact;
     var h = '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
@@ -1027,16 +1044,35 @@
 
   function viewTrips() {
     if (!LOADED) return head(scopeTitle('운행일지')) + skeleton();
-    var A = audit(), c = {};
-    A.forEach(function (f) { c[f.k] = f.n; });
+    var A = audit();
+    // 칩 숫자는 '지금 걸린 사람·차량' 안에서 센다(검색어·칩 자신은 빼고).
+    var base = TRIPS.filter(function (t) {
+      if (FILT.who && t.username !== FILT.who) return false;
+      if (FILT.car && t.plate_no !== FILT.car) return false;
+      return true;
+    });
+    var inBase = {}; base.forEach(function (t) { inBase[t.id] = 1; });
+    var c = {};
+    A.forEach(function (f) {
+      c[f.k] = (f.rows || []).filter(function (t) { return inBase[t.id]; }).length;
+    });
     var rows = filtered(), t2 = totals(rows);
 
-    var h = head(scopeTitle('운행일지'), esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
+    // 누구/어느 차로 좁혀 놓았는지 제목에 드러낸다. 그 상태로 인쇄·CSV 를
+    // 누르는 실수를 줄인다.
+    var narrowed = [];
+    if (FILT.who) narrowed.push(nameOf(FILT.who));
+    if (FILT.car) narrowed.push(FILT.car);
+    var h = head(scopeTitle('운행일지') + (narrowed.length ? ' — ' + narrowed.join(' · ') : ''),
+      esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
 
     h += '<div class="bar">';
     if (isAll()) {
+      // ★ 지금 걸린 사람은 운행이 0건이어도 목록에 남겨야 한다. 안 그러면 셀렉트가
+      //   '사람 전체' 로 보이는데 표는 비어 있고, 같은 항목 재선택은 change 가 안 나서
+      //   다른 메뉴로 나갔다 오는 수밖에 없었다.
       var us = Object.keys(USERS).filter(function (u) {
-        return TRIPS.some(function (t) { return t.username === u; });
+        return u === FILT.who || TRIPS.some(function (t) { return t.username === u; });
       }).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
       h += '<label class="field">' + ic('users', 14) + '<select id="selWho"><option value="">사람 전체</option>' +
         us.map(function (u) {
@@ -1058,14 +1094,14 @@
     h += '</div>';
 
     h += '<div class="bar"><div class="seg">' +
-      seg('all', '전체', TRIPS.length) +
+      seg('all', '전체', base.length) +
       seg('unk', '통행료 미확정', c.unk, 1) +
       seg('jump', '계기판 튐', c.jump) +
       seg('nopurp', '목적 미선택', c.nopurp) +
       seg('overlap', '시간 겹침', c.overlap) +
       seg('zero', '0km', c.zero) +
-      seg('manual', '수기', TRIPS.filter(function (t) { return t.is_manual; }).length) +
-      seg('commute', '출퇴근', TRIPS.filter(function (t) { return t.purpose === '출퇴근'; }).length) +
+      seg('manual', '수기', base.filter(function (t) { return t.is_manual; }).length) +
+      seg('commute', '출퇴근', base.filter(function (t) { return t.purpose === '출퇴근'; }).length) +
       '</div></div>';
 
     h += sect(n0(rows.length) + '건', km(t2.km) + ' km · 업무용 ' + won(t2.cost), '', tripTable(rows));
@@ -2365,6 +2401,10 @@
     });
     var rt = $('btnRetryLoad');
     if (rt) rt.addEventListener('click', function () { LOAD_ERR = ''; loadAll(); });
+    var cf = $('btnClearFilt');
+    if (cf) cf.addEventListener('click', function () {
+      FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; render();
+    });
     // 드롭존은 화면을 다시 그릴 때마다 새로 생기므로 그때마다 연결한다.
     var dz = $('hpDrop');
     if (dz) {
