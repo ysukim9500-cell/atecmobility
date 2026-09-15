@@ -1450,9 +1450,13 @@
   function paintHpCount() {
     HP.groups.forEach(function (g, gi) {
       var picked = (g.matched || []).filter(function (m) { return m.pick; });
-      var sum = picked.reduce(function (a, m) { return a + (Number(m.amount) || 0); }, 0);
+      // ★ 금액은 m.sum 이다. 예전에는 m.amount 를 더해서(그런 필드가 없다)
+      //   체크를 아무리 해도 합계가 늘 ₩0 으로 보였다.
+      var sum = picked.reduce(function (a, m) { return a + (Number(m.sum) || 0); }, 0);
+      var todo = (g.matched || []).filter(function (m) { return m.kind !== 'same'; });
       var lab = $('hpSum' + gi);
-      if (lab) lab.innerHTML = '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum);
+      if (lab) lab.innerHTML = '남은 것 <b>' + n0(todo.length) + '건</b> · ' +
+        '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum);
       var btn = document.querySelector('[data-hpapply="' + gi + '"]');
       if (btn) { btn.disabled = !picked.length; btn.textContent = n0(picked.length) + '건 확정하기'; }
     });
@@ -2946,11 +2950,16 @@
     HP.groups.forEach(function (g, gi) {
       var picked = (g.matched || []).filter(function (e) { return e.pick; });
       var sum = picked.reduce(function (s, e) { return s + e.sum; }, 0);
+      // ★ 값이 이미 영수증과 같은 줄은 손댈 것이 없다. 표에서 빼고 접어 둔다.
+      //   안 빼면 확정해도 표가 그대로라 아무 일도 안 일어난 것처럼 보인다.
+      var todo = (g.matched || []).filter(function (e) { return e.kind !== 'same'; });
+      var done = (g.matched || []).filter(function (e) { return e.kind === 'same'; });
 
       h += '<section class="sect"><div class="hd">' +
         '<h2>카드 ' + esc(g.card4 || '?') + '</h2>' +
         '<span class="cnt">' + n0((g.records || []).length) + '건 · ' +
-        won((g.records || []).reduce(function (s, r) { return s + (r.amount || 0); }, 0)) + '</span>' +
+        won((g.records || []).reduce(function (s, r) { return s + (r.amount || 0); }, 0)) +
+        (done.length ? ' · <b style="color:var(--ok)">' + n0(done.length) + '건 맞춤</b>' : '') + '</span>' +
         '<div class="sp"></div>' +
         '<select class="field" style="height:30px" data-hpcar="' + gi + '">' +
         '<option value="">— 차량 고르기 —</option>' +
@@ -2964,12 +2973,18 @@
         h += blank('차량을 골라 주세요.', '어느 차의 카드인지 정해야 운행과 맞출 수 있습니다.', 'car');
       } else if (!(g.matched || []).length) {
         h += blank('맞는 운행이 없습니다.', '통과 시각이 이 차량의 운행 시간 안에 들지 않습니다.', 'ticket');
+      } else if (!todo.length) {
+        // 전부 맞은 상태. 여기서 표를 그대로 두면 '아직 할 일이 있다' 로 읽힌다.
+        h += '<div class="panel"><div class="blank"><div class="ico" style="color:var(--ok)">' +
+          ic('check', 21) + '</div><div class="t">이 카드는 다 맞췄습니다.</div>' +
+          '<div class="d">' + n0(done.length) + '건이 영수증 금액과 같습니다.</div></div></div>';
       } else {
         h += '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
           '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"></th>' +
           '<th>운행</th><th>지금 값</th><th class="n">영수증</th><th class="n">차이</th><th>영수증 내역</th>' +
           '</tr></thead><tbody>';
-        g.matched.forEach(function (e, ei) {
+        todo.forEach(function (e) {
+          var ei = g.matched.indexOf(e);          // 체크박스 키는 원래 자리를 쓴다
           var t = e.trip;
           var now = e.kind === 'new' ? '<span class="st warn">미확정</span>'
             : (e.who === 'person'
@@ -2995,6 +3010,16 @@
         });
         h += '</tbody></table></div></div>';
 
+        if (done.length) {
+          h += '<details class="hpun"><summary>이미 영수증과 같은 ' + n0(done.length) +
+            '건 (손댈 것 없음)</summary><div class="hpunb">' +
+            done.slice(0, 60).map(function (e) {
+              return '<div><span class="mono">' + md(e.trip.start_time) + ' ' + hm(e.trip.start_time) +
+                '</span> ' + esc(dong(e.trip.start_address)) + ' → ' + esc(dong(e.trip.end_address)) +
+                ' <b>' + n0(e.sum) + '</b></div>';
+            }).join('') + '</div></details>';
+        }
+
         if ((g.unmatched || []).length) {
           h += '<details class="hpun"><summary>맞는 운행을 못 찾은 기록 ' +
             n0(g.unmatched.length) + '건</summary><div class="hpunb">' +
@@ -3007,7 +3032,8 @@
         }
 
         h += '<div class="hpact">' +
-          '<span class="dim" id="hpSum' + gi + '">선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum) + '</span>' +
+          '<span class="dim" id="hpSum' + gi + '">남은 것 <b>' + n0(todo.length) + '건</b> · ' +
+          '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum) + '</span>' +
           '<button class="btn pri" data-hpapply="' + gi + '"' + (picked.length ? '' : ' disabled') + '>' +
           n0(picked.length) + '건 확정하기</button></div>';
       }
@@ -3756,7 +3782,17 @@
   /* ── 검증용 이음매 ──────────────────────────────────────────────
      실데이터 하네스(_realstub.js)가 깔렸을 때만 인쇄 생성기를 밖으로 낸다.
      배포본에는 __VERIFY__ 가 없으므로 아무 일도 하지 않는다. */
-  if (window.__VERIFY__) { window.__buildPrint = buildPrint; window.__state = function () { return { TRIPS: TRIPS, EVID: EVID, VEHICLES: VEHICLES, USERS: USERS, RATES: RATES, CYC: CYC }; }; }
+  if (window.__VERIFY__) {
+    window.__buildPrint = buildPrint;
+    window.__state = function () { return { TRIPS: TRIPS, EVID: EVID, VEHICLES: VEHICLES, USERS: USERS, RATES: RATES, CYC: CYC }; };
+    // 하이패스는 실제 영수증 PDF 없이는 재현이 안 된다. 대조 결과를 직접 넣어
+    // '확정' 뒤에 화면이 바뀌는지 확인할 수 있게 열어 둔다(검증용).
+    window.__hp = function (g) {
+      if (g) { HP.groups = hpMarkLocked(g); HP.batch = 'verify'; render(); }
+      return HP;
+    };
+    window.__hpApply = hpApply;
+  }
 
   /* ══════════════════ 시작 ══════════════════ */
   if (ss(K_AT) && me()) enter();
