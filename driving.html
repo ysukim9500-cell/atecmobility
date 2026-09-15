@@ -86,6 +86,9 @@ img{display:block}
 
 /* 관리자 전용 — display:revert 는 <a> 를 inline 으로 되돌려 메뉴를 깨뜨린다. */
 .adm{display:none}
+/* 권한 관리는 관리자 중에서도 마스터 계정만 본다(서버 RPC 가 그렇게 못 박혀 있다). */
+.mst{display:none !important}
+body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
 body.is-admin .navsec.adm{display:block}
 
@@ -677,6 +680,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
       <a tabindex="0" role="button" data-v="hipass"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조</a>
       <a tabindex="0" role="button" data-v="settle"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산·엑셀</a>
+      <a tabindex="0" role="button" data-v="account"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>내 계정</a>
 
       <div class="navsec adm">관리</div>
       <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 마감 현황</a>
@@ -688,6 +692,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>
       <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
+      <a tabindex="0" role="button" data-v="perm" class="adm mst"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>권한 관리</a>
     </aside>
 
     <main id="main"><div class="inner" id="inner"></div></main>

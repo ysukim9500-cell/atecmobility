@@ -214,6 +214,9 @@
   var APPR = [], LINES = {}, PEOPLE = {};   // 결재 건 · 부서별 기본 결재선 · 사람 목록(이름·부서·직급)
   var LOADED = false, LOADING = false, AUDIT = null;
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
+  /** driving-account 가 알려 주는 것 — 권한 관리를 할 수 있는 계정인가.
+   *  마스터 계정 이름을 웹에 적어 두지 않으려고 서버에 물어본다. */
+  var ACCT = { can_manage_admin: false };
   var LOAD_ERR = '';     // 적재 실패 사유(스켈레톤에 갇히지 않게 화면에 남긴다)
   var FILT = { chip: 'all', who: '', car: '', q: '' };
   /**
@@ -283,6 +286,16 @@
     $('login').style.display = 'none';
     $('app').style.display = 'block';
     buildCycleSelect();
+    // 권한 관리 메뉴를 보일지 서버에 물어본다. 실패해도 화면은 정상 동작한다.
+    api('/functions/v1/driving-account', { method: 'POST', body: JSON.stringify({ action: 'whoami' }) })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (a) {
+        if (a && a.ok) {
+          ACCT = a;
+          document.body.classList.toggle('is-master', !!a.can_manage_admin);
+          if (LOADED) render();
+        }
+      }).catch(function () { });
     syncProfile().then(function () {
       ME = me();
       var nm = ME.name || ME.username || '';
@@ -547,6 +560,157 @@
     var done = {};
     EDUP.forEach(function (p) { if (p.username === mine && p.completed_at) done[p.video_id] = 1; });
     return vids.filter(function (v) { return !done[v.id]; }).length;
+  }
+
+  /* ══════════════════ 내 계정 ══════════════════ */
+  function viewAccount() {
+    var u = personOf(myName());
+    var h = head('내 계정', esc(u.name || myName()));
+    h += sect('내 정보', null, '',
+      '<div class="panel"><table class="kv"><tbody>' +
+      kv('아이디', esc(myName())) +
+      kv('이름', esc(u.name || '—')) +
+      kv('소속', esc([u.company_name, u.dept].filter(Boolean).join(' ') || '—')) +
+      kv('직급', esc(u.position || '—')) +
+      kv('차량번호', esc(u.plate_no || '—')) +
+      kv('차 종', esc(u.vehicle_type || '—')) +
+      kv('운행일지 관리자', ME.is_admin ? '예' : '아니오') +
+      '</tbody></table></div>');
+
+    h += sect('비밀번호 바꾸기', null, '',
+      '<div class="panel" style="padding:20px"><div class="form">' +
+      frow('현재 비밀번호', '<input class="inp" type="password" id="pwCur" autocomplete="current-password">') +
+      frow('새 비밀번호', '<input class="inp" type="password" id="pwNew" autocomplete="new-password">',
+        '4자 이상. <b>앱과 웹이 같은 비밀번호</b>를 씁니다 — 바꾸면 앱에서도 새 것으로 들어가셔야 합니다.') +
+      frow('새 비밀번호 확인', '<input class="inp" type="password" id="pwNew2" autocomplete="new-password">') +
+      '</div><div style="margin-top:14px;text-align:right">' +
+      '<button class="btn pri" id="btnPwSave">비밀번호 바꾸기</button></div></div>');
+    return h;
+
+    function kv(k, v) { return '<tr><th>' + k + '</th><td>' + v + '</td></tr>'; }
+    function frow(label, body, hint) {
+      return '<div class="frow"><label class="flab">' + label + '</label><div class="fbody">' + body +
+        (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
+    }
+  }
+
+  function savePassword() {
+    var cur = ($('pwCur') || {}).value || '';
+    var a = ($('pwNew') || {}).value || '', b2 = ($('pwNew2') || {}).value || '';
+    if (!cur) { toast('현재 비밀번호를 넣어 주세요.', true); return; }
+    if (a.length < 4) { toast('새 비밀번호는 4자 이상이어야 합니다.', true); return; }
+    if (a !== b2) { toast('새 비밀번호 확인이 다릅니다.', true); return; }
+    if (a === cur) { toast('지금 쓰시는 것과 다른 비밀번호를 넣어 주세요.', true); return; }
+    var btn = $('btnPwSave'); btn.disabled = true; btn.textContent = '바꾸는 중…';
+    api('/functions/v1/driving-account', {
+      method: 'POST', body: JSON.stringify({ action: 'change_password', current: cur, next: a })
+    }).then(function (r) { return r.json().then(function (x) { return { ok: r.ok, j: x }; }); })
+      .then(function (res) {
+        btn.disabled = false; btn.textContent = '비밀번호 바꾸기';
+        if (!res.ok || !res.j || !res.j.ok) {
+          toast((res.j && res.j.error) || '바꾸지 못했습니다.', true); return;
+        }
+        ['pwCur', 'pwNew', 'pwNew2'].forEach(function (id) { if ($(id)) $(id).value = ''; });
+        toast(res.j.message || '비밀번호를 바꿨습니다.');
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = '비밀번호 바꾸기';
+        toast('바꾸지 못했습니다.', true);
+      });
+  }
+
+  /* ══════════════════ 권한 관리 (마스터 계정만) ══════════════════ */
+  function viewPerm() {
+    if (!LOADED) return head('권한 관리') + skeleton();
+    var list = Object.keys(USERS).sort(function (a, b) {
+      var x = USERS[a], y = USERS[b];
+      return (y.is_admin ? 1 : 0) - (x.is_admin ? 1 : 0) ||
+        nameOf(a).localeCompare(nameOf(b), 'ko');
+    });
+    var admins = list.filter(function (u) { return USERS[u].is_admin; }).length;
+    var h = head('권한 관리', list.length + '명 · 관리자 ' + admins + '명');
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;' +
+      'line-height:1.9;color:var(--ink-3)">' +
+      '<b style="color:var(--ink-2)">운행일지 관리자</b>는 전 직원의 운행·정산·증빙을 보고, ' +
+      '계기판을 고칠 수 있습니다.<br>' +
+      '바꿀 때마다 <b>본인 비밀번호</b>를 한 번 더 확인합니다 — 자리를 비운 사이 남이 ' +
+      '권한을 주는 일을 막기 위해서입니다.</div></section>';
+    h += sect('직원', list.length + '명', '',
+      '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+      '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th></th></tr></thead><tbody>' +
+      list.map(function (u) {
+        var x = USERS[u];
+        return '<tr>' +
+          '<td><span class="lead">' + esc(x.name || u) + '</span></td>' +
+          '<td class="dim">' + esc(u) + '</td>' +
+          '<td class="dim">' + esc(x.dept || '—') + '</td>' +
+          '<td>' + (x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
+          '<td class="n" style="white-space:nowrap">' +
+          // 마스터 계정 자신은 바꿀 수 없다(서버 RPC 가 거부한다). 버튼을 아예 안 보인다.
+          (u === myName()
+            ? '<span class="dim">본인 계정</span>'
+            : '<button class="btn sm" data-perm="' + esc(u) + '" data-on="' + (x.is_admin ? '0' : '1') + '">' +
+              (x.is_admin ? '관리자 해제' : '관리자 지정') + '</button> ' +
+              '<button class="btn sm" data-pwreset="' + esc(u) + '">비밀번호 초기화</button>') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div></div>');
+    return h;
+  }
+
+  /** 권한·비밀번호를 바꾸기 전에 본인 비밀번호를 확인받는 창. */
+  function openPermConfirm(kind, target, enabled) {
+    var nm = nameOf(target);
+    $('pTitle').textContent = kind === 'admin'
+      ? (enabled ? '관리자 지정' : '관리자 해제') : '비밀번호 초기화';
+    $('pSub').textContent = nm + ' (' + target + ')';
+    var body = '<div class="form">';
+    if (kind === 'pw') {
+      body += '<div class="frow"><label class="flab">새 비밀번호</label><div class="fbody">' +
+        '<input class="inp" type="text" id="rsNew" autocomplete="off" placeholder="4자 이상">' +
+        '<div class="fhint">본인에게 직접 알려 주셔야 합니다. ' +
+        '<b>앱과 웹이 같은 비밀번호</b>를 씁니다.</div></div></div>';
+    } else {
+      body += '<div class="anote">' + esc(nm) + ' 님을 <b>' +
+        (enabled ? '운행일지 관리자로 지정' : '관리자에서 해제') + '</b>합니다.' +
+        (enabled ? ' 전 직원의 운행·정산·증빙을 보게 되고 계기판을 고칠 수 있습니다.' : '') +
+        '</div>';
+    }
+    body += '<div class="frow"><label class="flab">본인 비밀번호</label><div class="fbody">' +
+      '<input class="inp" type="password" id="rsMine" autocomplete="current-password">' +
+      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호입니다.</div>' +
+      '</div></div></div>';
+    $('pBody').innerHTML = body;
+    $('pFoot').innerHTML = '<span style="flex:1"></span>' +
+      '<button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnPermGo" data-kind="' + kind + '" data-target="' + esc(target) +
+      '" data-on="' + (enabled ? '1' : '0') + '">확인</button>';
+    $('panel').classList.add('open');
+  }
+
+  function runPerm(kind, target, enabled) {
+    var mine = ($('rsMine') || {}).value || '';
+    if (!mine) { toast('본인 비밀번호를 넣어 주세요.', true); return; }
+    var payload = { action: kind === 'admin' ? 'set_admin' : 'reset_password', target: target, password: mine };
+    if (kind === 'admin') payload.enabled = enabled;
+    else {
+      var np = ($('rsNew') || {}).value || '';
+      if (np.length < 4) { toast('새 비밀번호는 4자 이상이어야 합니다.', true); return; }
+      payload.next = np;
+    }
+    var btn = $('btnPermGo'); btn.disabled = true; btn.textContent = '처리 중…';
+    api('/functions/v1/driving-account', { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, j: x }; }); })
+      .then(function (res) {
+        btn.disabled = false; btn.textContent = '확인';
+        if (!res.ok || !res.j || !res.j.ok) {
+          toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return;
+        }
+        if (kind === 'admin' && USERS[target]) USERS[target].is_admin = enabled;
+        closePanel(); render();
+        toast(res.j.message || '처리했습니다.');
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = '확인';
+        toast('처리하지 못했습니다.', true);
+      });
   }
 
   /* ══════════════════ 결재 ══════════════════
@@ -2372,11 +2536,12 @@
     hipass: viewHipass, settle: viewSettle, inbox: viewInbox,
     a_close: viewClose, a_trips: viewTrips, a_check: viewCheck, a_evid: viewEvid,
     a_hipass: viewHipass, a_settle: viewSettle,
-    people: viewPeople, cars: viewCars, eduadm: viewEduAdm
+    people: viewPeople, cars: viewCars, eduadm: viewEduAdm,
+    account: viewAccount, perm: viewPerm
   };
   /** 관리자만 열 수 있는 화면. */
   var ADMIN_VIEWS = ['a_close', 'a_trips', 'a_check', 'a_evid', 'a_hipass', 'a_settle',
-    'people', 'cars', 'eduadm'];
+    'people', 'cars', 'eduadm', 'perm'];
   /** 지금 화면이 전사 범위인가. 화면 안에서 '이름 칸을 보일까' 같은 판단에 쓴다. */
   function isAll() { return ADMIN_VIEWS.indexOf(VIEW) >= 0; }
   /** 같은 화면을 개인/전사로 쓰므로 제목으로 범위를 드러낸다. */
@@ -2426,6 +2591,8 @@
     if (!VIEWS[v]) return;
     // 관리 화면은 관리자만. 주소를 직접 만져도 못 들어간다(서버 RLS 가 이중으로 막는다).
     if (ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) return;
+    // 권한 관리는 관리자 중에서도 마스터 계정만(서버 RPC 가 그렇게 못 박혀 있다).
+    if (v === 'perm' && !ACCT.can_manage_admin) return;
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all';
@@ -2495,6 +2662,16 @@
     }
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
     if ((el = e.target.closest('#btnPrintGo'))) { runPrint(el.dataset.who); return; }
+    if (e.target.closest('#btnPwSave')) { savePassword(); return; }
+    if ((el = e.target.closest('[data-perm]'))) {
+      openPermConfirm('admin', el.dataset.perm, el.dataset.on === '1'); return;
+    }
+    if ((el = e.target.closest('[data-pwreset]'))) {
+      openPermConfirm('pw', el.dataset.pwreset, false); return;
+    }
+    if ((el = e.target.closest('#btnPermGo'))) {
+      runPerm(el.dataset.kind, el.dataset.target, el.dataset.on === '1'); return;
+    }
     if (e.target.closest('#burger')) { document.body.classList.toggle('nav-open'); return; }
     // 내 프로필 버튼은 개인 자리다 — 관리 화면으로 보내지 않는다(직원 현황은 관리 메뉴에 있다).
     if (e.target.closest('#uBtn')) { go('close'); return; }
