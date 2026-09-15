@@ -178,7 +178,9 @@
     if (a.indexOf('서울') === 0 || a.indexOf('경기') === 0 || a.indexOf('인천') === 0) return '수도권';
     for (var i = 0; i < OTHER_SIDO.length; i++) if (a.indexOf(OTHER_SIDO[i]) === 0) return '지방';
     lat = Number(lat) || 0; lng = Number(lng) || 0;
-    if (lat !== 0 && lng !== 0 && lat >= 37.0 && lat <= 38.3 && lng >= 126.0 && lng <= 127.9) return '수도권';
+    // ★ 경도 상한 127.5 — 앱(FuelRegion.kt · Models.swift)·서버와 같은 값이어야 한다.
+    //   강원 영서(춘천 ~127.7 · 원주 ~127.9)가 수도권으로 잡히던 것을 좁힌 값이다.
+    if (lat !== 0 && lng !== 0 && lat >= 37.0 && lat <= 38.3 && lng >= 126.0 && lng <= 127.5) return '수도권';
     return '지방';
   }
   var BUSINESS = '일반업무';   // 서버 index.ts 25행. 비용 정산 대상은 이것뿐이다.
@@ -214,6 +216,12 @@
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
   var LOAD_ERR = '';     // 적재 실패 사유(스켈레톤에 갇히지 않게 화면에 남긴다)
   var FILT = { chip: 'all', who: '', car: '', q: '' };
+  /**
+   * 인쇄에 담을 운행목적. 앱 내보내기 창과 같다 — 기본은 '업무만'.
+   * 앱 MainScreen.kt 366~369행: expBiz=true, expCom=false, expPer=false.
+   * 같은 화면에 "차량일지 제출 시에는 '업무' 운행내역만 선택하세요" 안내가 있다.
+   */
+  var PRINT_PURPOSES = ['일반업무'];
   var DRAFT = null;                   // 상신 창에서 편집 중인 결재선
 
   /* ══════════════════ 로그인 ══════════════════ */
@@ -380,10 +388,16 @@
   function isUnknownToll(t) {
     return t.toll_cost == null || t.toll_status === 'UNKNOWN' || t.toll_status === 'PENDING';
   }
+  /** 지금 화면 범위의 점검 결과(캐시). 화면이 바뀌면 go() 가 캐시를 비운다. */
   function audit() {
     if (AUDIT) return AUDIT;
+    AUDIT = auditOf(TRIPS);
+    return AUDIT;
+  }
+  /** 임의의 운행 목록을 점검한다. 뱃지는 화면 범위와 무관하게 '내 것'으로 세야 한다. */
+  function auditOf(LIST) {
     var byPerson = {};
-    TRIPS.forEach(function (t) { (byPerson[t.username] = byPerson[t.username] || []).push(t); });
+    LIST.forEach(function (t) { (byPerson[t.username] = byPerson[t.username] || []).push(t); });
 
     // ① 계기판 도약 — 같은 사람·같은 차에서 1,000km 이상 튀는 지점
     var jump = [];
@@ -403,15 +417,15 @@
 
     // ② 차량 혼선 — 한 번호판을 두 사람 이상이 쓰는 경우
     var byCarAll = {};
-    TRIPS.forEach(function (t) { (byCarAll[t.plate_no] = byCarAll[t.plate_no] || {})[t.username] = 1; });
+    LIST.forEach(function (t) { (byCarAll[t.plate_no] = byCarAll[t.plate_no] || {})[t.username] = 1; });
     var shared = Object.keys(byCarAll).filter(function (p) { return Object.keys(byCarAll[p]).length > 1; });
-    var sharedRows = TRIPS.filter(function (t) { return shared.indexOf(t.plate_no) >= 0; });
+    var sharedRows = LIST.filter(function (t) { return shared.indexOf(t.plate_no) >= 0; });
 
     // ③ 통행료 미확정 (업무용만 — 정산 대상)
-    var unk = TRIPS.filter(function (t) { return (t.purpose || '') === BUSINESS && isUnknownToll(t); });
+    var unk = LIST.filter(function (t) { return (t.purpose || '') === BUSINESS && isUnknownToll(t); });
 
     // ④ 0km 운행
-    var zero = TRIPS.filter(function (t) { return (Number(t.distance_km) || 0) <= 0; });
+    var zero = LIST.filter(function (t) { return (Number(t.distance_km) || 0) <= 0; });
 
     // ⑤ 시간이 겹치는 운행 (같은 사람, 자동기록끼리)
     var overlap = [];
@@ -424,16 +438,18 @@
     });
 
     // ⑥ 운행목적 미선택 — 비용 집계에서 통째로 빠진다
-    var nopurp = TRIPS.filter(function (t) {
+    var nopurp = LIST.filter(function (t) {
       var p = t.purpose || '';
       return p !== BUSINESS && p !== '출퇴근' && p !== '비업무용';
     });
 
     // ⑦ 유류단가 미등록 — 금액이 0으로 새는 지점 (총액 계산 후에 채워진다)
-    TRIPS.forEach(tripFuel);
+    LIST.forEach(tripFuel);
     var missKeys = Object.keys(RATE_MISS);
 
-    AUDIT = [
+    // ★ 전역 캐시(AUDIT)를 여기서 건드리지 않는다. 뱃지가 부를 때 관리 화면의
+    //   점검 결과를 개인 것으로 덮어써 버린다. 결과를 돌려주기만 한다.
+    return [
       { k: 'jump', sev: 'bad', ico: 'gauge', t: '계기판이 크게 튄 곳', rows: jump, n: jump.length,
         d: '같은 사람이 같은 차에서 1,000km 넘게 건너뛰었습니다. 차를 바꿨거나 숫자를 잘못 넣은 것입니다.' },
       { k: 'shared', sev: 'bad', ico: 'car', t: '한 차를 두 사람이 쓴 번호판', rows: sharedRows, n: shared.length,
@@ -449,7 +465,7 @@
       { k: 'zero', sev: 'warn', ico: 'list', t: '0km 운행', rows: zero, n: zero.length,
         d: '거리가 0인 기록입니다. 잘못 눌렀거나 바로 껐을 때 생깁니다.' }
     ];
-    return AUDIT;
+
   }
   function flaggedIds() {
     var s = {};
@@ -478,14 +494,25 @@
     return o;
   }
 
+  /**
+   * 메뉴 뱃지. **항상 본인 기준**이어야 한다 — 개인 메뉴에 붙은 숫자이기 때문이다.
+   * 예전에는 현재 화면 범위(TRIPS·EVID)를 써서, 관리 화면에 있는 동안 저장하거나
+   * 주기를 다시 고르면 전사 숫자가 박히고 개인 화면으로 돌아와도 안 돌아왔다.
+   */
   function paintPills() {
-    var A = audit();
+    var mine = myName();
+    var myTrips = ALL_TRIPS.filter(function (t) { return t.username === mine; });
+    var A = auditOf(myTrips);
     var bad = A.filter(function (f) { return f.sev === 'bad'; }).reduce(function (s, f) { return s + f.n; }, 0);
     var warn = A.filter(function (f) { return f.sev === 'warn'; }).reduce(function (s, f) { return s + f.n; }, 0);
-    var mine = myName();
-    set('pTrips', ALL_TRIPS.filter(function (t) { return t.username === mine; }).length, false);
+    var r = cycleRange(CYC.y, CYC.m);
+    var myEvid = ALL_EVID.filter(function (e) {
+      var d = Number(e.date_millis);
+      return e.username === mine && d >= r.lo && d < r.hi;
+    });
+    set('pTrips', myTrips.length, false);
     set('pCheck', bad || warn, bad > 0);
-    set('pEvid', evidOfCycle().length, false);
+    set('pEvid', myEvid.length, false);
     set('pEdu', eduTodo(), eduTodo() > 0);
     set('pInbox', inbox().length, inbox().length > 0);
     function set(id, v, hot) {
@@ -687,7 +714,15 @@
   function viewInbox() {
     if (!LOADED) return head('결재함') + skeleton();
     var mine = inbox();
-    var others = APPR.filter(function (a) { return mine.indexOf(a) < 0; });
+    // ★ 결재함은 개인 화면이다. 관리자는 APPR 에 전 직원 결재건이 들어 있어,
+    //   거르지 않으면 남의 결재 진행상황과 금액이 '그 밖의 건' 으로 나열됐다.
+    //   내가 올린 것과 내가 결재선에 든 것만 남긴다.
+    var meNow = myName();
+    var others = APPR.filter(function (a) {
+      if (mine.indexOf(a) >= 0) return false;
+      if (a.username === meNow) return true;
+      return (a.steps || []).some(function (s) { return s && s.approver === meNow; });
+    });
 
     var h = head('결재함', mine.length ? '내 차례 ' + mine.length + '건' : '내 차례인 건이 없습니다');
     if (mine.length) {
@@ -859,7 +894,8 @@
     if (badN || T.unk) {
       var list = A.filter(function (f) { return f.n > 0; }).slice(0, 4);
       h += sect('바로 봐야 할 것', null,
-        '<button class="btn sm" data-v="check">전체 점검 ' + ic('chev', 13) + '</button>',
+        '<button class="btn sm" data-v="' + (isAll() ? 'a_check' : 'check') + '">전체 점검 ' +
+          ic('chev', 13) + '</button>',
         '<div class="panel">' + list.map(issueRow).join('') + '</div>');
     }
 
@@ -1270,10 +1306,35 @@
     return (!isFinite(n)) ? 0 : Math.round(n);
   }
   /** 앱 TollCharge.tollAmountForExport — 확정 상태면 금액+영수증, 미확정이면 영수증만(0이면 빈칸). */
+  var TOLL_MAX = 200000;                 // TollCharge.MAX_AMOUNT 와 같아야 한다
+  /**
+   * 앱 TollCharge.tollAmountForExport 와 같은 값을 낸다.
+   *
+   * ★ 앱은 상태와 금액이 규약을 어기면(예: UNKNOWN 인데 금액이 있음) 객체를 만들지 못하고
+   *   TollCharge.legacy(금액) 로 되돌린 뒤 내보낸다(TripEntity.kt 79~91행).
+   *   웹에 그 단계가 없어, 상태·금액이 손상된 옛 기록에서 앱과 다른 값이 나왔다.
+   *   9월분 실데이터에는 그런 조합이 없지만 과거 회차·다른 기기 병합분에는 생길 수 있다.
+   */
   function tollForExport(t, evAmount) {
     var ev = Math.max(0, Number(evAmount) || 0);
-    if (isUnknownToll(t)) return ev > 0 ? ev : null;
-    return (Number(t.toll_cost) || 0) + ev;
+    var st = t.toll_status;
+    var amt = t.toll_cost == null ? null : Number(t.toll_cost);
+    if (amt != null && !isFinite(amt)) amt = null;
+
+    // 앱의 require() 와 같은 검사. 어기면 legacy 로 되돌린다.
+    var ok =
+      (st === 'UNKNOWN' || st === 'PENDING') ? amt === null
+      : st === 'CHARGED' ? (amt !== null && amt >= 1 && amt <= TOLL_MAX)
+      : st === 'FREE_CONFIRMED' ? amt === 0
+      : st === 'MANUAL' ? (amt !== null && amt >= 0 && amt <= TOLL_MAX)
+      : false;                               // 알 수 없는 상태도 legacy 로
+    if (!ok) {
+      if (amt != null && amt > 0) { st = 'MANUAL'; amt = Math.min(amt, TOLL_MAX); }
+      else { st = 'UNKNOWN'; amt = null; }
+    }
+    // UNKNOWN·PENDING 은 비워 두고, 근거가 있는 0원만 실제 0 으로 내보낸다.
+    if (st === 'UNKNOWN' || st === 'PENDING') return ev > 0 ? ev : null;
+    return (amt || 0) + ev;
   }
   /** 그 운행에 적용되는 유류 단가(원/km). 지역·분기로 고른다. */
   function rateOf(t) {
@@ -1301,7 +1362,11 @@
     var r = cycleRange(CYC.y, CYC.m);
     var a = APPR.filter(function (x) { return x.username === mine && x.cycle === CYCKEY(); })[0];
 
-    var all = TRIPS.filter(function (t) { return t.username === mine; });
+    // ★ 목적을 먼저 거른다. 앱도 거른 목록을 넘기므로, 차량 분리·영수증 합산·
+    //   근거자료 행·합계가 모두 거른 뒤 기준이 된다.
+    var all = TRIPS.filter(function (t) {
+      return t.username === mine && PRINT_PURPOSES.indexOf(t.purpose || '') >= 0;
+    });
     // 차량별로 나눈다. 순서는 그 차의 첫 운행 시각.
     var byPlate = {}, plates = [];
     all.forEach(function (t) {
@@ -1341,11 +1406,20 @@
 
     // ── 근거자료(영수증) 금액을 날짜별로 모은다 (앱 196~215행) ──
     //    앱은 그 차량 것만 본다(evidenceForRange(vehicleId)). 웹은 차량번호로 맞춘다.
+    // 이 사람이 이번 회차에 차를 한 대만 썼다면, 차량번호가 빈 영수증도 그 차 것으로 본다.
+    // (차량을 지웠다 복원하면 번호판이 비어 저장된다. 앱도 같은 예외를 둔다 —
+    //  안 두면 그 금액이 기록부에서 통째로 사라진다.)
+    var onlyOneCar = (function () {
+      var seen = {};
+      TRIPS.forEach(function (t) { if (t.username === mine && t.plate_no) seen[t.plate_no] = 1; });
+      return Object.keys(seen).length <= 1;
+    })();
     var evPark = {}, evToll = {};
     EVID.forEach(function (e) {
       var d = Number(e.date_millis);
       if (e.username !== mine || !(d >= r.lo && d < r.hi)) return;
-      if ((e.vehicle_plate || '') !== plate) return;
+      var ep = (e.vehicle_plate || '');
+      if (ep !== plate && !(ep === '' && onlyOneCar)) return;
       if (!(Number(e.amount) > 0)) return;
       var k = ymd(d);
       if (e.category === '주차') evPark[k] = (evPark[k] || 0) + Number(e.amount);
@@ -1394,10 +1468,11 @@
         '<td class="n">' + n0(g) + '</td>' +
         '<td class="n">' + n0(hh) + '</td>' +
         '<td class="n">' + n0(dist) + '</td>' +
-        '<td class="n">' + (fuel ? n0(fuel) : '') + '</td>' +
+        // 앱은 수식 결과에 #,##0 서식이라 0 도 '0' 으로 찍힌다. 빈 칸으로 두면 안 된다.
+        '<td class="n">' + n0(fuel) + '</td>' +
         '<td class="n">' + (park > 0 ? n0(park) : '') + '</td>' +
         '<td class="n">' + (toll == null ? '' : n0(toll)) + '</td>' +
-        '<td class="n">' + (total ? n0(total) : '') + '</td></tr>';
+        '<td class="n">' + n0(total) + '</td></tr>';
     });
 
     orphan.forEach(function (d) {
@@ -1541,6 +1616,7 @@
     return s.y + ' ' + s.q + '분기 기준';
   }
 
+  /** 인쇄 전에 담을 운행목적을 고르게 한다. 앱 내보내기 창과 같은 자리다. */
   function doPrint(who) {
     if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
     // 개인 화면에서는 본인 것만 뽑는다. 남의 이름으로 부르면 운행은 없어도
@@ -1549,8 +1625,39 @@
       toast('다른 분 운행기록부는 관리 › 전체 정산에서 뽑을 수 있습니다.', true);
       return;
     }
+    var target = who || myName();
+    $('pTitle').textContent = '운행기록부 인쇄';
+    $('pSub').textContent = nameOf(target) + ' · ' + cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
+    $('pBody').innerHTML =
+      '<div class="form"><div class="frow"><label class="flab">담을 운행</label><div class="fbody">' +
+      '<div class="radios">' + PURPOSES.map(function (p) {
+        return '<label class="radio"><input type="checkbox" name="ppurp" value="' + esc(p) + '"' +
+          (PRINT_PURPOSES.indexOf(p) >= 0 ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
+      }).join('') + '</div>' +
+      '<div class="fhint">차량일지를 <b>제출</b>하실 때는 <b>일반업무</b>만 고르십시오. ' +
+      '앱에서 엑셀로 내려받을 때와 같은 기준입니다.</div>' +
+      '</div></div></div>' +
+      '<div class="anote">운행기록부 뒤에 <b>영수증 사진</b>이 함께 붙습니다. ' +
+      '브라우저 인쇄 창에서 <b>PDF로 저장</b>을 고르시면 파일로 남길 수 있습니다.</div>';
+    $('pFoot').innerHTML = '<span style="flex:1"></span>' +
+      '<button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnPrintGo" data-who="' + esc(target) + '">인쇄</button>';
+    $('panel').classList.add('open');
+  }
+
+  /** 고른 목적으로 실제 인쇄물을 만들어 인쇄 창을 연다. */
+  function runPrint(who) {
+    var picked = Array.prototype.slice
+      .call(document.querySelectorAll('input[name="ppurp"]:checked'))
+      .map(function (x) { return x.value; });
+    if (!picked.length) { toast('담을 운행을 한 가지 이상 고르세요.', true); return; }
+    PRINT_PURPOSES = picked;
+    closePanel();
     var host = $('printArea');
     host.innerHTML = buildPrint(who);
+    if (!host.querySelector('table.plog tbody tr td:not(:empty)')) {
+      toast('고르신 목적에 해당하는 운행이 없습니다.', true); return;
+    }
     var imgs = Array.prototype.slice.call(host.querySelectorAll('img'));
     var left = imgs.length;
     toast(left ? '영수증 ' + left + '장을 불러오는 중입니다…' : '인쇄 창을 엽니다…');
@@ -1741,6 +1848,7 @@
   var HP = { groups: [], batch: '', busy: false, note: '' };
 
   function viewHipass() {
+    if (!LOADED) return head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조') + skeleton();
     var h = head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조',
       isAll() ? '영수증 PDF 를 읽어 전 직원 통행료를 확정합니다'
               : '영수증 PDF 를 읽어 내 통행료를 확정합니다');
@@ -2140,7 +2248,12 @@
           }
           toast(j.error || '넣지 못했습니다.', true); return;
         }
-        if (res.j.row) { ALL_TRIPS.unshift(res.j.row); applyScope(); }
+        if (res.j.row) {
+          // 서버는 start_time 내림차순으로 준다. 맨 앞에 꽂으면 08.22 가 08.21 위에 붙는다.
+          ALL_TRIPS.push(res.j.row);
+          ALL_TRIPS.sort(function (a, b) { return b.start_time - a.start_time; });
+          applyScope();
+        }
         AUDIT = null;
         toastOk('운행을 넣었습니다.', res.j.warning);
         closePanel(); paintPills(); render();
@@ -2276,6 +2389,10 @@
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all';
+    // ★ 하이패스 대조 결과도 반드시 버린다. 안 버리면 관리 화면에서 맞춰 둔
+    //   남의 운행이 개인 화면에 그대로 남고(이름 칸은 사라져 남의 것인 줄도 모른다),
+    //   '확정하기' 를 누르면 남의 운행에 통행료가 써진다.
+    HP = { groups: [], batch: '', busy: false, note: '' };
     applyScope();
     document.body.classList.remove('nav-open');
     render();
@@ -2288,7 +2405,15 @@
     if (e.target.closest('[data-close]')) { closePanel(); return; }
     if ((el = e.target.closest('[data-v]'))) { go(el.dataset.v); return; }
     if ((el = e.target.closest('[data-chip]'))) { FILT.chip = el.dataset.chip; render(); return; }
-    if ((el = e.target.closest('[data-issue]'))) { FILT.chip = el.dataset.issue; FILT.who = ''; go('trips'); return; }
+    if ((el = e.target.closest('[data-issue]'))) {
+      // go() 가 필터를 비우므로 반드시 go() **뒤에** 넣어야 한다. 예전에는 앞에 넣어
+      // 필터가 날아갔고, 화면도 개인 운행일지로 못 박혀 있어 전체 점검에서 누르면
+      // 보러 간 건이 한 건도 안 보였다.
+      var issue = el.dataset.issue;
+      go(isAll() ? 'a_trips' : 'trips');
+      FILT.chip = issue; FILT.who = '';
+      render(); return;
+    }
     if ((el = e.target.closest('[data-edit]'))) { openEdit(el.dataset.edit); return; }
     if (e.target.closest('#btnSaveTrip')) { saveTrip(e.target.closest('#btnSaveTrip').dataset.id); return; }
     if (e.target.closest('#btnAddTrip')) { openCreate(); return; }
@@ -2310,21 +2435,29 @@
 
     if (e.target.closest('#btnCreateTrip')) { createTrip(false); return; }
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
+    // ★ 인쇄 버튼은 직원 행(data-person) 안에 들어 있다. 같은 핸들러 안에서
+    //   행 검사가 먼저 돌면 인쇄 대신 화면 이동이 일어난다(stopPropagation 은
+    //   같은 리스너 안에서는 소용이 없다). 반드시 행보다 먼저 본다.
+    if ((el = e.target.closest('[data-print]'))) { doPrint(el.dataset.print || undefined); return; }
     if ((el = e.target.closest('[data-person]'))) {
-      if (!ME || !ME.is_admin) return;
-      go('a_trips');
+      // 지금 보고 있는 범위 안에서 이동한다. 개인 화면에서 눌렀는데 전사 목록으로
+      // 튀면 안 되고, 일반 직원에게 아무 일도 안 일어나는 죽은 클릭이어도 안 된다.
+      go(isAll() ? 'a_trips' : 'trips');
       FILT.who = el.dataset.person; FILT.chip = 'all';
       render(); return;
     }
-    if ((el = e.target.closest('[data-car]'))) { FILT.car = el.dataset.car; FILT.chip = 'all'; go('trips'); return; }
-    if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
-    if ((el = e.target.closest('[data-print]'))) {
-      e.stopPropagation();                       // 직원 행 클릭(운행일지 이동)과 겹치지 않게
-      doPrint(el.dataset.print || undefined);
-      return;
+    if ((el = e.target.closest('[data-car]'))) {
+      // 차량 목록은 관리 화면에만 있다. 개인 운행일지로 보내면 내 차가 아니라 빈 표가 된다.
+      var car = el.dataset.car;
+      go(isAll() ? 'a_trips' : 'trips');
+      FILT.car = car; FILT.chip = 'all';
+      render(); return;
     }
+    if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
+    if ((el = e.target.closest('#btnPrintGo'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#burger')) { document.body.classList.toggle('nav-open'); return; }
-    if (e.target.closest('#uBtn')) { go(ME && ME.is_admin ? 'people' : 'close'); return; }
+    // 내 프로필 버튼은 개인 자리다 — 관리 화면으로 보내지 않는다(직원 현황은 관리 메뉴에 있다).
+    if (e.target.closest('#uBtn')) { go('close'); return; }
 
     /* ── 결재 ── */
     if (e.target.closest('#btnOpenSubmit')) { openSubmit(); return; }
