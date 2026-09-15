@@ -1,427 +1,706 @@
+<!--
+  ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
+  여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
+  같이 올라가야 하는 것: driving-app.js · hipass.js · brand/atec-lockup.png · brand/atec-mark.png
+-->
 <!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>ATEC Driving — 운행일지</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#ffffff">
+<title>ATEC 운행일지</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/css/SpoqaHanSansNeo.css">
 <style>
+/* ════════════════════════════════════════════════════════════════════════
+   ATEC 운행일지 — 디자인 시스템
+   [가이드라인] ATEC mobility Corporate Identity Design Guidelines (2025-12) 준거
+
+   CI 실측값
+     레드   C10 M100 Y50 K0  = R215 G0  B81   = #D70051
+     그레이 C67 M52  Y44 K18  = R90  G102 B111 = #5A666F
+     서체   Spoqa Han Sans Neo (Light 300 / Regular 400 / Medium 500 / Bold 700)
+            ★ 600 굵기가 없다. 600 을 쓰면 브라우저가 가짜 볼드를 만든다. 쓰지 말 것.
+
+   설계 규칙
+     1. 회색은 임의로 고르지 않는다. CI 그레이의 색상각(206°)을 유지한 채
+        명도만 내린 한 계열로 쓴다 — 그래야 화면 전체가 브랜드 안에 있다.
+     2. 레드는 '여기를 보라'일 때만. 강조·경고·현재위치·주요행동.
+     3. 상자를 겹치지 않는다. 면과 여백으로 나누고 선은 머리카락 굵기로.
+     4. 숫자가 주인공. 전부 tabular-nums · 우측정렬 · 라벨보다 크고 진하게.
+     5. 첫 화면은 숫자 나열이 아니라 '한 문장의 판정'으로 연다.
+   ════════════════════════════════════════════════════════════════════════ */
+
 :root{
-  --ink:#1B1518; --ink-2:#4A4045; --muted:#8C8188; --faint:#B6ACB1;
-  --wine:#A00040; --wine-2:#7A0031; --wine-tint:#FBF0F4;
-  --paper:#FAF8F7; --surface:#FFFFFF; --line:#EDE7E4; --line-2:#F5F1EF;
-  --ok:#137A52; --warn:#A65B10; --bad:#B3182C; --info:#2A54C6;
-  --shadow:0 1px 2px rgba(27,21,24,.05), 0 8px 24px rgba(27,21,24,.07);
+  /* ── CI 원색 ── */
+  --red:#D70051;      /* PANTONE 기준색 */
+  --red-700:#A3003D;  /* 눌림·호버 */
+  --red-100:#F8D3E1;
+  --red-50:#FCEEF3;
+
+  /* ── CI 그레이(#5A666F, hue 206°)에서 파생한 한 계열 ── */
+  --ink-900:#1D252B;  /* 제목 */
+  --ink-800:#2F3941;
+  --ink-700:#434E56;  /* 본문 */
+  --ink-600:#5B6871;  /* = CI 그레이 */
+  --ink-500:#788691;  /* 보조 */
+  --ink-400:#A0AAB1;  /* 흐림 */
+  --ink-300:#C7CDD1;
+  --ink-200:#E2E6E9;  /* 선 */
+  --ink-100:#F0F3F4;  /* 옅은 선 */
+  --ink-50:#F8F9FA;   /* 바탕 */
+
+  --canvas:#F6F7F8;
+  --surface:#FFFFFF;
+  --sunken:#FAFBFC;
+
+  --ok:#0C7A57; --ok-50:#EAF6F1;
+  --warn:#96620A; --warn-50:#FCF5E9;
+
+  --rail:248px; --head:58px;
+  --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px;
+  --pop:0 1px 2px rgba(29,37,43,.05), 0 16px 40px -12px rgba(29,37,43,.22);
+  --ease:cubic-bezier(.2,.6,.35,1);
+  --t:.13s var(--ease);
 }
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
 html,body{margin:0;padding:0;min-height:100%}
-body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
-  background:var(--paper);color:var(--ink);font-size:13.5px;line-height:1.55;
-  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-.mut{color:var(--muted)} .sp{flex:1}
-.admin-only{display:none} body.is-admin .admin-only{display:block}
+body{
+  font-family:"Spoqa Han Sans Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,
+    "Segoe UI","Malgun Gothic",sans-serif;
+  background:var(--canvas);color:var(--ink-700);
+  font-size:13.5px;font-weight:400;line-height:1.62;letter-spacing:-.003em;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums;
+}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:3px}
+[hidden]{display:none !important}
+svg{display:block;flex:none}
+img{display:block}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}}
 
-/* ── 로그인 ── */
-#login{min-height:100vh;display:grid;place-items:center;padding:24px}
-.lbox{width:100%;max-width:352px}
-.lbrand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;letter-spacing:-.03em;margin-bottom:6px}
-.lbrand .mk{font-size:21px;line-height:1}
-.lsub{color:var(--muted);font-size:12.5px;margin-bottom:26px}
+/* 관리자 전용 — display:revert 는 <a> 를 inline 으로 되돌려 메뉴를 깨뜨린다. */
+.adm{display:none}
+body.is-admin a.adm{display:flex}
+body.is-admin .navsec.adm{display:block}
+
+/* ── 로고 ────────────────────────────────────────────────────────────
+   CI 원본 아트워크를 그대로 쓴다. 글꼴로 흉내 내지 않는다.
+   가로 비율은 원본 그대로 두고 높이만 지정한다.                     */
+.logo-mark{height:15px;width:auto}          /* ATEC 영문 기본형 (1242:273) */
+.logo-lockup{height:26px;width:auto}        /* ATEC mobility 가로형 (3481:315) */
+.appname{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
+.appname .div{width:1px;height:14px;background:var(--ink-200)}
+.appname .nm{font-size:14px;font-weight:500;color:var(--ink-600);letter-spacing:-.01em}
+
+/* ═════════════════ 로그인 ═════════════════ */
+#login{min-height:100dvh;display:grid;place-items:center;padding:32px 22px}
+.lwrap{width:100%;max-width:348px}
+.lwrap .logo-lockup{height:24px;margin-bottom:26px}
+.ltitle{font-size:21px;font-weight:700;color:var(--ink-900);letter-spacing:-.035em;margin:0}
+.ltag{margin:7px 0 28px;font-size:13.5px;color:var(--ink-500);line-height:1.7}
 .fld{margin-bottom:11px}
-.fld label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
-.fld input{width:100%;font:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line);
-  border-radius:9px;background:var(--surface);color:var(--ink)}
-.fld input:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
-.fld input::placeholder{color:var(--faint)}
-#loginBtn{width:100%;font:inherit;font-size:14px;font-weight:700;cursor:pointer;border:0;
-  background:var(--wine);color:#fff;padding:12px;border-radius:9px;margin-top:6px}
-#loginBtn:hover{background:var(--wine-2)} #loginBtn[disabled]{background:#D6CBD1;cursor:not-allowed}
-.lmsg{margin-top:13px;font-size:12.5px;border-left:2px solid var(--bad);padding:3px 0 3px 12px;
-  color:var(--bad);display:none} .lmsg.show{display:block}
-.lnote{margin-top:22px;font-size:12px;color:var(--muted);border-left:2px solid var(--line);
-  padding:3px 0 3px 12px;line-height:1.7} .lnote b{color:var(--ink-2);font-weight:600}
+.fld label{display:block;font-size:11.5px;font-weight:500;color:var(--ink-600);
+  margin-bottom:6px;letter-spacing:.01em}
+.fld input{width:100%;font-size:15px;padding:12px 14px;border:1px solid var(--ink-200);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink-900);
+  transition:border-color var(--t),box-shadow var(--t)}
+.fld input::placeholder{color:var(--ink-400)}
+.fld input:focus{outline:none;border-color:var(--ink-500);box-shadow:0 0 0 4px var(--ink-100)}
+#loginBtn{width:100%;font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:var(--red);
+  color:#fff;padding:13px;border-radius:var(--r-sm);margin-top:12px;transition:background var(--t)}
+#loginBtn:hover{background:var(--red-700)}
+#loginBtn:disabled{background:var(--ink-300);cursor:progress}
+.lmsg{margin-top:13px;font-size:12.5px;color:var(--red-700);background:var(--red-50);
+  border-radius:var(--r-xs);padding:10px 12px;display:flex;gap:8px;align-items:flex-start;line-height:1.55}
+.lnote{margin-top:28px;padding-top:20px;border-top:1px solid var(--ink-200);
+  font-size:12.5px;color:var(--ink-500);line-height:1.85}
+.lnote b{color:var(--ink-700);font-weight:500}
 
-/* ── 뼈대 ── */
-#app{display:none;flex-direction:column;min-height:100vh}
-header.top{background:var(--surface);border-bottom:1px solid var(--line);padding:0 20px;height:54px;
-  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30}
-.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14.5px;letter-spacing:-.015em}
-.brand .mk{font-size:16px;line-height:1}
-.brand .sub{font-weight:500;font-size:12.5px;color:var(--muted);border-left:1px solid var(--line);padding-left:11px}
-.who{font-size:12px;color:var(--muted);text-align:right;line-height:1.35}
-.who b{color:var(--ink);font-weight:600;display:block;font-size:12.5px}
-nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;gap:2px;
-  padding:0 20px;position:sticky;top:54px;z-index:29;overflow-x:auto}
-nav.tabs a{font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);padding:9px 14px 11px;
-  border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;text-decoration:none}
-nav.tabs a:hover{color:var(--ink)}
-nav.tabs a.on{color:var(--wine);border-bottom-color:var(--wine);font-weight:600}
-main{flex:1;padding:24px 26px 70px;max-width:1420px;width:100%;margin:0 auto}
-h2.pg{font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:-.03em}
-p.pgsub{margin:0 0 20px;color:var(--muted);font-size:12.5px} p.pgsub b{color:var(--ink-2);font-weight:600}
+/* ═════════════════ 뼈대 ═════════════════ */
+#app{display:none}
+header.top{
+  position:sticky;top:0;z-index:50;height:var(--head);background:rgba(255,255,255,.9);
+  backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:14px;padding:0 20px}
+.sp{flex:1}
 
-/* ── 조각 ── */
-.btn{font:inherit;font-weight:600;font-size:12.5px;cursor:pointer;border:1px solid var(--line);
-  background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:7px}
-.btn:hover{background:var(--line-2)}
-.btn.pri{background:var(--wine);border-color:var(--wine);color:#fff}
-.btn.pri:hover{background:var(--wine-2)}
-.btn.pri[disabled]{background:#D6CBD1;border-color:#D6CBD1;cursor:not-allowed}
-.btn.sm{padding:3px 9px;font-size:11.5px;border-radius:6px}
-select.f,input.f{font:inherit;font-size:12.5px;font-weight:500;padding:6px 10px;border:1px solid var(--line);
-  border-radius:7px;background:var(--surface);color:var(--ink)}
-select.f:focus,input.f:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
-input.f.admin-only{display:none} body.is-admin input.f.admin-only{display:inline-block}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
-.card h3{margin:0 0 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:9px}
-.card h3 .tag{font-size:11px;font-weight:500;color:var(--muted)}
-.grid{display:grid;gap:14px}
-@media(min-width:1060px){.grid.c2{grid-template-columns:1fr 1fr}}
+/* 마감주기 = 전 화면을 지배하는 값이라 머리띠에 고정한다 */
+.cycle{position:relative;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;
+  border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);cursor:pointer;
+  font-size:12.5px;font-weight:500;color:var(--ink-900);transition:border-color var(--t),background var(--t)}
+.cycle:hover{border-color:var(--ink-400);background:var(--sunken)}
+.cycle svg{color:var(--ink-400)}
+.cycle select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;border:0}
+/* 포커스 표시는 투명한 select 가 아니라 겉껍데기에 그린다 — 안 그러면 키보드로
+   Tab 했을 때 지금 어디에 있는지 전혀 안 보인다. */
+.cycle select:focus-visible{outline:0}
+.cycle:focus-within{outline:2px solid var(--red);outline-offset:2px}
+/* 표에서 눌러서 여는 행 — 키보드로 갔을 때 어디인지 보이게 한다. */
+tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.cycle .tag{font-weight:400;color:var(--ink-500)}
 
-.kpis{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
-  border-radius:10px;overflow:hidden;margin-bottom:16px}
-.kpi{flex:1 1 140px;padding:15px 18px;position:relative}
-.kpi+.kpi::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:1px;background:var(--line)}
-.kpi .k{font-size:11.5px;color:var(--muted);font-weight:500}
-.kpi .v{font-size:23px;font-weight:700;letter-spacing:-.045em;margin-top:4px;
-  font-variant-numeric:tabular-nums;line-height:1.15}
-.kpi .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
-.kpi.alert .v{color:var(--bad)}
+.uchip{display:flex;align-items:center;gap:9px;padding:3px 8px 3px 3px;border-radius:999px;
+  cursor:pointer;border:0;background:none;transition:background var(--t)}
+.uchip:hover{background:var(--ink-100)}
+.uav{width:29px;height:29px;border-radius:50%;background:var(--ink-600);color:#fff;font-size:11.5px;
+  font-weight:500;display:grid;place-items:center;letter-spacing:-.02em;flex:none}
+.uav.is-admin-av{background:var(--red)}
+.utxt{text-align:left;line-height:1.3;min-width:0}
+.utxt b{display:block;font-size:12.5px;font-weight:500;color:var(--ink-900)}
+.utxt span{display:block;font-size:11px;color:var(--ink-400);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:150px}
 
-.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;
-  color:var(--ink-2);white-space:nowrap}
-.pill::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--faint);flex:none}
-.pill.ok::before{background:var(--ok)} .pill.ok{color:var(--ok)}
-.pill.warn::before{background:var(--warn)} .pill.warn{color:var(--warn)}
-.pill.bad::before{background:var(--bad)} .pill.bad{color:var(--bad)}
-.pill.info::before{background:var(--info)} .pill.info{color:var(--info)}
-.pill.mute{color:var(--muted)}
-.tagx{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--ink-200);
+  border-radius:var(--r-xs);background:var(--surface);cursor:pointer;color:var(--ink-600);transition:var(--t)}
+.iconbtn:hover{border-color:var(--ink-400);background:var(--sunken);color:var(--ink-800)}
+#burger{display:none}
 
-.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:12.5px}
-table.wide{min-width:1140px}
-th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap;vertical-align:middle}
-th{font-weight:500;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line)}
-th.admin-only,td.admin-only{display:none}
-body.is-admin th.admin-only,body.is-admin td.admin-only{display:table-cell}
+.shell{display:flex;align-items:flex-start}
+
+/* ── 좌측 레일 ───────────────────────────────────────────────────── */
+aside{width:var(--rail);flex:0 0 var(--rail);position:sticky;top:var(--head);
+  height:calc(100dvh - var(--head));overflow-y:auto;overscroll-behavior:contain;
+  padding:18px 12px 36px;border-right:1px solid var(--ink-200);background:var(--surface)}
+.navsec{padding:18px 10px 7px;font-size:10.5px;font-weight:700;color:var(--ink-400);letter-spacing:.11em}
+.navsec:first-child{padding-top:2px}
+aside a{display:flex;align-items:center;gap:11px;height:37px;padding:0 10px;border-radius:var(--r-xs);
+  font-size:13px;font-weight:400;color:var(--ink-700);cursor:pointer;text-decoration:none;
+  position:relative;transition:background var(--t),color var(--t)}
+aside a svg{color:var(--ink-400);transition:color var(--t)}
+aside a:hover{background:var(--ink-100);color:var(--ink-900)}
+aside a:hover svg{color:var(--ink-600)}
+aside a.on{background:var(--red-50);color:var(--red-700);font-weight:500}
+aside a.on svg{color:var(--red)}
+aside a.on::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
+  background:var(--red);border-radius:0 3px 3px 0}
+.pill{margin-left:auto;font-size:11px;font-weight:500;min-width:20px;height:20px;padding:0 6px;
+  border-radius:999px;display:grid;place-items:center;background:var(--ink-100);color:var(--ink-500)}
+.pill.hot{background:var(--red);color:#fff;font-weight:700}
+aside a.on .pill{background:#fff;color:var(--red-700)}
+aside a.on .pill.hot{background:var(--red);color:#fff}
+
+main{flex:1;min-width:0;padding:28px 30px 88px}
+.inner{max-width:1280px;margin:0 auto}
+
+/* ── 페이지 머리 ─────────────────────────────────────────────────── */
+.phead{margin-bottom:24px}
+.phead h1{margin:0;font-size:24px;font-weight:700;color:var(--ink-900);
+  letter-spacing:-.035em;line-height:1.24}
+.phead p{margin:6px 0 0;font-size:13px;color:var(--ink-500)}
+
+/* ── 히어로: 한 문장의 판정 ──────────────────────────────────────── */
+.hero{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r-lg);
+  padding:28px 30px;margin-bottom:18px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.11em;color:var(--ink-400);
+  display:flex;align-items:center;gap:8px}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex:none}
+.eyebrow .dot.ok{background:var(--ok)}
+.verdict{margin:14px 0 0;font-size:28px;font-weight:700;color:var(--ink-900);
+  letter-spacing:-.04em;line-height:1.3}
+.verdict em{font-style:normal;color:var(--red)}
+.verdict.clean em{color:var(--ok)}
+.track{margin-top:22px;height:5px;border-radius:99px;background:var(--ink-100);overflow:hidden}
+.track i{display:block;height:100%;border-radius:99px;background:var(--red);
+  transition:width .8s var(--ease)}
+.track.done i{background:var(--ink-400)}
+.facts{display:flex;flex-wrap:wrap;gap:0 38px;margin-top:22px}
+.fact{padding-top:2px}
+.fact .k{font-size:11.5px;color:var(--ink-400);font-weight:400}
+.fact .v{font-size:21px;font-weight:700;color:var(--ink-900);letter-spacing:-.035em;line-height:1.38}
+.fact .v small{font-size:12.5px;font-weight:500;color:var(--ink-400);margin-left:2px;letter-spacing:0}
+.fact .v.alert{color:var(--red)}
+.fact .sub{font-size:11.5px;color:var(--ink-400)}
+
+/* ── 구역 ───────────────────────────────────────────────────────── */
+.sect{margin-top:28px}
+.sect > .hd{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding:0 2px}
+.sect > .hd h2{margin:0;font-size:14px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
+.sect > .hd .cnt{font-size:12px;color:var(--ink-400)}
+.sect > .hd .sp{flex:1}
+.panel{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);overflow:hidden}
+
+/* ── 점검 항목 ───────────────────────────────────────────────────── */
+.issue{display:flex;align-items:center;gap:15px;padding:16px 20px;width:100%;text-align:left;
+  border:0;border-bottom:1px solid var(--ink-100);background:none;cursor:pointer;
+  transition:background var(--t)}
+.issue:last-child{border-bottom:0}
+.issue:hover{background:var(--sunken)}
+.issue[disabled]{cursor:default}
+.issue[disabled]:hover{background:none}
+.issue .ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none}
+.issue.sv-bad .ico{background:var(--red-50);color:var(--red)}
+.issue.sv-warn .ico{background:var(--warn-50);color:var(--warn)}
+.issue.sv-ok  .ico{background:var(--ok-50);color:var(--ok)}
+.issue .bd{flex:1;min-width:0}
+.issue .t{font-size:13.5px;font-weight:500;color:var(--ink-900);display:block}
+.issue .d{font-size:12.5px;color:var(--ink-500);margin-top:2px;line-height:1.58;display:block}
+.issue .amt{font-size:20px;font-weight:700;letter-spacing:-.03em;color:var(--ink-400)}
+.issue.sv-bad .amt{color:var(--red)}
+.issue.sv-warn .amt{color:var(--warn)}
+.issue.sv-ok .amt{color:var(--ok)}
+.issue .go{color:var(--ink-300);transition:transform .16s var(--ease),color var(--t)}
+.issue:hover .go{transform:translateX(3px);color:var(--ink-500)}
+
+/* ── 표 ─────────────────────────────────────────────────────────── */
+/* ★ overflow 를 가진 요소가 sticky 의 기준이 된다. top 은 반드시 0.
+   행이 많은 표만 .tall 로 자기 스크롤을 갖는다(런타임에 붙인다). */
+.scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+.scroll table{min-width:660px}
+.scroll.tall{max-height:min(64dvh,680px)}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+thead th{position:sticky;top:0;z-index:2;background:var(--surface);
+  text-align:left;font-weight:500;font-size:11px;color:var(--ink-400);letter-spacing:.05em;
+  padding:12px 15px;border-bottom:1px solid var(--ink-200);white-space:nowrap}
+th.n,td.n{text-align:right}
+tbody td{padding:11px 15px;border-bottom:1px solid var(--ink-100);white-space:nowrap;
+  color:var(--ink-700);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
-tbody tr:hover td{background:#FCFAFA}
-tbody td:first-child{font-weight:600}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-td.wrap{white-space:normal;max-width:290px}
-td.src{color:var(--muted);font-size:11.5px;max-width:170px;overflow:hidden;text-overflow:ellipsis}
-td.empty{text-align:center;color:var(--muted);padding:36px 12px;font-weight:400}
-tfoot td{border-top:1px solid var(--line);background:var(--line-2);font-weight:600}
+tbody tr.clk{cursor:pointer}
+tbody tr.clk:hover td{background:var(--sunken)}
+td .lead,td.lead{font-weight:500;color:var(--ink-900)}
+td.n{font-variant-numeric:tabular-nums}
+td.total{font-weight:700;color:var(--ink-900)}
+td.el{max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--ink-500)}
+td.dim{color:var(--ink-400)}
+td.unk{color:var(--red);font-weight:500}   /* 미확정 건수 — Spoqa 는 600 이 없어 500 을 쓴다 */
+/* 문제가 있는 행은 왼쪽 가는 줄로. 칸을 색칠하면 숫자가 안 읽힌다. */
+tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 
-.lst{list-style:none;margin:0;padding:0}
-.lst li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--line-2);
-  margin:0 -8px;border-radius:7px}
-.lst li:last-child{border-bottom:0}
-.lst li[data-go]{cursor:pointer} .lst li[data-go]:hover{background:var(--wine-tint)}
-.lst li[data-go]::after{content:'\203A';color:var(--faint);font-size:15px}
-.lst .nm{font-weight:600;width:74px;flex:none}
-.lst .ds{color:var(--muted);font-size:12.5px;flex:1}
-.lst .vl{font-weight:600;font-variant-numeric:tabular-nums}
-.lst .vl.bad{color:var(--bad)}
+/* ── 상태 ───────────────────────────────────────────────────────── */
+.st{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:400;white-space:nowrap}
+.st::before{content:"";width:5px;height:5px;border-radius:50%;flex:none;background:var(--ink-300)}
+.st.ok{color:var(--ok)} .st.ok::before{background:var(--ok)}
+.st.warn{color:var(--warn)} .st.warn::before{background:var(--warn)}
+.st.bad{color:var(--red);font-weight:500} .st.bad::before{background:var(--red)}
+.st.dim{color:var(--ink-400)}
+.kind{display:inline-block;font-size:11.5px;font-weight:400;color:var(--ink-500);
+  border:1px solid var(--ink-200);border-radius:5px;padding:0 6px;line-height:19px}
+.kind.biz{color:var(--ink-900);border-color:var(--ink-400);font-weight:500}
 
-.note{border-left:2px solid var(--line);padding:3px 0 3px 13px;font-size:12.5px;line-height:1.65;color:var(--ink-2)}
-.note b{font-weight:600;color:var(--ink)} .note.warn{border-left-color:var(--warn)}
-.note.ok{border-left-color:var(--ok)}
+/* ── 필터 ───────────────────────────────────────────────────────── */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--ink-100);border-radius:var(--r-sm);padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;cursor:pointer;font-size:12.5px;font-weight:400;color:var(--ink-500);
+  padding:6px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;transition:var(--t)}
+.seg button:hover{color:var(--ink-900)}
+.seg button.on{background:var(--surface);color:var(--ink-900);font-weight:500;
+  box-shadow:0 1px 2px rgba(29,37,43,.08)}
+.seg button .c{font-size:11px;font-weight:500;color:var(--ink-400)}
+.seg button.on .c{color:var(--red)}
+.seg button.on.warnish .c{color:var(--warn)}
 
-/* ── 업로드 ── */
-.drop{border:1px dashed #DFD5D9;border-radius:10px;padding:30px 18px;text-align:center;
-  background:var(--surface);cursor:pointer;display:block}
-.drop:hover,.drop.over{border-color:var(--wine);background:var(--wine-tint)}
-.drop .t{font-weight:600;font-size:13.5px} .drop .s{color:var(--muted);font-size:12px;margin-top:4px}
-.drop input{display:none}
+.field{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;background:var(--surface);
+  border:1px solid var(--ink-200);border-radius:var(--r-xs);color:var(--ink-400);transition:border-color var(--t)}
+.field:focus-within{border-color:var(--ink-500)}
+.field select,.field input{border:0;background:none;outline:none;font-size:12.5px;color:var(--ink-900);
+  font-weight:400;min-width:0}
+.field input{width:152px}
+.field input::placeholder{color:var(--ink-400)}
 
-/* ── 대조 ── */
-.grp{border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden;background:var(--surface)}
-.grp .gh{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:12px 16px;
-  background:var(--line-2);border-bottom:1px solid var(--line)}
-.grp .gh .t{font-weight:700;font-size:13px}
-.grp .gh .vote,.grp .gh .lbl{font-size:12px;color:var(--muted)}
-.item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line-2);cursor:pointer}
-.item:last-child{border-bottom:0} .item:hover{background:#FCFAFA}
-.item.diff{box-shadow:inset 2px 0 0 var(--bad)}
-.item.diff-person{box-shadow:inset 2px 0 0 var(--warn)}
-.item.new{box-shadow:inset 2px 0 0 var(--info)}
-.item.same{opacity:.6}
-.item input[type=checkbox]{width:15px;height:15px;accent-color:var(--wine);margin-top:3px;flex:none}
-.item .body{flex:1;min-width:0}
-.item .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
-.item .hd .d{font-weight:600;font-size:12.5px}
-.item .money{font-variant-numeric:tabular-nums;font-size:12.5px}
-.item .money .old{color:var(--muted);text-decoration:line-through}
-.item .money .new{color:var(--ok)}
-.item .money .dl{color:var(--bad);font-weight:600}
-.item .lines{font-size:11.5px;color:var(--muted);line-height:1.8;display:block}
-.item .lines span{margin-right:12px;white-space:nowrap}
-.item .pwarn{margin-top:6px;font-size:11.5px;color:var(--warn);border-left:2px solid var(--warn);padding-left:10px}
-.applybar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0 0}
-.res{border-left:2px solid var(--ok);padding:4px 0 4px 13px;font-size:12.5px;color:var(--ink-2);margin-top:14px}
-.res.bad{border-left-color:var(--bad);color:var(--bad)}
+.btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:var(--r-xs);
+  border:1px solid var(--ink-200);background:var(--surface);color:var(--ink-700);font-size:12.5px;
+  font-weight:500;cursor:pointer;transition:var(--t)}
+.btn:hover{border-color:var(--ink-400);background:var(--sunken);color:var(--ink-900)}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.btn.pri:hover{background:var(--red-700);border-color:var(--red-700)}
+.btn.sm{height:29px;padding:0 11px;font-size:11.5px}
 
-/* ── 수정 패널 ── */
-#edit{position:fixed;inset:0;z-index:60;display:none}
-#edit.open{display:block}
-#eBackdrop{position:absolute;inset:0;background:rgba(27,21,24,.32)}
-#ePanel{position:absolute;right:0;top:0;bottom:0;width:100%;max-width:420px;background:var(--surface);
-  box-shadow:var(--shadow);display:flex;flex-direction:column;animation:slide .16s ease-out}
-@keyframes slide{from{transform:translateX(14px);opacity:.6}to{transform:none;opacity:1}}
-#ePanel .eh{padding:18px 22px 14px;border-bottom:1px solid var(--line);position:relative}
-#ePanel .eh .t{font-weight:700;font-size:15px;letter-spacing:-.02em;padding-right:30px}
-#ePanel .eh .s{color:var(--muted);font-size:12px;margin-top:3px;line-height:1.5}
-#eClose{position:absolute;right:14px;top:14px;border:0;background:none;font-size:20px;color:var(--muted);
-  cursor:pointer;line-height:1;padding:4px 8px;border-radius:6px}
-#eClose:hover{background:var(--line-2);color:var(--ink)}
-#ePanel .eb{flex:1;overflow-y:auto;padding:18px 22px}
-#ePanel .ef{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
-.efld{margin-bottom:16px}
-.efld label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
-.efld .hint{font-size:11.5px;color:var(--muted);margin-top:5px}
-.efld input,.efld select{width:100%;font:inherit;font-size:13.5px;padding:9px 11px;
-  border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
-.efld input:focus,.efld select:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px var(--wine-tint)}
-.efld .two{display:flex;gap:8px} .efld .two input{flex:1}
-.efld .inline{display:flex;gap:8px;align-items:center} .efld .inline input{flex:1}
-.efld.admin-only{display:none} body.is-admin .efld.admin-only{display:block}
+/* ── 빈 상태 / 로딩 ─────────────────────────────────────────────── */
+.blank{padding:64px 24px;text-align:center}
+.blank .ico{width:46px;height:46px;margin:0 auto 15px;border-radius:13px;background:var(--ink-100);
+  display:grid;place-items:center;color:var(--ink-400)}
+.blank .t{font-size:14px;font-weight:500;color:var(--ink-700)}
+.blank .d{font-size:12.5px;color:var(--ink-400);margin-top:5px}
+.sk{background:var(--ink-100);border-radius:5px;height:12px;position:relative;overflow:hidden}
+.sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);
+  animation:shimmer 1.35s infinite}
+@keyframes shimmer{100%{transform:translateX(100%)}}
+.fade{animation:fade .24s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
-/* ── 알림 ── */
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
-  background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:12.5px;font-weight:500;
-  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:80;max-width:80vw;text-align:center}
-.toast.show{opacity:1;transform:translateX(-50%)}
-.toast.bad{background:var(--bad)}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);
-  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
-@keyframes sp{to{transform:rotate(360deg)}}
-#busy{display:none;color:var(--muted);font-size:12.5px}
-#busy .spin{border-color:rgba(160,0,64,.25);border-top-color:var(--wine)}
+/* ── 슬라이드 패널 ──────────────────────────────────────────────── */
+#panel{position:fixed;inset:0;z-index:70;display:none}
+#panel.open{display:block}
+#panel .veil{position:absolute;inset:0;background:rgba(29,37,43,.36);animation:fade .2s}
+#panel .sheet{position:absolute;top:0;right:0;bottom:0;width:min(468px,100%);background:var(--surface);
+  box-shadow:var(--pop);display:flex;flex-direction:column;animation:slide .28s var(--ease)}
+@keyframes slide{from{transform:translateX(26px);opacity:.55}to{transform:none;opacity:1}}
+#panel .ph{padding:17px 20px;border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:12px}
+#panel .ph .t{font-size:15px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
+#panel .ph .s{font-size:12px;color:var(--ink-400);margin-top:1px}
+#panel .pb{flex:1;overflow-y:auto;padding:6px 20px 20px}
+#panel .pf{padding:14px 20px;border-top:1px solid var(--ink-200);display:flex;gap:9px;align-items:center}
+.kv{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--ink-100);font-size:13px}
+.kv:last-child{border-bottom:0}
+.kv .k{flex:0 0 86px;color:var(--ink-400);font-size:12.5px}
+.kv .v{flex:1;min-width:0;color:var(--ink-700);word-break:break-word}
+.kv .v b{color:var(--ink-900);font-weight:500}
+.kv .v .dim{color:var(--ink-400)}
+
+/* ── 결재 ───────────────────────────────────────────────────────────
+   결재는 '어디까지 갔나'가 전부다. 그래서 진행 막대를 크게 쓰고
+   나머지는 최대한 조용히 둔다. 승인·반려 버튼만 눈에 띄면 된다.       */
+.astrip{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);
+  padding:16px 20px 18px}
+.acard{border-bottom:1px solid var(--ink-100);padding:16px 20px 18px}
+.acard:last-child{border-bottom:0}
+.ahd{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:4px}
+.ahd b{font-size:14px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
+.acyc{font-size:12px;color:var(--ink-500)}
+.asum{font-size:12px;color:var(--ink-400);font-variant-numeric:tabular-nums}
+
+/* 진행 막대 */
+.aprog{display:flex;align-items:center;flex-wrap:wrap;gap:0 2px;margin-top:12px}
+.anode{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-size:10.5px;font-weight:500}
+.anode.done{background:var(--ok);color:#fff}
+.anode.now{background:var(--red);color:#fff}
+.anode.bad{background:var(--red-700);color:#fff;font-weight:700}
+.anode.wait{background:var(--ink-100);color:var(--ink-400)}
+.alabel{font-size:12px;color:var(--ink-700);margin:0 12px 0 7px;white-space:nowrap}
+.alabel.wait{color:var(--ink-400)}
+.alabel em{font-style:normal;color:var(--ink-400);font-size:11px;margin-left:5px}
+.aline{width:22px;height:2px;background:var(--ink-200);flex:none}
+.aline.done{background:var(--ok)}
+.aact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+
+/* 상신 창 */
+.aline-list{border-top:1px solid var(--ink-100);margin-top:4px}
+.arow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--ink-100)}
+.aseq{width:24px;height:24px;border-radius:50%;background:var(--ink-100);color:var(--ink-500);
+  display:grid;place-items:center;font-size:11.5px;font-weight:500;flex:none}
+.aseq.me{background:var(--ink-900);color:#fff}
+.awho{flex:1;min-width:0}
+.awho b{display:block;font-size:13.5px;font-weight:500;color:var(--ink-900)}
+.awho span{display:block;font-size:11.5px;color:var(--ink-400)}
+.awho select.apick{width:100%;font-size:13px;padding:7px 9px;border:1px solid var(--red-100);
+  border-radius:var(--r-xs);background:var(--red-50);color:var(--ink-900)}
+.abox{font-size:11.5px;color:var(--ink-500);white-space:nowrap}
+select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5px 7px;
+  background:var(--surface);color:var(--ink-700);font-size:11.5px}
+.iconbtn.sm{width:26px;height:26px;border-color:transparent}
+.iconbtn.sm:hover{border-color:var(--ink-200)}
+.aadd{margin-top:12px}
+.aadd select{width:100%;font-size:13px;padding:10px 12px;border:1px dashed var(--ink-300);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink-500)}
+.awarn{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:11px 13px;
+  background:var(--warn-50);border-radius:var(--r-xs);font-size:12.5px;color:var(--warn);line-height:1.55}
+.awarn svg{margin-top:2px;flex:none}
+.anote{margin-top:14px;font-size:12.5px;color:var(--ink-500);line-height:1.7}
+.anote b{color:var(--ink-900);font-weight:500}
+
+/* ── 입력 폼 (운행 고치기 · 추가) ────────────────────────────────── */
+.form{border-top:1px solid var(--ink-100);margin-top:4px}
+.frow{display:flex;gap:16px;padding:15px 0;border-bottom:1px solid var(--ink-100);align-items:flex-start}
+.frow:last-child{border-bottom:0}
+.flab{flex:0 0 74px;font-size:12.5px;color:var(--ink-500);padding-top:8px}
+.flab .only{display:inline-block;font-size:10px;font-weight:500;color:var(--red);
+  background:var(--red-50);border-radius:4px;padding:0 5px;line-height:16px;margin-left:4px}
+.fbody{flex:1;min-width:0}
+.fhint{font-size:11.5px;color:var(--ink-400);margin-top:7px;line-height:1.6}
+.fhint b{color:var(--ink-600);font-weight:500}
+.inp{width:100%;font-size:14px;padding:9px 11px;border:1px solid var(--ink-200);
+  border-radius:var(--r-xs);background:var(--surface);color:var(--ink-900);
+  transition:border-color var(--t),box-shadow var(--t)}
+.inp:focus{outline:none;border-color:var(--ink-500);box-shadow:0 0 0 3px var(--ink-100)}
+.inp::placeholder{color:var(--ink-400)}
+.inp.num{width:126px;text-align:right;font-variant-numeric:tabular-nums}
+.unit{font-size:12.5px;color:var(--ink-400);margin-left:7px}
+.arrowto{color:var(--ink-400);margin:0 8px;font-size:13px}
+.radios{display:flex;flex-wrap:wrap;gap:7px}
+.radio{position:relative;   /* 숨긴 input 의 기준. 없으면 패널 좌상단에 포커스 점이 뜬다 */
+  display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--ink-200);
+  border-radius:999px;cursor:pointer;font-size:12.5px;color:var(--ink-600);transition:var(--t);user-select:none}
+.radio:hover{border-color:var(--ink-400)}
+.radio input{position:absolute;opacity:0;width:0;height:0}
+.radio:has(input:checked){background:var(--ink-900);border-color:var(--ink-900);color:#fff;font-weight:500}
+.radio:has(input:focus-visible){outline:2px solid var(--red);outline-offset:2px}
+
+/* ── 하이패스 대조 ──────────────────────────────────────────────── */
+.drop{border:1.5px dashed var(--ink-300);border-radius:var(--r);background:var(--surface);
+  padding:36px 24px;text-align:center;transition:var(--t);margin-bottom:16px}
+.drop.over{border-color:var(--red);background:var(--red-50)}
+.drop .dico{width:46px;height:46px;margin:0 auto 14px;border-radius:13px;background:var(--ink-100);
+  display:grid;place-items:center;color:var(--ink-400)}
+.drop.over .dico{background:var(--red-100);color:var(--red)}
+.drop .dt{font-size:14.5px;font-weight:500;color:var(--ink-900)}
+.drop .dd{font-size:12.5px;color:var(--ink-400);margin-top:4px}
+.drop label.btn{cursor:pointer}
+
+.hpnote{display:flex;gap:10px;align-items:flex-start;padding:13px 16px;border-radius:var(--r-sm);
+  background:var(--ink-50);border:1px solid var(--ink-200);font-size:13px;color:var(--ink-700);
+  margin-bottom:14px;line-height:1.6}
+.hpnote svg{margin-top:2px;flex:none;color:var(--ink-400)}
+.hpnote b{color:var(--ink-900);font-weight:500}
+.hpnote.warn{background:var(--warn-50);border-color:#F0E2C4;color:var(--warn)}
+.hpnote.warn svg{color:var(--warn)}
+.hpnote.warn b{color:var(--warn)}
+
+.hpact{display:flex;align-items:center;gap:14px;justify-content:flex-end;margin-top:13px;
+  font-size:12.5px}
+.hpact .dim{color:var(--ink-500);margin-right:auto}
+.hpact .dim b{color:var(--ink-900);font-weight:500}
+
+.hpun{margin-top:11px;border:1px solid var(--ink-200);border-radius:var(--r-sm);background:var(--surface)}
+.hpun summary{padding:11px 16px;cursor:pointer;font-size:12.5px;color:var(--ink-600);
+  list-style:none;display:flex;align-items:center;gap:7px}
+.hpun summary::-webkit-details-marker{display:none}
+.hpun summary::before{content:"▸";color:var(--ink-400);font-size:11px}
+.hpun[open] summary::before{content:"▾"}
+.hpun summary:hover{color:var(--ink-900)}
+.hpunb{padding:4px 16px 14px;border-top:1px solid var(--ink-100);font-size:12.5px;
+  color:var(--ink-600);max-height:260px;overflow-y:auto}
+.hpunb > div{padding:5px 0;border-bottom:1px solid var(--ink-100);display:flex;gap:10px}
+.hpunb > div:last-of-type{border-bottom:0}
+.hpunb b{color:var(--ink-900);font-weight:500;margin-left:auto;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink-500)}
+
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:pointer;margin:0}
+
+/* ── 토스트 ─────────────────────────────────────────────────────── */
+#toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,16px);z-index:90;
+  background:var(--ink-900);color:#fff;padding:12px 19px;border-radius:var(--r-sm);font-size:13px;
+  font-weight:400;opacity:0;pointer-events:none;transition:.2s var(--ease);max-width:88vw;box-shadow:var(--pop)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.bad{background:var(--red-700)}
+
+/* ══════════════════ 인쇄 ══════════════════════════════════════════
+   운행기록부 + 영수증을 한 번에 찍는다. 브라우저의 'PDF로 저장' 이 곧 한 권이다.
+   한글 글꼴·사진을 브라우저가 이미 갖고 있어 서버에서 PDF 를 만들 이유가 없다.
+   화면에서는 #printArea 를 감춰 두고 @media print 에서만 펼친다.          */
+#printArea{display:none}
+
+@media print{
+  @page{size:A4;margin:11mm 10mm}
+  html,body{background:#fff !important;color:#000;font-size:9.5pt}
+  header.top,aside,#panel,#toast,main{display:none !important}
+  #printArea{display:block}
+  .psheet{break-after:page;page-break-after:always}
+  .psheet:last-child{break-after:auto;page-break-after:auto}
+
+  .ptitle{margin:0 0 7mm;font-size:17pt;font-weight:700;text-align:center;letter-spacing:.06em}
+  .psub{margin:0 0 5mm;text-align:center;font-size:9pt;color:#333}
+  .phead{display:flex;gap:5mm;align-items:flex-start;margin-bottom:4mm}
+  .pinfo{flex:1;border-collapse:collapse}
+  .pinfo th,.pinfo td{border:.4pt solid #000;padding:1.6mm 2.4mm;font-size:9pt}
+  .pinfo th{width:24mm;background:#F2F2F2;font-weight:500;text-align:center;white-space:nowrap}
+  .pappr{border-collapse:collapse}
+  .pappr th,.pappr td{border:.4pt solid #000;text-align:center;font-size:8pt;font-weight:500}
+  .pappr th{background:#F2F2F2;padding:1.2mm 2mm;white-space:nowrap}
+  .pappr .plabel{width:7mm;padding:0;letter-spacing:.1em}
+  .pappr td{width:17mm;height:13mm;vertical-align:middle}
+  .psign{font-size:8.5pt;line-height:1.3}
+  .psign span{display:block;font-size:6.5pt;color:#555;margin-top:.6mm}
+  /* 해당 없는 결재칸 — 대각선 빗금으로 지운다(사내 문서 관행) */
+  .pslash{background:
+    linear-gradient(to top right,transparent calc(50% - .25pt),#000 50%,transparent calc(50% + .25pt))}
+
+  .psum{width:100%;border-collapse:collapse;margin-bottom:3mm}
+  .psum th,.psum td{border:.4pt solid #000;padding:1.6mm 2.4mm;font-size:8.5pt}
+  .psum th{background:#F2F2F2;font-weight:500;white-space:nowrap;text-align:center}
+  .psum td.n{text-align:right;font-variant-numeric:tabular-nums}
+
+  .plog{width:100%;border-collapse:collapse;table-layout:fixed}
+  /* 한글은 break-all 로 끊으면 글자가 뭉개진다. 어절 단위로 접는다. */
+  .plog th,.plog td{border:.4pt solid #000;padding:1.1mm 1.4mm;font-size:7.4pt;line-height:1.32;
+    word-break:keep-all;overflow-wrap:anywhere;vertical-align:middle}
+  .plog thead th{background:#F2F2F2;font-weight:500;text-align:center;font-size:7.2pt}
+  .plog thead{display:table-header-group}         /* 페이지마다 머리글 반복 */
+  .plog tr{break-inside:avoid;page-break-inside:avoid}
+  .plog td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .plog tfoot th{background:#F2F2F2;text-align:center;font-weight:700}
+  .plog tfoot td{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+  /* 지역별 분해 행 — 회계가 "총거리×단가" 와 왜 다른지 문서 안에서 보이게 한다(앱 223~240행) */
+  .plog tfoot tr.ppart th{background:#FFF;text-align:left;font-weight:400;font-size:7.2pt;color:#333}
+  .plog tfoot tr.ppart td{font-weight:400;color:#333}
+  .plog tfoot tr.pgrand th{background:#E8E8E8;font-size:8pt}
+  .plog tfoot tr.pgrand td{background:#E8E8E8;font-size:8.6pt}
+  /* A4 가로 인쇄폭 190mm 를 13칸에 나눈다. 합이 190 을 넘으면 표가 잘린다.
+     주소 세 칸(출발·도착·방문처)에 최대한 넉넉히 주는 것이 핵심이다. */
+  .plog th:nth-child(1),.plog td:nth-child(1){width:14mm;text-align:center}   /* 운행일자 */
+  .plog th:nth-child(2),.plog td:nth-child(2){width:24mm}                     /* 출발지역 */
+  .plog th:nth-child(3),.plog td:nth-child(3){width:24mm}                     /* 도착지역 */
+  .plog th:nth-child(4),.plog td:nth-child(4){width:22mm}                     /* 방문처   */
+  .plog th:nth-child(5),.plog td:nth-child(5),
+  .plog th:nth-child(6),.plog td:nth-child(6){width:8mm;text-align:center}
+  .plog th:nth-child(7),.plog td:nth-child(7),
+  .plog th:nth-child(8),.plog td:nth-child(8){width:14mm}
+  .plog th:nth-child(9),.plog td:nth-child(9){width:11mm}
+  .plog th:nth-child(10),.plog td:nth-child(10){width:13mm}
+  .plog th:nth-child(11),.plog td:nth-child(11){width:11mm}
+  .plog th:nth-child(12),.plog td:nth-child(12){width:12mm}
+  .plog th:nth-child(13),.plog td:nth-child(13){width:14mm}
+  .pwarn{margin-top:2.5mm;font-size:7.6pt;color:#333}
+
+  /* 영수증 */
+  .prhead{display:flex;align-items:baseline;gap:4mm;border-bottom:.6pt solid #000;
+    padding-bottom:1.8mm;margin-bottom:3.5mm}
+  .prhead b{font-size:12pt}
+  .prhead span{font-size:8.5pt;color:#333}
+  .prhead .pg{margin-left:auto}
+  .prhead .psum2{font-weight:700;color:#000}
+  .prgrid{display:grid;grid-template-columns:1fr 1fr;gap:4mm;height:245mm;align-content:start}
+  .prgrid.one{grid-template-columns:1fr;height:248mm}
+  .prgrid figure{margin:0;display:flex;flex-direction:column;min-height:0;
+    break-inside:avoid;page-break-inside:avoid}
+  .prgrid img{width:100%;flex:1;min-height:0;object-fit:contain;border:.4pt solid #BBB}
+  .prgrid figcaption{font-size:7.6pt;color:#333;padding-top:1.2mm;text-align:center}
+}
+
+/* ── 좁은 화면 ──────────────────────────────────────────────────────
+   폰에는 앱이 있으므로 전용 기능을 만들지 않는다.
+   앱 서랍의 '웹에서 열기'로 열렸을 때 깨지지 않을 정도만 지킨다.      */
+@media (max-width:900px){
+  :root{--rail:100%}
+  #burger{display:grid}
+  .shell{display:block}
+  aside{position:fixed;top:var(--head);left:0;right:0;bottom:0;z-index:45;display:none;
+    height:auto;border-right:0;padding:10px 12px 44px}
+  body.nav-open{overflow:hidden}
+  body.nav-open aside{display:block}
+  aside a{height:45px}
+  main{padding:18px 16px 64px}
+  header.top{padding:0 12px;gap:9px}
+  .appname .div,.appname .nm{display:none}
+  .utxt{display:none}
+  .cycle{padding:0 10px;gap:6px}
+  .cycle .tag,.cycle .yr{display:none}
+  .phead h1{font-size:20px}
+  .hero{padding:20px 18px;border-radius:var(--r)}
+  .verdict{font-size:21px}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}
+  .fact .v{font-size:18px}
+  #panel .sheet{width:100%;top:auto;height:92dvh;border-radius:var(--r-lg) var(--r-lg) 0 0;
+    animation:up .3s var(--ease)}
+  @keyframes up{from{transform:translateY(32px);opacity:.55}to{transform:none;opacity:1}}
+}
 </style>
 </head>
 <body>
 
-<!-- ═══════════ 로그인 ═══════════ -->
-<div id="login">
-  <div class="lbox">
-    <div class="lbrand"><span class="mk">🚗</span>ATEC Driving</div>
-    <div class="lsub">운행일지 · PC 관리 화면</div>
-    <form id="loginForm" autocomplete="on">
-      <div class="fld"><label for="u">아이디</label>
-        <input id="u" name="username" type="text" autocomplete="username"
-               placeholder="앱에서 쓰시는 아이디" required autocapitalize="none" spellcheck="false"></div>
-      <div class="fld"><label for="p">비밀번호</label>
-        <input id="p" name="password" type="password" autocomplete="current-password"
-               placeholder="앱 비밀번호 그대로" required></div>
-      <button id="loginBtn" type="submit">로그인</button>
-    </form>
-    <div class="lmsg" id="lmsg"></div>
-    <div class="lnote"><b>앱에서 쓰시던 아이디와 비밀번호</b>를 그대로 넣으시면 됩니다.
-      따로 가입하실 필요 없습니다. 비밀번호를 잊으셨으면 관리자에게 초기화를 요청해 주세요.</div>
-  </div>
-</div>
+<!-- 아이콘 — 24px 격자, stroke 1.7, currentColor -->
+<svg class="sr" aria-hidden="true"><defs>
+<g id="i-close" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></g>
+<g id="i-list" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></g>
+<g id="i-scan" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></g>
+<g id="i-receipt" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.8h12v16.4l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9.5 8.5h5M9.5 12.5h5"/></g>
+<g id="i-play" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M10.4 9.3l4.4 2.7-4.4 2.7z"/></g>
+<g id="i-ticket" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3.8 8.6V6.8h16.4v1.8a2.2 2.2 0 000 6.8v1.8H3.8v-1.8a2.2 2.2 0 000-6.8z"/><path d="M13 8.2v7.6"/></g>
+<g id="i-won" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5l3 9 4.5-9 4.5 9 3-9M4 11.5h16M4 14.5h16"/></g>
+<g id="i-users" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8.5" r="3"/><path d="M3.8 19.2c.6-3 2.9-4.7 5.7-4.7s5.1 1.7 5.7 4.7"/><path d="M16.2 6.2a2.9 2.9 0 010 5.4M17.6 14.9c2 .5 3.3 1.9 3.8 4.3"/></g>
+<g id="i-car" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5v2.2h2.6v-2.2M17.4 16.5v2.2H20v-2.2"/><path d="M3.6 16.5v-4l1.9-4.6A1.6 1.6 0 017 6.9h10a1.6 1.6 0 011.5 1L20.4 12.5v4z"/><path d="M4 12.6h16"/><circle cx="7.4" cy="14.5" r=".9" fill="currentColor" stroke="none"/><circle cx="16.6" cy="14.5" r=".9" fill="currentColor" stroke="none"/></g>
+<g id="i-cap" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.6L21 9l-9 4.4L3 9z"/><path d="M6.6 11v4.6c0 1.5 2.4 2.7 5.4 2.7s5.4-1.2 5.4-2.7V11"/></g>
+<g id="i-gauge" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 17.4a8.6 8.6 0 1114.8 0"/><path d="M12 13.2l3.4-3"/><circle cx="12" cy="14.3" r="1.2" fill="currentColor" stroke="none"/></g>
+<g id="i-chev" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5l6.5 6.5-6.5 6.5"/></g>
+<g id="i-down" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></g>
+<g id="i-dl" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.8 10.6L12 14.8l4.2-4.2"/><path d="M4.5 17.6v1.2A1.6 1.6 0 006.1 20.4h11.8a1.6 1.6 0 001.6-1.6v-1.2"/></g>
+<g id="i-alert" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.4v4.4"/><circle cx="12" cy="16.1" r=".95" fill="currentColor" stroke="none"/><path d="M10.6 4.6L3.2 18a1.6 1.6 0 001.4 2.4h14.8A1.6 1.6 0 0020.8 18L13.4 4.6a1.6 1.6 0 00-2.8 0z"/></g>
+<g id="i-check" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></g>
+<g id="i-search" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.2"/><path d="M15.6 15.6L20 20"/></g>
+<g id="i-cal" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="5.4" width="16.4" height="14.8" rx="2"/><path d="M3.8 10h16.4M8.4 3.6v3.4M15.6 3.6v3.4"/></g>
+<g id="i-out" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 8V5.8a1.6 1.6 0 00-1.6-1.6H5.6A1.6 1.6 0 004 5.8v12.4a1.6 1.6 0 001.6 1.6h7.3a1.6 1.6 0 001.6-1.6V16"/><path d="M9 12h11M16.8 8.6L20.2 12l-3.4 3.4"/></g>
+<g id="i-stamp" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 19.2h15.6"/><path d="M5.6 16.4h12.8v-1.6a1.6 1.6 0 00-1.6-1.6H7.2a1.6 1.6 0 00-1.6 1.6z"/><path d="M9.6 13.2V9.8a2.4 2.4 0 114.8 0v3.4"/></g>
+<g id="i-menu" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g>
+</defs></svg>
 
-<!-- ═══════════ 본문 ═══════════ -->
+<!-- ═══ 로그인 ═══ -->
+<section id="login">
+  <div class="lwrap">
+    <img class="logo-lockup" src="brand/atec-lockup.png" alt="ATEC mobility 에이텍모빌리티">
+    <h1 class="ltitle">운행일지</h1>
+    <p class="ltag">앱에서 쓰시는 아이디로 바로 들어오십니다.<br>따로 가입하실 것 없습니다.</p>
+    <div class="fld"><label for="u">아이디</label>
+      <input id="u" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="예) ysukim"></div>
+    <div class="fld"><label for="p">비밀번호</label>
+      <input id="p" type="password" autocomplete="current-password" placeholder="앱 비밀번호"></div>
+    <button id="loginBtn">로그인</button>
+    <div class="lmsg" id="lmsg" hidden>
+      <svg width="15" height="15" viewBox="0 0 24 24" style="margin-top:2px"><use href="#i-alert"/></svg>
+      <span id="lmsgT"></span></div>
+    <p class="lnote">
+      앱에서 비밀번호를 바꾸시면 <b>여기도 같이 바뀝니다.</b><br>
+      회사 차량 운행기록과 정산 내역을 다룹니다. 공용 PC에서는 <b>반드시 로그아웃</b>해 주세요.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ 본 화면 ═══ -->
 <div id="app">
   <header class="top">
-    <div class="brand"><span class="mk">🚗</span>ATEC Driving<span class="sub">운행일지</span></div>
-    <span class="sp"></span>
-    <div class="who"><b id="whoName">—</b><span id="whoMeta"></span></div>
-    <button class="btn" id="logoutBtn">로그아웃</button>
+    <button class="iconbtn" id="burger" aria-label="메뉴 열기">
+      <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button>
+    <span class="appname">
+      <img class="logo-mark" src="brand/atec-mark.png" alt="ATEC">
+      <span class="div"></span><span class="nm">운행일지</span>
+    </span>
+    <div class="sp"></div>
+    <label class="cycle" id="cycleBox">
+      <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-cal"/></svg>
+      <span id="cycleTxt">—</span><span class="tag" id="cycleTag"></span>
+      <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-down"/></svg>
+      <select id="selCycle" aria-label="마감주기 선택"></select>
+    </label>
+    <button class="uchip" id="uBtn" title="내 정보">
+      <span class="uav" id="uAv">—</span>
+      <span class="utxt"><b id="uName">—</b><span id="uMeta"></span></span>
+    </button>
+    <button class="iconbtn" id="logoutBtn" aria-label="로그아웃" title="로그아웃">
+      <svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-out"/></svg></button>
   </header>
 
-  <nav class="tabs" id="nav">
-    <a data-v="close" class="on">마감 현황</a>
-    <a data-v="trips">운행일지</a>
-    <a data-v="hipass" class="admin-only">하이패스 대조</a>
-    <a data-v="settle">정산</a>
-  </nav>
+  <div class="shell">
+    <!-- 메뉴 <a> 에는 href 가 없다(주소를 바꾸지 않는 화면 전환이라서).
+         그래서 tabindex·role 을 직접 준다 — 없으면 마우스 없이는 화면을 못 바꾼다. -->
+    <aside id="nav">
+      <div class="navsec">내 운행</div>
+      <a tabindex="0" role="button" data-v="close" class="on"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
+      <a tabindex="0" role="button" data-v="trips"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행일지<span class="pill" id="pTrips" hidden></span></a>
+      <a tabindex="0" role="button" data-v="check"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>기록 점검<span class="pill" id="pCheck" hidden></span></a>
+      <a tabindex="0" role="button" data-v="evid"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>증빙<span class="pill" id="pEvid" hidden></span></a>
+      <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
+      <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
 
-  <main>
-    <div class="row">
-      <select class="f" id="fCycle"></select>
-      <span class="sp"></span>
-      <span id="busy"><span class="spin"></span> 불러오는 중…</span>
-    </div>
+      <div class="navsec">정산</div>
+      <a tabindex="0" role="button" data-v="hipass"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조</a>
+      <a tabindex="0" role="button" data-v="settle"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산·엑셀</a>
 
-    <!-- ① 마감 현황 -->
-    <section id="view_close">
-      <h2 class="pg">마감 현황</h2>
-      <p class="pgsub" id="cLabel">—</p>
-      <div class="kpis">
-        <div class="kpi"><div class="k">운행</div><div class="v" id="kTrips">—</div></div>
-        <div class="kpi"><div class="k">주행거리</div><div class="v" id="kDist">—</div></div>
-        <div class="kpi"><div class="k">통행료 합계</div><div class="v" id="kToll">—</div></div>
-        <div class="kpi"><div class="k">주차비 합계</div><div class="v" id="kPark">—</div></div>
-        <div class="kpi"><div class="k">통행료 미확정</div><div class="v" id="kUnk">—</div></div>
-      </div>
-      <div class="grid c2">
-        <div class="card">
-          <h3>점검 <span class="tag">누르면 그 목록으로 갑니다</span><span class="sp"></span>
-            <span id="closeState"></span></h3>
-          <ul class="lst" id="chk"></ul>
-          <div class="note" style="margin-top:14px">
-            통행료는 <b>하이패스 영수증</b>을 올리면 한 번에 정리됩니다.
-            남는 것만 운행일지에서 직접 넣으시면 됩니다.
-          </div>
-        </div>
-        <div class="card">
-          <h3>차량별 <span class="tag">운행 많은 순 12대</span></h3>
-          <div class="tblwrap">
-            <table>
-              <thead><tr><th>차량</th><th class="num">운행</th><th class="num">거리</th>
-                <th class="num">통행료</th><th class="num">미확정</th></tr></thead>
-              <tbody id="vehRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
+      <div class="navsec adm">관리</div>
+      <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
+      <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>
+      <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
+    </aside>
 
-    <!-- ② 운행일지 -->
-    <section id="view_trips" style="display:none">
-      <h2 class="pg">운행일지</h2>
-      <p class="pgsub"><b id="tLabel"></b> · <span id="tCount"></span></p>
-      <div class="row">
-        <select class="f" id="fVeh"><option value="">전체 차량</option></select>
-        <input class="f admin-only" id="fWho" placeholder="오너드라이버 검색" style="width:150px">
-        <select class="f" id="fState">
-          <option value="">전체</option>
-          <option value="unknown">통행료 미확정</option>
-          <option value="nopurpose">운행목적 비어 있음</option>
-          <option value="odo">계기판 불연속</option>
-          <option value="manual">수기 입력</option>
-          <option value="weekend">주말·야간</option>
-        </select>
-      </div>
-      <div class="tblwrap">
-        <table class="wide">
-          <thead><tr>
-            <th>운행일자</th><th>목적</th><th>차량</th><th class="admin-only">오너드라이버</th>
-            <th class="num">거리</th><th>시간</th><th>출발 → 도착</th><th>방문처</th>
-            <th class="num">계기판</th><th class="num">통행료</th><th class="num">주차</th>
-            <th>통행료 근거</th><th></th>
-          </tr></thead>
-          <tbody id="tRows"></tbody>
-        </table>
-      </div>
-      <div class="note" style="margin-top:14px">
-        <b>고치기</b>를 누르면 목적·방문처·통행료·주차비를 바꿀 수 있습니다.
-        여기서 넣은 금액은 <b>사람이 정한 값</b>으로 기록되어, 자동계산이 덮어쓰지 않습니다.
-      </div>
-    </section>
-
-    <!-- ③ 하이패스 -->
-    <section id="view_hipass" style="display:none">
-      <h2 class="pg">하이패스 대조</h2>
-      <p class="pgsub" id="hpSub">하이패스에서 받은 영수증 PDF 를 올리면 <b>실제 청구액</b>으로 맞춥니다</p>
-      <label class="drop" id="drop">
-        <input type="file" id="pdf" accept="application/pdf,.pdf" multiple>
-        <div class="t">PDF 를 여기에 끌어놓거나 눌러서 고르세요</div>
-        <div class="s">파일은 <b>브라우저 안에서만</b> 읽습니다 — 서버로 올리지 않습니다</div>
-      </label>
-      <div id="hpBusy" style="display:none;margin-top:16px;color:var(--muted);font-size:12.5px">
-        <span class="spin" style="border-color:rgba(160,0,64,.25);border-top-color:var(--wine)"></span> 읽는 중…
-      </div>
-      <div class="kpis" id="hpKpis" style="display:none;margin-top:16px">
-        <div class="kpi"><div class="k">읽은 영수증</div><div class="v" id="hRead">—</div></div>
-        <div class="kpi"><div class="k">운행에 배분</div><div class="v" id="hHit">—</div></div>
-        <div class="kpi"><div class="k">지금 값과 같음</div><div class="v" id="hSame">—</div></div>
-        <div class="kpi alert"><div class="k">자동계산과 다름</div><div class="v" id="hDiff">—</div></div>
-        <div class="kpi"><div class="k">사람 값과 다름</div><div class="v" id="hPerson">—</div></div>
-        <div class="kpi"><div class="k">미확정 → 확정</div><div class="v" id="hNew">—</div></div>
-        <div class="kpi alert"><div class="k">붙일 운행 없음</div><div class="v" id="hMiss">—</div></div>
-      </div>
-      <div id="hpGroups" style="margin-top:16px"></div>
-      <div id="hpResult"></div>
-      <div class="note warn" style="margin-top:16px">
-        <b>사람이 직접 정한 금액은 기본으로 덮지 않습니다.</b> 영수증과 다르면 노란 줄로 표시만 하고,
-        바꾸실지는 직접 체크해서 정하시면 됩니다.
-      </div>
-    </section>
-
-    <!-- ④ 정산 -->
-    <section id="view_settle" style="display:none">
-      <h2 class="pg">정산</h2>
-      <p class="pgsub" id="sLabel">—</p>
-      <div class="row"><span class="sp"></span><button class="btn" id="sCsv">엑셀(CSV)로 받기</button></div>
-      <div class="tblwrap">
-        <table>
-          <thead><tr><th>오너드라이버</th><th class="num">운행</th><th class="num">주행거리</th>
-            <th class="num">통행료</th><th class="num">주차비</th><th class="num">합계</th>
-            <th class="num">통행료 미확정</th></tr></thead>
-          <tbody id="sRows"></tbody>
-          <tfoot id="sFoot"></tfoot>
-        </table>
-      </div>
-      <div class="note warn" id="sNote" style="margin-top:14px;display:none">
-        통행료가 아직 정해지지 않은 운행이 <b id="sNoteN">0</b>건 있습니다 —
-        그만큼 <b>합계가 실제보다 적게</b> 나옵니다. 하이패스 대조로 먼저 정리하시는 게 좋습니다.
-      </div>
-      <div class="note" style="margin-top:12px">
-        유류비는 분기 고시단가로 월간 리포트가 따로 계산합니다. 여기서는 <b>통행료·주차비</b>만 집계합니다.
-        <b>비업무용</b> 운행은 제외했습니다.
-      </div>
-    </section>
-  </main>
-</div>
-
-<!-- ═══════════ 수정 패널 ═══════════ -->
-<div id="edit">
-  <div id="eBackdrop"></div>
-  <div id="ePanel">
-    <div class="eh">
-      <button id="eClose" title="닫기" type="button">&times;</button>
-      <div class="t" id="eTitle">—</div>
-      <div class="s" id="eSub"></div>
-    </div>
-    <div class="eb">
-      <div class="efld"><label for="ePurpose">운행목적</label>
-        <select id="ePurpose">
-          <option value="">고르세요</option>
-          <option>일반업무</option><option>출퇴근</option><option>비업무용</option>
-        </select>
-        <div class="hint">비업무용은 정산에서 빠집니다.</div></div>
-
-      <div class="efld"><label for="eVisit">방문처</label>
-        <input id="eVisit" placeholder="어디에 다녀오셨나요"></div>
-
-      <div class="efld"><label for="eToll">통행료 (원)</label>
-        <div class="inline">
-          <input id="eToll" inputmode="numeric" placeholder="비워 두면 '모름'">
-          <button class="btn sm" id="eUnknown" type="button">모름으로</button>
-        </div>
-        <div class="hint" id="eTollNow"></div>
-        <div class="hint">여기서 넣은 값은 <b>사람이 정한 값</b>이라 자동계산이 덮지 않습니다.</div></div>
-
-      <div class="efld"><label for="ePark">주차비 (원)</label>
-        <input id="ePark" inputmode="numeric" placeholder="없으면 비워 두세요"></div>
-
-      <div class="efld admin-only">
-        <label>계기판 (관리자만)</label>
-        <div class="two">
-          <input id="eOdoS" inputmode="numeric" placeholder="출발">
-          <input id="eOdoE" inputmode="numeric" placeholder="도착">
-        </div>
-        <div class="hint" id="eOdoHint"></div>
-        <div class="hint">고치면 주행거리도 함께 다시 계산됩니다.</div></div>
-    </div>
-    <div class="ef">
-      <button class="btn" id="eCancel" type="button">취소</button>
-      <button class="btn pri" id="eSave" type="button">저장</button>
-    </div>
+    <main id="main"><div class="inner" id="inner"></div></main>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div id="panel">
+  <div class="veil" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="ph">
+      <div><div class="t" id="pTitle">상세</div><div class="s" id="pSub"></div></div>
+      <div class="sp"></div>
+      <button class="iconbtn" data-close aria-label="닫기">
+        <svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pb" id="pBody"></div>
+    <div class="pf" id="pFoot"></div>
+  </div>
+</div>
+
+<!-- 인쇄 전용 영역. 화면에서는 숨어 있고 @media print 에서만 펼쳐진다. -->
+<div id="printArea" aria-hidden="true"></div>
+
+<div id="toast" role="status"></div>
 
 <script src="hipass.js"></script>
-<script src="app.js"></script>
+<script src="driving-app.js"></script>
 </body>
 </html>

@@ -1,0 +1,16 @@
+
+# ── 검증용 부산물 — 절대 올리지 말 것 ────────────────────────────────
+#   이 리포지터리는 공개다. _realdata.json 에는 직원 운행 2,695건이
+#   주소까지 그대로 들어 있다.
+_realdata.json
+_expect.json
+_realpix.json
+_realstub.js
+_realpreview.html
+_stub.js
+_preview.html
+_print.html
+_mobile.html
+_bp_range.txt
+server.log
+ci.pdf
