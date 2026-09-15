@@ -530,6 +530,9 @@
     set('pTrips', myTrips.length, false);
     set('pCheck', bad || warn, bad > 0);
     set('pEvid', myEvid.length, false);
+    set('pToll', myTrips.filter(function (t) {
+      return isUnknownToll(t) && (t.purpose || '') === BUSINESS;
+    }).length, false);
     set('pEdu', eduTodo(), eduTodo() > 0);
     set('pInbox', inbox().length, inbox().length > 0);
     function set(id, v, hot) {
@@ -560,6 +563,174 @@
     var done = {};
     EDUP.forEach(function (p) { if (p.username === mine && p.completed_at) done[p.video_id] = 1; });
     return vids.filter(function (v) { return !done[v.id]; }).length;
+  }
+
+  /* ══════════════════ 통행료 채우기 ══════════════════
+     자동계산이 못 정한 것을 사람이 채우는 자리다.
+     한 건씩 치게 하면 1인당 35건이라 아무도 안 한다(2026-09 실측: 52% 미확정).
+     그래서 **같은 구간끼리 묶어** 한 번에 처리한다. 실제로 구로↔가산 왕복처럼
+     시내 구간이 뭉쳐 있어, 묶음 하나에 '없음' 을 누르면 수십 건이 정리된다. */
+  var FILLS = {};                   // 구간키 → 정한 값(숫자) 또는 0
+
+  function viewTollFill() {
+    if (!LOADED) return head('통행료 채우기') + skeleton();
+    var mine = myName();
+    var rows = TRIPS.filter(function (t) {
+      return t.username === mine && isUnknownToll(t) && (t.purpose || '') === BUSINESS;
+    });
+    var h = head('통행료 채우기', rows.length
+      ? n0(rows.length) + '건이 비어 있습니다'
+      : '비어 있는 통행료가 없습니다');
+
+    if (!rows.length) {
+      return h + blank('채울 것이 없습니다.',
+        '자동계산과 하이패스 대조로 모두 정해졌습니다.', 'check');
+    }
+
+    // 구간별로 묶는다. 같은 구간을 전에 사람이 확정한 적이 있으면 그 금액을 권한다.
+    var g = {}, order = [];
+    rows.forEach(function (t) {
+      var k = dong(t.start_address) + ' → ' + dong(t.end_address);
+      if (!g[k]) { g[k] = { key: k, rows: [], hint: null }; order.push(k); }
+      g[k].rows.push(t);
+    });
+    // 이력: 같은 사람·같은 구간에서 사람이 확정했던 금액
+    var hist = {};
+    TRIPS.forEach(function (t) {
+      if (t.username !== mine || isUnknownToll(t)) return;
+      var k = dong(t.start_address) + ' → ' + dong(t.end_address);
+      (hist[k] = hist[k] || []).push(Number(t.toll_cost) || 0);
+    });
+    order.forEach(function (k) {
+      var v = hist[k];
+      if (!v || !v.length) return;
+      // 가장 자주 나온 금액을 권한다.
+      var cnt = {}, best = null;
+      v.forEach(function (x) { cnt[x] = (cnt[x] || 0) + 1; if (best === null || cnt[x] > cnt[best]) best = x; });
+      g[k].hint = Number(best);
+    });
+    order.sort(function (a, b) { return g[b].rows.length - g[a].rows.length; });
+
+    var done = 0, sum = 0;
+    order.forEach(function (k) {
+      if (FILLS[k] == null) return;
+      done += g[k].rows.length; sum += FILLS[k] * g[k].rows.length;
+    });
+
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;' +
+      'line-height:1.9;color:var(--ink-3)">' +
+      '같은 구간끼리 묶었습니다. <b style="color:var(--ink-2)">시내 운행처럼 요금소를 안 지난 구간은 ' +
+      '「없음」</b>을 누르시면 그 구간 전체가 한 번에 정리됩니다.<br>' +
+      '전에 정하신 금액이 있으면 회색으로 적어 두었습니다 — 눌러서 그대로 쓰실 수 있습니다.<br>' +
+      '<b style="color:var(--ink-2)">업무용 운행만</b> 보입니다. 출퇴근·비업무용은 정산과 제출 서류에 ' +
+      '들어가지 않아 채우실 필요가 없습니다.' +
+      '</div></section>';
+
+    h += '<section class="sect"><div class="hpact" style="border-radius:var(--r-lg);' +
+      'border:1px solid var(--line);background:var(--surface);padding:12px 16px">' +
+      '<span class="dim" id="tfSum">정한 것 <b>' + n0(done) + '</b> / ' + n0(rows.length) + '건' +
+      (sum ? ' · 합계 ' + won(sum) : '') + '</span>' +
+      '<button class="btn" id="tfAllFree">남은 것 전부 「없음」</button>' +
+      '<button class="btn pri" id="tfSave"' + (done ? '' : ' disabled') + '>' +
+      n0(done) + '건 저장</button></div></section>';
+
+    h += '<div class="panel"><div class="scroll tall" data-rows><table><thead><tr>' +
+      '<th>구간</th><th class="n">건수</th><th>날짜</th><th class="n">통행료</th>' +
+      '</tr></thead><tbody>' +
+      order.map(function (k, i) {
+        var x = g[k], v = FILLS[k];
+        var days = x.rows.slice(0, 5).map(function (t) { return md(t.start_time); }).join(', ') +
+          (x.rows.length > 5 ? ' 외 ' + (x.rows.length - 5) + '일' : '');
+        return '<tr' + (v != null ? ' class="tfdone"' : '') + '>' +
+          '<td><span class="lead">' + esc(k) + '</span></td>' +
+          '<td class="n lead">' + n0(x.rows.length) + '</td>' +
+          '<td class="dim">' + esc(days) + '</td>' +
+          '<td class="n" style="white-space:nowrap">' +
+          '<button class="btn sm" data-tffree="' + i + '">없음</button> ' +
+          '<input class="inp num" data-tfamt="' + i + '" inputmode="numeric" style="width:92px" ' +
+          'placeholder="' + (x.hint != null ? n0(x.hint) : '원') + '" value="' +
+          (v != null && v > 0 ? n0(v) : '') + '">' +
+          (x.hint != null ? ' <button class="btn sm" data-tfhint="' + i + '" ' +
+            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">' +
+            (x.hint === 0 ? '없음' : n0(x.hint) + '원') + '</button>' : '') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+
+    // 지금 화면의 묶음을 이벤트에서 쓰려고 담아 둔다.
+    TF_GROUPS = order.map(function (k) { return g[k]; });
+    return h;
+  }
+  var TF_GROUPS = [];
+
+  /** 묶음의 금액칸을 읽어 FILLS 에 반영한다(입력 도중에도 호출된다). */
+  function tfRead() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tfamt]'), function (el) {
+      var i = +el.dataset.tfamt, k = TF_GROUPS[i] && TF_GROUPS[i].key;
+      if (!k) return;
+      var s = String(el.value || '').replace(/[^\d]/g, '');
+      if (s === '') { if (FILLS[k] !== 0) delete FILLS[k]; return; }
+      FILLS[k] = Number(s);
+    });
+  }
+
+  /** 남은 것을 전부 0원으로 확정하기 전에 무슨 뜻인지 보여 준다.
+   *  자동계산은 이미 '요금소 미통과' 가 확실한 건을 0원으로 확정해 둔다.
+   *  여기 남은 것은 자동으로 못 정한 것이라, 무턱대고 0원을 찍으면 실제로
+   *  지난 통행료만큼 회사가 덜 지급한다. */
+  function openAllFree() {
+    tfRead();
+    var left = 0, groups = 0;
+    TF_GROUPS.forEach(function (x) {
+      if (FILLS[x.key] != null) return;
+      left += x.rows.length; groups++;
+    });
+    if (!left) { toast('남은 것이 없습니다.'); return; }
+    $('pTitle').textContent = '남은 것 전부 「없음」';
+    $('pSub').textContent = n0(groups) + '개 구간 · ' + n0(left) + '건';
+    $('pBody').innerHTML =
+      '<div class="anote">남은 <b>' + n0(left) + '건</b>을 <b>통행료 없음(0원)</b>으로 확정합니다.</div>' +
+      '<div class="form"><div class="frow"><div class="fbody">' +
+      '<div class="fhint">자동계산은 요금소를 안 지난 것이 <b>확실한</b> 운행을 이미 0원으로 ' +
+      '확정해 둡니다. 여기 남은 것은 자동으로 못 정한 운행이라, 실제로 요금소를 지난 것이 ' +
+      '섞여 있으면 <b>그만큼 회사가 덜 지급</b>합니다.<br>' +
+      '요금소를 지난 운행이 있으면 취소하고 그 구간만 금액을 넣어 주십시오.</div>' +
+      '</div></div></div>';
+    $('pFoot').innerHTML = '<span style="flex:1"></span>' +
+      '<button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnAllFreeGo">' + n0(left) + '건 없음으로</button>';
+    $('panel').classList.add('open');
+  }
+
+  function tfSave() {
+    tfRead();
+    var items = [], n = 0;
+    TF_GROUPS.forEach(function (x) {
+      var v = FILLS[x.key];
+      if (v == null) return;
+      x.rows.forEach(function (t) { items.push({ id: t.id, amount: v }); n++; });
+    });
+    if (!items.length) { toast('정한 것이 없습니다.', true); return; }
+    if (items.length > 500) { toast('한 번에 500건까지만 저장됩니다. 나눠서 저장해 주세요.', true); return; }
+    var btn = $('tfSave'); btn.disabled = true; btn.textContent = '저장 중…';
+    api('/functions/v1/toll-apply', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'manual', batch: '웹 통행료 채우기 ' + CYCKEY(), items: items })
+    }).then(function (r) { return r.json().then(function (x) { return { ok: r.ok, j: x }; }); })
+      .then(function (res) {
+        btn.disabled = false; btn.textContent = n0(n) + '건 저장';
+        if (!res.ok || !res.j || !res.j.ok) {
+          toast((res.j && res.j.error) || '저장하지 못했습니다.', true); return;
+        }
+        var skipped = res.j.skipped || [];
+        FILLS = {};
+        AUDIT = null;
+        loadAll();                       // 서버 값을 다시 받아 화면을 맞춘다
+        toastOk(n0(res.j.applied || items.length) + '건 저장했습니다.',
+          skipped.length ? skipped.length + '건은 건너뛰었습니다 (' + skipped[0].why + ')' : null);
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = n0(n) + '건 저장';
+        toast('저장하지 못했습니다.', true);
+      });
   }
 
   /* ══════════════════ 내 계정 ══════════════════ */
@@ -2537,7 +2708,7 @@
     a_close: viewClose, a_trips: viewTrips, a_check: viewCheck, a_evid: viewEvid,
     a_hipass: viewHipass, a_settle: viewSettle,
     people: viewPeople, cars: viewCars, eduadm: viewEduAdm,
-    account: viewAccount, perm: viewPerm
+    account: viewAccount, perm: viewPerm, tollfill: viewTollFill
   };
   /** 관리자만 열 수 있는 화면. */
   var ADMIN_VIEWS = ['a_close', 'a_trips', 'a_check', 'a_evid', 'a_hipass', 'a_settle',
@@ -2600,6 +2771,7 @@
     //   남의 운행이 개인 화면에 그대로 남고(이름 칸은 사라져 남의 것인 줄도 모른다),
     //   '확정하기' 를 누르면 남의 운행에 통행료가 써진다.
     HP = { groups: [], batch: '', busy: false, note: '' };
+    FILLS = {};                   // 채우던 통행료도 화면이 바뀌면 의미가 없다
     applyScope();
     document.body.classList.remove('nav-open');
     render();
@@ -2663,6 +2835,22 @@
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
     if ((el = e.target.closest('#btnPrintGo'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#btnPwSave')) { savePassword(); return; }
+    if ((el = e.target.closest('[data-tffree]'))) {
+      tfRead();
+      var gf = TF_GROUPS[+el.dataset.tffree]; if (gf) FILLS[gf.key] = 0;
+      render(); return;
+    }
+    if ((el = e.target.closest('[data-tfhint]'))) {
+      tfRead();
+      var gh = TF_GROUPS[+el.dataset.tfhint]; if (gh) FILLS[gh.key] = gh.hint;
+      render(); return;
+    }
+    if (e.target.closest('#tfAllFree')) { openAllFree(); return; }
+    if (e.target.closest('#btnAllFreeGo')) {
+      TF_GROUPS.forEach(function (x) { if (FILLS[x.key] == null) FILLS[x.key] = 0; });
+      closePanel(); render(); return;
+    }
+    if (e.target.closest('#tfSave')) { tfSave(); return; }
     if ((el = e.target.closest('[data-perm]'))) {
       openPermConfirm('admin', el.dataset.perm, el.dataset.on === '1'); return;
     }
@@ -2754,6 +2942,21 @@
     queueSearch(e.target);
   });
   document.addEventListener('input', function (e) {
+    if (e.target.dataset && e.target.dataset.tfamt !== undefined) {
+      // 표를 다시 그리면 커서가 튄다 — 요약 줄과 저장 버튼만 고쳐 쓴다.
+      tfRead();
+      var d2 = 0, s2 = 0, tot = 0;
+      TF_GROUPS.forEach(function (x) {
+        tot += x.rows.length;
+        if (FILLS[x.key] == null) return;
+        d2 += x.rows.length; s2 += FILLS[x.key] * x.rows.length;
+      });
+      var lab = $('tfSum');
+      if (lab) lab.innerHTML = '정한 것 <b>' + n0(d2) + '</b> / ' + n0(tot) + '건' + (s2 ? ' · 합계 ' + won(s2) : '');
+      var sb = $('tfSave');
+      if (sb) { sb.disabled = !d2; sb.textContent = n0(d2) + '건 저장'; }
+      return;
+    }
     if (e.target.id !== 'qBox') return;
     FILT.q = e.target.value;
     if (IME) return;                       // 조합이 끝나면 compositionend 가 부른다

@@ -87,6 +87,9 @@ img{display:block}
 /* 관리자 전용 — display:revert 는 <a> 를 inline 으로 되돌려 메뉴를 깨뜨린다. */
 .adm{display:none}
 /* 권한 관리는 관리자 중에서도 마스터 계정만 본다(서버 RPC 가 그렇게 못 박혀 있다). */
+/* 통행료 채우기 — 정한 묶음은 옅게 해 남은 것이 눈에 띄게 한다 */
+tbody tr.tfdone{background:var(--sunken)}
+tbody tr.tfdone .lead{color:var(--ink-500)}
 .mst{display:none !important}
 body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
@@ -679,6 +682,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
       <a tabindex="0" role="button" data-v="hipass"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조</a>
+      <a tabindex="0" role="button" data-v="tollfill"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>통행료 채우기<span class="pill" id="pToll" hidden></span></a>
       <a tabindex="0" role="button" data-v="settle"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산·엑셀</a>
       <a tabindex="0" role="button" data-v="account"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>내 계정</a>
 
