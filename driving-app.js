@@ -1171,6 +1171,55 @@
       : defaultSteps();
     renderSubmit();
   }
+  /** 결재자 찾기 입력에 지금 쳐 놓은 글자. 창을 다시 그려도 남는다. */
+  var APPR_Q = '';
+
+  /** 이름·아이디·부서·직급 어디에든 걸리면 후보로 본다. 이미 넣은 사람과 본인은 뺀다. */
+  function apprCandidates() {
+    var q = APPR_Q.trim().toLowerCase();
+    var used = DRAFT.map(function (s) { return s.approver; }).filter(Boolean);
+    var list = Object.keys(PEOPLE).filter(function (u) {
+      return u !== myName() && used.indexOf(u) < 0;
+    });
+    if (q) {
+      list = list.filter(function (u) {
+        var p = personOf(u);
+        return [nameOf(u), u, p.dept || '', p.position || ''].join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+    }
+    return list.sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
+  }
+
+  function apprCandHtml() {
+    var all = apprCandidates();
+    if (!all.length) {
+      return '<div class="acnone">' +
+        (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.'
+          : '더 넣을 사람이 없습니다.') + '</div>';
+    }
+    var show = all.slice(0, 8);
+    return show.map(function (u, i) {
+      var p = personOf(u);
+      return '<button class="acand-i' + (i === 0 ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
+        '<b>' + esc(nameOf(u)) + '</b>' +
+        '<span>' + esc([p.dept, p.position].filter(Boolean).join(' · ') || u) + '</span>' +
+        (i === 0 ? '<span class="acent">Enter</span>' : '') + '</button>';
+    }).join('') +
+      (all.length > show.length
+        ? '<div class="acnone">그 밖에 ' + n0(all.length - show.length) + '명 — 더 쳐서 좁혀 주세요.</div>'
+        : '');
+  }
+
+  function addApprover(u) {
+    if (!u || DRAFT.length >= 4) return;
+    if (DRAFT.some(function (s) { return s.approver === u; })) return;
+    DRAFT.push({ approver: u, box: BOXES[Math.min(DRAFT.length + 1, BOXES.length - 1)] });
+    APPR_Q = '';                       // 다음 사람을 바로 칠 수 있게 비운다
+    renderSubmit();
+    var box = $('apprQ');
+    if (box) box.focus();
+  }
+
   function renderSubmit() {
     // ★ 관리자는 TRIPS 에 전 직원 운행이 들어 있다. 예전에는 그 합계를 그대로
     //   보여 줘서 "1,842건 · ₩12,400,000" 같은 회사 전체 숫자가 자기 결재 금액인
@@ -1209,13 +1258,13 @@
     h += '</div>';
 
     if (DRAFT.length < 4) {
-      h += '<div class="aadd"><select id="addAppr"><option value="">＋ 결재자 추가</option>' +
-        pickable.filter(function (u) {
-          return !DRAFT.some(function (s) { return s.approver === u; });
-        }).map(function (u) {
-          return '<option value="' + esc(u) + '">' + esc(nameOf(u)) + ' · ' +
-            esc(personOf(u).dept || '') + ' ' + esc(personOf(u).position || '') + '</option>';
-        }).join('') + '</select></div>';
+      // ★ 예전에는 61명짜리 <select> 였다. 마감일에 그 목록을 훑어 고르는 것은
+      //   할 짓이 아니다. 이름을 두어 글자만 쳐도 좁혀지게 바꿨다.
+      //   부서·직급으로도 찾힌다("광역", "팀장").
+      h += '<div class="aadd">' +
+        '<input id="apprQ" autocomplete="off" placeholder="결재자 이름을 쓰세요 (예: ' +
+        esc(nameOf(pickable[0] || '')) + ')" value="' + esc(APPR_Q) + '">' +
+        '<div class="acand" id="apprCand">' + apprCandHtml() + '</div></div>';
     }
 
     var warn = [];
@@ -3036,6 +3085,7 @@
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
     if ((el = e.target.closest('#btnPrintGo'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#btnPwSave')) { savePassword(); return; }
+    if ((el = e.target.closest('[data-addappr]'))) { addApprover(el.dataset.addappr); return; }
     if ((el = e.target.closest('[data-tffree]'))) {
       tfRead();
       var gf = TF_GROUPS[+el.dataset.tffree]; if (gf) FILLS[gf.key] = 0;
@@ -3118,10 +3168,6 @@
       return;
     }
     // ── 상신 창 ──
-    if (e.target.id === 'addAppr' && e.target.value) {
-      DRAFT.push({ approver: e.target.value, box: BOXES[Math.min(DRAFT.length + 1, BOXES.length - 1)] });
-      renderSubmit(); return;
-    }
     if (e.target.classList.contains('apick')) {
       DRAFT[+e.target.dataset.idx].approver = e.target.value;
       renderSubmit(); return;
@@ -3143,6 +3189,13 @@
     queueSearch(e.target);
   });
   document.addEventListener('input', function (e) {
+    if (e.target.id === 'apprQ') {
+      // 창 전체를 다시 그리면 커서가 튀고 한글 조합이 끊긴다 — 후보 목록만 바꾼다.
+      APPR_Q = e.target.value;
+      var cand = $('apprCand');
+      if (cand) cand.innerHTML = apprCandHtml();
+      return;
+    }
     if (e.target.dataset && e.target.dataset.tfamt !== undefined) {
       // 표를 다시 그리면 커서가 튄다 — 요약 줄과 저장 버튼만 고쳐 쓴다.
       tfRead();
@@ -3179,6 +3232,13 @@
     }
     if (e.key === 'Escape') { closePanel(); document.body.classList.remove('nav-open'); }
     if (e.key === 'Enter' && (e.target.id === 'u' || e.target.id === 'p')) doLogin();
+    // 결재자 찾기 — Enter 로 맨 위 후보를 넣는다.
+    if (e.key === 'Enter' && e.target.id === 'apprQ') {
+      e.preventDefault();
+      var top = apprCandidates()[0];
+      if (top) addApprover(top);
+      return;
+    }
     // '/' 로 검색창에 바로 간다
     if (e.key === '/' && VIEW === 'trips' && document.activeElement.tagName !== 'INPUT') {
       var b = $('qBox'); if (b) { e.preventDefault(); b.focus(); b.select(); }

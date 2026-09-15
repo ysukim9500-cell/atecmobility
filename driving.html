@@ -399,6 +399,26 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .aadd{margin-top:12px}
 .aadd select{width:100%;font-size:13px;padding:10px 12px;border:1px dashed var(--ink-300);
   border-radius:var(--r-sm);background:var(--surface);color:var(--ink-500)}
+/* 결재자 찾기 — 61명 드롭다운 대신 이름을 쳐서 좁힌다 */
+.aadd input{width:100%;font-size:13.5px;padding:11px 13px;border:1px solid var(--ink-200);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink-900);outline:0}
+.aadd input:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
+.acand{margin-top:6px;border:1px solid var(--ink-100);border-radius:var(--r-sm);
+  overflow:hidden;max-height:268px;overflow-y:auto}
+.acand-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 13px;
+  border:0;border-bottom:1px solid var(--ink-100);background:var(--surface);cursor:pointer;
+  font:inherit;transition:background var(--t)}
+.acand-i:last-child{border-bottom:0}
+.acand-i:hover,.acand-i:focus-visible{background:var(--ink-100)}
+.acand-i.top{background:var(--red-50)}
+.acand-i.top:hover{background:var(--red-100)}
+.acand-i b{font-size:13.5px;font-weight:500;color:var(--ink-900);flex:none}
+.acand-i span{font-size:11.5px;color:var(--ink-400);flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.acand-i .acent{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  color:var(--red);background:var(--surface);border:1px solid var(--red-100);
+  border-radius:4px;padding:2px 6px}
+.acnone{padding:11px 13px;font-size:12px;color:var(--ink-400);background:var(--sunken)}
 .awarn{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:11px 13px;
   background:var(--warn-50);border-radius:var(--r-xs);font-size:12.5px;color:var(--warn);line-height:1.55}
 .awarn svg{margin-top:2px;flex:none}
