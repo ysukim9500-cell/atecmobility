@@ -205,6 +205,9 @@
 
   /* ══════════════════ 상태 ══════════════════ */
   var ME = null, VIEW = 'close', CYC = currentCycle();
+  // ALL_* = 서버(RLS)가 내려준 전부. 일반 직원이면 어차피 본인 것뿐이다.
+  // TRIPS·EVID = 지금 열려 있는 화면이 쓰는 범위. applyScope() 가 채운다.
+  var ALL_TRIPS = [], ALL_EVID = [];
   var TRIPS = [], USERS = {}, VEHICLES = [], EVID = [], EDUV = [], EDUP = [], EDUT = [];
   var APPR = [], LINES = {}, PEOPLE = {};   // 결재 건 · 부서별 기본 결재선 · 사람 목록(이름·부서·직급)
   var LOADED = false, LOADING = false, AUDIT = null;
@@ -337,10 +340,10 @@
       // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
       fetchAll('/rest/v1/v_driving_people?select=*&order=name.asc')
     ]).then(function (out) {
-      TRIPS = out[0] || [];
+      ALL_TRIPS = out[0] || [];
       USERS = {}; (out[1] || []).forEach(function (u) { USERS[u.username] = u; });
       VEHICLES = out[2] || [];
-      EVID = out[3] || [];
+      ALL_EVID = out[3] || [];
       EDUV = out[4] || []; EDUP = out[5] || []; EDUT = out[6] || [];
       RATES = {}; RATE_MISS = {};
       (out[7] || []).forEach(function (x) { RATES[x.year + '-' + x.quarter + '-' + x.region] = Number(x.price); });
@@ -351,6 +354,7 @@
       PEOPLE = {}; (out[11] || []).forEach(function (p) { PEOPLE[p.username] = p; });
       if (seq !== LOAD_SEQ) return;          // 더 최근 요청이 있다 — 이 응답은 버린다
       LOADED = true; LOADING = false; AUDIT = null;
+      applyScope();
       paintPills();
       render();
     }).catch(function (e) {
@@ -478,7 +482,8 @@
     var A = audit();
     var bad = A.filter(function (f) { return f.sev === 'bad'; }).reduce(function (s, f) { return s + f.n; }, 0);
     var warn = A.filter(function (f) { return f.sev === 'warn'; }).reduce(function (s, f) { return s + f.n; }, 0);
-    set('pTrips', TRIPS.length, false);
+    var mine = myName();
+    set('pTrips', ALL_TRIPS.filter(function (t) { return t.username === mine; }).length, false);
     set('pCheck', bad || warn, bad > 0);
     set('pEvid', evidOfCycle().length, false);
     set('pEdu', eduTodo(), eduTodo() > 0);
@@ -810,7 +815,7 @@
 
   /* ══════════════════ 마감 현황 ══════════════════ */
   function viewClose() {
-    if (!LOADED) return head('마감 현황') + skeleton();
+    if (!LOADED) return head(isAll() ? '전체 마감 현황' : '마감 현황') + skeleton();
     var T = totals(TRIPS), A = audit();
     var bads = A.filter(function (f) { return f.sev === 'bad' && f.n > 0; });
     var badN = bads.reduce(function (s, f) { return s + f.n; }, 0);
@@ -831,7 +836,8 @@
       verdict = '<em>손볼 것이 없습니다</em>'; clean = ' clean';
     }
 
-    var h = head('마감 현황', ME.is_admin ? '전체 직원 ' + Object.keys(USERS).length + '명' : esc(ME.name || ''));
+    var h = head(isAll() ? '전체 마감 현황' : '마감 현황',
+      isAll() ? '전체 직원 ' + Object.keys(USERS).length + '명' : esc(ME.name || ''));
 
     h += '<div class="hero fade">' +
       '<div class="eyebrow"><span class="dot"></span>' + esc(cycleName(CYC.y, CYC.m)) +
@@ -857,7 +863,7 @@
         '<div class="panel">' + list.map(issueRow).join('') + '</div>');
     }
 
-    if (ME.is_admin) {
+    if (isAll()) {
       var byU = {};
       TRIPS.forEach(function (t) { (byU[t.username] = byU[t.username] || []).push(t); });
       var rows = Object.keys(byU).map(function (u) { var x = totals(byU[u]); x.u = u; return x; })
@@ -916,7 +922,7 @@
       '<th>이름</th><th>소속</th><th class="n">운행</th><th class="n">거리</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th>' +
       '<th class="n">합계</th><th class="n">미확정</th>' +
-      (ME.is_admin ? '<th></th>' : '') + '</tr></thead><tbody>';
+      (isAll() ? '<th></th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function (x) {
       var u = USERS[x.u] || {};
       h += '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '">' +
@@ -929,7 +935,7 @@
         '<td class="n">' + (x.park ? n0(x.park) : '—') + '</td>' +
         '<td class="n total">' + n0(x.cost) + '</td>' +
         '<td class="n ' + (x.unk ? 'unk' : 'dim') + '">' + (x.unk ? n0(x.unk) : '—') + '</td>' +
-        (ME.is_admin
+        (isAll()
           ? '<td class="n"><button class="btn sm" data-print="' + esc(x.u) + '" ' +
             'title="' + esc(u.name || x.u) + ' 님 운행기록부 인쇄">' + ic('receipt', 13) + '인쇄</button></td>'
           : '') + '</tr>';
@@ -942,7 +948,7 @@
     opt = opt || {};
     if (!rows.length) return blank('조건에 맞는 운행이 없습니다.', '필터를 바꿔 보세요.', 'list');
     var flags = flaggedIds();
-    var showWho = ME.is_admin && !opt.compact;
+    var showWho = isAll() && !opt.compact;
     var h = '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
       '<th>날짜</th>' + (showWho ? '<th>이름</th>' : '') + '<th>목적</th><th>차량</th>' +
       '<th class="n">거리</th>' + (opt.compact ? '' : '<th class="n">계기판</th>') +
@@ -984,15 +990,15 @@
   }
 
   function viewTrips() {
-    if (!LOADED) return head('운행일지') + skeleton();
+    if (!LOADED) return head(scopeTitle('운행일지')) + skeleton();
     var A = audit(), c = {};
     A.forEach(function (f) { c[f.k] = f.n; });
     var rows = filtered(), t2 = totals(rows);
 
-    var h = head('운행일지', esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
+    var h = head(scopeTitle('운행일지'), esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
 
     h += '<div class="bar">';
-    if (ME.is_admin) {
+    if (isAll()) {
       var us = Object.keys(USERS).filter(function (u) {
         return TRIPS.some(function (t) { return t.username === u; });
       }).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
@@ -1039,12 +1045,12 @@
 
   /* ══════════════════ 기록 점검 ══════════════════ */
   function viewCheck() {
-    if (!LOADED) return head('기록 점검') + skeleton();
+    if (!LOADED) return head(scopeTitle('기록 점검')) + skeleton();
     var A = audit();
     var found = A.filter(function (f) { return f.n > 0; });
     var okOnes = A.filter(function (f) { return f.n === 0; });
 
-    var h = head('기록 점검', esc(cycleName(CYC.y, CYC.m)) + ' · 실제로 사고가 났던 유형만 봅니다');
+    var h = head(scopeTitle('기록 점검'), esc(cycleName(CYC.y, CYC.m)) + ' · 실제로 사고가 났던 유형만 봅니다');
 
     if (!found.length) {
       h += '<div class="hero fade"><div class="eyebrow"><span class="dot" style="background:var(--ok)"></span>점검 완료</div>' +
@@ -1077,9 +1083,9 @@
 
   /* ══════════════════ 증빙 ══════════════════ */
   function viewEvid() {
-    if (!LOADED) return head('증빙') + skeleton();
+    if (!LOADED) return head(scopeTitle('증빙')) + skeleton();
     var rows = evidOfCycle().sort(function (a, b) { return b.date_millis - a.date_millis; });
-    var h = head('증빙', esc(cycleName(CYC.y, CYC.m)) + ' · 앱에서 올린 영수증');
+    var h = head(scopeTitle('증빙'), esc(cycleName(CYC.y, CYC.m)) + ' · 앱에서 올린 영수증');
     if (!rows.length) return h + blank('등록된 영수증이 없습니다.', '앱의 증빙 화면에서 올리시면 여기에 모입니다.', 'receipt');
 
     var sum = rows.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
@@ -1093,11 +1099,11 @@
       }).join('') + '</div></div>';
 
     h += sect('내역', rows.length + '건', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>날짜</th>' + (ME.is_admin ? '<th>이름</th>' : '') + '<th>구분</th><th>차량</th>' +
+      '<th>날짜</th>' + (isAll() ? '<th>이름</th>' : '') + '<th>구분</th><th>차량</th>' +
       '<th class="n">금액</th><th>메모</th><th></th></tr></thead><tbody>' +
       rows.map(function (e) {
         return '<tr><td><span class="lead">' + md(e.date_millis) + '</span></td>' +
-          (ME.is_admin ? '<td>' + esc(nameOf(e.username)) + '</td>' : '') +
+          (isAll() ? '<td>' + esc(nameOf(e.username)) + '</td>' : '') +
           '<td><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
           '<td class="dim">' + esc(e.vehicle_plate || '—') + '</td>' +
           '<td class="n total">' + n0(e.amount) + '</td>' +
@@ -1162,14 +1168,14 @@
 
   /* ══════════════════ 정산 ══════════════════ */
   function viewSettle() {
-    if (!LOADED) return head('정산') + skeleton();
+    if (!LOADED) return head(scopeTitle('정산')) + skeleton();
     var T = totals(TRIPS);
     var byU = {};
     TRIPS.forEach(function (t) { (byU[t.username] = byU[t.username] || []).push(t); });
     var rows = Object.keys(byU).map(function (u) { var x = totals(byU[u]); x.u = u; return x; })
       .sort(function (a, b) { return b.cost - a.cost; });
 
-    var h = head('정산', esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
+    var h = head(scopeTitle('정산'), esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
 
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>업무용 비용 합계</div>' +
       '<p class="verdict">' + won(T.cost) + '</p>' +
@@ -1189,9 +1195,9 @@
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
-    h += sect(ME.is_admin ? '직원별' : '내 내역', rows.length + (ME.is_admin ? '명' : '건'),
+    h += sect(isAll() ? '직원별' : '내 내역', rows.length + (isAll() ? '명' : '건'),
       '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
-        (ME.is_admin ? '내 것 인쇄' : '인쇄용 출력') + '</button>' +
+        (isAll() ? '내 것 인쇄' : '인쇄용 출력') + '</button>' +
       '<button class="btn sm" id="btnCsv">' + ic('dl', 13) + 'CSV</button>', personTable(rows));
 
     h += sect('산정 기준', null, '',
@@ -1537,6 +1543,12 @@
 
   function doPrint(who) {
     if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
+    // 개인 화면에서는 본인 것만 뽑는다. 남의 이름으로 부르면 운행은 없어도
+    // 머리 정보(이름·부서·차량)가 찍히므로 여기서 막는다.
+    if (who && who !== myName() && !isAll()) {
+      toast('다른 분 운행기록부는 관리 › 전체 정산에서 뽑을 수 있습니다.', true);
+      return;
+    }
     var host = $('printArea');
     host.innerHTML = buildPrint(who);
     var imgs = Array.prototype.slice.call(host.querySelectorAll('img'));
@@ -1729,7 +1741,9 @@
   var HP = { groups: [], batch: '', busy: false, note: '' };
 
   function viewHipass() {
-    var h = head('하이패스 대조', '영수증 PDF 를 읽어 통행료를 확정합니다');
+    var h = head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조',
+      isAll() ? '영수증 PDF 를 읽어 전 직원 통행료를 확정합니다'
+              : '영수증 PDF 를 읽어 내 통행료를 확정합니다');
 
     var T = totals(TRIPS);
     if (LOADED && T.unk) {
@@ -1789,7 +1803,7 @@
             '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' + (e.pick ? ' checked' : '') + '></td>' +
             '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
-            (ME.is_admin ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') + '</td>' +
+            (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') + '</td>' +
             '<td>' + now + '</td>' +
             '<td class="n lead">' + n0(e.sum) + '</td>' +
             '<td class="n">' + diff + '</td>' +
@@ -1877,7 +1891,7 @@
         if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '반영하지 못했습니다.', true); return; }
         // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다.
         (res.j.rows || []).forEach(function (row) {
-          var t = TRIPS.filter(function (x) { return x.id === row.id; })[0];
+          var t = ALL_TRIPS.filter(function (x) { return x.id === row.id; })[0];
           if (t) { t.toll_cost = row.toll_cost; t.toll_status = row.toll_status; t.toll_source = row.toll_source; }
         });
         AUDIT = null;
@@ -2019,7 +2033,7 @@
     $('pSub').textContent = cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
 
     var h = '<div class="form">';
-    if (ME.is_admin) {
+    if (ME.is_admin && isAll()) {
       var us = Object.keys(PEOPLE).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
       h += fld('누구 운행', '<select class="inp" id="cWho">' + us.map(function (u) {
         return '<option value="' + esc(u) + '"' + (u === mine ? ' selected' : '') + '>' +
@@ -2126,7 +2140,7 @@
           }
           toast(j.error || '넣지 못했습니다.', true); return;
         }
-        if (res.j.row) TRIPS.unshift(res.j.row);
+        if (res.j.row) { ALL_TRIPS.unshift(res.j.row); applyScope(); }
         AUDIT = null;
         toastOk('운행을 넣었습니다.', res.j.warning);
         closePanel(); paintPills(); render();
@@ -2202,11 +2216,29 @@
   function closePanel() { $('panel').classList.remove('open'); }
 
   /* ══════════════════ 라우팅 ══════════════════ */
+  // 개인 화면과 관리 화면이 같은 함수를 쓰고 범위만 다르다.
+  // 관리 화면 키는 전부 'a_' 로 시작한다(전사 = all).
   var VIEWS = {
     close: viewClose, trips: viewTrips, check: viewCheck, evid: viewEvid, edu: viewEdu,
-    hipass: viewHipass, settle: viewSettle, people: viewPeople, cars: viewCars, eduadm: viewEduAdm,
-    inbox: viewInbox
+    hipass: viewHipass, settle: viewSettle, inbox: viewInbox,
+    a_close: viewClose, a_trips: viewTrips, a_check: viewCheck, a_evid: viewEvid,
+    a_hipass: viewHipass, a_settle: viewSettle,
+    people: viewPeople, cars: viewCars, eduadm: viewEduAdm
   };
+  /** 관리자만 열 수 있는 화면. */
+  var ADMIN_VIEWS = ['a_close', 'a_trips', 'a_check', 'a_evid', 'a_hipass', 'a_settle',
+    'people', 'cars', 'eduadm'];
+  /** 지금 화면이 전사 범위인가. 화면 안에서 '이름 칸을 보일까' 같은 판단에 쓴다. */
+  function isAll() { return ADMIN_VIEWS.indexOf(VIEW) >= 0; }
+  /** 같은 화면을 개인/전사로 쓰므로 제목으로 범위를 드러낸다. */
+  function scopeTitle(t) { return isAll() ? '전체 ' + t : t; }
+  /** 지금 화면 범위에 맞게 TRIPS·EVID 를 채운다. */
+  function applyScope() {
+    if (isAll()) { TRIPS = ALL_TRIPS; EVID = ALL_EVID; return; }
+    var me = myName();
+    TRIPS = ALL_TRIPS.filter(function (t) { return t.username === me; });
+    EVID = ALL_EVID.filter(function (e) { return e.username === me; });
+  }
   function render() {
     // 적재가 실패했으면 스켈레톤 대신 사유와 다시 시도 버튼을 보여 준다.
     $('inner').innerHTML = LOAD_ERR
@@ -2239,7 +2271,12 @@
   }
   function go(v) {
     if (!VIEWS[v]) return;
+    // 관리 화면은 관리자만. 주소를 직접 만져도 못 들어간다(서버 RLS 가 이중으로 막는다).
+    if (ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) return;
     VIEW = v;
+    AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
+    FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all';
+    applyScope();
     document.body.classList.remove('nav-open');
     render();
     window.scrollTo({ top: 0 });
@@ -2275,7 +2312,9 @@
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
     if ((el = e.target.closest('[data-person]'))) {
       if (!ME || !ME.is_admin) return;
-      FILT.who = el.dataset.person; FILT.chip = 'all'; go('trips'); return;
+      go('a_trips');
+      FILT.who = el.dataset.person; FILT.chip = 'all';
+      render(); return;
     }
     if ((el = e.target.closest('[data-car]'))) { FILT.car = el.dataset.car; FILT.chip = 'all'; go('trips'); return; }
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
