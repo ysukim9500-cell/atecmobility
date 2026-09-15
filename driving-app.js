@@ -786,6 +786,14 @@
       ? n0(rows.length) + '건이 비어 있습니다'
       : '비어 있는 통행료가 없습니다');
 
+    // ★ 결재가 끝난 주기는 서버가 통행료도 막는다. 채우게 두면 전부 채운 뒤
+    //   저장에서야 '결재가 끝난 기간' 으로 다 튕긴다 — 먼저 말한다.
+    if (rows.length && cycleApproved(mine)) {
+      return h + lockedNote('통행료를 채울 수 없습니다',
+        n0(rows.length) + '건이 비어 있지만 <b>' + esc(cycleName(CYC.y, CYC.m)) +
+        ' 결재가 이미 끝나</b>, 이 주기의 통행료는 바꿀 수 없습니다.');
+    }
+
     if (!rows.length) {
       return h + blank('채울 것이 없습니다.',
         '자동계산과 하이패스 대조로 모두 정해졌습니다.', 'check');
@@ -969,10 +977,19 @@
           toast((res.j && res.j.error) || '저장하지 못했습니다.', true); return;
         }
         var skipped = res.j.skipped || [];
+        // ★ applied 가 0 이면 한 건도 안 써진 것이다. 예전에는 '0 || items.length' 라
+        //   47건 저장했다고 띄우고 FILLS 까지 비워, 거짓말에 더해 친 값도 날렸다.
+        var applied = Number(res.j.applied) || 0;
+        if (!applied) {
+          toast(skipped.length
+            ? '한 건도 저장되지 않았습니다 — ' + skipped[0].why
+            : '한 건도 저장되지 않았습니다.', true);
+          return;                        // 친 값은 그대로 둔다
+        }
         FILLS = {};
         AUDIT = null;
         loadAll();                       // 서버 값을 다시 받아 화면을 맞춘다
-        toastOk(n0(res.j.applied || items.length) + '건 저장했습니다.',
+        toastOk(n0(applied) + '건 저장했습니다.',
           skipped.length ? skipped.length + '건은 건너뛰었습니다 (' + skipped[0].why + ')' : null);
       }).catch(function () {
         btn.disabled = false; btn.textContent = n0(n) + '건 저장';
@@ -1452,6 +1469,15 @@
     if (reg && out.indexOf(reg) < 0) out.unshift(reg);
     return out;
   }
+  /** 결재가 끝나 못 고치는 화면에 쓰는 안내. 할 수 없는 일을 시키지 않으려고 둔다. */
+  function lockedNote(title, body) {
+    return '<div class="panel" style="padding:30px 26px;text-align:center">' +
+      '<div style="color:var(--ok);margin-bottom:10px">' + ic('check', 22) + '</div>' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(title) + '</div>' +
+      '<div class="dim" style="font-size:13px;line-height:1.8;max-width:430px;margin:0 auto">' +
+      body + '</div></div>';
+  }
+
   /** 지금 보고 있는 마감주기가 그 사람 기준으로 결재 완료됐는가. */
   function cycleApproved(u) {
     return APPR.some(function (a) {
@@ -1498,6 +1524,9 @@
     var verdict, clean = '';
     if (badN) {
       verdict = '손봐야 할 기록이 <em>' + n0(badN) + '건</em> 있습니다';
+    } else if (T.unk && !isAll() && cycleApproved(myName())) {
+      // 결재가 끝났으면 채울 수도 없다 — 채우라고 시키지 않는다.
+      verdict = '<em>결재가 끝났습니다</em>'; clean = ' clean';
     } else if (T.unk) {
       verdict = '통행료 <em>' + n0(T.unk) + '건</em>만 채우면 끝납니다';
     } else if (!T.n) {
@@ -2654,6 +2683,14 @@
       isAll() ? '영수증 PDF 를 읽어 전 직원 통행료를 확정합니다'
               : '영수증 PDF 를 읽어 내 통행료를 확정합니다');
 
+    // ★ 개인 화면에서 내 주기가 결재 완료면 서버가 전부 튕긴다. 먼저 말한다.
+    //   (전체 화면은 사람마다 다르므로 묶음 줄에서 따로 표시한다.)
+    if (!isAll() && cycleApproved(myName())) {
+      return h + lockedNote('통행료를 확정할 수 없습니다',
+        '<b>' + esc(cycleName(CYC.y, CYC.m)) + ' 결재가 이미 끝나</b> 이 주기의 통행료는 ' +
+        '바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다.');
+    }
+
     var T = totals(TRIPS);
     if (LOADED && T.unk) {
       h += '<div class="hpnote">' + ic('ticket', 16) +
@@ -2709,11 +2746,12 @@
               : '<b style="color:' + (e.diff > 0 ? 'var(--ok)' : 'var(--red)') + '">' +
                 (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
           h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '">' +
-            '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' + (e.pick ? ' checked' : '') + '></td>' +
+            '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
+            (e.pick ? ' checked' : '') + (e.locked ? ' disabled' : '') + '></td>' +
             '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
             (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') + '</td>' +
-            '<td>' + now + '</td>' +
+            '<td>' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
             '<td class="n lead">' + n0(e.sum) + '</td>' +
             '<td class="n">' + diff + '</td>' +
             '<td class="el dim" title="' + esc(e.lines.map(function (r) {
@@ -2766,7 +2804,7 @@
               : '영수증에서 통행 기록을 찾지 못했습니다.';
             HP.groups = []; render(); return;
           }
-          HP.groups = window.Hipass.match(recs, TRIPS);
+          HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
           HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '');
           render();
@@ -2774,10 +2812,27 @@
     });
   }
 
+  /** 결재가 끝난 운행에는 표시를 달고 선택을 풀어 둔다. 서버가 되돌리기 때문이다. */
+  function hpMarkLocked(groups) {
+    (groups || []).forEach(function (g) {
+      (g.matched || []).forEach(function (e) {
+        e.locked = apprLocked(e.trip);
+        if (e.locked) e.pick = false;
+      });
+    });
+    return groups;
+  }
+
   function hpApply(gi) {
     var g = HP.groups[gi]; if (!g) return;
-    var picked = (g.matched || []).filter(function (e) { return e.pick; });
-    if (!picked.length) return;
+    var picked = (g.matched || []).filter(function (e) { return e.pick && !e.locked; });
+    if (!picked.length) {
+      // 예전에는 말없이 돌아갔다 — 왜 아무 일도 안 일어나는지 알 수가 없었다.
+      var anyLocked = (g.matched || []).some(function (e) { return e.locked; });
+      toast(anyLocked ? '고르신 것이 없습니다. 결재가 끝난 운행은 바꿀 수 없습니다.'
+                      : '반영할 것을 골라 주세요.', true);
+      return;
+    }
     var over = picked.filter(function (e) { return e.who === 'person' && e.kind === 'diff-person'; });
     if (over.length && !window.confirm(
       '사람이 직접 정한 값 ' + over.length + '건을 영수증 금액으로 덮습니다.\n계속하시겠습니까?')) return;
@@ -2805,12 +2860,17 @@
         });
         AUDIT = null;
         var skipped = (res.j.skipped || []);
+        var applied = Number(res.j.applied) || 0;
         if (res.j.warning) toast(res.j.warning, true);
-        else if (skipped.length) toast(res.j.applied + '건 반영 · ' + skipped.length + '건 건너뜀 (' +
+        // ★ 0건이면 '반영했다' 로 읽히면 안 된다. 왜 못 했는지를 앞세운다.
+        else if (!applied) toast(skipped.length
+          ? '한 건도 반영되지 않았습니다 — ' + skipped[0].why
+          : '한 건도 반영되지 않았습니다.', true);
+        else if (skipped.length) toast(applied + '건 반영 · ' + skipped.length + '건 건너뜀 (' +
           skipped[0].why + ')', true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
-        else toast(res.j.applied + '건 확정했습니다.');
+        else toast(applied + '건 확정했습니다.');
         // 남은 것만 다시 계산
-        window.Hipass.assign(g, TRIPS);
+        hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
         paintPills(); render();
       }).catch(function () { toast('서버에 연결하지 못했습니다.', true); });
   }
@@ -3242,12 +3302,14 @@
     if ((el = e.target.closest('[data-hpapply]'))) { hpApply(+el.dataset.hpapply); return; }
     if (e.target.matches('[data-hpall]')) {
       var gi = +e.target.dataset.hpall, on = e.target.checked;
-      (HP.groups[gi].matched || []).forEach(function (x) { x.pick = on; });
+      (HP.groups[gi].matched || []).forEach(function (x) { if (!x.locked) x.pick = on; });
       render(); return;
     }
     if (e.target.matches('[data-hppick]')) {
       var p = e.target.dataset.hppick.split('.');
-      HP.groups[+p[0]].matched[+p[1]].pick = e.target.checked;
+      var ent = HP.groups[+p[0]].matched[+p[1]];
+      if (ent.locked) { e.target.checked = false; return; }
+      ent.pick = e.target.checked;
       // ★ render() 를 부르지 않는다. 화면을 통째로 갈아끼우면 표가 맨 위로 튀고
       //   포커스와 펼쳐 둔 목록이 사라진다. 바뀐 숫자만 고쳐 쓴다.
       paintHpCount();
@@ -3365,9 +3427,9 @@
     if (e.target.id === 'selCar') { FILT.car = e.target.value; renderKeepFocus('selCar'); return; }
     if (e.target.id === 'hpFile') { hpFiles(e.target.files); return; }
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
-      var g = HP.groups[+e.target.dataset.hpcar];
+      var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
       g.plate = e.target.value || null;
-      window.Hipass.assign(g, TRIPS);
+      hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
       render(); return;
     }
     if (e.target.id === 'cPlate') {
