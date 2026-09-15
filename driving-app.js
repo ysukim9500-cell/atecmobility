@@ -2029,11 +2029,9 @@
     // 이 사람이 이번 회차에 차를 한 대만 썼다면, 차량번호가 빈 영수증도 그 차 것으로 본다.
     // (차량을 지웠다 복원하면 번호판이 비어 저장된다. 앱도 같은 예외를 둔다 —
     //  안 두면 그 금액이 기록부에서 통째로 사라진다.)
-    var onlyOneCar = (function () {
-      var seen = {};
-      TRIPS.forEach(function (t) { if (t.username === mine && t.plate_no) seen[t.plate_no] = 1; });
-      return Object.keys(seen).length <= 1;
-    })();
+    // 앱은 **등록 차량이 1대 이하**일 때만 번호판 빈 영수증을 포함한다(AppRepository 463행).
+    //    운행에 나온 번호판 수로 재면 기준이 갈린다.
+    var onlyOneCar = VEHICLES.filter(function (v) { return v.username === mine; }).length <= 1;
     var evPark = {}, evToll = {};
     EVID.forEach(function (e) {
       var d = Number(e.date_millis);
@@ -2174,6 +2172,134 @@
     return h;
   }
 
+  /* ══════════════════ 엑셀 내려받기 ══════════════════
+     ★ 제출 서류는 **앱이 내보내는 엑셀이 기준**이다. 인쇄물이 아니다.
+       직원이 받아서 계기판을 고치면 운행거리(=H−G) → 유류비(=MAX(0,I)×단가) →
+       금액합계(=SUM(J:L)) → 하단 SUM 까지 수식으로 따라 바뀌어야 한다.
+       양식(열 폭·병합·서식·결재란)도 xlsx.js 가 앱 ExcelExporter.kt 를 그대로 옮겼다. */
+
+  /** 차량 한 대치 엑셀 한 장을 만든다. 앱 exportRange 와 같은 순서·같은 규칙. */
+  function sheetDataFor(mine, u, plate, list, r) {
+    // 앱 188행: 같은 날이면 계기판 순, 그 다음 시각 순.
+    var rows = list.slice().sort(function (x, y) {
+      return dayNo(x.start_time) - dayNo(y.start_time)
+        || odoInt(x.start_odometer) - odoInt(y.start_odometer)
+        || x.start_time - y.start_time;
+    });
+    var veh = VEHICLES.filter(function (v) {
+      return v.username === mine && (v.plate_no || '') === plate;
+    })[0] || {};
+
+    // 영수증 금액 — 앱은 그 차량 것만 본다. 차를 한 대만 쓰면 번호판 빈 것도 포함.
+    // 앱은 **등록 차량이 1대 이하**일 때만 번호판 빈 영수증을 포함한다(AppRepository 463행).
+    //    운행에 나온 번호판 수로 재면 기준이 갈린다.
+    var onlyOneCar = VEHICLES.filter(function (v) { return v.username === mine; }).length <= 1;
+    var evPark = {}, evToll = {};
+    EVID.forEach(function (e) {
+      var d = Number(e.date_millis);
+      if (e.username !== mine || !(d >= r.lo && d < r.hi)) return;
+      var ep = (e.vehicle_plate || '');
+      if (ep !== plate && !(ep === '' && onlyOneCar)) return;
+      if (!(Number(e.amount) > 0)) return;
+      var k = ymd(d);
+      if (e.category === '주차') evPark[k] = (evPark[k] || 0) + Number(e.amount);
+      if (e.category === '통행료') evToll[k] = (evToll[k] || 0) + Number(e.amount);
+    });
+    var tripDates = {};
+    rows.forEach(function (t) { tripDates[ymd(t.start_time)] = 1; });
+    var orphanDates = Object.keys(evPark).concat(Object.keys(evToll))
+      .filter(function (d, i, arr) { return arr.indexOf(d) === i && !tripDates[d]; }).sort();
+
+    var seen = {}, out = [], partMap = {};
+    rows.forEach(function (t) {
+      var g = odoInt(t.start_odometer), hh = odoInt(t.end_odometer);
+      var rate = rateOf(t);
+      var day = ymd(t.start_time);
+      var first = !seen[day]; seen[day] = 1;
+      var park = (Number(t.parking_cost) || 0) + (first ? (evPark[day] || 0) : 0);
+      var toll = tollForExport(t, first ? (evToll[day] || 0) : 0);
+      out.push({
+        date: day, start: dong(t.start_address), end: dong(t.end_address),
+        visit: t.visit_place || '', purpose: t.purpose || '', manual: !!t.is_manual,
+        odoS: g, odoE: hh, rate: rate, parking: park, toll: toll
+      });
+      // 지역별 분해 — FuelCost.km 규칙(역행이면 0)을 그대로 쓴다.
+      var km = Math.max(0, hh - g);
+      var rg = region(t.start_address || '', t.start_lat, t.start_lng);
+      var key = rg + '-' + rate;
+      var p = partMap[key] = partMap[key] || { region: rg, rate: rate, km: 0, amount: 0 };
+      p.km += km; p.amount += km * Math.max(rate, 0);
+    });
+    var orphans = orphanDates.map(function (d) {
+      return { date: d, parking: evPark[d] || 0, toll: evToll[d] || 0 };
+    });
+    var parts = Object.keys(partMap).map(function (k) { return partMap[k]; })
+      .filter(function (p) { return p.km > 0; })
+      .sort(function (x, y) {
+        return (x.region === '수도권' ? 0 : 1) - (y.region === '수도권' ? 0 : 1) || x.rate - y.rate;
+      });
+    if (parts.length < 2) parts = [];
+
+    return {
+      dept: [u.company_name, u.dept].filter(Boolean).join(' ').trim(),
+      name: u.name || mine,
+      plateNo: plate,
+      // 앱 255행: 차량 레코드 우선, 비어 있으면 프로필 값.
+      vehicleType: veh.vehicle_type || u.vehicle_type || '',
+      periodLabel: periodLabel(),
+      quarterLabel: fuelLabel(),
+      rows: out, orphans: orphans, parts: parts
+    };
+  }
+
+  /** 엑셀 파일을 만들어 내려받는다. 차량이 여러 대면 대수만큼 파일이 나온다(앱과 같다). */
+  function downloadXlsx(who) {
+    if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
+    var mine = who || myName();
+    if (who && who !== myName() && !isAll()) {
+      toast('다른 분 운행기록부는 관리 › 전체 정산에서 뽑을 수 있습니다.', true);
+      return;
+    }
+    if (!window.Xlsx) { toast('엑셀 모듈을 불러오지 못했습니다. 새로고침해 주세요.', true); return; }
+
+    var u = personOf(mine), r = cycleRange(CYC.y, CYC.m);
+    var all = TRIPS.filter(function (t) {
+      return t.username === mine && PRINT_PURPOSES.indexOf(t.purpose || '') >= 0;
+    });
+    if (!all.length) { toast('고르신 목적에 해당하는 운행이 없습니다.', true); return; }
+
+    var byPlate = {}, plates = [];
+    all.forEach(function (t) {
+      var p = t.plate_no || '';
+      if (!byPlate[p]) { byPlate[p] = []; plates.push(p); }
+      byPlate[p].push(t);
+    });
+    plates.sort(function (x, y) { return minStart(byPlate[x]) - minStart(byPlate[y]); });
+
+    var made = 0;
+    plates.forEach(function (plate, i) {
+      var data = sheetDataFor(mine, u, plate, byPlate[plate], r);
+      var bytes = window.Xlsx.build(data);
+      var safe = String(plate).replace(/[^0-9A-Za-z가-힣]/g, '');
+      var fname = 'ATEC Driving 운행일지_' + safe + '_' + ymd(r.lo) + '_' + ymd(r.hi - 1) + '.xlsx';
+      // 여러 장이면 브라우저가 한꺼번에 받는 것을 막을 수 있어 조금씩 띄운다.
+      setTimeout(function () { saveBlob(bytes, fname); }, i * 400);
+      made++;
+    });
+    toast(made > 1 ? '엑셀 ' + made + '개를 내려받습니다(차량별로 한 장씩).' : '엑셀을 내려받습니다.');
+  }
+
+  function saveBlob(bytes, filename) {
+    var blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
   /** 영수증 사진 — 앱 엑셀에는 없는 웹 추가분(기록부 양식 자체는 건드리지 않는다). */
   function printEvidencePages(mine, u, r) {
     var evid = EVID.filter(function (e) {
@@ -2246,7 +2372,7 @@
       return;
     }
     var target = who || myName();
-    $('pTitle').textContent = '운행기록부 인쇄';
+    $('pTitle').textContent = '운행기록부 엑셀 내려받기';
     $('pSub').textContent = nameOf(target) + ' · ' + cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
     $('pBody').innerHTML =
       '<div class="form"><div class="frow"><label class="flab">담을 운행</label><div class="fbody">' +
@@ -2257,11 +2383,13 @@
       '<div class="fhint">차량일지를 <b>제출</b>하실 때는 <b>일반업무</b>만 고르십시오. ' +
       '앱에서 엑셀로 내려받을 때와 같은 기준입니다.</div>' +
       '</div></div></div>' +
-      '<div class="anote">운행기록부 뒤에 <b>영수증 사진</b>이 함께 붙습니다. ' +
-      '브라우저 인쇄 창에서 <b>PDF로 저장</b>을 고르시면 파일로 남길 수 있습니다.</div>';
+      '<div class="anote"><b>앱에서 내려받는 것과 같은 엑셀 파일</b>입니다. ' +
+      '받아서 계기판을 고치시면 운행거리·유류비·합계가 <b>수식으로 따라 바뀝니다</b>.<br>' +
+      '차량을 두 대 이상 모셨으면 <b>차량별로 한 장씩</b> 나옵니다(앱과 같습니다).</div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="btnPrintGo" data-who="' + esc(target) + '">인쇄</button>';
+      '<button class="btn" id="btnPrintPaper" data-who="' + esc(target) + '">영수증까지 인쇄</button>' +
+      '<button class="btn pri" id="btnXlsxGo" data-who="' + esc(target) + '">엑셀 내려받기</button>';
     $('panel').classList.add('open');
   }
 
@@ -2275,9 +2403,12 @@
     closePanel();
     var host = $('printArea');
     host.innerHTML = buildPrint(who);
-    if (!host.querySelector('table.plog tbody tr td:not(:empty)')) {
-      toast('고르신 목적에 해당하는 운행이 없습니다.', true); return;
-    }
+    // 빈 자리 표시 행은 &nbsp; 로 채워져 있어 :not(:empty) 로는 안 걸린다. 실제 글자로 본다.
+    //    (앱은 이런 경우 파일 자체를 만들지 않는다 — MainViewModel 368행)
+    var anyRow = Array.prototype.some.call(
+      host.querySelectorAll('table.plog tbody tr td'),
+      function (td) { return td.textContent.replace(/[s ]/g, '') !== ''; });
+    if (!anyRow) { toast('고르신 목적에 해당하는 운행이 없습니다.', true); return; }
     var imgs = Array.prototype.slice.call(host.querySelectorAll('img'));
     var left = imgs.length;
     toast(left ? '영수증 ' + left + '장을 불러오는 중입니다…' : '인쇄 창을 엽니다…');
@@ -3083,7 +3214,19 @@
       render(); return;
     }
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
-    if ((el = e.target.closest('#btnPrintGo'))) { runPrint(el.dataset.who); return; }
+    if ((el = e.target.closest('#btnXlsxGo'))) {
+      // 고른 목적을 먼저 반영한 뒤 엑셀을 만든다.
+      var picked = Array.prototype.slice
+        .call(document.querySelectorAll('input[name="ppurp"]:checked'))
+        .map(function (x) { return x.value; });
+      if (!picked.length) { toast('담을 운행을 한 가지 이상 고르세요.', true); return; }
+      PRINT_PURPOSES = picked;
+      var who = el.dataset.who;
+      closePanel();
+      downloadXlsx(who);
+      return;
+    }
+    if ((el = e.target.closest('#btnPrintPaper'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#btnPwSave')) { savePassword(); return; }
     if ((el = e.target.closest('[data-addappr]'))) { addApprover(el.dataset.addappr); return; }
     if ((el = e.target.closest('[data-tffree]'))) {
