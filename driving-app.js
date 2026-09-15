@@ -342,7 +342,9 @@
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
       'toll_cost,toll_status,toll_source,toll_revision,parking_cost,is_manual,' +
-      'overspeed_count,rapid_accel_count,rapid_decel_count,max_speed_kmh';
+      'overspeed_count,rapid_accel_count,rapid_decel_count,max_speed_kmh,' +
+      // ★ 이 셋이 빠지면 점수가 실제보다 높게 나온다(앱 SafetyScore 와 갈린다).
+      'school_zone_overspeed_count,sustained_overspeed_count,harsh_corner_count';
 
     Promise.all([
       fetchAll('/rest/v1/trips?select=' + COLS + '&deleted_at=is.null' +
@@ -563,6 +565,204 @@
     var done = {};
     EDUP.forEach(function (p) { if (p.username === mine && p.completed_at) done[p.video_id] = 1; });
     return vids.filter(function (v) { return !done[v.id]; }).length;
+  }
+
+  /* ══════════════════ 안전운전 점수 ══════════════════
+     앱 util/SafetyScore.kt 를 그대로 옮긴 것이다. 한쪽을 고치면 앱(Kotlin/Swift)도
+     같이 고쳐야 한다 — 같은 사람의 점수가 앱과 웹에서 다르면 아무도 안 믿는다.
+
+       과속 −3 · 보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3
+       지속과속 −2/회(운행당 상한 −10)
+       야간(KST 22~06시 출발)은 상한 적용 뒤 합계 ×1.5. 0~100 으로 자른다.
+
+     ★ 수기 운행은 평가하지 않는다(2026-07-27 정책, AppRepository 1473행).
+       GPS 기록이 없어 위반이 0으로 잡히고, 그대로 두면 점수가 부풀려진다. */
+  var SAFE_GRADES = [[90, '안전', 'ok'], [80, '양호', 'ok'], [70, '주의', 'warn'], [0, '위험', 'bad']];
+
+  function safeScore(t) {
+    var z = function (v) { return Math.max(0, Number(v) || 0); };
+    var sus = Math.min(z(t.sustained_overspeed_count) * 2, 10);
+    var p = z(t.overspeed_count) * 3 + z(t.school_zone_overspeed_count) * 5 +
+      z(t.rapid_accel_count) * 3 + z(t.rapid_decel_count) * 5 +
+      z(t.harsh_corner_count) * 3 + sus;
+    if (isNightTrip(t.start_time)) p = Math.round(p * 1.5);
+    return Math.max(0, Math.min(100, 100 - p));
+  }
+  /** 야간 판정은 기기 시간대가 아니라 한국시간 고정 — 앱·서버와 같은 기준. */
+  function isNightTrip(ms) { var h = kd(Number(ms)).getUTCHours(); return h >= 22 || h < 6; }
+  /** 거리 가중 평균. 짧은 운행이 과대 반영되지 않게 한다(최소 1km). */
+  function safeAvg(pairs) {
+    if (!pairs.length) return -1;
+    var a = 0, b = 0;
+    pairs.forEach(function (x) { var w = Math.max(x[1], 1); a += x[0] * w; b += w; });
+    return b > 0 ? Math.round(a / b) : 0;
+  }
+  function safeGrade(s) {
+    for (var i = 0; i < SAFE_GRADES.length; i++) if (s >= SAFE_GRADES[i][0]) return SAFE_GRADES[i];
+    return SAFE_GRADES[SAFE_GRADES.length - 1];
+  }
+  function safeEvents(t) {
+    var z = function (v) { return Math.max(0, Number(v) || 0); };
+    return z(t.overspeed_count) + z(t.school_zone_overspeed_count) + z(t.rapid_accel_count) +
+      z(t.rapid_decel_count) + z(t.harsh_corner_count) + z(t.sustained_overspeed_count);
+  }
+  /** 그 사람의 이번 주기 안전 요약. 자동 기록만 본다. */
+  function safeOf(list) {
+    var auto = list.filter(function (t) { return !t.is_manual; });
+    var pairs = auto.map(function (t) { return [safeScore(t), Number(t.distance_km) || 0]; });
+    var o = {
+      n: auto.length, manual: list.length - auto.length,
+      km: auto.reduce(function (a, t) { return a + (Number(t.distance_km) || 0); }, 0),
+      score: safeAvg(pairs), rows: auto,
+      over: 0, school: 0, accel: 0, decel: 0, corner: 0, sustained: 0, maxSpeed: 0
+    };
+    auto.forEach(function (t) {
+      o.over += Math.max(0, Number(t.overspeed_count) || 0);
+      o.school += Math.max(0, Number(t.school_zone_overspeed_count) || 0);
+      o.accel += Math.max(0, Number(t.rapid_accel_count) || 0);
+      o.decel += Math.max(0, Number(t.rapid_decel_count) || 0);
+      o.corner += Math.max(0, Number(t.harsh_corner_count) || 0);
+      o.sustained += Math.max(0, Number(t.sustained_overspeed_count) || 0);
+      o.maxSpeed = Math.max(o.maxSpeed, Number(t.max_speed_kmh) || 0);
+    });
+    o.events = o.over + o.school + o.accel + o.decel + o.corner + o.sustained;
+    o.per100 = o.km >= 1 ? o.events / (o.km / 100) : o.events;
+    return o;
+  }
+
+  function viewSafety() {
+    if (!LOADED) return head(scopeTitle('안전운전')) + skeleton();
+    var h = head(scopeTitle('안전운전'),
+      esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)));
+
+    if (!isAll()) {
+      var s = safeOf(TRIPS);
+      if (s.score < 0) {
+        return h + blank('평가할 운행이 없습니다.',
+          '안전운전 점수는 앱이 <b>자동으로 기록한</b> 운행만 봅니다. ' +
+          '수기로 넣은 운행은 GPS 기록이 없어 평가하지 않습니다.', 'gauge');
+      }
+      var g = safeGrade(s.score);
+      h += '<div class="hero fade">' +
+        '<div class="eyebrow"><span class="dot' + (g[2] === 'ok' ? ' ok' : '') + '"></span>' +
+        esc(cycleName(CYC.y, CYC.m)) + ' 안전운전</div>' +
+        '<p class="verdict' + (g[2] === 'ok' ? ' clean' : '') + '"><em>' + n0(s.score) + '점</em> · ' +
+        g[1] + '</p>' +
+        '<div class="facts">' +
+        fact('평가한 운행', n0(s.n) + '<small>건</small>', n0(Math.round(s.km)) + ' km') +
+        fact('위험 운전', n0(s.events) + '<small>회</small>', '100km당 ' + s.per100.toFixed(1) + '회') +
+        fact('최고 속도', n0(s.maxSpeed) + '<small>km/h</small>', '') +
+        fact('수기 운행', n0(s.manual) + '<small>건</small>', '평가 제외') +
+        '</div></div>';
+      h += sect('무엇이 깎였나', null, '', safeBreak(s));
+      h += sect('점수가 낮은 운행', null, '', safeTripTable(s.rows.slice()
+        .sort(function (a, b) { return safeScore(a) - safeScore(b); }).slice(0, 20)));
+      h += safeRuleNote();
+      return h;
+    }
+
+    // ── 전체 ──
+    var byU = {};
+    TRIPS.forEach(function (t) { (byU[t.username] = byU[t.username] || []).push(t); });
+    var rows = Object.keys(byU).map(function (u) {
+      var x = safeOf(byU[u]); x.u = u; return x;
+    }).filter(function (x) { return x.score >= 0; })
+      .sort(function (a, b) { return a.score - b.score; });
+    var dist = {};
+    rows.forEach(function (x) { var g2 = safeGrade(x.score)[1]; dist[g2] = (dist[g2] || 0) + 1; });
+    var all = [];
+    rows.forEach(function (x) { x.rows.forEach(function (t) { all.push([safeScore(t), Number(t.distance_km) || 0]); }); });
+
+    var gAll = safeGrade(safeAvg(all));
+    h += '<div class="hero fade">' +
+      '<div class="eyebrow"><span class="dot' + (gAll[2] === 'ok' ? ' ok' : '') + '"></span>' +
+      esc(cycleName(CYC.y, CYC.m)) + ' 전체 안전운전</div>' +
+      '<p class="verdict' + (gAll[2] === 'ok' ? ' clean' : '') + '">평균 <em>' + n0(safeAvg(all)) +
+      '점</em> · ' + gAll[1] + '</p>' +
+      '<div class="facts">' +
+      fact('평가 대상', n0(rows.length) + '<small>명</small>', '자동 기록이 있는 사람') +
+      fact('주의 이하', n0((dist['주의'] || 0) + (dist['위험'] || 0)) + '<small>명</small>', '70점 미만은 위험') +
+      fact('위험 운전', n0(rows.reduce(function (a, x) { return a + x.events; }, 0)) + '<small>회</small>', '') +
+      fact('등급', Object.keys(dist).map(function (k) { return k + ' ' + dist[k]; }).join(' · '), '') +
+      '</div></div>';
+
+    h += sect('직원별', rows.length + '명', '',
+      '<div class="panel"><div class="scroll tall" data-rows><table><thead><tr>' +
+      '<th>이름</th><th>소속</th><th class="n">점수</th><th>등급</th>' +
+      '<th class="n">운행</th><th class="n">거리</th><th class="n">과속</th>' +
+      '<th class="n">급가속</th><th class="n">급감속</th><th class="n">100km당</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (x) {
+        var u = USERS[x.u] || {}, g3 = safeGrade(x.score);
+        return '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '"' +
+          (x.score < 80 ? ' class="flagged"' : '') + '>' +
+          '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
+          '<td class="dim">' + esc(u.dept || '—') + '</td>' +
+          '<td class="n total">' + n0(x.score) + '</td>' +
+          '<td><span class="st ' + g3[2] + '">' + g3[1] + '</span></td>' +
+          '<td class="n">' + n0(x.n) + '</td>' +
+          '<td class="n">' + n0(Math.round(x.km)) + '</td>' +
+          '<td class="n' + (x.over ? ' unk' : ' dim') + '">' + (x.over || '—') + '</td>' +
+          '<td class="n' + (x.accel ? '' : ' dim') + '">' + (x.accel || '—') + '</td>' +
+          '<td class="n' + (x.decel ? ' unk' : ' dim') + '">' + (x.decel || '—') + '</td>' +
+          '<td class="n dim">' + x.per100.toFixed(1) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>');
+    h += safeRuleNote();
+    return h;
+
+    function fact(k, v, sub, alert) {
+      return '<div class="fact"><div class="k">' + esc(k) + '</div>' +
+        '<div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
+        '<div class="sub">' + esc(sub || '') + '</div></div>';
+    }
+  }
+
+  function safeBreak(s) {
+    var items = [
+      ['과속', s.over, 3], ['어린이보호구역 과속', s.school, 5], ['급가속', s.accel, 3],
+      ['급감속', s.decel, 5], ['급회전', s.corner, 3], ['지속과속', s.sustained, 2]
+    ].filter(function (x) { return x[1] > 0; });
+    if (!items.length) {
+      return '<div class="panel" style="padding:22px 20px;text-align:center;color:var(--ink-3)">' +
+        '위험 운전이 한 번도 없었습니다.</div>';
+    }
+    return '<div class="panel"><table class="kv"><tbody>' +
+      items.map(function (x) {
+        return '<tr><th>' + esc(x[0]) + '</th><td><b>' + n0(x[1]) + '회</b>' +
+          '<span class="dim"> · 1회당 −' + x[2] + '점</span></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function safeTripTable(rows) {
+    if (!rows.length) return blank('평가한 운행이 없습니다.', null, 'list');
+    return '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+      '<th>날짜</th><th class="n">점수</th><th>구간</th><th class="n">과속</th>' +
+      '<th class="n">급가감속</th><th class="n">최고</th></tr></thead><tbody>' +
+      rows.map(function (t) {
+        var sc = safeScore(t), g = safeGrade(sc);
+        return '<tr class="clk" tabindex="0" data-trip="' + esc(t.id) + '">' +
+          '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
+          hm(t.start_time) + (isNightTrip(t.start_time) ? ' 야간' : '') + '</span></td>' +
+          '<td class="n total">' + n0(sc) + ' <span class="st ' + g[2] + '">' + g[1] + '</span></td>' +
+          '<td class="dim">' + esc(dong(t.start_address)) + ' → ' + esc(dong(t.end_address)) + '</td>' +
+          '<td class="n">' + (Number(t.overspeed_count) || 0) + '</td>' +
+          '<td class="n">' + ((Number(t.rapid_accel_count) || 0) + (Number(t.rapid_decel_count) || 0)) + '</td>' +
+          '<td class="n dim">' + n0(t.max_speed_kmh) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
+
+  function safeRuleNote() {
+    return '<section class="sect"><div class="panel" style="padding:18px 20px;font-size:12.5px;' +
+      'line-height:1.95;color:var(--ink-3)">' +
+      '<b style="color:var(--ink-2)">100점에서 깎습니다.</b> ' +
+      '과속 −3 · 어린이보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3 · ' +
+      '지속과속 −2(운행당 −10까지)<br>' +
+      '밤 10시~새벽 6시에 출발한 운행은 깎인 점수를 <b>1.5배</b>로 칩니다.<br>' +
+      '여러 운행의 평균은 <b>주행거리로 가중</b>합니다 — 짧은 운행이 과대 반영되지 않게 합니다.<br>' +
+      '<b style="color:var(--ink-2)">수기로 넣은 운행은 평가하지 않습니다</b> — GPS 기록이 없어 ' +
+      '위반이 0으로 잡히면 점수가 부풀려집니다.<br>' +
+      '앱과 같은 식을 씁니다 — 두 숫자가 다르면 버그입니다.' +
+      '</div></section>';
   }
 
   /* ══════════════════ 통행료 채우기 ══════════════════
@@ -2708,11 +2908,12 @@
     a_close: viewClose, a_trips: viewTrips, a_check: viewCheck, a_evid: viewEvid,
     a_hipass: viewHipass, a_settle: viewSettle,
     people: viewPeople, cars: viewCars, eduadm: viewEduAdm,
-    account: viewAccount, perm: viewPerm, tollfill: viewTollFill
+    account: viewAccount, perm: viewPerm, tollfill: viewTollFill,
+    safety: viewSafety, a_safety: viewSafety
   };
   /** 관리자만 열 수 있는 화면. */
   var ADMIN_VIEWS = ['a_close', 'a_trips', 'a_check', 'a_evid', 'a_hipass', 'a_settle',
-    'people', 'cars', 'eduadm', 'perm'];
+    'people', 'cars', 'eduadm', 'perm', 'a_safety'];
   /** 지금 화면이 전사 범위인가. 화면 안에서 '이름 칸을 보일까' 같은 판단에 쓴다. */
   function isAll() { return ADMIN_VIEWS.indexOf(VIEW) >= 0; }
   /** 같은 화면을 개인/전사로 쓰므로 제목으로 범위를 드러낸다. */
