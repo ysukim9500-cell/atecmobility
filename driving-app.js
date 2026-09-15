@@ -1441,6 +1441,21 @@
   function nameOf(u) { var x = USERS[u] || PEOPLE[u]; return (x && x.name) || u || '—'; }
   function personOf(u) { return USERS[u] || PEOPLE[u] || {}; }
   /** 다시 그린 뒤 같은 요소로 포커스를 돌려준다(셀렉트를 키보드로 넘길 때 필요). */
+  /** 끌어다 놓기 연결. 화면·패널을 다시 그릴 때마다 새로 붙인다. */
+  function bindDrop(dz, onFiles) {
+    if (!dz || dz.__bound) return;
+    dz.__bound = 1;
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e2) { e2.preventDefault(); dz.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e2) { e2.preventDefault(); dz.classList.remove('over'); });
+    });
+    dz.addEventListener('drop', function (e2) {
+      onFiles(e2.dataTransfer && e2.dataTransfer.files);
+    });
+  }
+
   function renderKeepFocus(id) {
     render();
     var el = $(id);
@@ -1874,81 +1889,119 @@
   }
 
   /* ══════════════════ 증빙 올리기 ══════════════════
-     ★ 이미지만 받는다.
-       영수증은 결재 서류에 <img> 로 그대로 박히므로, PDF 를 올리게 두면 그
-       자리가 빈다. PDF 를 브라우저에서 이미지로 바꾸는 길(pdf.js)을 붙여 봤는데
-       워커가 메인 스레드를 잡고 안 풀렸다 — 검증 못 한 1MB 짜리 외부 의존성을
-       결재 서류 경로에 넣지 않는다. 스캐너에서 JPG 로 저장해 올리시면 된다.
-       버킷도 image/jpeg·png·webp 만 받도록 막아 두었다.
-       (금액은 여러 장이어도 첫 장에만 붙인다 — 장 수만큼 곱해지면 안 된다.) */
-  var EVUP = { busy: false, files: [], note: '' };
+     스캐너가 뱉는 것은 대개 PDF 인데, 영수증은 결재 서류에 <img> 로 그대로
+     박히므로 PDF 를 그냥 저장하면 그 자리가 빈다. 그래서 **올리는 시점에
+     장마다 JPEG 로 바꿔서** 저장한다(vendor/pdf.min.js · Mozilla · Apache-2.0).
+
+     ★ pdf.js 워커는 반드시 같은 출처여야 한다.
+       cdnjs 에서 바로 부르면 브라우저가 교차출처 Worker 를 막고 메인 스레드
+       폴백으로 넘어간다. vendor/ 에 직접 두는 이유다.
+     ★ 탭을 다른 데로 옮기면 렌더가 멈춘다(브라우저가 숨은 탭의 rAF 를 멈춘다).
+       돌아오면 이어서 돈다 — 그래서 진행 상황을 글로 보여 준다. */
+  var EVUP = { busy: false, items: [] };
 
   function openEvUpload() {
     if (cycleApproved(myName())) { toast('결재가 끝난 주기에는 올릴 수 없습니다.', true); return; }
-    EVUP = { busy: false, files: [], note: '' };
+    EVUP.items.forEach(function (it) { if (it.url) URL.revokeObjectURL(it.url); });
+    EVUP = { busy: false, items: [] };
     var r = cycleRange(CYC.y, CYC.m);
     var my = personOf(myName());
     var cars = myPlates();
     $('pTitle').textContent = '스캔본 올리기';
     $('pSub').textContent = cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
     $('pBody').innerHTML =
-      '<div class="form">' +
-      evRow('구분', '<select class="inp" id="evCat" style="max-width:200px">' +
-        ['주유', '주차', '통행료', '계기판'].map(function (c) {
-          return '<option value="' + c + '">' + c + '</option>';
-        }).join('') + '</select>') +
-      evRow('날짜', '<input class="inp" type="date" id="evDate" style="max-width:200px" value="' +
-        ymd(Math.min(Date.now(), r.hi - 1)) + '" min="' + ymd(r.lo) + '" max="' + ymd(r.hi - 1) + '">',
-        '이번 마감주기 안에서만 올릴 수 있습니다') +
-      evRow('금액', '<input class="inp num" id="evAmt" inputmode="numeric" placeholder="0">',
-        '계기판 사진은 0원으로 두셔도 됩니다') +
-      evRow('차량', cars.length
+      '<div class="drop" id="evDrop" style="margin:0 0 14px">' +
+      '<div class="dico">' + ic('receipt', 22) + '</div>' +
+      '<div class="dt">영수증을 여기에 끌어다 놓으세요</div>' +
+      '<div class="dd">사진(JPG · PNG · WebP)과 PDF · 여러 장도 됩니다<br>' +
+      'PDF 는 장마다 사진으로 바꿔서 올립니다 — 결재 서류에 그대로 들어가기 때문입니다</div>' +
+      '<label class="btn" style="margin-top:14px">파일 고르기' +
+      '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple hidden></label>' +
+      '</div>' +
+      '<div class="form" style="margin-top:0"><div class="frow">' +
+      '<label class="flab">차량</label><div class="fbody">' +
+      (cars.length
         ? '<select class="inp" id="evCar" style="max-width:200px">' +
-          cars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') +
-          '</select>'
+          cars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') + '</select>'
         : '<input class="inp" id="evCar" style="max-width:200px" placeholder="예) 12가3456" value="' +
           esc(my.plate_no || '') + '">') +
-      evRow('메모', '<input class="inp" id="evMemo" maxlength="80" placeholder="선택">') +
-      evRow('파일', '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp">',
-        'JPG · PNG · WebP. <b>PDF 는 아직 안 됩니다</b> — 영수증이 결재 서류에 ' +
-        '사진으로 그대로 들어가기 때문입니다. 스캐너에서 <b>JPG 로 저장</b>해 주세요.') +
-      '</div><div id="evNote" class="fhint" style="margin-top:12px"></div>';
+      '<div class="fhint">올리는 것 전부에 같이 붙습니다</div></div></div></div>' +
+      '<div id="evList"></div>' +
+      '<div id="evNote" class="fhint" style="margin-top:10px"></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="btnEvGo">올리기</button>';
+      '<button class="btn" id="evFill" hidden>첫 줄 값을 아래로</button>' +
+      '<button class="btn pri" id="btnEvGo" disabled>올리기</button>';
     $('panel').classList.add('open');
-
-    function evRow(label, body, hint) {
-      return '<div class="frow"><label class="flab">' + label + '</label><div class="fbody">' + body +
-        (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
-    }
+    EVUP.lo = r.lo; EVUP.hi = r.hi;
+    bindDrop($('evDrop'), evAddFiles);
   }
 
-  /** 내가 이번 주기에 쓴 차량 번호. 없으면 프로필 값. */
+  /** 내가 이번 주기에 쓴 차량 번호. 없으면 등록 차량. */
   function myPlates() {
     var mine = myName(), seen = {};
-    ALL_TRIPS.forEach(function (t) {
-      if (t.username === mine && t.plate_no) seen[t.plate_no] = 1;
-    });
-    VEHICLES.forEach(function (v) {
-      if (v.username === mine && v.plate_no) seen[v.plate_no] = 1;
-    });
+    ALL_TRIPS.forEach(function (t) { if (t.username === mine && t.plate_no) seen[t.plate_no] = 1; });
+    VEHICLES.forEach(function (v) { if (v.username === mine && v.plate_no) seen[v.plate_no] = 1; });
     return Object.keys(seen).sort();
   }
 
   function evNote(msg) { var el = $('evNote'); if (el) el.innerHTML = msg; }
 
-  /** 파일 하나 → JPEG Blob 목록(지금은 늘 한 장). 너무 크면 줄여서 올린다. */
-  function toJpegs(file) {
-    if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
-      return Promise.reject(new Error('pdf'));
-    }
-    // 버킷 제한 12MB. 인쇄에는 가로 2000px 이면 충분하다.
-    return shrinkImage(file).then(function (b) { return [b]; });
+  /** pdf.js 를 쓸 때만 불러온다. 워커는 같은 출처여야 한다. */
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (window.__pdfjs) return window.__pdfjs;
+    window.__pdfjs = new Promise(function (ok, no) {
+      var sc = document.createElement('script');
+      sc.src = 'vendor/pdf.min.js';
+      sc.onload = function () {
+        if (!window.pdfjsLib) { no(new Error('pdfjs')); return; }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        ok(window.pdfjsLib);
+      };
+      sc.onerror = function () { window.__pdfjs = null; no(new Error('pdfjs')); };
+      document.head.appendChild(sc);
+    });
+    return window.__pdfjs;
   }
 
   function canvasToJpeg(cv) {
     return new Promise(function (ok) { cv.toBlob(function (b) { ok(b); }, 'image/jpeg', 0.88); });
+  }
+
+  /** 파일 하나 → JPEG Blob 목록. PDF 는 장마다, 사진은 한 장(크면 줄여서). */
+  function fileToJpegs(file, onStep) {
+    var isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
+    if (!isPdf) return shrinkImage(file).then(function (b) { return [b]; });
+    return loadPdfJs().then(function (pdfjs) {
+      return file.arrayBuffer().then(function (buf) {
+        return pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+      });
+    }).then(function (doc) {
+      if (doc.numPages > 30) throw new Error('toomany');
+      var out = [], chain = Promise.resolve();
+      for (var i = 1; i <= doc.numPages; i++) {
+        (function (n) {
+          chain = chain.then(function () {
+            if (onStep) onStep(n, doc.numPages);
+            return doc.getPage(n).then(function (page) {
+              // 영수증 글씨가 읽혀야 하므로 가로 1600px 쯤으로 맞춘다.
+              var v1 = page.getViewport({ scale: 1 });
+              var sc = Math.min(3, Math.max(1, 1600 / v1.width));
+              var vp = page.getViewport({ scale: sc });
+              var cv = document.createElement('canvas');
+              cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+              var cx = cv.getContext('2d');
+              cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+              return page.render({ canvasContext: cx, viewport: vp }).promise
+                .then(function () { return canvasToJpeg(cv); })
+                .then(function (b) { out.push(b); });
+            });
+          });
+        })(i);
+      }
+      return chain.then(function () { return out; });
+    });
   }
 
   function shrinkImage(file) {
@@ -1972,82 +2025,162 @@
     });
   }
 
-  function runEvUpload() {
-    if (EVUP.busy) return;
-    var f = ($('evFile') || {}).files;
-    if (!f || !f.length) { toast('올릴 파일을 골라 주세요.', true); return; }
-    var file = f[0];
-    if (file.size > 30e6) { toast('파일이 너무 큽니다(30MB 넘음).', true); return; }
-
-    var cat = ($('evCat') || {}).value || '주유';
-    var dateStr = ($('evDate') || {}).value || '';
-    var amt = Math.round(Number(String(($('evAmt') || {}).value || '').replace(/[^\d]/g, '')) || 0);
-    var car = String(($('evCar') || {}).value || '').trim();
-    var memo = String(($('evMemo') || {}).value || '').trim();
-
-    var r = cycleRange(CYC.y, CYC.m);
-    // 날짜 칸은 KST 기준이다. 앱이 넣는 값과 같은 자정 밀리초로 맞춘다.
-    var ms = Date.parse(dateStr + 'T00:00:00+09:00');
-    if (!isFinite(ms)) { toast('날짜를 골라 주세요.', true); return; }
-    if (ms < r.lo || ms >= r.hi) { toast('이번 마감주기 안의 날짜여야 합니다.', true); return; }
-    if (amt < 0 || amt > 5000000) { toast('금액이 범위를 벗어났습니다.', true); return; }
+  /** 고른 파일들을 줄로 만든다. PDF 는 장마다 한 줄. */
+  function evAddFiles(files) {
+    var list = Array.prototype.slice.call(files || []);
+    if (!list.length || EVUP.busy) return;
+    var tooBig = list.filter(function (f) { return f.size > 30e6; });
+    if (tooBig.length) { evNote('<b style="color:var(--red)">30MB 가 넘는 파일이 있습니다: ' +
+      esc(tooBig[0].name) + '</b>'); return; }
 
     EVUP.busy = true;
-    var btn = $('btnEvGo'); if (btn) { btn.disabled = true; btn.textContent = '읽는 중…'; }
-    evNote('파일을 읽고 있습니다…');
-
-    toJpegs(file).then(function (blobs) {
-      if (!blobs.length) throw new Error('empty');
-      evNote(blobs.length > 1 ? blobs.length + '장을 올립니다…' : '올리는 중…');
-      if (btn) btn.textContent = '올리는 중…';
-      var mine = myName(), done = 0;
-      // 한 장씩 차례로. 한꺼번에 던지면 실패한 것이 어느 장인지 알 수 없다.
-      return blobs.reduce(function (chain, blob, i) {
-        return chain.then(function () {
-          var key = Date.now() + i;                 // client_key(bigint) · 경로에도 쓴다
-          var path = mine + '/' + key + '.jpg';
-          return apiRetry('/storage/v1/object/evidence/' + path, {
-            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob
-          }).then(function (up) {
-            if (!up.ok) return up.text().then(function (t) {
-              throw new Error('파일 ' + (i + 1) + '장: ' + (t || up.status));
-            });
-            return apiRetry('/rest/v1/evidences', {
-              method: 'POST',
-              headers: { Prefer: 'return=minimal' },
-              body: JSON.stringify({
-                username: mine, client_key: key, vehicle_plate: car,
-                date_millis: ms, category: cat,
-                // ★ 금액은 첫 장에만. 장마다 넣으면 장 수만큼 부풀어 오른다.
-                amount: i === 0 ? amt : 0,
-                memo: blobs.length > 1 ? (memo ? memo + ' ' : '') + '(' + (i + 1) + '/' + blobs.length + '쪽)' : memo,
-                captured_at: 0, photo_path: path
-              })
-            }).then(function (ins) {
-              if (!ins.ok) return ins.text().then(function (t) {
-                throw new Error('기록 ' + (i + 1) + '장: ' + (t || ins.status));
-              });
-              done++;
-              evNote(done + ' / ' + blobs.length + '장 올렸습니다.');
+    var today = ymd(Math.min(Date.now(), EVUP.hi - 1));
+    var chain = Promise.resolve();
+    list.forEach(function (file) {
+      chain = chain.then(function () {
+        evNote('<b>' + esc(file.name) + '</b> 읽는 중…');
+        return fileToJpegs(file, function (n, total) {
+          evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
+            (total > 3 ? ' <span class="dim">(다른 탭으로 가시면 멈춥니다)</span>' : ''));
+        }).then(function (blobs) {
+          blobs.forEach(function (b, i) {
+            EVUP.items.push({
+              blob: b, url: URL.createObjectURL(b),
+              name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : ''),
+              cat: '주유', date: today, amt: '', memo: ''
             });
           });
         });
-      }, Promise.resolve()).then(function () { return blobs.length; });
-    }).then(function (n) {
-      EVUP.busy = false;
-      closePanel();
-      toastOk(n > 1 ? n + '장을 올렸습니다.' : '올렸습니다.',
-        n > 1 ? '금액은 첫 장에만 넣었습니다 — 합계가 장 수만큼 늘지 않게 합니다.' : null);
-      AUDIT = null;
-      loadAll();
+      });
+    });
+    chain.then(function () {
+      EVUP.busy = false; evNote(''); paintEvList();
     }).catch(function (e) {
-      EVUP.busy = false;
-      if (btn) { btn.disabled = false; btn.textContent = '올리기'; }
+      EVUP.busy = false; paintEvList();
       var m = String((e && e.message) || '');
       evNote('<b style="color:var(--red)">' + esc(
-        m === 'pdf' ? 'PDF 는 아직 올릴 수 없습니다. 스캐너에서 JPG 로 저장해 올려 주세요.'
-          : m === 'image' ? '이미지를 읽지 못했습니다. 다른 파일로 해 보세요.'
-            : m || '올리지 못했습니다.') + '</b>');
+        m === 'pdfjs' ? 'PDF 를 읽는 도구를 불러오지 못했습니다. 사진으로 올려 주세요.'
+          : m === 'toomany' ? 'PDF 가 30장을 넘습니다. 나눠서 올려 주세요.'
+            : m === 'image' ? '이미지를 읽지 못했습니다. 다른 파일로 해 보세요.'
+              : '읽지 못했습니다: ' + m) + '</b>');
+    });
+  }
+
+  /** 지금 표에 쳐 넣은 값을 EVUP.items 에 담는다(다시 그리기 전에 부른다). */
+  function evRead() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-evrow]'), function (tr) {
+      var i = +tr.dataset.evrow, it = EVUP.items[i];
+      if (!it) return;
+      var g = function (sel) { var el = tr.querySelector(sel); return el ? el.value : ''; };
+      it.cat = g('[data-evcat]') || it.cat;
+      it.date = g('[data-evdate]') || it.date;
+      it.amt = String(g('[data-evamt]') || '').replace(/[^\d]/g, '');
+      it.memo = g('[data-evmemo]') || '';
+    });
+  }
+
+  function paintEvList() {
+    var box = $('evList'); if (!box) return;
+    var n = EVUP.items.length;
+    if (!n) {
+      box.innerHTML = '';
+      var b0 = $('btnEvGo'); if (b0) { b0.disabled = true; b0.textContent = '올리기'; }
+      var f0 = $('evFill'); if (f0) f0.hidden = true;
+      return;
+    }
+    box.innerHTML = '<div class="panel"><div class="scroll" data-rows style="max-height:46vh">' +
+      '<table><thead><tr><th style="width:56px"></th><th>구분</th><th>날짜</th>' +
+      '<th class="n">금액</th><th>메모</th><th></th></tr></thead><tbody>' +
+      EVUP.items.map(function (it, i) {
+        return '<tr data-evrow="' + i + '">' +
+          '<td><img src="' + it.url + '" alt="" style="width:44px;height:44px;object-fit:cover;' +
+          'border-radius:var(--r-sm);border:1px solid var(--line);display:block"></td>' +
+          '<td><select class="inp" data-evcat style="width:104px">' +
+          ['주유', '주차', '통행료', '계기판'].map(function (c) {
+            return '<option value="' + c + '"' + (it.cat === c ? ' selected' : '') + '>' + c + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><input class="inp" type="date" data-evdate style="width:148px" value="' + esc(it.date) +
+          '" min="' + ymd(EVUP.lo) + '" max="' + ymd(EVUP.hi - 1) + '"></td>' +
+          '<td class="n"><input class="inp num" data-evamt inputmode="numeric" style="width:100px" ' +
+          'placeholder="0" value="' + esc(it.amt) + '"></td>' +
+          '<td><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
+          esc(it.memo) + '"></td>' +
+          '<td class="n"><button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
+      esc(EVUP.items.map(function (x) { return x.name; }).slice(0, 3).join(' · ')) +
+      (n > 3 ? ' 외 ' + (n - 3) + '장' : '') + '</div></div>';
+    var b = $('btnEvGo'); if (b) { b.disabled = false; b.textContent = n0(n) + '장 올리기'; }
+    var f = $('evFill'); if (f) f.hidden = n < 2;
+  }
+
+  function runEvUpload() {
+    if (EVUP.busy) return;
+    if (!EVUP.items.length) { toast('올릴 파일을 골라 주세요.', true); return; }
+    evRead();
+    var car = String(($('evCar') || {}).value || '').trim();
+    var mine = myName();
+
+    // 다 보내기 전에 값을 먼저 본다 — 절반 올리고 튕기면 수습이 어렵다.
+    for (var i = 0; i < EVUP.items.length; i++) {
+      var it = EVUP.items[i];
+      var ms = Date.parse(it.date + 'T00:00:00+09:00');
+      if (!isFinite(ms)) { toast((i + 1) + '번째 줄의 날짜를 골라 주세요.', true); return; }
+      if (ms < EVUP.lo || ms >= EVUP.hi) {
+        toast((i + 1) + '번째 줄이 이번 마감주기 밖입니다.', true); return;
+      }
+      var amt = Number(it.amt || 0);
+      if (!isFinite(amt) || amt < 0 || amt > 5000000) {
+        toast((i + 1) + '번째 줄의 금액이 범위를 벗어났습니다.', true); return;
+      }
+      it.ms = ms; it.amtN = Math.round(amt);
+    }
+
+    EVUP.busy = true;
+    var btn = $('btnEvGo'); if (btn) { btn.disabled = true; btn.textContent = '올리는 중…'; }
+    var total = EVUP.items.length, done = 0;
+
+    EVUP.items.reduce(function (chain, it, i) {
+      return chain.then(function () {
+        evNote((done + 1) + ' / ' + total + '장 올리는 중…');
+        var key = Date.now() + i;                  // client_key(bigint) · 경로에도 쓴다
+        var path = mine + '/' + key + '.jpg';
+        return apiRetry('/storage/v1/object/evidence/' + path, {
+          method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: it.blob
+        }).then(function (up) {
+          if (!up.ok) return up.text().then(function (t) {
+            throw new Error((i + 1) + '번째 파일: ' + (t || up.status));
+          });
+          return apiRetry('/rest/v1/evidences', {
+            method: 'POST', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              username: mine, client_key: key, vehicle_plate: car,
+              date_millis: it.ms, category: it.cat, amount: it.amtN,
+              memo: it.memo, captured_at: 0, photo_path: path
+            })
+          }).then(function (ins) {
+            if (!ins.ok) return ins.text().then(function (t) {
+              throw new Error((i + 1) + '번째 기록: ' + (t || ins.status));
+            });
+            done++;
+          });
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      EVUP.busy = false;
+      EVUP.items.forEach(function (x) { if (x.url) URL.revokeObjectURL(x.url); });
+      EVUP.items = [];
+      closePanel();
+      toastOk(n0(done) + '장을 올렸습니다.');
+      AUDIT = null; loadAll();
+    }).catch(function (e) {
+      EVUP.busy = false;
+      if (btn) { btn.disabled = false; btn.textContent = n0(total - done) + '장 올리기'; }
+      // 이미 올라간 것은 지운다 — 어디까지 됐는지 모른 채로 다시 누르면 겹친다.
+      EVUP.items.splice(0, done);
+      paintEvList();
+      evNote('<b style="color:var(--red)">' + esc(done ? done + '장까지 올리고 멈췄습니다 — ' +
+        (e && e.message) : '올리지 못했습니다: ' + (e && e.message)) + '</b>');
     });
   }
 
@@ -2078,14 +2211,13 @@
         if (!e.photo_path) return null;
         return apiRetry('/storage/v1/object/evidence/' + e.photo_path, { method: 'DELETE' });
       })
-      .then(function () {
-        closePanel(); toastOk('지웠습니다.'); AUDIT = null; loadAll();
-      })
+      .then(function () { closePanel(); toastOk('지웠습니다.'); AUDIT = null; loadAll(); })
       .catch(function () {
         if (btn) { btn.disabled = false; btn.textContent = '지우기'; }
         toast('지우지 못했습니다.', true);
       });
   }
+
 
   /* ══════════════════ 안전교육 ══════════════════ */
   function viewEdu() {
@@ -3499,16 +3631,7 @@
       FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; render();
     });
     // 드롭존은 화면을 다시 그릴 때마다 새로 생기므로 그때마다 연결한다.
-    var dz = $('hpDrop');
-    if (dz) {
-      ['dragenter', 'dragover'].forEach(function (ev) {
-        dz.addEventListener(ev, function (e2) { e2.preventDefault(); dz.classList.add('over'); });
-      });
-      ['dragleave', 'drop'].forEach(function (ev) {
-        dz.addEventListener(ev, function (e2) { e2.preventDefault(); dz.classList.remove('over'); });
-      });
-      dz.addEventListener('drop', function (e2) { hpFiles(e2.dataTransfer && e2.dataTransfer.files); });
-    }
+    bindDrop($('hpDrop'), hpFiles);
     // 행이 많은 표만 자체 스크롤 + 머리글 고정. 짧은 표까지 가두면 답답하다.
     Array.prototype.forEach.call($('inner').querySelectorAll('.scroll[data-rows]'), function (w) {
       var n = w.querySelectorAll('tbody tr').length;
@@ -3598,6 +3721,27 @@
     }
     if (e.target.closest('#btnEvUp')) { openEvUpload(); return; }
     if (e.target.closest('#btnEvGo')) { runEvUpload(); return; }
+    if ((el = e.target.closest('[data-evrm]'))) {
+      evRead();                                   // 다시 그리기 전에 쳐 넣은 값을 지킨다
+      var rm = EVUP.items.splice(+el.dataset.evrm, 1)[0];
+      if (rm && rm.url) URL.revokeObjectURL(rm.url);
+      paintEvList(); return;
+    }
+    if (e.target.closest('#evFill')) {
+      // 스캔 10장이면 구분·날짜가 대개 같다. 첫 줄 값을 아래로 내려 준다.
+      evRead();
+      var f0 = EVUP.items[0];
+      if (f0) {
+        // ★ 금액은 복사하지 않는다. 영수증마다 다른데 복사해 두면 못 고친 채로
+        //   올라가 그 금액이 그대로 정산에 들어간다. 구분·날짜만 내린다.
+        EVUP.items.forEach(function (x, i) {
+          if (i) { x.cat = f0.cat; x.date = f0.date; }
+        });
+        paintEvList();
+        toast('첫 줄의 구분·날짜를 아래로 내렸습니다.');
+      }
+      return;
+    }
     if ((el = e.target.closest('[data-evdel]'))) { evDelete(el.dataset.evdel); return; }
     if ((el = e.target.closest('#btnEvDelGo'))) { runEvDelete(el.dataset.id); return; }
     if (e.target.closest('#btnCsv')) { downloadCsv(); return; }
@@ -3690,6 +3834,7 @@
     if (e.target.id === 'selWho') { FILT.who = e.target.value; renderKeepFocus('selWho'); return; }
     if (e.target.id === 'selCar') { FILT.car = e.target.value; renderKeepFocus('selCar'); return; }
     if (e.target.id === 'hpFile') { hpFiles(e.target.files); return; }
+    if (e.target.id === 'evFile') { evAddFiles(e.target.files); e.target.value = ''; return; }
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
       var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
       g.plate = e.target.value || null;
