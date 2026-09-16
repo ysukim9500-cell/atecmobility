@@ -62,7 +62,15 @@
     opt = opt || {};
     var h = opt.headers || {};
     h.apikey = KEY;
-    h.Authorization = 'Bearer ' + (ss(K_AT) || KEY);
+    // ★ 토큰이 없으면 절대 anon 키로 내려가지 않는다. anon 은 앱 경로라 정책이
+    //   통째로 열려 있어, 그리로 쓰면 잠금·본인 제한이 전부 사라진 채 '성공' 한다.
+    //   401 을 돌려주면 apiRetry 가 refresh 를 시도하고, 그것도 안 되면 그대로 실패한다.
+    var at = ss(K_AT);
+    if (!at) {
+      return Promise.resolve(new Response('{"error":"로그인이 풀렸습니다. 다시 로그인해 주세요."}',
+        { status: 401, headers: { 'Content-Type': 'application/json' } }));
+    }
+    h.Authorization = 'Bearer ' + at;
     if (opt.body && !h['Content-Type']) h['Content-Type'] = 'application/json';
     opt.headers = h;
     return fetch(SB + path, opt);
@@ -338,7 +346,8 @@
     //    하이패스는 옛 주기 운행 객체를 가리킨 채 남아 반영 결과가 안 보였다.)
     FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all';
     HP = { groups: [], batch: '', busy: false, note: '' };
-    FILLS = {};                            // 주기가 바뀌면 구간 키가 의미를 잃는다
+    // FILLS 는 여기서 안 버린다. loadAll 은 저장·증빙 올리기 뒤에도 돌기 때문에,
+    // 여기서 비우면 증빙 한 장 올리고 온 사이에 30칸이 사라진다. 주기 변경 핸들러가 비운다.
     var r = cycleRange(CYC.y, CYC.m);
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
@@ -479,7 +488,7 @@
       { k: 'rate', sev: 'bad', ico: 'won', t: '유류단가 미등록', rows: [], n: missKeys.length,
         d: missKeys.length ? missKeys.join(' · ') + ' 단가가 없어 유류비가 0원으로 계산됩니다.' : '없습니다.' },
       { k: 'unk', sev: 'warn', ico: 'ticket', t: '통행료 미확정', rows: unk, n: unk.length,
-        d: '정산에서 0원으로 잡혀 회사가 덜 내주게 됩니다. 하이패스 대조나 직접 입력으로 채워 주세요.' },
+        d: '정산에서 0원으로 잡혀 회사가 덜 내주게 됩니다. 「통행료 채우기」에서 구간별로 한 번에 정리하실 수 있습니다.' },
       { k: 'overlap', sev: 'warn', ico: 'list', t: '시간이 겹치는 운행', rows: overlap, n: overlap.length,
         d: '같은 사람이 같은 시간에 두 건을 기록했습니다.' },
       { k: 'zero', sev: 'warn', ico: 'list', t: '0km 운행', rows: zero, n: zero.length,
@@ -765,7 +774,7 @@
       '여러 운행의 평균은 <b>주행거리로 가중</b>합니다 — 짧은 운행이 과대 반영되지 않게 합니다.<br>' +
       '<b style="color:var(--ink-2)">수기로 넣은 운행은 평가하지 않습니다</b> — GPS 기록이 없어 ' +
       '위반이 0으로 잡히면 점수가 부풀려집니다.<br>' +
-      '앱과 같은 식을 씁니다 — 두 숫자가 다르면 버그입니다.' +
+      '앱의 안전운전 점수와 같은 식으로 계산합니다. 앱과 다르게 나오면 알려 주세요.' +
       '</div></section>';
   }
 
@@ -789,9 +798,9 @@
     // ★ 결재가 끝난 주기는 서버가 통행료도 막는다. 채우게 두면 전부 채운 뒤
     //   저장에서야 '결재가 끝난 기간' 으로 다 튕긴다 — 먼저 말한다.
     if (rows.length && cycleApproved(mine)) {
-      return h + lockedNote('통행료를 채울 수 없습니다',
-        n0(rows.length) + '건이 비어 있지만 <b>' + esc(cycleName(CYC.y, CYC.m)) +
-        ' 결재가 이미 끝나</b>, 이 주기의 통행료는 바꿀 수 없습니다.');
+      return h + lockedNote(cycleName(CYC.y, CYC.m) + ' 결재가 끝났습니다',
+        '비어 있는 ' + n0(rows.length) + '건은 정산에 0원으로 들어갔습니다. ' +
+        '결재가 끝난 주기의 통행료는 바꿀 수 없습니다.');
     }
 
     if (!rows.length) {
@@ -833,7 +842,8 @@
       'line-height:1.9;color:var(--ink-3)">' +
       '같은 구간끼리 묶었습니다. <b style="color:var(--ink-2)">시내 운행처럼 요금소를 안 지난 구간은 ' +
       '「없음」</b>을 누르시면 그 구간 전체가 한 번에 정리됩니다.<br>' +
-      '전에 정하신 금액이 있으면 회색으로 적어 두었습니다 — 눌러서 그대로 쓰실 수 있습니다.<br>' +
+      '전에 정하신 금액이 있으면 「지난번 N원」 버튼이 붙어 있습니다 — 누르면 그대로 들어갑니다.<br>' +
+      '잘못 눌렀으면 칸을 비우세요. 비운 줄은 \'아직 안 정함\' 으로 돌아갑니다.<br>' +
       '<b style="color:var(--ink-2)">업무용 운행만</b> 보입니다. 출퇴근·비업무용은 정산과 제출 서류에 ' +
       '들어가지 않아 채우실 필요가 없습니다.' +
       '</div></section>';
@@ -867,13 +877,13 @@
           '<td class="n lead">' + n0(x.rows.length) + '</td>' +
           '<td class="dim">' + esc(days) + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
-          '<button class="btn sm" data-tffree="' + i + '">없음</button> ' +
+          '<button class="btn sm" data-tffree="' + i + '" aria-label="' + esc(k) + ' 통행료 없음">없음</button> ' +
           '<input class="inp num" data-tfamt="' + i + '" inputmode="numeric" style="width:92px" ' +
-          'placeholder="' + (x.hint ? n0(x.hint) : '원') + '" value="' +
+          'placeholder="원" aria-label="' + esc(k) + ' 통행료 금액" value="' +
           // 정한 줄은 0원도 숫자로 보여 준다 — 어디까지 했는지 눈에 보이게.
           (v == null ? '' : n0(v)) + '">' +
           (x.hint ? ' <button class="btn sm" data-tfhint="' + i + '" ' +
-            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">전에 ' +
+            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">지난번 ' +
             n0(x.hint) + '원</button>' : '') +
           '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
@@ -952,7 +962,7 @@
       '</div></div></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="btnAllFreeGo">' + n0(left) + '건 없음으로</button>';
+      '<button class="btn pri" id="btnAllFreeGo">' + n0(left) + '건 없음으로 표시</button>';
     $('panel').classList.add('open');
   }
 
@@ -986,7 +996,13 @@
             : '한 건도 저장되지 않았습니다.', true);
           return;                        // 친 값은 그대로 둔다
         }
-        FILLS = {};
+        // 건너뛴 운행이 있는 구간의 값은 남긴다 — 부분 성공 뒤 다시 저장할 수 있게.
+        var skipIds = {};
+        skipped.forEach(function (x) { skipIds[x.id] = 1; });
+        TF_GROUPS.forEach(function (x) {
+          if (FILLS[x.key] == null) return;
+          if (!x.rows.some(function (t) { return skipIds[t.id]; })) delete FILLS[x.key];
+        });
         AUDIT = null;
         loadAll();                       // 서버 값을 다시 받아 화면을 맞춘다
         toastOk(n0(applied) + '건 저장했습니다.',
@@ -1024,7 +1040,9 @@
 
     function kv(k, v) { return '<tr><th>' + k + '</th><td>' + v + '</td></tr>'; }
     function frow(label, body, hint) {
-      return '<div class="frow"><label class="flab">' + label + '</label><div class="fbody">' + body +
+      var m = /id="([^"]+)"/.exec(body);     // 라벨을 칸에 잇는다 — 보조기기가 어느 칸인지 읽는다
+      return '<div class="frow"><label class="flab"' + (m ? ' for="' + m[1] + '"' : '') + '>' + label +
+        '</label><div class="fbody">' + body +
         (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
     }
   }
@@ -1494,7 +1512,9 @@
       '<div style="color:var(--ok);margin-bottom:10px">' + ic('check', 22) + '</div>' +
       '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(title) + '</div>' +
       '<div class="dim" style="font-size:13px;line-height:1.8;max-width:430px;margin:0 auto">' +
-      body + '</div></div>';
+      body + '</div>' +
+      '<div style="margin-top:16px"><button class="btn sm" data-v="close">마감 현황에서 인쇄용 PDF 받기 ' +
+      ic('chev', 13) + '</button></div></div>';
   }
 
   /** 지금 보고 있는 마감주기가 그 사람 기준으로 결재 완료됐는가. */
@@ -1541,11 +1561,12 @@
 
     // 한 문장의 판정 — 숫자 네 개보다 이게 먼저다
     var verdict, clean = '';
-    if (badN) {
-      verdict = '손봐야 할 기록이 <em>' + n0(badN) + '건</em> 있습니다';
-    } else if (T.unk && !isAll() && cycleApproved(myName())) {
-      // 결재가 끝났으면 채울 수도 없다 — 채우라고 시키지 않는다.
+    var approved = !isAll() && cycleApproved(myName());
+    if (approved) {
+      // 결재가 끝났으면 고칠 수도 채울 수도 없다 — 손보라고 시키지 않는다.
       verdict = '<em>결재가 끝났습니다</em>'; clean = ' clean';
+    } else if (badN) {
+      verdict = '손봐야 할 기록이 <em>' + n0(badN) + '건</em> 있습니다';
     } else if (T.unk) {
       verdict = '통행료 <em>' + n0(T.unk) + '건</em>만 채우면 끝납니다';
     } else if (!T.n) {
@@ -1844,15 +1865,16 @@
     // 스캐너로 뜬 영수증을 올리는 자리. 결재가 끝난 주기는 서버가 막으므로
     // 버튼도 두지 않는다 — 올리게 해 놓고 저장에서 튕기면 안 된다.
     var upBtn = locked ? '' :
-      '<button class="btn pri sm" id="btnEvUp">' + ic('receipt', 13) + '스캔본 올리기</button>';
+      '<button class="btn pri sm" id="btnEvUp">' + ic('receipt', 13) + '영수증 올리기</button>';
 
     if (!rows.length) {
       return h + (locked
         ? blank('등록된 영수증이 없습니다.', esc(cycleName(CYC.y, CYC.m)) + ' 결재가 끝나 더 올릴 수 없습니다.', 'receipt')
-        : blank('등록된 영수증이 없습니다.',
-            '앱에서 올리시거나, 아래 버튼으로 스캔본을 올리시면 여기에 모입니다.', 'receipt') +
-          '<div style="text-align:center;margin-top:-10px;padding-bottom:18px">' +
-          '<button class="btn pri" id="btnEvUp">' + ic('receipt', 14) + '스캔본 올리기</button></div>');
+        : '<div class="panel"><div class="blank"><div class="ico">' + ic('receipt', 21) + '</div>' +
+          '<div class="t">등록된 영수증이 없습니다.</div>' +
+          '<div class="d">앱에서 올리시거나 여기서 사진·PDF 를 올리시면 여기에 모입니다.</div>' +
+          '<div style="margin-top:16px"><button class="btn pri" id="btnEvUp">' + ic('receipt', 14) +
+          '영수증 올리기</button></div></div></div>');
     }
 
     var sum = rows.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
@@ -1865,6 +1887,8 @@
         return '<div class="fact"><div class="k">' + esc(c) + '</div><div class="v">' + won(byCat[c]) + '</div></div>';
       }).join('') + '</div></div>';
 
+    if (locked) h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' + esc(cycleName(CYC.y, CYC.m)) +
+      ' 결재가 끝났습니다.</b> 영수증을 더 올리거나 지울 수 없습니다.</span></div>';
     h += sect('내역', rows.length + '건', upBtn,
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
       '<th>날짜</th>' + (isAll() ? '<th>이름</th>' : '') + '<th>구분</th><th>차량</th>' +
@@ -1907,16 +1931,16 @@
     var r = cycleRange(CYC.y, CYC.m);
     var my = personOf(myName());
     var cars = myPlates();
-    $('pTitle').textContent = '스캔본 올리기';
+    $('pTitle').textContent = '영수증 올리기';
     $('pSub').textContent = cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
     $('pBody').innerHTML =
       '<div class="drop" id="evDrop" style="margin:0 0 14px">' +
       '<div class="dico">' + ic('receipt', 22) + '</div>' +
-      '<div class="dt">영수증을 여기에 끌어다 놓으세요</div>' +
-      '<div class="dd">사진(JPG · PNG · WebP)과 PDF · 여러 장도 됩니다<br>' +
+      '<div class="dt">영수증 사진이나 PDF 를 올려 주세요</div>' +
+      '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
       'PDF 는 장마다 사진으로 바꿔서 올립니다 — 결재 서류에 그대로 들어가기 때문입니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
-      '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple hidden></label>' +
+      '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>' +
       '<div class="form" style="margin-top:0"><div class="frow">' +
       '<label class="flab">차량</label><div class="fbody">' +
@@ -1930,7 +1954,7 @@
       '<div id="evNote" class="fhint" style="margin-top:10px"></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
-      '<button class="btn" id="evFill" hidden>첫 줄 값을 아래로</button>' +
+      '<button class="btn" id="evFill" hidden>첫 줄 구분·날짜를 아래로</button>' +
       '<button class="btn pri" id="btnEvGo" disabled>올리기</button>';
     $('panel').classList.add('open');
     EVUP.lo = r.lo; EVUP.hi = r.hi;
@@ -1947,21 +1971,18 @@
 
   function evNote(msg) { var el = $('evNote'); if (el) el.innerHTML = msg; }
 
-  /** pdf.js 를 쓸 때만 불러온다. 워커는 같은 출처여야 한다. */
+  /** pdf.js(4.10.38, ESM)를 쓸 때만 불러온다. 워커는 같은 출처여야 한다.
+   *  3.11 은 CVE-2024-4367(악성 PDF 의 폰트로 JS 실행)에 걸려 올렸다. */
   function loadPdfJs() {
-    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
     if (window.__pdfjs) return window.__pdfjs;
-    window.__pdfjs = new Promise(function (ok, no) {
-      var sc = document.createElement('script');
-      sc.src = 'vendor/pdf.min.js';
-      sc.onload = function () {
-        if (!window.pdfjsLib) { no(new Error('pdfjs')); return; }
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
-        ok(window.pdfjsLib);
-      };
-      sc.onerror = function () { window.__pdfjs = null; no(new Error('pdfjs')); };
-      document.head.appendChild(sc);
-    });
+    // import() 는 'vendor/…' 같은 상대 지정자를 못 푼다("Failed to resolve module
+    // specifier") — 문서 기준 절대 URL 로 만들어 넘긴다. 워커도 같은 방식.
+    var base = function (p) { return new URL(p, location.href).href; };
+    window.__pdfjs = new Function('u', 'return import(u)')(base('vendor/pdf.min.mjs'))
+      .then(function (m) {
+        m.GlobalWorkerOptions.workerSrc = base('vendor/pdf.worker.min.mjs');
+        return m;
+      }, function (e) { console.error('pdf.js 로드 실패:', e); window.__pdfjs = null; throw new Error('pdfjs'); });
     return window.__pdfjs;
   }
 
@@ -1975,10 +1996,12 @@
     if (!isPdf) return shrinkImage(file).then(function (b) { return [b]; });
     return loadPdfJs().then(function (pdfjs) {
       return file.arrayBuffer().then(function (buf) {
-        return pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+        // isEvalSupported:false — 폰트 글리프를 new Function 으로 컴파일하지 않는다.
+        // 메일로 받은 영수증 PDF 는 '외부 파일' 이다(CVE-2024-4367 의 완화책).
+        return pdfjs.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
       });
     }).then(function (doc) {
-      if (doc.numPages > 30) throw new Error('toomany');
+      if (doc.numPages > 30) { doc.destroy(); throw new Error('toomany'); }
       var out = [], chain = Promise.resolve();
       for (var i = 1; i <= doc.numPages; i++) {
         (function (n) {
@@ -2000,7 +2023,8 @@
           });
         })(i);
       }
-      return chain.then(function () { return out; });
+      return chain.then(function () { doc.destroy(); return out; },
+        function (e) { doc.destroy(); throw e; });
     });
   }
 
@@ -2011,7 +2035,10 @@
       img.onload = function () {
         URL.revokeObjectURL(url);
         var max = 2000;
-        if (img.width <= max && img.height <= max && file.size <= 4e6) { ok(file); return; }
+        // JPEG 이 아니면 크기와 무관하게 캔버스를 거쳐 JPEG 으로 만든다 — 경로도 헤더도 .jpg 다.
+        if (file.type === 'image/jpeg' && img.width <= max && img.height <= max && file.size <= 4e6) {
+          ok(file); return;
+        }
         var sc = Math.min(1, max / Math.max(img.width, img.height));
         var cv = document.createElement('canvas');
         cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
@@ -2033,15 +2060,17 @@
     if (tooBig.length) { evNote('<b style="color:var(--red)">30MB 가 넘는 파일이 있습니다: ' +
       esc(tooBig[0].name) + '</b>'); return; }
 
+    evRead();                      // ★ 다시 그리기 전에 쳐 둔 값을 지킨다(안 부르면 금액이 다 날아갔다)
     EVUP.busy = true;
-    var today = ymd(Math.min(Date.now(), EVUP.hi - 1));
+    // 기본 날짜: 오늘. 보는 주기 밖이면 주기 안으로 당긴다(미래 주기를 보며 올리면 전부 튕겼다).
+    var today = ymd(Math.max(EVUP.lo, Math.min(Date.now(), EVUP.hi - 1)));
     var chain = Promise.resolve();
     list.forEach(function (file) {
       chain = chain.then(function () {
         evNote('<b>' + esc(file.name) + '</b> 읽는 중…');
         return fileToJpegs(file, function (n, total) {
           evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
-            (total > 3 ? ' <span class="dim">(다른 탭으로 가시면 멈춥니다)</span>' : ''));
+            (total > 3 ? ' <span class="dim">(다른 탭으로 가시면 잠시 멈추고, 돌아오시면 이어집니다)</span>' : ''));
         }).then(function (blobs) {
           blobs.forEach(function (b, i) {
             EVUP.items.push({
@@ -2102,7 +2131,7 @@
           '<td><input class="inp" type="date" data-evdate style="width:148px" value="' + esc(it.date) +
           '" min="' + ymd(EVUP.lo) + '" max="' + ymd(EVUP.hi - 1) + '"></td>' +
           '<td class="n"><input class="inp num" data-evamt inputmode="numeric" style="width:100px" ' +
-          'placeholder="0" value="' + esc(it.amt) + '"></td>' +
+          'placeholder="원" aria-label="' + (i + 1) + '번째 금액" value="' + esc(it.amt) + '"></td>' +
           '<td><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
           esc(it.memo) + '"></td>' +
           '<td class="n"><button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
@@ -2115,7 +2144,7 @@
   }
 
   function runEvUpload() {
-    if (EVUP.busy) return;
+    if (EVUP.busy) { toast('아직 파일을 읽는 중입니다. 잠시만 기다려 주세요.'); return; }
     if (!EVUP.items.length) { toast('올릴 파일을 골라 주세요.', true); return; }
     evRead();
     var car = String(($('evCar') || {}).value || '').trim();
@@ -2132,6 +2161,9 @@
       var amt = Number(it.amt || 0);
       if (!isFinite(amt) || amt < 0 || amt > 5000000) {
         toast((i + 1) + '번째 줄의 금액이 범위를 벗어났습니다.', true); return;
+      }
+      if (!amt && it.cat !== '계기판') {
+        toast((i + 1) + '번째 줄의 금액을 넣어 주세요. 계기판 사진만 0원이어도 됩니다.', true); return;
       }
       it.ms = ms; it.amtN = Math.round(amt);
     }
@@ -2156,11 +2188,16 @@
             body: JSON.stringify({
               username: mine, client_key: key, vehicle_plate: car,
               date_millis: it.ms, category: it.cat, amount: it.amtN,
-              memo: it.memo, captured_at: 0, photo_path: path
+              // ★ captured_at 을 0 으로 두면 앱의 90일 사진 정리(cleanupEvidenceServer,
+              //   captured_at < cutoff)가 웹에서 올린 사진을 다음 동기화에 바로 지운다.
+              memo: it.memo, captured_at: Date.now(), photo_path: path
             })
           }).then(function (ins) {
             if (!ins.ok) return ins.text().then(function (t) {
-              throw new Error((i + 1) + '번째 기록: ' + (t || ins.status));
+              // 파일만 올라간 채로 두지 않는다(다시 누르면 새 키로 또 올라가 파일이 둘이 된다).
+              return apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' })
+                .catch(function () {})
+                .then(function () { throw new Error((i + 1) + '번째 기록: ' + (t || ins.status)); });
             });
             done++;
           });
@@ -2176,21 +2213,34 @@
     }).catch(function (e) {
       EVUP.busy = false;
       if (btn) { btn.disabled = false; btn.textContent = n0(total - done) + '장 올리기'; }
-      // 이미 올라간 것은 지운다 — 어디까지 됐는지 모른 채로 다시 누르면 겹친다.
+      // 이미 올라간 것은 목록에서 빼고 화면에도 바로 반영한다 — 안 그러면 '안 올라갔나'
+      // 하고 다시 올려 겹친다.
       EVUP.items.splice(0, done);
       paintEvList();
-      evNote('<b style="color:var(--red)">' + esc(done ? done + '장까지 올리고 멈췄습니다 — ' +
-        (e && e.message) : '올리지 못했습니다: ' + (e && e.message)) + '</b>');
+      if (done) { AUDIT = null; loadAll(); }
+      evNote('<b style="color:var(--red)">' + esc(done
+        ? done + '장까지 올렸습니다. ' + (total - done) + '장이 남았습니다 — ' + evWhy(e)
+        : '올리지 못했습니다 — ' + evWhy(e)) + '</b>');
     });
+  }
+
+  /** 서버 원문 대신 사람이 할 수 있는 말로. 원문은 콘솔에 남긴다. */
+  function evWhy(e) {
+    var m = String((e && e.message) || '');
+    console.error('증빙 올리기 실패:', m);
+    if (/413|too large/i.test(m)) return '파일이 너무 큽니다. 사진을 줄여서 다시 올려 주세요.';
+    if (/401|403|jwt|로그인/i.test(m)) return '로그인이 풀렸습니다. 다시 로그인한 뒤 올려 주세요.';
+    if (/409|duplicate/i.test(m)) return '같은 파일이 이미 올라가 있습니다. 목록을 다시 확인해 주세요.';
+    return '잠시 뒤 「올리기」를 다시 눌러 주세요.';
   }
 
   function evDelete(id) {
     var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!e) return;
-    $('pTitle').textContent = '증빙 지우기';
+    $('pTitle').textContent = '영수증 지우기';
     $('pSub').textContent = md(e.date_millis) + ' · ' + (e.category || '') +
       (e.amount ? ' · ' + won(e.amount) : '');
-    $('pBody').innerHTML = '<div class="anote">이 증빙을 지웁니다. 되돌릴 수 없습니다.</div>' +
+    $('pBody').innerHTML = '<div class="anote">이 영수증을 지웁니다. 되돌릴 수 없습니다.</div>' +
       (e.photo_path ? '<div class="form"><div class="frow"><div class="fbody">' +
         '<img src="' + esc(SB + '/storage/v1/object/public/evidence/' + e.photo_path) + '" ' +
         'style="max-width:100%;border-radius:var(--r-sm);border:1px solid var(--line)" alt=""></div></div></div>' : '');
@@ -2208,13 +2258,18 @@
     apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(e.id), { method: 'DELETE' })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
-        if (!e.photo_path) return null;
-        return apiRetry('/storage/v1/object/evidence/' + e.photo_path, { method: 'DELETE' });
+        if (!e.photo_path) return true;
+        // 앱이 올린 파일은 anon 경로라 웹 권한으로 못 지울 수 있다. 결과를 보고 말한다.
+        return apiRetry('/storage/v1/object/evidence/' + e.photo_path, { method: 'DELETE' })
+          .then(function (r2) { return r2.ok; }, function () { return false; });
       })
-      .then(function () { closePanel(); toastOk('지웠습니다.'); AUDIT = null; loadAll(); })
+      .then(function (fileGone) {
+        closePanel(); AUDIT = null; loadAll();
+        toastOk('지웠습니다.', fileGone ? null : '기록은 지웠지만 사진 파일은 남았습니다.');
+      })
       .catch(function () {
         if (btn) { btn.disabled = false; btn.textContent = '지우기'; }
-        toast('지우지 못했습니다.', true);
+        toast('지우지 못했습니다. 잠시 뒤 다시 해 보세요.', true);
       });
   }
 
@@ -2294,13 +2349,13 @@
       h += '<section class="sect"><button class="issue sv-warn" data-issue="unk" style="border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surface)">' +
         '<span class="ico">' + ic('ticket', 17) + '</span>' +
         '<span class="bd"><span class="t">통행료 미확정 ' + n0(T.unk) + '건이 0원으로 계산됐습니다</span>' +
-        '<span class="d">채우면 합계가 올라갑니다. 하이패스 대조나 직접 입력으로 확정해 주세요.</span></span>' +
+        '<span class="d">채우면 합계가 올라갑니다. 통행료 채우기에서 한 번에 정리하실 수 있습니다.</span></span>' +
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
     // 개인 범위에서 rows 는 사람 목록(늘 1명)이다. 건수는 운행 수로 적는다.
-    h += sect(isAll() ? '직원별' : '내 내역',
-      isAll() ? rows.length + '명' : n0(T.n) + '건',
+    h += sect(isAll() ? '직원별' : '내 정산',
+      isAll() ? rows.length + '명' : '운행 ' + n0(T.n) + '건',
       '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
         (isAll() ? '내 것 인쇄' : '인쇄용 출력') + '</button>' +
       '<button class="btn sm" id="btnCsv">' + ic('dl', 13) + 'CSV</button>', personTable(rows));
@@ -2310,7 +2365,7 @@
       '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
       '유류비 = 분기 기준단가 × (반올림한 도착계기 − 반올림한 출발계기)<br>' +
       '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '-' + pad(b[1]); }).join(' · ')) + '<br>' +
-      '<b style="color:var(--ink-2)">서버 월간리포트와 같은 식</b>을 씁니다 — 두 숫자가 다르면 버그입니다.</div>');
+      '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산합니다. 리포트와 다르면 알려 주세요.</div>');
     return h;
   }
 
@@ -3056,9 +3111,8 @@
     // ★ 개인 화면에서 내 주기가 결재 완료면 서버가 전부 튕긴다. 먼저 말한다.
     //   (전체 화면은 사람마다 다르므로 묶음 줄에서 따로 표시한다.)
     if (!isAll() && cycleApproved(myName())) {
-      return h + lockedNote('통행료를 확정할 수 없습니다',
-        '<b>' + esc(cycleName(CYC.y, CYC.m)) + ' 결재가 이미 끝나</b> 이 주기의 통행료는 ' +
-        '바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다.');
+      return h + lockedNote(cycleName(CYC.y, CYC.m) + ' 결재가 끝났습니다',
+        '결재가 끝난 주기의 통행료는 바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다.');
     }
 
     var T = totals(TRIPS);
@@ -3073,10 +3127,11 @@
       '<div class="dt">영수증 PDF 를 여기에 끌어다 놓으세요</div>' +
       '<div class="dd">한국도로공사 하이패스 이용내역 · 여러 개도 됩니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
-      '<input type="file" id="hpFile" accept="application/pdf,.pdf" multiple hidden></label>' +
+      '<input type="file" id="hpFile" accept="application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>';
 
-    if (HP.note) h += '<div class="hpnote warn">' + ic('alert', 16) + '<span>' + esc(HP.note) + '</span></div>';
+    if (HP.note) h += '<div class="hpnote' + (HP.noteBad ? ' warn' : '') + '">' +
+      ic(HP.noteBad ? 'alert' : 'check', 16) + '<span>' + esc(HP.note) + '</span></div>';
     if (!HP.groups.length) return h;
 
     HP.groups.forEach(function (g, gi) {
@@ -3087,11 +3142,11 @@
       var todo = (g.matched || []).filter(function (e) { return e.kind !== 'same'; });
       var done = (g.matched || []).filter(function (e) { return e.kind === 'same'; });
 
-      h += '<section class="sect"><div class="hd">' +
+      h += '<section class="sect" data-hpcard="' + gi + '"><div class="hd">' +
         '<h2>카드 ' + esc(g.card4 || '?') + '</h2>' +
         '<span class="cnt">' + n0((g.records || []).length) + '건 · ' +
         won((g.records || []).reduce(function (s, r) { return s + (r.amount || 0); }, 0)) +
-        (done.length ? ' · <b style="color:var(--ok)">' + n0(done.length) + '건 맞춤</b>' : '') + '</span>' +
+        (done.length ? ' · <b style="color:var(--ok)">' + n0(done.length) + '건 확정됨</b>' : '') + '</span>' +
         '<div class="sp"></div>' +
         '<select class="field" style="height:30px" data-hpcar="' + gi + '">' +
         '<option value="">— 차량 고르기 —</option>' +
@@ -3108,11 +3163,13 @@
       } else if (!todo.length) {
         // 전부 맞은 상태. 여기서 표를 그대로 두면 '아직 할 일이 있다' 로 읽힌다.
         h += '<div class="panel"><div class="blank"><div class="ico" style="color:var(--ok)">' +
-          ic('check', 21) + '</div><div class="t">이 카드는 다 맞췄습니다.</div>' +
-          '<div class="d">' + n0(done.length) + '건이 영수증 금액과 같습니다.</div></div></div>';
+          ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐습니다.</div>' +
+          '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같습니다.</div></div></div>';
       } else {
         h += '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-          '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"></th>' +
+          '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"' +
+          (todo.length && todo.every(function (x) { return x.pick || x.locked; }) ? ' checked' : '') +
+          ' aria-label="이 카드의 운행 전부 고르기"></th>' +
           '<th>운행</th><th>지금 값</th><th class="n">영수증</th><th class="n">차이</th><th>영수증 내역</th>' +
           '</tr></thead><tbody>';
         todo.forEach(function (e) {
@@ -3120,7 +3177,7 @@
           var t = e.trip;
           var now = e.kind === 'new' ? '<span class="st warn">미확정</span>'
             : (e.who === 'person'
-              ? '<span class="st bad">사람이 정함 ' + n0(t.toll_cost) + '</span>'
+              ? '<span class="st bad">직접 넣은 ' + n0(t.toll_cost) + '</span>'
               : '<span class="dim">자동 ' + n0(t.toll_cost) + '</span>');
           var diff = e.diff == null ? '<span class="dim">—</span>'
             : e.diff === 0 ? '<span class="st ok">같음</span>'
@@ -3128,7 +3185,8 @@
                 (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
           h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '">' +
             '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
-            (e.pick ? ' checked' : '') + (e.locked ? ' disabled' : '') + '></td>' +
+            (e.pick ? ' checked' : '') +
+            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></td>' +
             '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
             (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') + '</td>' +
@@ -3143,8 +3201,8 @@
         h += '</tbody></table></div></div>';
 
         if (done.length) {
-          h += '<details class="hpun"><summary>이미 영수증과 같은 ' + n0(done.length) +
-            '건 (손댈 것 없음)</summary><div class="hpunb">' +
+          h += '<details class="hpun"><summary>이미 확정된 ' + n0(done.length) +
+            '건 — 영수증과 같아 손댈 것 없음</summary><div class="hpunb">' +
             done.slice(0, 60).map(function (e) {
               return '<div><span class="mono">' + md(e.trip.start_time) + ' ' + hm(e.trip.start_time) +
                 '</span> ' + esc(dong(e.trip.start_address)) + ' → ' + esc(dong(e.trip.end_address)) +
@@ -3192,12 +3250,14 @@
           if (++done < files.length) return;
           HP.busy = false;
           if (!recs.length) {
+            HP.noteBad = true;
             HP.note = bad ? '읽지 못한 파일이 있습니다. 한국도로공사 이용내역 PDF 가 맞는지 확인해 주세요.'
               : '영수증에서 통행 기록을 찾지 못했습니다.';
             HP.groups = []; render(); return;
           }
           HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+          HP.noteBad = !!bad;
           HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '');
           render();
         });
@@ -3215,19 +3275,29 @@
     return groups;
   }
 
-  function hpApply(gi) {
+  function hpApply(gi, force) {
     var g = HP.groups[gi]; if (!g) return;
     var picked = (g.matched || []).filter(function (e) { return e.pick && !e.locked; });
     if (!picked.length) {
       // 예전에는 말없이 돌아갔다 — 왜 아무 일도 안 일어나는지 알 수가 없었다.
       var anyLocked = (g.matched || []).some(function (e) { return e.locked; });
       toast(anyLocked ? '고르신 것이 없습니다. 결재가 끝난 운행은 바꿀 수 없습니다.'
-                      : '반영할 것을 골라 주세요.', true);
+                      : '확정할 운행을 골라 주세요.', true);
       return;
     }
     var over = picked.filter(function (e) { return e.who === 'person' && e.kind === 'diff-person'; });
-    if (over.length && !window.confirm(
-      '사람이 직접 정한 값 ' + over.length + '건을 영수증 금액으로 덮습니다.\n계속하시겠습니까?')) return;
+    if (over.length && !force) {
+      // 브라우저 기본 confirm 대신 다른 확인(전부 없음·지우기)과 같은 패널을 쓴다.
+      $('pTitle').textContent = '직접 넣은 값을 덮습니다';
+      $('pSub').textContent = n0(over.length) + '건';
+      $('pBody').innerHTML = '<div class="anote">영수증 금액으로 바꿉니다. 앱이나 웹에서 직접 넣으신 값은 사라집니다.</div>';
+      $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+        '<button class="btn pri" id="btnHpOverGo" data-gi="' + gi + '">' + n0(over.length) + '건 덮어쓰기</button>';
+      $('panel').classList.add('open');
+      return;
+    }
+    var hbtn = document.querySelector('[data-hpapply="' + gi + '"]');
+    if (hbtn) { hbtn.disabled = true; hbtn.textContent = '확정 중…'; }
 
     var items = picked.map(function (e) {
       return {
@@ -3239,12 +3309,15 @@
       };
     });
 
-    toast('반영 중입니다…');
+    toast('확정 중입니다…');
     apiRetry('/functions/v1/toll-apply', {
       method: 'POST', body: JSON.stringify({ items: items, batch: HP.batch })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '반영하지 못했습니다.', true); return; }
+        if (!res.ok || !res.j || !res.j.ok) {
+          if (hbtn) { hbtn.disabled = false; hbtn.textContent = n0(picked.length) + '건 확정하기'; }
+          toast((res.j && res.j.error) || '확정하지 못했습니다.', true); return;
+        }
         // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다.
         (res.j.rows || []).forEach(function (row) {
           var t = ALL_TRIPS.filter(function (x) { return x.id === row.id; })[0];
@@ -3256,15 +3329,21 @@
         if (res.j.warning) toast(res.j.warning, true);
         // ★ 0건이면 '반영했다' 로 읽히면 안 된다. 왜 못 했는지를 앞세운다.
         else if (!applied) toast(skipped.length
-          ? '한 건도 반영되지 않았습니다 — ' + skipped[0].why
-          : '한 건도 반영되지 않았습니다.', true);
-        else if (skipped.length) toast(applied + '건 반영 · ' + skipped.length + '건 건너뜀 (' +
+          ? '한 건도 확정되지 않았습니다 — ' + skipped[0].why
+          : '한 건도 확정되지 않았습니다.', true);
+        else if (skipped.length) toast(applied + '건 확정 · ' + skipped.length + '건은 건너뛰었습니다 (' +
           skipped[0].why + ')', true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
         else toast(applied + '건 확정했습니다.');
         // 남은 것만 다시 계산
         hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
         paintPills(); render();
-      }).catch(function () { toast('서버에 연결하지 못했습니다.', true); });
+        // 통째로 다시 그리면 스크롤이 맨 위로 간다 — 눌렀던 카드로 돌려놓는다.
+        var card = document.querySelector('[data-hpcard="' + gi + '"]');
+        if (card) card.scrollIntoView({ block: 'start' });
+      }).catch(function () {
+        if (hbtn) { hbtn.disabled = false; hbtn.textContent = n0(picked.length) + '건 확정하기'; }
+        toast('서버에 연결하지 못했습니다.', true);
+      });
   }
 
   /* ══════════════════ 상세 패널 ══════════════════ */
@@ -3581,6 +3660,7 @@
 
   var PANEL_FROM = null;                 // 패널을 연 버튼 — 닫을 때 그리로 돌려준다
   function closePanel() {
+    if (!$('panel').classList.contains('open')) { PANEL_FROM = null; return; }
     $('panel').classList.remove('open');
     // 안 돌려주면 포커스가 <body> 로 떨어져 키보드로 쓰던 자리를 잃는다.
     if (PANEL_FROM && document.contains(PANEL_FROM)) { try { PANEL_FROM.focus(); } catch (e) {} }
@@ -3623,6 +3703,7 @@
       : (VIEWS[VIEW] || viewClose)();
     Array.prototype.forEach.call($('nav').querySelectorAll('[data-v]'), function (a) {
       a.classList.toggle('on', a.dataset.v === VIEW);
+      if (a.dataset.v === VIEW) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     var rt = $('btnRetryLoad');
     if (rt) rt.addEventListener('click', function () { LOAD_ERR = ''; loadAll(); });
@@ -3674,6 +3755,8 @@
       // 필터가 날아갔고, 화면도 개인 운행일지로 못 박혀 있어 전체 점검에서 누르면
       // 보러 간 건이 한 건도 안 보였다.
       var issue = el.dataset.issue;
+      // 미확정 통행료는 한 건씩 여는 운행일지가 아니라 구간별로 묶어 채우는 화면으로.
+      if (issue === 'unk' && !isAll()) { go('tollfill'); return; }
       go(isAll() ? 'a_trips' : 'trips');
       FILT.chip = issue; FILT.who = '';
       render(); return;
@@ -3683,9 +3766,14 @@
     if (e.target.closest('#btnAddTrip')) { openCreate(); return; }
     /* ── 하이패스 대조 ── */
     if ((el = e.target.closest('[data-hpapply]'))) { hpApply(+el.dataset.hpapply); return; }
+    if ((el = e.target.closest('#btnHpOverGo'))) { closePanel(); hpApply(+el.dataset.gi, true); return; }
     if (e.target.matches('[data-hpall]')) {
       var gi = +e.target.dataset.hpall, on = e.target.checked;
-      (HP.groups[gi].matched || []).forEach(function (x) { if (!x.locked) x.pick = on; });
+      // 접어 둔(이미 같은) 줄은 표에 없으니 건드리지 않는다. 안 그러면 "남은 것 3건 ·
+      // 선택 7건" 처럼 보이는 것보다 많이 잡히고, 같은 값을 서버에 다시 쓴다.
+      (HP.groups[gi].matched || []).forEach(function (x) {
+        if (!x.locked && x.kind !== 'same') x.pick = on;
+      });
       render(); return;
     }
     if (e.target.matches('[data-hppick]')) {
@@ -3776,8 +3864,15 @@
     }
     if (e.target.closest('#tfAllFree')) { openAllFree(); return; }
     if (e.target.closest('#btnAllFreeGo')) {
-      TF_GROUPS.forEach(function (x) { if (FILLS[x.key] == null) FILLS[x.key] = 0; });
-      closePanel(); render(); return;      // 전부 바뀌므로 이때는 다시 그린다
+      var marked = 0, doneNow = 0;
+      TF_GROUPS.forEach(function (x) {
+        if (FILLS[x.key] == null) { FILLS[x.key] = 0; marked += x.rows.length; }
+        doneNow += x.rows.length;
+      });
+      closePanel(); render();              // 전부 바뀌므로 이때는 다시 그린다
+      // 패널 버튼이 완료형이라 '끝났다' 로 읽힌다 — 아직 저장 전임을 말한다.
+      toast(n0(marked) + '건을 없음으로 표시했습니다. 아래 「' + n0(doneNow) + '건 저장」을 눌러야 저장됩니다.');
+      return;
     }
     if (e.target.closest('#tfSave')) { tfSave(); return; }
     if ((el = e.target.closest('[data-perm]'))) {
@@ -3829,6 +3924,7 @@
     if (e.target.id === 'selCycle') {
       var v = e.target.value.split('-');
       CYC = { y: +v[0], m: +v[1] };
+      FILLS = {};                          // 주기가 바뀌면 구간 키가 의미를 잃는다 — 여기서만 버린다
       paintCycle(); loadAll(); return;
     }
     if (e.target.id === 'selWho') { FILT.who = e.target.value; renderKeepFocus('selWho'); return; }
@@ -3905,6 +4001,7 @@
     }
     if (e.key === 'Escape') { closePanel(); document.body.classList.remove('nav-open'); }
     if (e.key === 'Enter' && (e.target.id === 'u' || e.target.id === 'p')) doLogin();
+    if (e.key === 'Enter' && /^pw(Cur|New|New2)$/.test(e.target.id)) { e.preventDefault(); savePassword(); return; }
     // 결재자 찾기 — Enter 로 맨 위 후보를 넣는다.
     if (e.key === 'Enter' && e.target.id === 'apprQ') {
       e.preventDefault();
