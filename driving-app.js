@@ -846,6 +846,10 @@
       '잘못 눌렀으면 칸을 비우세요. 비운 줄은 \'아직 안 정함\' 으로 돌아갑니다.<br>' +
       '<b style="color:var(--ink-2)">업무용 운행만</b> 보입니다. 출퇴근·비업무용은 정산과 제출 서류에 ' +
       '들어가지 않아 채우실 필요가 없습니다.' +
+      '<div style="margin-top:12px">한국도로공사 <b style="color:var(--ink-2)">하이패스 이용내역 PDF</b> 가 ' +
+      '있으면 한 번에 확정됩니다. ' +
+      '<button class="btn sm" data-v="hipass" style="margin-left:4px">하이패스 대조 ' + ic('chev', 13) +
+      '</button></div>' +
       '</div></section>';
 
     h += '<section class="sect"><div class="hpact" style="border-radius:var(--r-lg);' +
@@ -1594,8 +1598,9 @@
     // 결재 — 히어로 바로 아래. 이 주기가 지금 어디까지 갔는지가 제일 궁금하다.
     h += apprStrip();
 
-    // 점검 요약 — 문제가 있을 때만, 있으면 크게
-    if (badN || T.unk) {
+    // 점검 요약 — 문제가 있을 때만, 있으면 크게.
+    //  결재가 끝났으면 어차피 못 고치니 시키지 않는다.
+    if ((badN || T.unk) && !approved) {
       var list = A.filter(function (f) { return f.n > 0; }).slice(0, 4);
       h += sect('바로 봐야 할 것', null,
         '<button class="btn sm" data-v="' + (isAll() ? 'a_check' : 'check') + '">전체 점검 ' +
