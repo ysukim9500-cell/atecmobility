@@ -2,11 +2,11 @@
 
 여기 있는 것은 우리가 쓴 코드가 아니다. **바꾸지 말 것.**
 
-## pdf.js 3.11.174 (Mozilla · Apache-2.0)
+## pdf.js 4.10.38 (Mozilla · Apache-2.0)
 
-- `pdf.min.js` · `pdf.worker.min.js`
-- 받은 곳: https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/
-- 받은 날: 2026-09-15
+- `pdf.min.mjs` · `pdf.worker.min.mjs` (ESM — `import()` 로 부른다)
+- 받은 곳: https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/
+- 받은 날: 2026-09-16 (3.11.174 → 4.10.38: CVE-2024-4367 — 악성 PDF 의 폰트로 JS 가 실행되는 취약점, 4.2.67 에서 수정. 그와 별개로 getDocument 에 isEvalSupported:false 를 늘 준다)
 
 ### 왜 CDN 을 안 쓰고 여기에 두나
 
@@ -20,5 +20,5 @@
 
 ### 올릴 때 같이 가야 하는 것
 
-driving.html 은 `vendor/pdf.min.js` 를 필요할 때만 불러온다. 배포 저장소
+driving.html 은 `vendor/pdf.min.mjs` 를 필요할 때만 `import()` 한다. 배포 저장소
 (atecmobility)에도 `vendor/` 를 통째로 올려야 한다.
