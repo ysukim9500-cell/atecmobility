@@ -1919,7 +1919,7 @@ async function cloudGetMetas(keys){
   for(const x of rows){
     let info; try{ info=JSON.parse(x.payload); }catch(e){ continue; }
     if(!info || !info.chunks) continue;
-    out[x.key]={chunks:info.chunks, stamp:info.stamp||x.updated_at, updated_at:x.updated_at, updated_by:x.updated_by};
+    out[x.key]={chunks:info.chunks, len:info.len||0, stamp:info.stamp||x.updated_at, updated_at:x.updated_at, updated_by:x.updated_by};
   }
   return out;
 }
@@ -1955,7 +1955,9 @@ async function cloudDownload(metas, onProgress){
   if(!mk || !mk.chunks) return {kb:null, daily:null, dailyFailed:false};
   const kb = await cloudDownloadKey('kb', mk.chunks, onProgress, 40, 60);
   let daily=null, dailyFailed=false;
-  if(md && md.chunks){ try{ daily = await cloudDownloadKey('daily', md.chunks, onProgress, 60, 85); }catch(e){ console.warn('daily 내려받기 실패 — 접수 자료만 적용', e); dailyFailed=true; } }
+  const DAILY_MAX_BYTES = 40*1000*1000;   // 이보다 큰 이벤트 게시본은 내려받지 않는다 (브라우저가 멈춤) — 게시 측에서 최근 7일치만 올리도록 바뀜
+  if(md && md.chunks && (md.len||0) > DAILY_MAX_BYTES){ console.warn('daily 게시본이 너무 큼('+Math.round(md.len/1e6)+'MB) — 건너뜀. 관리자가 다시 게시하면 최근 7일치만 올라감'); dailyFailed=true; }
+  else if(md && md.chunks){ try{ daily = await cloudDownloadKey('daily', md.chunks, onProgress, 60, 85); }catch(e){ console.warn('daily 내려받기 실패 — 접수 자료만 적용', e); dailyFailed=true; } }
   if(onProgress) onProgress(85);
   return {kb, daily, dailyFailed};
 }
