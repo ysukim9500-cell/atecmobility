@@ -254,7 +254,14 @@
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         b.disabled = false; b.textContent = '로그인';
-        if (!res.ok || !res.j || !res.j.ok) { loginErr((res.j && res.j.error) || '로그인에 실패했습니다.'); return; }
+        if (!res.ok || !res.j || !res.j.ok) {
+          var msg = (res.j && res.j.error) || '로그인에 실패했습니다.';
+          // ★ 같은 사이트의 다른 도구(통합관제 등)에 저장된 **이메일**을 브라우저가 이 칸에 자동으로
+          //   채워, 앱 아이디 대신 이메일로 로그인하다 막히는 일이 실제로 있었다(2026-09-23).
+          //   앱 아이디에 '@' 가 들어간 사람도 있어 막지는 않고, 실패했을 때만 짚어 준다.
+          if (u.indexOf('@') > 0) msg += ' — 이메일이 아니라 앱에서 쓰는 아이디를 넣으셨는지 확인해 주세요.';
+          loginErr(msg); return;
+        }
         ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token);
         ss(K_ME, JSON.stringify(res.j.profile));
         $('p').value = '';
