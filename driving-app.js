@@ -75,10 +75,14 @@
     opt.headers = h;
     return fetch(SB + path, opt);
   }
-  /** 401/403 이면 토큰을 한 번 갱신하고 다시 시도한다. */
+  /** 401 이면 토큰을 한 번 갱신하고 다시 시도한다.
+   *  ★ 403 은 다시 보내지 않는다(2026-09-29 검증로봇). 만료된 토큰은 PostgREST·함수 게이트웨이
+   *    모두 401 을 주고, 403 은 "권한 없음·비밀번호 불일치" 같은 **판정 결과**다. 403 에도 재전송하면
+   *    비밀번호를 한 번 틀린 것이 서버에서 두 번 실행돼 실패 횟수가 2씩 올라가고(앱 로그인과
+   *    공유하는 카운터), 웹에서 5번 틀리면 앱까지 10분 잠겼다. */
   function apiRetry(path, opt) {
     return api(path, opt).then(function (r) {
-      if (r.status !== 401 && r.status !== 403) return r;
+      if (r.status !== 401) return r;
       var rt = ss(K_RT);
       if (!rt) return r;
       return fetch(SB + '/auth/v1/token?grant_type=refresh_token', {
@@ -1398,8 +1402,14 @@
         }
         toastOk(res.j.message || okMsg || '처리했습니다.', res.j.warning);
         closePanel();
+        // 처리는 이미 끝났다. 뒤이은 목록 재조회가 실패해도 '연결 실패' 로 오인시키지 않는다 —
+        // 그러면 사용자가 상신을 다시 눌러 헷갈린다. 전체를 다시 불러오게 한다.
         return fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc')
-          .then(function (rows) { APPR = rows || []; paintPills(); render(); return true; });
+          .then(function (rows) { APPR = rows || []; paintPills(); render(); return true; })
+          .catch(function (e) {
+            if (e && e.authGone) { toast('로그인이 만료되었습니다. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return true; }
+            toast('처리는 됐습니다. 목록을 다시 불러옵니다.'); loadAll(); return true;
+          });
       }).catch(function () { toast('서버에 연결하지 못했습니다.', true); return false; });
   }
 
