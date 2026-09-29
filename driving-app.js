@@ -523,8 +523,14 @@
   }
 
   /* ══════════════════ 집계 ══════════════════ */
-  function totals(rows) {
-    var o = { n: rows.length, km: 0, bizKm: 0, fuel: 0, toll: 0, park: 0, unk: 0, manual: 0 };
+  /**
+   * 비용 합계. 운행에 적힌 금액에 **영수증(주차·통행료) 금액을 더한다** — 앱 엑셀·임원 리포트와
+   * 같은 규칙(2026-09-29). 예전에는 운행만 더해서, 이 화면의 합계가 같은 화면에서 내려받는
+   * 엑셀과 달랐다. 운행 목록 표의 소계처럼 '표에 있는 운행만' 원하면 opt.tripsOnly.
+   * ※ 영수증은 목적이 없어 목적과 무관하게 더한다(엑셀도 운행 없는 날의 영수증을 행으로 남긴다).
+   */
+  function totals(rows, opt) {
+    var o = { n: rows.length, km: 0, bizKm: 0, fuel: 0, toll: 0, park: 0, unk: 0, manual: 0, evPark: 0, evToll: 0, evN: 0 };
     rows.forEach(function (t) {
       var d = Number(t.distance_km) || 0;
       o.km += d;
@@ -536,6 +542,20 @@
       o.toll += Number(t.toll_cost) || 0;
       o.park += Number(t.parking_cost) || 0;
     });
+    if (!(opt && opt.tripsOnly) && rows.length) {
+      var users = {};
+      rows.forEach(function (t) { users[t.username] = 1; });
+      var r = cycleRange(CYC.y, CYC.m);
+      EVID.forEach(function (e) {
+        if (!users[e.username]) return;
+        var d = Number(e.date_millis);
+        if (!(d >= r.lo && d < r.hi)) return;
+        var a = Number(e.amount);
+        if (!(a > 0)) return;
+        if (e.category === '주차') { o.park += a; o.evPark += a; o.evN++; }
+        else if (e.category === '통행료') { o.toll += a; o.evToll += a; o.evN++; }
+      });
+    }
     o.cost = o.fuel + o.toll + o.park;
     return o;
   }
@@ -1790,7 +1810,7 @@
     A.forEach(function (f) {
       c[f.k] = (f.rows || []).filter(function (t) { return inBase[t.id]; }).length;
     });
-    var rows = filtered(), t2 = totals(rows);
+    var rows = filtered(), t2 = totals(rows, { tripsOnly: true });   // 표에 보이는 운행만의 소계
 
     // 누구/어느 차로 좁혀 놓았는지 제목에 드러낸다. 그 상태로 인쇄·CSV 를
     // 누르는 실수를 줄인다.
@@ -2376,8 +2396,10 @@
       '<div class="fact"><div class="k">유류비</div><div class="v">' + won(T.fuel) +
       '</div><div class="sub">업무거리 ' + km(T.bizKm) + ' km</div></div>' +
       '<div class="fact"><div class="k">통행료</div><div class="v">' + won(T.toll) +
-      '</div><div class="sub">' + (T.unk ? '미확정 ' + n0(T.unk) + '건 제외' : '전부 확정') + '</div></div>' +
-      '<div class="fact"><div class="k">주차비</div><div class="v">' + won(T.park) + '</div></div>' +
+      '</div><div class="sub">' + (T.unk ? '미확정 ' + n0(T.unk) + '건 제외' : '전부 확정') +
+      (T.evToll ? ' · 영수증 ' + won(T.evToll) + ' 포함' : '') + '</div></div>' +
+      '<div class="fact"><div class="k">주차비</div><div class="v">' + won(T.park) + '</div>' +
+      (T.evPark ? '<div class="sub">영수증 ' + won(T.evPark) + ' 포함</div>' : '') + '</div>' +
       '</div></div>';
 
     if (T.unk) {
