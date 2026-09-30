@@ -1,0 +1,796 @@
+[
+ {
+  "no": 1,
+  "line": "수인분당선",
+  "name": "연수",
+  "devices": [
+   150,
+   154
+  ],
+  "pending": false
+ },
+ {
+  "no": 2,
+  "line": "수인분당선",
+  "name": "송도",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 3,
+  "line": "수인분당선",
+  "name": "인하대",
+  "devices": [
+   154,
+   155
+  ],
+  "pending": false
+ },
+ {
+  "no": 4,
+  "line": "수인분당선",
+  "name": "숭의",
+  "devices": [
+   153
+  ],
+  "pending": false
+ },
+ {
+  "no": 5,
+  "line": "수인분당선",
+  "name": "신포",
+  "devices": [
+   154,
+   155
+  ],
+  "pending": false
+ },
+ {
+  "no": 6,
+  "line": "수인분당선",
+  "name": "인천",
+  "devices": [
+   153
+  ],
+  "pending": false
+ },
+ {
+  "no": 7,
+  "line": "수인분당선",
+  "name": "청명",
+  "devices": [
+   151,
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 8,
+  "line": "수인분당선",
+  "name": "영통",
+  "devices": [
+   151,
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 9,
+  "line": "수인분당선",
+  "name": "망포",
+  "devices": [
+   150,
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 10,
+  "line": "수인분당선",
+  "name": "매탄권선",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 11,
+  "line": "수인분당선",
+  "name": "수원시청",
+  "devices": [
+   154,
+   155
+  ],
+  "pending": false
+ },
+ {
+  "no": 12,
+  "line": "수인분당선",
+  "name": "압구정로데오",
+  "devices": [
+   151,
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 13,
+  "line": "수인분당선",
+  "name": "강남구청",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 14,
+  "line": "수인분당선",
+  "name": "선정릉",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 15,
+  "line": "수인분당선",
+  "name": "선릉",
+  "devices": [
+   155
+  ],
+  "pending": false
+ },
+ {
+  "no": 16,
+  "line": "수인분당선",
+  "name": "한티",
+  "devices": [
+   172
+  ],
+  "pending": false
+ },
+ {
+  "no": 17,
+  "line": "수인분당선",
+  "name": "도곡",
+  "devices": [
+   170,
+   173
+  ],
+  "pending": false
+ },
+ {
+  "no": 18,
+  "line": "수인분당선",
+  "name": "초지",
+  "devices": [
+   162
+  ],
+  "pending": false
+ },
+ {
+  "no": 19,
+  "line": "수인분당선",
+  "name": "달월",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 20,
+  "line": "수인분당선",
+  "name": "월곶",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 21,
+  "line": "수인분당선",
+  "name": "소래포구",
+  "devices": [
+   150,
+   153
+  ],
+  "pending": false
+ },
+ {
+  "no": 22,
+  "line": "수인분당선",
+  "name": "인천논현",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 23,
+  "line": "수인분당선",
+  "name": "호구포",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 24,
+  "line": "수인분당선",
+  "name": "남동인더스파크",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 25,
+  "line": "수인분당선",
+  "name": "원인재",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 26,
+  "line": "서해선",
+  "name": "초지",
+  "devices": [
+   154,
+   158
+  ],
+  "pending": false
+ },
+ {
+  "no": 27,
+  "line": "수인분당선",
+  "name": "매교",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 28,
+  "line": "수인분당선",
+  "name": "수원",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 29,
+  "line": "수인분당선",
+  "name": "고색",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 30,
+  "line": "수인분당선",
+  "name": "오목천",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 31,
+  "line": "수인분당선",
+  "name": "어천",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 32,
+  "line": "수인분당선",
+  "name": "야목",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 33,
+  "line": "수인분당선",
+  "name": "사리",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 34,
+  "line": "수인분당선",
+  "name": "구룡",
+  "devices": [
+   171
+  ],
+  "pending": false
+ },
+ {
+  "no": 35,
+  "line": "수인분당선",
+  "name": "개포동",
+  "devices": [
+   171
+  ],
+  "pending": false
+ },
+ {
+  "no": 36,
+  "line": "수인분당선",
+  "name": "대모산입구",
+  "devices": [
+   171,
+   172
+  ],
+  "pending": false
+ },
+ {
+  "no": 37,
+  "line": "수인분당선",
+  "name": "이매",
+  "devices": [
+   171,
+   172
+  ],
+  "pending": false
+ },
+ {
+  "no": 38,
+  "line": "수인분당선",
+  "name": "죽전",
+  "devices": [
+   156
+  ],
+  "pending": false
+ },
+ {
+  "no": 39,
+  "line": "수인분당선",
+  "name": "보정",
+  "devices": [
+   154,
+   157
+  ],
+  "pending": false
+ },
+ {
+  "no": 40,
+  "line": "수인분당선",
+  "name": "구성",
+  "devices": [
+   152,
+   162
+  ],
+  "pending": false
+ },
+ {
+  "no": 41,
+  "line": "수인분당선",
+  "name": "신갈",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 42,
+  "line": "수인분당선",
+  "name": "기흥",
+  "devices": [
+   151,
+   153
+  ],
+  "pending": false
+ },
+ {
+  "no": 43,
+  "line": "수인분당선",
+  "name": "상갈",
+  "devices": [
+   150,
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 44,
+  "line": "서해선",
+  "name": "김포공항",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 45,
+  "line": "서해선",
+  "name": "원종",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 46,
+  "line": "서해선",
+  "name": "시우",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 47,
+  "line": "서해선",
+  "name": "원시",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 48,
+  "line": "서해선",
+  "name": "부천종합운동장",
+  "devices": [
+   153,
+   154
+  ],
+  "pending": false
+ },
+ {
+  "no": 49,
+  "line": "서해선",
+  "name": "소사",
+  "devices": [
+   151,
+   153
+  ],
+  "pending": false
+ },
+ {
+  "no": 50,
+  "line": "서해선",
+  "name": "소새울",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 51,
+  "line": "서해선",
+  "name": "시흥대야",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 52,
+  "line": "서해선",
+  "name": "신천",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 53,
+  "line": "서해선",
+  "name": "신현",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 54,
+  "line": "서해선",
+  "name": "시흥시청",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 55,
+  "line": "서해선",
+  "name": "시흥능곡",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 56,
+  "line": "서해선",
+  "name": "달미",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 57,
+  "line": "서해선",
+  "name": "선부",
+  "devices": [],
+  "pending": true
+ },
+ {
+  "no": 58,
+  "line": "경부선",
+  "name": "평택지제",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 59,
+  "line": "경부선",
+  "name": "평택",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 60,
+  "line": "경부선",
+  "name": "두정",
+  "devices": [
+   160,
+   168
+  ],
+  "pending": false
+ },
+ {
+  "no": 61,
+  "line": "경부선",
+  "name": "천안",
+  "devices": [
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 62,
+  "line": "경부선",
+  "name": "당정",
+  "devices": [
+   160
+  ],
+  "pending": false
+ },
+ {
+  "no": 63,
+  "line": "경부선",
+  "name": "서동탄",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 64,
+  "line": "경부선",
+  "name": "세마",
+  "devices": [
+   150,
+   151
+  ],
+  "pending": false
+ },
+ {
+  "no": 65,
+  "line": "경부선",
+  "name": "진위",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 66,
+  "line": "경부선",
+  "name": "서정리",
+  "devices": [
+   150
+  ],
+  "pending": false
+ },
+ {
+  "no": 67,
+  "line": "과천선",
+  "name": "범계",
+  "devices": [
+   156,
+   162
+  ],
+  "pending": false
+ },
+ {
+  "no": 68,
+  "line": "과천선",
+  "name": "평촌",
+  "devices": [
+   161
+  ],
+  "pending": false
+ },
+ {
+  "no": 69,
+  "line": "장항선",
+  "name": "봉명",
+  "devices": [
+   162
+  ],
+  "pending": false
+ },
+ {
+  "no": 70,
+  "line": "장항선",
+  "name": "쌍용",
+  "devices": [
+   161
+  ],
+  "pending": false
+ },
+ {
+  "no": 71,
+  "line": "장항선",
+  "name": "천안아산",
+  "devices": [
+   160,
+   162,
+   164
+  ],
+  "pending": false
+ },
+ {
+  "no": 72,
+  "line": "장항선",
+  "name": "탕정",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 73,
+  "line": "장항선",
+  "name": "배방",
+  "devices": [
+   163
+  ],
+  "pending": false
+ },
+ {
+  "no": 74,
+  "line": "장항선",
+  "name": "온양온천",
+  "devices": [
+   160
+  ],
+  "pending": false
+ },
+ {
+  "no": 75,
+  "line": "장항선",
+  "name": "신창",
+  "devices": [
+   161
+  ],
+  "pending": false
+ },
+ {
+  "no": 76,
+  "line": "경강선",
+  "name": "판교",
+  "devices": [
+   155,
+   156
+  ],
+  "pending": false
+ },
+ {
+  "no": 77,
+  "line": "경강선",
+  "name": "성남",
+  "devices": [
+   154,
+   155
+  ],
+  "pending": false
+ },
+ {
+  "no": 78,
+  "line": "경강선",
+  "name": "이매",
+  "devices": [
+   174,
+   175
+  ],
+  "pending": false
+ },
+ {
+  "no": 79,
+  "line": "경강선",
+  "name": "삼동",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 80,
+  "line": "경강선",
+  "name": "경기광주",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 81,
+  "line": "경강선",
+  "name": "초월",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 82,
+  "line": "경강선",
+  "name": "곤지암",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 83,
+  "line": "경강선",
+  "name": "신둔도예촌",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 84,
+  "line": "경강선",
+  "name": "이천",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 85,
+  "line": "경강선",
+  "name": "부발",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 86,
+  "line": "경강선",
+  "name": "세종대왕릉",
+  "devices": [
+   152
+  ],
+  "pending": false
+ },
+ {
+  "no": 87,
+  "line": "경강선",
+  "name": "여주",
+  "devices": [
+   152
+  ],
+  "pending": false
+ }
+]
