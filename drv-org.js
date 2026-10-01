@@ -1,69 +1,107 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    drv-org.js — 조직도 · 결재선 (운행일지 관리자)
    ---------------------------------------------------------------------------
-   · 조직도(driving_org)는 결재선을 짜기 위한 사람 목록이다. 앱 계정이 없는 사람도 들어 있다.
-     결재를 누르려면 계정이 있어야 하므로, 사람마다 '계정 연결'을 보여 준다.
-   · 결재선(driving_approval_lines)은 부서 단위다. 키는 본부 / 팀 / "팀/센터·파트".
-     직원이 상신 창을 열면 자기 소속에서 가장 가까운 결재선이 미리 채워진다
-     (센터·파트 → 팀 → 본부 순). 직원은 빼거나 더할 수 있다.
+   · 조직도(driving_org)가 결재선의 정본이다. **결재선은 부서마다 지정하지 않는다** —
+     상신자의 조직도 위치와 '직책' 칸에서 자동으로 만든다(2026-10-02 사용자 결정).
+       센터·파트의 장(센터장·파트장 등) → 결재란 「팀장」 칸
+       팀의 장(팀장)                    → 「실장」 칸
+       본부의 장(사업부장·공장장)       → 「대표이사」 칸
+     (칸 이름과 직위가 1:1이 아니다 — 사내 양식 관례. 20260915020000 마이그레이션 주석 참고)
+     본인이 그 단계의 장이면 그 위 단계부터. 장이 없거나 앱 계정이 없는 단계는 건너뛴다.
+     그래서 관리자가 할 일은 조직도에서 **직책 칸**과 **앱 계정**을 맞춰 두는 것뿐이다.
+   · 직원은 상신 창에서 미리 채워진 결재선을 빼거나 더하거나 칸을 바꿀 수 있다.
+   · 예전 부서별 결재선(driving_approval_lines)은 지우지 않고 남겨 둔다. 조직도로 결재선을 만들 수 없는
+     사람(조직도에 없거나 위로 장이 아무도 없는 사람)에게만 예비로 쓴다.
    · 사람을 지우지 않는다. '내리기'는 active=false 로 감출 뿐이다(기록이 남는다).
    · 쓰기는 서버 정책이 운행일지 관리자에게만 허락한다(화면에서 막는 것은 안내일 뿐).
    ═══════════════════════════════════════════════════════════════════════════ */
 (window.DrvExtQ = window.DrvExtQ || []).push(function (C) {
   'use strict';
   var $ = C.$, esc = C.esc, ic = C.ic, n0 = C.n0;
-  var BOXES = C.BOXES.slice(1);                 // 팀장 · 실장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
   var RANKS = ['대표이사', '부사장', '전무', '상무', '이사', '수석', '책임', '선임', '사원', '대표', '차장'];
 
   var SEL = '';                                 // 고른 부서 키: '' = 전체, 'A' 본부, 'A|B' 팀, 'A|B|C' 센터·파트
   var Q = '';                                   // 사람 찾기
-  var LEDIT = null;                             // 결재선 편집 중: { key, steps:[{box, users:[], pick}] }
 
   function nodeKey(o, depth) { return [o.division, o.team, o.unit].slice(0, depth).join('|'); }
   function parts(k) { return k ? k.split('|') : []; }
-  /** 결재선 키 — 본부는 본부 이름, 팀은 팀 이름, 센터·파트는 "팀/센터". (팀 이름이 앱의 '소속'과 같다) */
-  function lineKey(k) {
-    var p = parts(k);
-    if (!p.length) return '';
-    if (p.length === 1) return p[0];
-    if (p.length === 2) return p[1] || p[0];
-    return (p[1] ? p[1] + '/' : '') + p[2];
-  }
   function inNode(o, k) {
     var p = parts(k);
     return (!p[0] || o.division === p[0]) && (p.length < 2 || o.team === p[1]) && (p.length < 3 || o.unit === p[2]);
   }
   function nodeName(k) { var p = parts(k); return p.length ? (p[p.length - 1] || p[p.length - 2]) : '전체'; }
-
-  /** 그 부서에 적용되는 결재선과, 어디서 물려받았는지. */
-  function lineOf(k) {
-    var S = C.state(), p = parts(k);
-    var tries = [];
-    if (p.length === 3) tries.push([k, lineKey(k)]);
-    if (p.length >= 2 && p[1]) tries.push([p.slice(0, 2).join('|'), p[1]]);
-    if (p.length >= 1) tries.push([p[0], p[0]]);
-    for (var i = 0; i < tries.length; i++) {
-      var l = S.LINES[tries[i][1]];
-      if (l && Array.isArray(l.steps) && l.steps.length) return { line: l, own: i === 0, from: tries[i][0], key: tries[i][1] };
-    }
-    return null;
-  }
   function stepUsers(s) { return s.approver ? [s.approver] : (s.candidates || []).slice(); }
   function who(u) {
     var S = C.state(), o = S.ORG.filter(function (x) { return x.username === u; })[0];
     var p = S.PEOPLE[u] || {};
     return { name: (o && o.name) || p.name || u, rank: (o && o.rank) || p.position || '', has: !!S.PEOPLE[u] };
   }
+
+  /* ══════════════════ 자동 결재선 ══════════════════ */
+  /** 단계: 아래에서 위로. box = 결재란 칸, what = 화면에 보일 그 단계의 장 이름. */
+  var LEVELS = [
+    { key: 'unit', box: '팀장', what: '센터·파트장' },
+    { key: 'team', box: '실장', what: '팀장' },
+    { key: 'division', box: '대표이사', what: '사업부장' }
+  ];
+  /** 그 단계의 장들(조직도에서 직책 칸이 채워진 사람). pos = { division, team, unit } */
+  function headsAt(lv, pos) {
+    return C.state().ORG.filter(function (o) {
+      if (!String(o.role || '').trim() || o.division !== pos.division) return false;
+      if (lv === 'division') return !o.team && !o.unit;
+      if (lv === 'team') return !!pos.team && o.team === pos.team && !o.unit;
+      return !!pos.unit && o.team === pos.team && o.unit === pos.unit;
+    });
+  }
+  /**
+   * 그 자리(pos)에 있는 사람(self = 조직도 행, 없으면 그 부서의 보통 직원)의 결재선.
+   * 돌려주는 값: { steps: [{box, approver} | {box, candidates, pick}], notes: [건너뛴 까닭] }
+   */
+  function chainFor(pos, self) {
+    var S = C.state();
+    var lv = LEVELS.filter(function (l) {
+      return l.key === 'division' || (l.key === 'team' && pos.team) || (l.key === 'unit' && pos.unit);
+    });
+    // 본인이 그 단계의 장이면 그 단계와 그 아래는 뺀다(본인이 본인을 결재하지 않는다).
+    var at = -1;
+    lv.forEach(function (l, i) {
+      if (self && headsAt(l.key, pos).some(function (o) { return o.id === self.id; })) at = i;
+    });
+    lv = lv.slice(at + 1);
+    var used = {}, steps = [], notes = [];
+    if (self && self.username) used[self.username] = 1;
+    lv.forEach(function (l) {
+      var hs = headsAt(l.key, pos).filter(function (o) { return !self || o.id !== self.id; });
+      var ok = hs.filter(function (o) { return o.username && S.PEOPLE[o.username] && !used[o.username]; })
+        .map(function (o) { return o.username; })
+        .filter(function (u, i, a) { return a.indexOf(u) === i; });
+      if (!hs.length) { notes.push({ box: l.box, why: '조직도에 ' + l.what + ' 직책이 없음' }); return; }
+      if (!ok.length) {
+        notes.push({ box: l.box, why: hs.map(function (o) { return o.name; }).join('·') + ' ' + l.what + ' — 앱 계정이 없어 건너뜀' });
+        return;
+      }
+      ok.forEach(function (u) { used[u] = 1; });
+      steps.push(ok.length === 1 ? { box: l.box, approver: ok[0] } : { box: l.box, candidates: ok, pick: l.what });
+    });
+    return { steps: steps, notes: notes };
+  }
+  function posOf(o) { return { division: o.division || '', team: o.team || '', unit: o.unit || '' }; }
+  /** 결재선 한 줄(이름만) — 표 칸에 넣는다. */
+  function chainText(steps) {
+    return steps.map(function (s) {
+      var us = stepUsers(s);
+      return us.map(function (u) { return who(u).name; }).join('/') + '(' + s.box + ')';
+    }).join(' → ');
+  }
   function stepsHtml(steps) {
     return '<div class="oline">' + '<span class="ostep me"><em>담당</em><b>상신자 본인</b></span>' +
       steps.map(function (s) {
         var us = stepUsers(s);
-        return '<span class="oarrow">→</span><span class="ostep"><em>' + esc(s.box || '') + '</em>' +
+        return '<span class="oarrow">→</span><span class="ostep"><em>' + esc(s.box || '') + ' 칸</em>' +
           (us.length > 1 ? '<span class="dim">' + esc(s.pick || '후보') + ' 중 1명</span>' : '') +
           us.map(function (u) {
             var w = who(u);
-            return '<b' + (w.has ? '' : ' class="nouser" title="앱 계정이 없어 결재를 누를 수 없습니다"') + '>' +
-              esc(w.name) + (w.rank ? ' <small>' + esc(w.rank) + '</small>' : '') + '</b>';
+            return '<b>' + esc(w.name) + (w.rank ? ' <small>' + esc(w.rank) + '</small>' : '') + '</b>';
           }).join('') + '</span>';
       }).join('') + '</div>';
   }
@@ -73,9 +111,11 @@
     var S = C.state();
     if (!S.LOADED) return C.head('조직도 · 결재선') + C.skeleton();
     var org = S.ORG;
-    var linked = org.filter(function (o) { return o.username; }).length;
-    var lineN = Object.keys(S.LINES).filter(function (k) { return (S.LINES[k].steps || []).length; }).length;
-    var h = C.head('조직도 · 결재선', n0(org.length) + '명 · 앱 계정 연결 ' + n0(linked) + '명 · 결재선 ' + n0(lineN) + '곳');
+    var linked = org.filter(function (o) { return o.username && S.PEOPLE[o.username]; });
+    // 앱 계정이 있는 사람 중 결재선이 자동으로 하나도 안 만들어지는 사람 — 관리자가 직책을 채워야 한다.
+    var noLine = linked.filter(function (o) { return !chainFor(posOf(o), o).steps.length; });
+    var h = C.head('조직도 · 결재선', n0(org.length) + '명 · 앱 계정 연결 ' + n0(linked.length) + '명 · ' +
+      (noLine.length ? '<b>결재선을 못 만드는 사람 ' + n0(noLine.length) + '명</b>' : '전원 결재선 자동'));
 
     // ── 왼쪽: 부서 나무 ──
     var tree = {}, order = [], first = {};
@@ -105,33 +145,46 @@
       }
       return 0;
     });
+    // 부서마다 그 부서의 장이 있는지(계정까지) — 없으면 나무에 주황 점.
+    var headState = function (k) {
+      var p = parts(k), lvKey = p.length === 3 ? 'unit' : p.length === 2 ? 'team' : 'division';
+      var hs = headsAt(lvKey, { division: p[0] || '', team: p[1] || '', unit: p[2] || '' });
+      if (!hs.length) return 'none';
+      return hs.some(function (o) { return o.username && S.PEOPLE[o.username]; }) ? 'ok' : 'noacct';
+    };
     var left = '<button class="onode root' + (SEL === '' ? ' on' : '') + '" data-onode="">전체 <span class="c">' + n0(org.length) + '</span></button>' +
       order.map(function (k) {
-        var d = parts(k).length, has = lineOf(k), own = has && has.own;
+        var d = parts(k).length, hsx = headState(k);
         return '<button class="onode d' + d + (SEL === k ? ' on' : '') + '" data-onode="' + esc(k) + '">' +
           '<span class="nm">' + esc(nodeName(k)) + '</span>' +
-          (own ? '<span class="dot ok" title="결재선이 지정돼 있습니다"></span>' : '') +
+          (hsx === 'ok' ? '' : '<span class="dot warn" title="' + (hsx === 'none' ? '이 부서의 장(직책)이 조직도에 없습니다' : '이 부서의 장에게 앱 계정이 없습니다') + '"></span>') +
           '<span class="c">' + n0(tree[k]) + '</span></button>';
       }).join('');
 
-    // ── 오른쪽: 결재선 + 사람 ──
+    // ── 오른쪽: 이 부서의 자동 결재선 + 사람 ──
     var right = '';
     if (SEL) {
-      var eff = lineOf(SEL), lk = lineKey(SEL);
-      right += '<div class="ocard"><div class="ohd"><b>' + esc(nodeName(SEL)) + ' 결재선</b>' +
-        (eff ? (eff.own ? '<span class="st ok">이 부서에 지정됨</span>'
-          : '<span class="st dim">' + esc(nodeName(eff.from)) + ' 결재선을 따름</span>')
-          : '<span class="st warn">지정된 결재선이 없습니다</span>') +
-        '<span style="flex:1"></span>' +
-        (eff && eff.own ? '<button class="btn sm" data-olinedel="' + esc(lk) + '">지정 풀기</button>' : '') +
-        '<button class="btn sm pri" data-olineedit="' + esc(SEL) + '">' + (eff && eff.own ? '고치기' : '이 부서 결재선 지정') + '</button></div>' +
-        (eff ? stepsHtml(eff.line.steps)
-          : '<div class="anote" style="margin-top:8px">결재선이 없으면 직원이 상신할 때 결재자를 직접 찾아 넣어야 합니다.</div>') +
+      var p0 = parts(SEL), pos = { division: p0[0] || '', team: p0[1] || '', unit: p0[2] || '' };
+      var ch = chainFor(pos, null);
+      right += '<div class="ocard"><div class="ohd"><b>' + esc(nodeName(SEL)) + ' 직원의 결재선</b>' +
+        '<span class="st ' + (ch.steps.length ? 'ok' : 'warn') + '">' + (ch.steps.length ? '조직도에서 자동' : '만들 수 없음') + '</span></div>' +
+        (ch.steps.length ? stepsHtml(ch.steps)
+          : '<div class="anote" style="margin-top:8px">이 부서 위로 직책(센터장·팀장·사업부장 등)이 채워진 사람이 없습니다. ' +
+            '그대로 두면 직원이 상신할 때 결재자를 직접 찾아 넣어야 합니다.</div>') +
+        (ch.notes.length ? '<div class="onotes">' + ch.notes.map(function (n) {
+          return '<div>' + ic('alert', 13) + '<span>「' + esc(n.box) + '」 칸 — ' + esc(n.why) + '</span></div>';
+        }).join('') + '</div>' : '') +
+        '<div class="anote" style="margin-top:10px">장 본인이 상신하면 그 위 단계부터 들어갑니다. 결재선을 바꾸려면 사람의 <b>직책</b>·<b>소속</b>·<b>앱 계정</b>을 고치세요 — 바로 반영됩니다.</div>' +
         '</div>';
     } else {
-      right += '<div class="ocard"><div class="anote" style="margin:0">왼쪽에서 부서를 고르면 그 부서의 <b>결재선</b>을 지정할 수 있습니다. ' +
-        '센터·파트에 결재선이 없으면 팀 것을, 팀에도 없으면 본부 것을 따릅니다. ' +
-        '직원은 상신할 때 미리 채워진 결재선에서 빼거나 더할 수 있습니다.</div></div>';
+      right += '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 조직도에서 자동으로 정해집니다.</b> 상신자가 속한 ' +
+        '<b>센터·파트의 장 → 팀장 → 사업부장</b> 순서로, 결재란은 각각 「팀장」·「실장」·「대표이사」 칸에 찍힙니다. ' +
+        '장이 없거나 앱 계정이 없는 단계는 건너뜁니다. 관리자는 사람의 <b>직책</b>과 <b>앱 계정</b>만 맞춰 두면 됩니다. ' +
+        '직원은 상신할 때 미리 채워진 결재선에서 빼거나 더할 수 있습니다.</div>' +
+        (noLine.length ? '<div class="awarn" style="margin-top:12px">' + ic('alert', 15) + '<span>앱 계정이 있는데 결재선을 못 만드는 사람이 <b>' +
+          n0(noLine.length) + '명</b> 있습니다(위로 직책이 채워진 사람이 없음): ' +
+          esc(noLine.slice(0, 8).map(function (o) { return o.name; }).join(', ') + (noLine.length > 8 ? ' 외 ' + (noLine.length - 8) + '명' : '')) +
+          '. 그 부서의 장에게 <b>직책</b>을 넣어 주세요.</span></div>' : '') + '</div>';
     }
 
     var q = Q.trim().toLowerCase();
@@ -145,19 +198,21 @@
       '<div class="sp" style="flex:1"></div>' +
       '<button class="btn sm pri" data-oadd>＋ 사람 추가</button></div>';
     right += people.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>앱 계정</th><th>결재선(자동)</th><th></th></tr></thead><tbody>' +
       people.map(function (o) {
         var acct = o.username
           ? (S.PEOPLE[o.username] ? '<span class="st ok">' + esc(o.username) + '</span>'
             : '<span class="st bad" title="연결한 계정이 없어졌습니다">' + esc(o.username) + '</span>')
           : '<span class="st dim">없음</span>';
+        var line = chainFor(posOf(o), o).steps;
+        var lt = chainText(line);
         return '<tr><td><span class="lead">' + esc(o.name) + '</span>' + (o.outsourced ? ' <span class="kind">외주</span>' : '') + '</td>' +
           '<td>' + esc(o.rank || '—') + '</td>' +
           '<td>' + (o.role ? '<span class="kind biz">' + esc(o.role) + '</span>' : '<span class="dim">—</span>') + '</td>' +
           '<td class="el dim" title="' + esc([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + '">' +
           esc([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + '</td>' +
-          '<td class="el" title="' + esc(o.duty || '') + '">' + esc(o.duty || '') + '</td>' +
           '<td>' + acct + '</td>' +
+          '<td class="el" title="' + esc(lt) + '">' + (line.length ? esc(lt) : '<span class="st warn">없음 — 상신 때 직접</span>') + '</td>' +
           // 「내리기」는 고치기 창 안에 있다 — 줄마다 두면 표가 넘쳐 잘리고, 「고치기」 옆이라 잘못 누르기 쉽다.
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-oedit="' + o.id + '" aria-label="' +
           esc(o.name) + ' 고치기">고치기</button></td></tr>';
@@ -166,8 +221,9 @@
 
     // ★ <aside> 를 쓰지 않는다 — 좌측 메뉴(aside)의 폭·고정 위치·좁은 화면 감춤 규칙을 그대로 물려받는다.
     h += '<div class="orgwrap"><nav class="otree" aria-label="부서">' + left + '</nav><div class="omain">' + right + '</div></div>';
-    h += '<div class="anote">결재를 누르려면 <b>앱 계정</b>이 있어야 합니다. 계정이 없는 사람을 결재선에 넣으면 그 칸에서 결재가 멈춥니다 — ' +
-      '먼저 앱에서 가입하게 한 뒤 「고치기」에서 계정을 이어 주세요. 퇴사·이동한 사람은 「고치기」 창의 <b>목록에서 내리기</b>로 감춥니다(기록은 남습니다).</div>';
+    h += '<div class="anote">결재를 누르려면 <b>앱 계정</b>이 있어야 합니다. 계정이 없는 장은 결재선에서 건너뜁니다 — ' +
+      '먼저 앱에서 가입하게 한 뒤 「고치기」에서 계정을 이어 주세요. 퇴사·이동한 사람은 「고치기」 창의 <b>목록에서 내리기</b>로 감춥니다(기록은 남습니다). ' +
+      '나무의 주황 점은 그 부서의 장(직책)이 없거나 계정이 없다는 뜻입니다.</div>';
     return h;
   }
 
@@ -205,7 +261,8 @@
         '팀 직속이면 비워 둡니다', 'oUnit') +
       fld('직급', '<input class="inp" id="oRank" list="dlRank" maxlength="20" value="' + esc(v.rank) + '">' + dl('dlRank', RANKS), null, 'oRank') +
       fld('직책', '<input class="inp" id="oRole" list="dlRole" maxlength="20" value="' + esc(v.role) + '">' +
-        dl('dlRole', ['사업부장', '공장장', '실장', '팀장', '센터장', '파트장']), '없으면 비워 둡니다', 'oRole') +
+        dl('dlRole', ['사업부장', '공장장', '실장', '팀장', '센터장', '파트장']),
+        '<b>그 부서의 장</b>일 때만 넣습니다(센터장·파트장·팀장·사업부장 등). 직원들의 결재선이 이 칸으로 자동으로 정해집니다. 장이 아니면 비워 둡니다', 'oRole') +
       fld('담당 업무', '<input class="inp" id="oDuty" maxlength="80" value="' + esc(v.duty) + '">', null, 'oDuty') +
       fld('앱 계정', '<select class="inp" id="oUser"><option value="">없음 (아직 가입 전)</option>' +
         accts.map(function (u) {
@@ -228,9 +285,8 @@
       return String(($(i) || {}).value || '');
     }).join('\u0001') + '\u0001' + ((($('oOut') || {}).checked) ? 1 : 0);
   }
-  /** 닫기 전에 되물어야 하는가 — 사람 창·결재선 창에서 실제로 바꾼 것이 있을 때만. */
+  /** 닫기 전에 되물어야 하는가 — 사람 창에서 실제로 바꾼 것이 있을 때만. */
   function dirty() {
-    if ($('lSave') && LEDIT) { readLine(); return JSON.stringify(LEDIT.steps) !== LEDIT.init; }
     if ($('oSave')) return personSig() !== P_INIT;
     return false;
   }
@@ -277,15 +333,16 @@
   function askOff(id) {
     var S = C.state(), o = S.ORG.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!o) return;
-    // 이 사람이 들어 있는 결재선 — 내리기 전에 알려 준다.
-    var inLines = o.username ? Object.keys(S.LINES).filter(function (k) {
-      return (S.LINES[k].steps || []).some(function (s) { return stepUsers(s).indexOf(o.username) >= 0; });
-    }) : [];
+    // 이 사람이 결재자로 들어가는 직원 수 — 내리면 그 직원들의 결재선에서 이 단계가 빠진다(자동).
+    var affected = o.username ? S.ORG.filter(function (x) {
+      return x.id !== o.id && chainFor(posOf(x), x).steps.some(function (s) { return stepUsers(s).indexOf(o.username) >= 0; });
+    }).length : 0;
     C.openPanel('목록에서 내리기', o.name + ' · ' + [o.team, o.unit].filter(Boolean).join(' › '),
       '<div class="anote" style="margin-top:0"><b>' + esc(o.name) + '</b> 님을 조직도에서 내립니다. 기록은 지워지지 않고 목록에서만 사라집니다. ' +
       '앱 계정과 운행 기록에는 아무 영향이 없습니다.</div>' +
-      (inLines.length ? '<div class="awarn">' + ic('alert', 15) + '<span>이 분은 <b>' + esc(inLines.join(' · ')) +
-        '</b> 결재선에 들어 있습니다. 내려도 결재선에서는 빠지지 않으니, 결재선도 고쳐 주세요.</span></div>' : ''),
+      (affected ? '<div class="awarn">' + ic('alert', 15) + '<span>이 분은 직원 <b>' + n0(affected) +
+        '명</b>의 결재선에 들어 있습니다. 내리면 그 직원들의 결재선에서 이 단계가 빠집니다 — 후임이 있으면 후임에게 <b>직책</b>을 먼저 넣어 주세요. ' +
+        '이미 올라간 결재 건은 바뀌지 않습니다.</span></div>' : ''),
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="oOffGo" data-id="' + o.id + '">내리기</button>');
   }
@@ -299,113 +356,6 @@
       .catch(function (e) { C.toast((e && e.message) || '내리지 못했습니다.', true); });
   }
 
-  /* ══════════════════ 결재선 편집 ══════════════════ */
-  function openLine(k) {
-    var eff = lineOf(k);
-    LEDIT = {
-      node: k, key: lineKey(k),
-      steps: eff ? eff.line.steps.map(function (s) { return { box: s.box || '', users: stepUsers(s), pick: s.pick || '' }; }) : []
-    };
-    if (!LEDIT.steps.length) LEDIT.steps.push({ box: '팀장', users: [], pick: '' });
-    LEDIT.init = JSON.stringify(LEDIT.steps);
-    paintLine();
-  }
-  /** 결재자로 고를 수 있는 사람 — 앱 계정이 있는 사람. 이 부서와 가까운 사람이 위로 온다. */
-  function pickList(k) {
-    var S = C.state(), p = parts(k), seen = {}, out = [];
-    var score = function (o) {
-      return (o.division === p[0] ? 0 : 4) + (p[1] && o.team === p[1] ? 0 : 2) + (o.role ? 0 : 1);
-    };
-    S.ORG.filter(function (o) { return o.username && S.PEOPLE[o.username]; })
-      .sort(function (a, b) { return score(a) - score(b) || a.sort - b.sort; })
-      .forEach(function (o) {
-        seen[o.username] = 1;
-        out.push({ u: o.username, label: o.name + ' · ' + [o.rank, o.role].filter(Boolean).join(' ') + ' · ' + ([o.team, o.unit].filter(Boolean).join(' › ') || o.division) });
-      });
-    // 조직도에 없는 앱 계정(본부 밖 임원 등)도 결재자가 될 수 있다.
-    Object.keys(S.PEOPLE).filter(function (u) { return !seen[u]; })
-      .sort(function (a, b) { return C.nameOf(a).localeCompare(C.nameOf(b), 'ko'); })
-      .forEach(function (u) {
-        var pp = S.PEOPLE[u];
-        out.push({ u: u, label: C.nameOf(u) + ' · ' + [pp.position, pp.dept].filter(Boolean).join(' · ') + ' · (조직도 밖)' });
-      });
-    return out;
-  }
-  function readLine() {
-    if (!LEDIT) return;
-    LEDIT.steps.forEach(function (s, i) {
-      var b = document.querySelector('[data-lbox="' + i + '"]'); if (b) s.box = b.value;
-      var p = document.querySelector('[data-lpick="' + i + '"]'); if (p) s.pick = p.value.trim();
-    });
-  }
-  function paintLine() {
-    var list = pickList(LEDIT.node);
-    var body = '<div class="anote" style="margin-top:0">위에서 아래 순서로 결재합니다. <b>칸</b>은 운행기록부 결재란의 어느 칸에 이름이 찍히는지입니다(쓰지 않는 칸은 빗금). ' +
-      '한 단계에 <b>두 명 이상</b> 넣으면 직원이 상신할 때 그중 한 명을 고릅니다(예: 센터장이 여럿인 팀).</div>' +
-      '<div class="lsteps"><div class="lstep me"><span class="lseq">본</span><span class="lwho"><b>상신자 본인</b></span><span class="lbox">담당</span></div>';
-    LEDIT.steps.forEach(function (s, i) {
-      var opts = list.filter(function (x) { return s.users.indexOf(x.u) < 0; });
-      body += '<div class="lstep"><span class="lseq">' + (i + 1) + '</span><span class="lwho">' +
-        (s.users.length ? s.users.map(function (u) {
-          var w = who(u);
-          return '<span class="lchip' + (w.has ? '' : ' bad') + '">' + esc(w.name) + (w.rank ? ' <small>' + esc(w.rank) + '</small>' : '') +
-            '<button data-lrm="' + i + ':' + esc(u) + '" aria-label="' + esc(w.name) + ' 빼기">' + ic('close', 11) + '</button></span>';
-        }).join('') : '<span class="dim">결재자를 골라 주세요</span>') +
-        '<select class="inp" data-ladd="' + i + '" aria-label="' + (i + 1) + '단계 결재자 고르기"><option value="">' +
-        (s.users.length ? '＋ 후보 더 넣기' : '결재자 고르기') + '</option>' +
-        opts.map(function (x) { return '<option value="' + esc(x.u) + '">' + esc(x.label) + '</option>'; }).join('') + '</select>' +
-        (s.users.length > 1 ? '<input class="inp" data-lpick="' + i + '" maxlength="12" placeholder="고를 때 보일 이름 (예: 센터장)" value="' + esc(s.pick) + '">' : '') +
-        '</span><select class="inp lbox" data-lbox="' + i + '" aria-label="' + (i + 1) + '단계 결재란 칸">' +
-        BOXES.map(function (b) { return '<option value="' + b + '"' + (s.box === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') +
-        '</select><button class="iconbtn sm" data-ldel="' + i + '" aria-label="' + (i + 1) + '단계 빼기">' + ic('close', 14) + '</button></div>';
-    });
-    body += '</div>' + (LEDIT.steps.length < 4 ? '<button class="btn sm" data-lmore>＋ 단계 추가</button>' : '');
-    C.openPanel(nodeName(LEDIT.node) + ' 결재선', '적용 부서: ' + LEDIT.key, body,
-      '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="lSave">저장</button>', true);
-  }
-  function saveLine() {
-    readLine();
-    var steps = LEDIT.steps;
-    if (!steps.length) { C.toast('결재 단계를 하나 이상 넣어 주세요.', true); return; }
-    for (var i = 0; i < steps.length; i++) {
-      if (!steps[i].users.length) { C.toast((i + 1) + '단계의 결재자를 골라 주세요.', true); return; }
-    }
-    var boxes = steps.map(function (s) { return s.box; });
-    if (boxes.some(function (b, i) { return boxes.indexOf(b) !== i; })) { C.toast('같은 결재란 칸이 두 번 들어 있습니다.', true); return; }
-    var all = [].concat.apply([], steps.map(function (s) { return s.users; }));
-    if (all.some(function (u, i) { return all.indexOf(u) !== i; })) { C.toast('같은 사람이 두 단계에 들어 있습니다.', true); return; }
-    var row = {
-      dept: LEDIT.key, updated_at: new Date().toISOString(),
-      steps: steps.map(function (s) {
-        return s.users.length === 1 ? { box: s.box, approver: s.users[0] }
-          : { box: s.box, candidates: s.users, pick: s.pick || s.box };
-      })
-    };
-    var btn = $('lSave'); if (btn) btn.disabled = true;
-    C.apiRetry('/rest/v1/driving_approval_lines?on_conflict=dept', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row)
-    }).then(function (r) { if (!r.ok) return fail(r, '저장'); })
-      .then(function () { return C.fetchAll('/rest/v1/driving_approval_lines?select=*'); })
-      .then(function (rows) {
-        C.setLines(rows); LEDIT = null; C.closePanel();
-        C.toast(row.dept + ' 결재선을 저장했습니다.'); C.render();
-      }).catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했습니다.', true); });
-  }
-  function askLineDel(key) {
-    C.openPanel('결재선 지정 풀기', key,
-      '<div class="anote" style="margin-top:0"><b>' + esc(key) + '</b> 에 따로 지정한 결재선을 풉니다. 풀면 윗부서 결재선을 따르고, ' +
-      '윗부서에도 없으면 직원이 상신할 때 결재자를 직접 넣습니다. 이미 올라간 결재 건은 바뀌지 않습니다.</div>',
-      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="lDelGo" data-key="' + esc(key) + '">풀기</button>');
-  }
-  function runLineDel(key) {
-    C.apiRetry('/rest/v1/driving_approval_lines?dept=eq.' + encodeURIComponent(key), { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
-      .then(function (r) { if (!r.ok) return fail(r, '풀기'); })
-      .then(function () { return C.fetchAll('/rest/v1/driving_approval_lines?select=*'); })
-      .then(function (rows) { C.setLines(rows); C.closePanel(); C.toast('결재선 지정을 풀었습니다.'); C.render(); })
-      .catch(function (e) { C.toast((e && e.message) || '풀지 못했습니다.', true); });
-  }
-
   /* ══════════════════ 이벤트 ══════════════════ */
   document.addEventListener('click', function (e) {
     var el;
@@ -415,31 +365,6 @@
     if ((el = e.target.closest('#oSave'))) { savePerson(el.dataset.id); return; }
     if ((el = e.target.closest('[data-ooff]'))) { askOff(el.dataset.ooff); return; }
     if ((el = e.target.closest('#oOffGo'))) { runOff(el.dataset.id); return; }
-    if ((el = e.target.closest('[data-olineedit]'))) { openLine(el.dataset.olineedit); return; }
-    if ((el = e.target.closest('[data-olinedel]'))) { askLineDel(el.dataset.olinedel); return; }
-    if ((el = e.target.closest('#lDelGo'))) { runLineDel(el.dataset.key); return; }
-    if (e.target.closest('#lSave')) { saveLine(); return; }
-    if (!LEDIT) return;
-    if (e.target.closest('[data-lmore]')) {
-      readLine();
-      var used = LEDIT.steps.map(function (s) { return s.box; });
-      LEDIT.steps.push({ box: BOXES.filter(function (b) { return used.indexOf(b) < 0; })[0] || BOXES[BOXES.length - 1], users: [], pick: '' });
-      paintLine(); return;
-    }
-    if ((el = e.target.closest('[data-ldel]'))) { readLine(); LEDIT.steps.splice(+el.dataset.ldel, 1); paintLine(); return; }
-    if ((el = e.target.closest('[data-lrm]'))) {
-      readLine();
-      var p = el.dataset.lrm, i = +p.slice(0, p.indexOf(':')), u = p.slice(p.indexOf(':') + 1);
-      LEDIT.steps[i].users = LEDIT.steps[i].users.filter(function (x) { return x !== u; });
-      paintLine(); return;
-    }
-  });
-  document.addEventListener('change', function (e) {
-    if (LEDIT && e.target.dataset && e.target.dataset.ladd !== undefined && e.target.value) {
-      readLine();
-      LEDIT.steps[+e.target.dataset.ladd].users.push(e.target.value);
-      paintLine();
-    }
   });
   var qT = 0, IME = false;
   // 조합이 시작되면 걸어 둔 다시 그리기도 지운다 — 음절 사이에 걸린 타이머가 다음 음절 조합 중에
@@ -458,14 +383,15 @@
     }, 200);
   }
 
-  /** 상신 창이 쓴다 — 그 사람 소속에서 가장 가까운 결재선(센터·파트 → 팀 → 본부). */
+  /**
+   * 상신 창이 쓴다 — 그 사람의 자동 결재선(조직도 위치·직책). 만들 수 없으면 null
+   * (그때 상신 창은 예전 부서별 결재선 → 직접 입력 순으로 넘어간다).
+   */
   function lineForUser(u) {
     var S = C.state(), o = S.ORG.filter(function (x) { return x.username === u; })[0];
     if (!o) return null;
-    var k = [o.division, o.team, o.unit].filter(function (x, i) { return i === 0 || x; }).join('|');
-    if (!o.team && o.unit) k = [o.division, '', o.unit].join('|');
-    var eff = lineOf(k);
-    return eff ? eff.line : null;
+    var ch = chainFor(posOf(o), o);
+    return ch.steps.length ? { steps: ch.steps, auto: true } : null;
   }
 
   return { views: { org: viewOrg }, admin: ['org'], lineForUser: lineForUser, dirty: dirty, onCycle: function () { } };

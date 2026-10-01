@@ -1468,7 +1468,7 @@
 
   /* ══════════════════ 결재 ══════════════════
      결재 단위는 사람 × 마감주기. 운행 건별로 결재하지 않는다.
-     결재선은 부서 기본선을 자동으로 채워 주되 잠그지 않는다 — 빼고 더할 수 있다.  */
+     결재선은 조직도에서 자동으로 채워 주되 잠그지 않는다 — 빼고 더할 수 있다.  */
   var CYCKEY = function () { return CYC.y + '-' + pad(CYC.m); };
   var BOXES = ['담당', '팀장', '실장', '사업부장', '대표이사'];
 
@@ -1485,7 +1485,7 @@
       return cur && cur.approver === mine;
     });
   }
-  /** 마지막으로 상신했던 결재선을 기억한다 — 부서 기본선보다 우선한다. */
+  /** 마지막으로 상신했던 결재선 — 조직도로 결재선을 만들 수 없는 사람에게만 쓴다(defaultSteps). */
   function lastSteps() {
     var mine = myName();
     var past = APPR.filter(function (a) {
@@ -1493,12 +1493,22 @@
     }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
     return past ? past.steps.map(function (s) { return { approver: s.approver, box: s.box }; }) : null;
   }
-  /** 부서 기본선 → 본인 위치 아래는 잘라낸다. pick 자리는 고르라고 비워 둔다. */
+  /**
+   * 상신 창에 미리 채울 결재선.
+   *   ① 조직도에서 자동(drv-org.js lineForUser — 센터·파트장 → 팀장 → 사업부장) — 정본
+   *   ② 지난번에 상신했던 결재선(조직도로 만들 수 없는 사람만)
+   *   ③ 예전 부서별 결재선(driving_approval_lines — 지우지 않고 예비로 남겨 둔 것)
+   * 본인 위치 아래는 잘라낸다. pick 자리는 고르라고 비워 둔다.
+   * ★ 2026-10-02 부터 자동이 먼저다. 예전에는 지난번 결재선이 먼저라, 조직도를 고쳐도 반영되지 않았다.
+   */
   function defaultSteps() {
-    var remembered = lastSteps();
-    if (remembered) return remembered;
+    var auto = EXT.lineForUser && EXT.lineForUser(myName());
     var me2 = personOf(myName());
-    var line = (EXT.lineForUser && EXT.lineForUser(myName())) || LINES[me2.dept];
+    if (!auto) {
+      var remembered = lastSteps();
+      if (remembered) return remembered;
+    }
+    var line = auto || LINES[me2.dept];
     if (!line || !Array.isArray(line.steps)) return [];
     var out = line.steps.map(function (s) {
       return { approver: s.approver || '', box: s.box || '', pick: s.pick || '', candidates: s.candidates || [] };
@@ -2213,7 +2223,7 @@
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
       (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' +
-        '결재선은 부서 기본선이 자동으로 채워집니다. 빼거나 더하실 수 있습니다.</div>') +
+        '결재선은 조직도(센터·파트장 → 팀장 → 사업부장)에서 자동으로 채워집니다. 빼거나 더하실 수 있습니다.</div>') +
       (locked && EXT.apprExtra ? EXT.apprExtra(a) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 주기의 운행·영수증을 고칠 수 없습니다. ' +
         '고치려면 <b>회수</b>한 뒤 수정해 다시 상신하세요' +

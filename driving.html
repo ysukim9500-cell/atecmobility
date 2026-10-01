@@ -297,6 +297,11 @@ table.evup tbody tr:first-child td{border-top:0}
 .onode .c{font-size:11px;color:var(--ink-400);font-variant-numeric:tabular-nums}
 .onode.on .c{color:rgba(255,255,255,.7)}
 .onode .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+.onode .dot.warn{background:var(--warn)}
+/* 자동 결재선에서 건너뛴 단계와 그 까닭 */
+.onotes{display:flex;flex-direction:column;gap:5px;margin-top:10px;font-size:12.5px;color:var(--warn)}
+.onotes div{display:flex;gap:6px;align-items:flex-start;line-height:1.55}
+.onotes svg{flex:none;margin-top:2px}
 .omain{min-width:0}
 .ocard{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px}
 .ohd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
