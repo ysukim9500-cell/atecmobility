@@ -1,8 +1,8 @@
 <!--
   ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
-  같이 올라가야 하는 것: driving-app.js · xlsx.js · hipass.js
-                         vendor/ (pdf.js 4.10.38 .mjs — 증빙 PDF 를 이미지로 바꾼다)
+  같이 올라가야 하는 것: driving-app.js · drv-verify.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
+                         vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF)
                          brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
 -->
 <!doctype html>
@@ -47,8 +47,8 @@
   --ink-800:#2F3941;
   --ink-700:#434E56;  /* 본문 */
   --ink-600:#5B6871;  /* = CI 그레이 */
-  --ink-500:#788691;  /* 보조 */
-  --ink-400:#A0AAB1;  /* 흐림 */
+  --ink-500:#6B7882;  /* 보조 — 흰 바탕 대비 4.5:1 (예전 #788691 은 3.7:1 이라 안내문이 안 읽혔다) */
+  --ink-400:#A0AAB1;  /* 흐림 — placeholder·비활성·아이콘에만. 읽어야 하는 글에는 쓰지 않는다(2.4:1) */
   --ink-300:#C7CDD1;
   --ink-200:#E2E6E9;  /* 선 */
   --ink-100:#F0F3F4;  /* 옅은 선 */
@@ -156,14 +156,177 @@ header.top{
   font-size:12.5px;font-weight:500;color:var(--ink-900);transition:border-color var(--t),background var(--t)}
 .cycle:hover{border-color:var(--ink-400);background:var(--sunken)}
 .cycle svg{color:var(--ink-400)}
-.cycle select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;border:0}
-/* 포커스 표시는 투명한 select 가 아니라 겉껍데기에 그린다 — 안 그러면 키보드로
-   Tab 했을 때 지금 어디에 있는지 전혀 안 보인다. */
-.cycle select:focus-visible{outline:0}
-.cycle:focus-within{outline:2px solid var(--red);outline-offset:2px}
 /* 표에서 눌러서 여는 행 — 키보드로 갔을 때 어디인지 보이게 한다. */
 tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cycle .tag{font-weight:400;color:var(--ink-500)}
+/* ── 기간 고르기: ◀ [기간 ▾] ▶ + 펼침 창 ──
+   예전에는 투명한 <select> 하나였다. 앞뒤로 넘기려면 목록을 열어 훑어야 했고,
+   여러 주기를 한꺼번에 볼 수도 없었다. */
+.cyc{position:relative;display:inline-flex;align-items:center;gap:4px}
+.cyc .cycle{font-family:inherit}
+.cyc .cycle:focus-visible,.cycnav:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.cyc.multi .cycle{border-color:var(--ink-600);background:var(--ink-50)}
+.cyc.multi .cycle .tag{color:var(--ink-900);font-weight:500}
+.cyc.past .cycle .tag::after{content:" · 지난 주기";color:var(--warn)}
+.cycnav{width:30px;height:34px;display:grid;place-items:center;border:1px solid var(--ink-200);border-radius:var(--r-xs);
+  background:var(--surface);color:var(--ink-600);cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t)}
+.cycnav:hover:not(:disabled){background:var(--sunken);border-color:var(--ink-400);color:var(--ink-900)}
+.cycnav:disabled{color:var(--ink-300);border-color:var(--ink-100);cursor:default}
+.cycnav.prev svg{transform:rotate(180deg)}
+#cycPop{position:absolute;top:calc(100% + 8px);right:0;z-index:60;width:372px;max-width:calc(100vw - 24px);
+  background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:14px;
+  box-shadow:0 18px 44px -18px rgba(29,37,43,.34),0 2px 6px rgba(29,37,43,.06)}
+.cp-sec{font-size:12px;font-weight:500;color:var(--ink-600);margin:12px 2px 7px}
+.cp-sec:first-child{margin-top:0}
+.cp-sec small{font-weight:400;color:var(--ink-600);margin-left:4px}
+.cp-quick{display:flex;flex-wrap:wrap;gap:6px}
+.cpq{height:29px;padding:0 11px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);
+  font:inherit;font-size:12px;color:var(--ink-700);cursor:pointer;transition:border-color var(--t),background var(--t)}
+.cpq:hover{border-color:var(--ink-400);background:var(--sunken)}
+.cpq.on{border-color:var(--ink-900);background:var(--ink-900);color:#fff;font-weight:500}
+.cp-list{max-height:238px;overflow:auto;border:1px solid var(--ink-100);border-radius:var(--r-sm)}
+.cpi{display:flex;align-items:center;gap:9px;width:100%;padding:8px 11px;border:0;border-bottom:1px solid var(--ink-100);
+  background:none;font:inherit;font-size:12.5px;color:var(--ink-700);cursor:pointer;text-align:left}
+.cpi:last-child{border-bottom:0}
+.cpi:hover{background:var(--sunken)}
+.cpi b{font-weight:500;color:var(--ink-900)}
+.cpi .dim{font-size:11.5px}
+.cpi.on{background:var(--red-50)}
+.cpi.on b{color:var(--red)}
+.cpi:focus-visible,.cpq:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.cp-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+.cp-range select{height:30px;border:1px solid var(--ink-200);border-radius:var(--r-xs);background:var(--surface);
+  font:inherit;font-size:12px;color:var(--ink-900);padding:0 6px}
+.cp-note{margin-top:11px;font-size:12px;line-height:1.65;color:var(--ink-600)}
+.kbd{display:inline-block;min-width:17px;padding:0 4px;border:1px solid var(--ink-200);border-bottom-width:2px;
+  border-radius:4px;font-size:10.5px;line-height:15px;text-align:center;color:var(--ink-600);background:var(--surface)}
+
+/* ── 좁히기 줄: 날짜 범위 · 정렬되는 열 머리 · 나눠 보기 ── */
+.fbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.dfil{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 11px;background:var(--surface);
+  border:1px solid var(--ink-200);border-radius:var(--r-xs);color:var(--ink-400)}
+.dfil.on{border-color:var(--ink-700)}
+.dfil input{border:0;background:none;outline:none;font:inherit;font-size:12.5px;color:var(--ink-900);width:118px;height:30px}
+.dfil input:focus-visible{box-shadow:0 1px 0 var(--red)}
+.qd{height:24px;padding:0 9px;border:0;border-radius:999px;background:var(--ink-100);font:inherit;font-size:11.5px;
+  color:var(--ink-600);cursor:pointer}
+.qd:hover{background:var(--ink-200);color:var(--ink-900)}
+.qd.on{background:var(--ink-900);color:#fff}
+.qd.x{width:24px;padding:0;display:grid;place-items:center}
+/* 정렬 머리는 <th aria-sort> 안의 진짜 <button> 이다. th 에 role="button" 을 주면 '열 머리' 역할이 지워져
+   화면낭독기가 정렬 상태(aria-sort)를 읽지 못한다. */
+th.srt{white-space:nowrap}
+th.srt button{border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;letter-spacing:inherit;
+  cursor:pointer;user-select:none;display:inline-flex;align-items:center}
+th.srt button:hover{color:var(--ink-900)}
+th.srt.on{color:var(--ink-900)}
+th.srt .ar{display:inline-block;width:11px;margin-left:3px;font-size:8.5px;color:var(--red)}
+th.srt button:focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:3px}
+.more{display:flex;align-items:center;gap:10px;justify-content:center;padding:12px;border-top:1px solid var(--ink-100);font-size:12px}
+tfoot td{padding:11px 15px;border-top:1px solid var(--ink-200);background:var(--sunken);font-size:12.5px;
+  font-weight:500;color:var(--ink-700);white-space:nowrap}
+tfoot td.n{font-variant-numeric:tabular-nums}
+.tbar{display:block;height:6px;border-radius:3px;background:var(--ink-100);overflow:hidden;min-width:60px}
+.tbar i{display:block;height:100%;background:var(--ink-600);border-radius:3px}
+
+/* ── 검증 ── */
+.vact{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+.vlist{padding:2px 0}
+.vitem{display:flex;gap:14px;align-items:flex-start;padding:13px 18px;border-bottom:1px solid var(--ink-100)}
+.vitem:last-child{border-bottom:0}
+.vitem > .st{flex:0 0 52px;margin-top:2px}
+.vitem.v-bad{box-shadow:inset 3px 0 0 var(--red)}
+.vb{flex:1;min-width:0}
+.vt{font-size:13.5px;font-weight:500;color:var(--ink-900)}
+.vd{font-size:12.5px;color:var(--ink-600);margin-top:3px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}
+.vitem .vgo{flex:none;align-self:center}
+.vsum{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px}
+.vsub{font-size:12px;color:var(--ink-600);margin:14px 2px 7px}
+/* 검증 요약 딱지: "검증" 라벨 + 등급별 색(빨강은 불일치에만) */
+.vsumc{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap}
+.vsumc .vlab{font-size:12px;color:var(--ink-600)}
+.vchip{border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);padding:3px 10px;cursor:pointer;font:inherit}
+.vchip:hover{border-color:var(--ink-400);background:var(--sunken)}
+.aext{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pdfwait{padding:44px 20px;text-align:center;font-size:13.5px;color:var(--ink-700)}
+.spin{width:26px;height:26px;margin:0 auto 14px;border-radius:50%;border:2.5px solid var(--ink-200);border-top-color:var(--red);
+  animation:spin .8s linear infinite}
+.spin.sm{display:inline-block;width:13px;height:13px;border-width:2px;margin:0 6px -2px 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+.pdfdone{padding:26px 6px 6px;text-align:center}
+.pdfdone .big{font-size:40px;font-weight:700;color:var(--ink-900);letter-spacing:-.04em;line-height:1.1}
+.pdfdone .big small{font-size:15px;font-weight:500;color:var(--ink-400);margin-left:3px}
+.pdfdone .anote{text-align:left}
+.pdfok{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:14px;font-size:12.5px;color:var(--ok)}
+
+/* ── 영수증 올리기(장 · 줄) ── */
+table.evup td{vertical-align:top;white-space:normal;padding:10px 8px}
+table.evup td:first-child{padding-left:14px}
+table.evup thead th{padding-left:8px;padding-right:8px}
+table.evup tr.pgfirst td{border-top:1px solid var(--ink-200)}
+table.evup tbody tr:first-child td{border-top:0}
+.evth{position:relative;width:64px}
+.evth img{width:48px;height:48px;object-fit:cover;border-radius:var(--r-sm);border:1px solid var(--line);display:block}
+.evth a:focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:var(--r-sm)}
+.pgno{position:absolute;left:11px;top:7px;font-size:10px;font-weight:700;color:#fff;background:var(--ink-900);
+  border-radius:4px;padding:0 4px;line-height:15px}
+.evhint{font-size:12px;color:var(--warn);margin-top:5px;line-height:1.5}
+.evhint.ok{color:var(--ink-600)}
+.evhint b{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:var(--ink-600);border-radius:3px;
+  padding:1px 4px;margin-right:3px}
+.evwait td{color:var(--ink-500);font-size:12.5px;vertical-align:middle !important}
+.inp.need{border-color:var(--red)}
+
+/* ── 조직도 · 결재선 ── */
+.orgwrap{display:grid;grid-template-columns:232px minmax(0,1fr);gap:16px;align-items:start}
+.omain tbody td,.omain thead th{padding-left:11px;padding-right:11px}
+.omain td.el{max-width:150px}
+.otree{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:6px;
+  position:sticky;top:calc(var(--head) + 14px);max-height:calc(100dvh - var(--head) - 40px);overflow:auto}
+.onode{display:flex;align-items:center;gap:7px;width:100%;height:32px;padding:0 9px;border:0;border-radius:var(--r-xs);
+  background:none;font:inherit;font-size:12.5px;color:var(--ink-700);cursor:pointer;text-align:left}
+.onode:hover{background:var(--ink-100)}
+.onode.on{background:var(--ink-900);color:#fff}
+.onode .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.onode.d1,.onode.root{font-weight:500;color:var(--ink-900)}
+.onode.d1{margin-top:4px}
+.onode.d2{padding-left:20px}
+.onode.d3{padding-left:34px;color:var(--ink-500)}
+.onode.on,.onode.on.d3{color:#fff}
+.onode .c{font-size:11px;color:var(--ink-400);font-variant-numeric:tabular-nums}
+.onode.on .c{color:rgba(255,255,255,.7)}
+.onode .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+.omain{min-width:0}
+.ocard{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px}
+.ohd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ohd b{font-size:14px;font-weight:700;color:var(--ink-900)}
+.oline{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin-top:14px}
+.ostep{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border:1px solid var(--ink-200);border-radius:var(--r-sm);
+  background:var(--sunken);font-size:12.5px;min-width:86px}
+.ostep em{font-style:normal;font-size:10.5px;color:var(--ink-400)}
+.ostep b{font-weight:500;color:var(--ink-900)}
+.ostep b small{font-weight:400;color:var(--ink-400)}
+.ostep b.nouser{color:var(--red)}
+.ostep.me{background:var(--surface)}
+.oarrow{align-self:center;color:var(--ink-300)}
+.lsteps{margin:14px 0 12px;border:1px solid var(--ink-200);border-radius:var(--r-sm)}
+.lstep{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-bottom:1px solid var(--ink-100)}
+.lstep:last-child{border-bottom:0}
+.lseq{flex:0 0 22px;height:22px;border-radius:50%;background:var(--ink-100);display:grid;place-items:center;
+  font-size:11px;font-weight:500;color:var(--ink-600);margin-top:5px}
+.lstep.me .lseq{background:var(--ink-900);color:#fff}
+.lwho{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lwho .inp{width:auto;flex:1 1 180px;font-size:12.5px;padding:6px 8px}
+.lbox{flex:0 0 96px;font-size:12.5px !important;padding:6px 8px !important;width:96px !important}
+.lstep.me .lbox{padding:6px 0 !important;color:var(--ink-400)}
+.lchip{display:inline-flex;align-items:center;gap:5px;height:27px;padding:0 4px 0 10px;border-radius:999px;
+  background:var(--ink-100);font-size:12.5px;color:var(--ink-900)}
+.lchip small{color:var(--ink-400)}
+.lchip.bad{background:var(--red-50);color:var(--red)}
+.lchip button{width:19px;height:19px;border:0;border-radius:50%;background:none;color:var(--ink-400);cursor:pointer;
+  display:grid;place-items:center}
+.lchip button:hover{background:var(--ink-200);color:var(--ink-900)}
 
 .uchip{display:flex;align-items:center;gap:9px;padding:3px 8px 3px 3px;border-radius:999px;
   cursor:pointer;border:0;background:none;transition:background var(--t)}
@@ -225,23 +388,24 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
   letter-spacing:-.04em;line-height:1.3}
 .verdict em{font-style:normal;color:var(--red)}
 .verdict.clean em{color:var(--ok)}
+.verdict.wait em{color:var(--warn)}   /* 결재 중·확인 필요 — 끝난 것(초록)과도, 틀린 것(빨강)과도 다르다 */
 .track{margin-top:22px;height:5px;border-radius:99px;background:var(--ink-100);overflow:hidden}
 .track i{display:block;height:100%;border-radius:99px;background:var(--red);
   transition:width .8s var(--ease)}
 .track.done i{background:var(--ink-400)}
 .facts{display:flex;flex-wrap:wrap;gap:0 38px;margin-top:22px}
 .fact{padding-top:2px}
-.fact .k{font-size:11.5px;color:var(--ink-400);font-weight:400}
+.fact .k{font-size:12px;color:var(--ink-600);font-weight:400}
 .fact .v{font-size:21px;font-weight:700;color:var(--ink-900);letter-spacing:-.035em;line-height:1.38}
 .fact .v small{font-size:12.5px;font-weight:500;color:var(--ink-400);margin-left:2px;letter-spacing:0}
 .fact .v.alert{color:var(--red)}
-.fact .sub{font-size:11.5px;color:var(--ink-400)}
+.fact .sub{font-size:12px;color:var(--ink-600)}
 
 /* ── 구역 ───────────────────────────────────────────────────────── */
 .sect{margin-top:28px}
 .sect > .hd{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding:0 2px}
 .sect > .hd h2{margin:0;font-size:14px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
-.sect > .hd .cnt{font-size:12px;color:var(--ink-400)}
+.sect > .hd .cnt{font-size:12px;color:var(--ink-600)}
 .sect > .hd .sp{flex:1}
 .panel{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);overflow:hidden}
 
@@ -280,7 +444,7 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 @media screen{
 table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 thead th{position:sticky;top:0;z-index:2;background:var(--surface);
-  text-align:left;font-weight:500;font-size:11px;color:var(--ink-400);letter-spacing:.05em;
+  text-align:left;font-weight:500;font-size:12px;color:var(--ink-600);letter-spacing:.02em;
   padding:12px 15px;border-bottom:1px solid var(--ink-200);white-space:nowrap}
 th.n,td.n{text-align:right}
 tbody td{padding:11px 15px;border-bottom:1px solid var(--ink-100);white-space:nowrap;
@@ -292,8 +456,8 @@ td .lead,td.lead{font-weight:500;color:var(--ink-900)}
 td.n{font-variant-numeric:tabular-nums}
 td.total{font-weight:700;color:var(--ink-900)}
 td.el{max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--ink-500)}
-td.dim{color:var(--ink-400)}
-.dim{color:var(--ink-400)}
+td.dim{color:var(--ink-500)}
+.dim{color:var(--ink-500)}
 td.unk{color:var(--red);font-weight:500}   /* 미확정 건수 — Spoqa 는 600 이 없어 500 을 쓴다 */
 /* 문제가 있는 행은 왼쪽 가는 줄로. 칸을 색칠하면 숫자가 안 읽힌다. */
 tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
@@ -305,7 +469,7 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .st.ok{color:var(--ok)} .st.ok::before{background:var(--ok)}
 .st.warn{color:var(--warn)} .st.warn::before{background:var(--warn)}
 .st.bad{color:var(--red);font-weight:500} .st.bad::before{background:var(--red)}
-.st.dim{color:var(--ink-400)}
+.st.dim{color:var(--ink-500)}
 .kind{display:inline-block;font-size:11.5px;font-weight:400;color:var(--ink-500);
   border:1px solid var(--ink-200);border-radius:5px;padding:0 6px;line-height:19px}
 .kind.biz{color:var(--ink-900);border-color:var(--ink-400);font-weight:500}
@@ -332,7 +496,8 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 
 .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:var(--r-xs);
   border:1px solid var(--ink-200);background:var(--surface);color:var(--ink-700);font-size:12.5px;
-  font-weight:500;cursor:pointer;transition:var(--t)}
+  font-weight:500;cursor:pointer;transition:var(--t);text-decoration:none;white-space:nowrap}
+.btn:disabled{opacity:.55;cursor:default}
 .btn:hover{border-color:var(--ink-400);background:var(--sunken);color:var(--ink-900)}
 .btn.pri{background:var(--red);border-color:var(--red);color:#fff}
 .btn.pri:hover{background:var(--red-700);border-color:var(--red-700)}
@@ -343,7 +508,7 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .blank .ico{width:46px;height:46px;margin:0 auto 15px;border-radius:13px;background:var(--ink-100);
   display:grid;place-items:center;color:var(--ink-400)}
 .blank .t{font-size:14px;font-weight:500;color:var(--ink-700)}
-.blank .d{font-size:12.5px;color:var(--ink-400);margin-top:5px}
+.blank .d{font-size:12.5px;color:var(--ink-600);margin-top:5px;line-height:1.7}
 .sk{background:var(--ink-100);border-radius:5px;height:12px;position:relative;overflow:hidden}
 .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);
@@ -359,14 +524,19 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
    닫히고 화면은 안 바뀌었다(두 번 눌러야 이동). 레일(248px)을 비켜 둔다. */
 #panel .veil{position:absolute;inset:0 0 0 var(--rail);background:rgba(29,37,43,.36);animation:fade .2s}
 @media (max-width:900px){ #panel .veil{inset:0} }
-#panel .sheet{position:absolute;top:0;right:0;bottom:0;width:min(468px,100%);background:var(--surface);
+#panel .sheet{position:absolute;top:0;right:0;bottom:0;width:min(468px,100%);background:var(--surface);border-radius:0;
   box-shadow:var(--pop);display:flex;flex-direction:column;animation:slide .28s var(--ease)}
 @keyframes slide{from{transform:translateX(26px);opacity:.55}to{transform:none;opacity:1}}
+#panel.wide .sheet{width:min(900px,100%)}
 #panel .ph{padding:17px 20px;border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:12px}
 #panel .ph .t{font-size:15px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
-#panel .ph .s{font-size:12px;color:var(--ink-400);margin-top:1px}
+#panel .ph .s{font-size:12px;color:var(--ink-600);margin-top:1px}
+/* 창을 열면 창 자체에 포커스를 준다(Tab 이 창 안에서 시작하게). 창 테두리에 포커스 선은 그리지 않는다. */
+#panel .sheet:focus,#panel .sheet:focus-visible{outline:none}
 #panel .pb{flex:1;overflow-y:auto;padding:6px 20px 20px}
 #panel .pf{padding:14px 20px;border-top:1px solid var(--ink-200);display:flex;gap:9px;align-items:center}
+/* 좁은 화면에서는 아랫줄 버튼이 넷까지 온다(← 결재 화면으로 · 닫기 · 내려받기 · 열기) — 넘치면 다음 줄로 내린다. */
+@media (max-width:900px){ #panel .pf{flex-wrap:wrap;row-gap:8px;justify-content:flex-end} }
 .kv{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--ink-100);font-size:13px}
 .kv:last-child{border-bottom:0}
 .kv .k{flex:0 0 86px;color:var(--ink-400);font-size:12.5px}
@@ -447,7 +617,7 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .awarn{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:11px 13px;
   background:var(--warn-50);border-radius:var(--r-xs);font-size:12.5px;color:var(--warn);line-height:1.55}
 .awarn svg{margin-top:2px;flex:none}
-.anote{margin-top:14px;font-size:12.5px;color:var(--ink-500);line-height:1.7}
+.anote{margin-top:14px;font-size:12.5px;color:var(--ink-700);line-height:1.7}
 .anote b{color:var(--ink-900);font-weight:500}
 
 /* ── 입력 폼 (운행 고치기 · 추가) ────────────────────────────────── */
@@ -458,8 +628,8 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .flab .only{display:inline-block;font-size:10px;font-weight:500;color:var(--red);
   background:var(--red-50);border-radius:4px;padding:0 5px;line-height:16px;margin-left:4px}
 .fbody{flex:1;min-width:0}
-.fhint{font-size:11.5px;color:var(--ink-400);margin-top:7px;line-height:1.6}
-.fhint b{color:var(--ink-600);font-weight:500}
+.fhint{font-size:12px;color:var(--ink-600);margin-top:7px;line-height:1.6}
+.fhint b{color:var(--ink-900);font-weight:500}
 .inp{width:100%;font-size:14px;padding:9px 11px;border:1px solid var(--ink-200);
   border-radius:var(--r-xs);background:var(--surface);color:var(--ink-900);
   transition:border-color var(--t),box-shadow var(--t)}
@@ -494,6 +664,9 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
   margin-bottom:14px;line-height:1.6}
 .hpnote svg{margin-top:2px;flex:none;color:var(--ink-400)}
 .hpnote b{color:var(--ink-900);font-weight:500}
+.hpnote > span{flex:1;min-width:0}
+.hpnote .btn,.hpnote .iconbtn{flex:none;align-self:center}
+.hpnote .iconbtn{width:29px;height:29px;border-color:transparent;background:none}
 .hpnote.warn{background:var(--warn-50);border-color:#F0E2C4;color:var(--warn)}
 .hpnote.warn svg{color:var(--warn)}
 .hpnote.warn b{color:var(--warn)}
@@ -638,6 +811,11 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
   .utxt{display:none}
   .cycle{padding:0 10px;gap:6px}
   .cycle .tag,.cycle .yr{display:none}
+  .cycnav{width:24px}
+  #cycPop{position:fixed;top:calc(var(--head) + 6px);right:12px;left:12px;width:auto}
+  .orgwrap{grid-template-columns:1fr}
+  .otree{position:static;max-height:220px}
+  .dfil input{width:104px}
   .phead h1{font-size:20px}
   .hero{padding:20px 18px;border-radius:var(--r)}
   .verdict{font-size:21px}
@@ -714,12 +892,19 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <img class="logo-mark tiny" src="brand/atec-mark.png" alt="ATEC">
     </button>
     <div class="sp"></div>
-    <label class="cycle" id="cycleBox">
-      <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-cal"/></svg>
-      <span id="cycleTxt">—</span><span class="tag" id="cycleTag"></span>
-      <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-down"/></svg>
-      <select id="selCycle" aria-label="마감주기 선택"></select>
-    </label>
+    <!-- 기간: ◀ ▶ 로 한 주기씩, 가운데를 누르면 주기 목록·여러 주기 조회. 키보드 [ ] 도 된다. -->
+    <div class="cyc" id="cycleBox">
+      <button class="cycnav prev" id="cycPrev" aria-label="앞 주기" title="앞 주기  [">
+        <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
+      <button class="cycle" id="cycBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cycPop" title="기간 고르기">
+        <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-cal"/></svg>
+        <span id="cycleTxt">—</span><span class="tag" id="cycleTag"></span>
+        <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-down"/></svg>
+      </button>
+      <button class="cycnav" id="cycNext" aria-label="다음 주기" title="다음 주기  ]">
+        <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
+      <div id="cycPop" role="dialog" aria-label="기간 고르기" hidden></div>
+    </div>
     <button class="uchip" id="uBtn" title="내 정보">
       <span class="uav" id="uAv">—</span>
       <span class="utxt"><b id="uName">—</b><span id="uMeta"></span></span>
@@ -739,13 +924,14 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
            범위만 바꿔 쓰므로, 어느 쪽을 보고 있는지 제목으로 구분한다. -->
     <aside id="nav">
       <!-- 마감 작업 순서대로: 현황 → 점검 → 통행료 → 증빙 → 정산. 그 밖의 것은 아래 묶음. -->
-      <div class="navsec">이번 달 마감</div>
+      <div class="navsec">마감 작업</div>
       <a tabindex="0" role="button" data-v="close" class="on"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
       <a tabindex="0" role="button" data-v="trips"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행일지<span class="pill" id="pTrips" hidden></span></a>
       <a tabindex="0" role="button" data-v="check"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>기록 점검<span class="pill" id="pCheck" hidden></span></a>
       <a tabindex="0" role="button" data-v="tollfill"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>통행료 채우기<span class="pill" id="pToll" hidden></span></a>
       <a tabindex="0" role="button" data-v="hipass"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>하이패스 대조</a>
       <a tabindex="0" role="button" data-v="evid"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>증빙<span class="pill" id="pEvid" hidden></span></a>
+      <a tabindex="0" role="button" data-v="verify"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증</a>
       <a tabindex="0" role="button" data-v="settle"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산·엑셀</a>
       <div class="navsec">그 밖에</div>
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
@@ -758,9 +944,11 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="a_trips" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 운행일지</a>
       <a tabindex="0" role="button" data-v="a_check" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>전체 기록 점검</a>
       <a tabindex="0" role="button" data-v="a_evid" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>전체 증빙</a>
+      <a tabindex="0" role="button" data-v="a_verify" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>전체 검증</a>
       <a tabindex="0" role="button" data-v="a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조 (전체)</a>
       <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>전체 정산</a>
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
+      <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>조직도 · 결재선</a>
       <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 안전운전</a>
       <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
@@ -773,7 +961,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
 
 <div id="panel">
   <div class="veil" data-close></div>
-  <div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet" id="pSheet" role="dialog" aria-modal="true" aria-labelledby="pTitle" tabindex="-1">
     <div class="ph">
       <div><div class="t" id="pTitle">상세</div><div class="s" id="pSub"></div></div>
       <div class="sp"></div>
@@ -792,6 +980,10 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
 
 <script src="hipass.js"></script>
 <script src="xlsx.js"></script>
+<!-- 확장 모듈은 본체보다 먼저 싣는다(DrvExtQ 에 올려 두면 본체가 붙인다). PDF 도구·글꼴은 쓸 때 받는다. -->
+<script src="sheetpdf.js"></script>
+<script src="drv-verify.js"></script>
+<script src="drv-org.js"></script>
 <script src="driving-app.js"></script>
 </body>
 </html>
