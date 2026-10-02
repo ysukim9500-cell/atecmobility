@@ -1401,13 +1401,13 @@
           '<td><span class="lead">' + esc(x.name || u) + '</span></td>' +
           '<td class="dim">' + esc(u) + '</td>' +
           '<td class="dim">' + esc(x.dept || '—') + '</td>' +
-          '<td>' + (u === 'ysukim' ? '<span class="st bad">마스터</span>'
+          '<td>' + (u === ACCT.master ? '<span class="st bad">마스터</span>'
             : MGRS.indexOf(u) >= 0 ? '<span class="st bad">권한 주는 관리자</span>'
             : x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           // 본인 · 마스터 · (마스터가 아니면) 다른 권한 주는 관리자는 바꿀 수 없다(서버가 거부한다). 버튼을 아예 안 보인다.
           (u === myName() ? '<span class="dim">본인 계정</span>'
-            : u === 'ysukim' || (!master && MGRS.indexOf(u) >= 0) ? '<span class="dim">바꿀 수 없음</span>'
+            : u === ACCT.master || (!master && MGRS.indexOf(u) >= 0) ? '<span class="dim">바꿀 수 없음</span>'
             : '<button class="btn sm" data-perm="' + esc(u) + '" data-on="' + (x.is_admin ? '0' : '1') + '">' +
               (x.is_admin ? '관리자 해제' : '관리자 지정') + '</button> ' +
               (master ? '<button class="btn sm" data-permmgr="' + esc(u) + '" data-on="' + (MGRS.indexOf(u) >= 0 ? '0' : '1') + '">' +
