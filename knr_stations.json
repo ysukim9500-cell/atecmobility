@@ -147,7 +147,7 @@
   "line": "수인분당선",
   "name": "한티",
   "devices": [
-   172
+   171
   ],
   "pending": false
  },
@@ -239,8 +239,8 @@
   "line": "서해선",
   "name": "초지",
   "devices": [
-   154,
-   158
+   54,
+   58
   ],
   "pending": false
  },
@@ -331,7 +331,7 @@
   "name": "대모산입구",
   "devices": [
    171,
-   172
+   173
   ],
   "pending": false
  },
@@ -350,7 +350,7 @@
   "line": "수인분당선",
   "name": "죽전",
   "devices": [
-   156
+   154
   ],
   "pending": false
  },
@@ -450,8 +450,8 @@
   "line": "서해선",
   "name": "소사",
   "devices": [
-   151,
-   153
+   51,
+   53
   ],
   "pending": false
  },
@@ -488,7 +488,7 @@
   "line": "서해선",
   "name": "시흥시청",
   "devices": [
-   152
+   52
   ],
   "pending": false
  },
@@ -497,7 +497,7 @@
   "line": "서해선",
   "name": "시흥능곡",
   "devices": [
-   152
+   52
   ],
   "pending": false
  },
@@ -678,7 +678,7 @@
   "line": "장항선",
   "name": "신창",
   "devices": [
-   161
+   162
   ],
   "pending": false
  },
