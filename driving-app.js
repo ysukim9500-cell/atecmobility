@@ -230,10 +230,10 @@
   // TRIPS·EVID = 지금 열려 있는 화면이 쓰는 범위. applyScope() 가 채운다.
   var ALL_TRIPS = [], ALL_EVID = [];
   var TRIPS = [], USERS = {}, VEHICLES = [], EVID = [], EDUV = [], EDUP = [], EDUT = [];
-  var APPR = [], LINES = {}, PEOPLE = {};   // 결재 건 · 부서별 기본 결재선 · 사람 목록(이름·부서·직급)
+  var APPR = [], PEOPLE = {};               // 결재 건 · 사람 목록(이름·부서·직급)
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
-  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, lineForUser: null, onCycle: [], dirty: [] };
+  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [] };
   var LOADED = false, LOADING = false, AUDIT = null;
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
   /** driving-account 가 알려 주는 것 — 권한 관리를 할 수 있는 계정인가.
@@ -610,10 +610,10 @@
       apiRetry('/rest/v1/app_config?id=eq.1&select=quarter_bounds').then(function (x) { return x.ok ? x.json() : []; }),
       // RLS 가 걸러 준다 — 본인 것 · 내가 결재자인 것 · 관리자는 전부.
       fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc'),
-      fetchAll('/rest/v1/driving_approval_lines?select=*'),
+      // ※ 부서별 결재선(driving_approval_lines)은 더 읽지 않는다 — 결재선은 상신자가 직접 고른다(2026-10-02).
       // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
       fetchAll('/rest/v1/v_driving_people?select=*&order=name.asc'),
-      // 조직도(결재선을 짜는 사람 목록). 내려간 사람(active=false)은 받지 않는다.
+      // 조직도(사람 명단 — 관리 화면). 내려간 사람(active=false)은 받지 않는다.
       fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc')
     ]);
 
@@ -638,9 +638,8 @@
         var cfg = (out[7] || [])[0];
         if (cfg) setQuarterBounds(cfg.quarter_bounds);
         APPR = out[8] || [];
-        LINES = {}; (out[9] || []).forEach(function (l) { LINES[l.dept] = l; });
-        PEOPLE = {}; (out[10] || []).forEach(function (p) { PEOPLE[p.username] = p; });
-        ORG = out[11] || [];
+        PEOPLE = {}; (out[9] || []).forEach(function (p) { PEOPLE[p.username] = p; });
+        ORG = out[10] || [];
         STATIC_AT = Date.now();
       }
       RATE_MISS = {};
@@ -1485,40 +1484,25 @@
       return cur && cur.approver === mine;
     });
   }
-  /** 마지막으로 상신했던 결재선 — 조직도로 결재선을 만들 수 없는 사람에게만 쓴다(defaultSteps). */
-  function lastSteps() {
-    var mine = myName();
-    var past = APPR.filter(function (a) {
-      return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length;
-    }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
-    return past ? past.steps.map(function (s) { return { approver: s.approver, box: s.box }; }) : null;
-  }
   /**
-   * 상신 창에 미리 채울 결재선.
-   *   ① 조직도에서 자동(drv-org.js lineForUser — 센터·파트장 → 팀장 → 사업부장) — 정본
-   *   ② 지난번에 상신했던 결재선(조직도로 만들 수 없는 사람만)
-   *   ③ 예전 부서별 결재선(driving_approval_lines — 지우지 않고 예비로 남겨 둔 것)
-   * 본인 위치 아래는 잘라낸다. pick 자리는 고르라고 비워 둔다.
-   * ★ 2026-10-02 부터 자동이 먼저다. 예전에는 지난번 결재선이 먼저라, 조직도를 고쳐도 반영되지 않았다.
+   * 내가 지난번에 올렸던 결재선 — 「지난번 결재선 불러오기」 버튼이 쓴다.
+   * 이번 주기에 반려·회수된 건이 있으면 그것, 없으면 다른 주기에 가장 최근 상신한 것.
+   * 계정이 없어진 사람·본인은 뺀다. 없으면 null.
+   *
+   * ★ 결재선은 **상신자가 직접 이름을 넣어 고른다**(2026-10-02 사용자 결정 —
+   *   "이름만 넣어 주면 결재하는 사람이 알아서 지정할 수 있게, 딱 누구다 이렇게 넣지 말고").
+   *   부서별 고정 결재선·조직도 자동 결재선으로 미리 채우지 않는다. 상신 창은 빈 칸으로 열린다.
    */
-  function defaultSteps() {
-    var auto = EXT.lineForUser && EXT.lineForUser(myName());
-    var me2 = personOf(myName());
-    if (!auto) {
-      var remembered = lastSteps();
-      if (remembered) return remembered;
-    }
-    var line = auto || LINES[me2.dept];
-    if (!line || !Array.isArray(line.steps)) return [];
-    var out = line.steps.map(function (s) {
-      return { approver: s.approver || '', box: s.box || '', pick: s.pick || '', candidates: s.candidates || [] };
-    });
-    // 사다리에서 본인을 찾으면 그 다음부터가 결재선이다.
-    var at = -1;
-    out.forEach(function (s, i) {
-      if (s.approver === myName() || (s.candidates || []).indexOf(myName()) >= 0) at = i;
-    });
-    return at >= 0 ? out.slice(at + 1) : out;
+  function previousSteps() {
+    var mine = myName(), cur = myAppr();
+    var past = (cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length) ? cur
+      : APPR.filter(function (a) {
+        return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length;
+      }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
+    if (!past) return null;
+    var out = past.steps.filter(function (s) { return s.approver && s.approver !== mine && PEOPLE[s.approver]; })
+      .map(function (s) { return { approver: s.approver, box: s.box }; });
+    return out.length ? out : null;
   }
 
   function apprStatusText(a) {
@@ -1563,10 +1547,12 @@
     if (a && (a.status === 'submitted' || a.status === 'approved')) {
       toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
     }
-    DRAFT = (a && a.status === 'rejected' && (a.steps || []).length)
-      ? a.steps.map(function (s) { return { approver: s.approver, box: s.box }; })
-      : defaultSteps();
+    // 빈 칸으로 연다 — 결재받을 분은 상신자가 이름을 넣어 고른다. 지난번 것은 버튼으로 불러온다.
+    DRAFT = [];
+    APPR_Q = '';
+    APPR_BOX = APPR_BOXES[0];           // 「팀장」 칸부터 — 바로 이름을 칠 수 있게
     renderSubmit();
+    var box = $('apprQ'); if (box) box.focus();
   }
   /** 결재자 찾기 입력에 지금 쳐 놓은 글자. 창을 다시 그려도 남는다. */
   var APPR_Q = '';
@@ -1607,64 +1593,99 @@
         : '');
   }
 
+  /* ── 결재란 칸 고르기 ──
+     상신 창은 운행기록부의 결재란 모양(담당 · 팀장 · 실장 · 사업부장 · 대표이사) 그대로 보여 준다.
+     상신자가 칸을 누르고 이름을 넣어 그 칸의 결재자를 고른다. 비워 둔 칸은 빗금(/)으로 찍히고 건너뛴다.
+     결재는 왼쪽 칸부터 채워진 칸 차례로 진행된다(DRAFT 는 늘 칸 순서로 정렬해 둔다).
+     (2026-10-02 사용자 결정 — "결재란 화면은 그대로 있고 본인이 선택해서 이름 넣는 방식, 건너뛰면 / 처리") */
+  var APPR_BOXES = BOXES.slice(1);       // 팀장 · 실장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
+  var APPR_BOX = '';                     // 지금 이름을 넣을 칸
+  function draftAt(box) { return DRAFT.filter(function (s) { return s.box === box; })[0] || null; }
+  /** 칸 순서로 정렬하고, 한 칸에 한 명 · 한 사람은 한 칸만 남긴다. */
+  function tidyDraft() {
+    var seenBox = {}, seenU = {};
+    DRAFT = DRAFT.filter(function (s) {
+      if (!s.approver || APPR_BOXES.indexOf(s.box) < 0 || seenBox[s.box] || seenU[s.approver]) return false;
+      seenBox[s.box] = 1; seenU[s.approver] = 1; return true;
+    }).sort(function (x, y) { return APPR_BOXES.indexOf(x.box) - APPR_BOXES.indexOf(y.box); });
+  }
+  /** 다음에 넣을 칸 — 지금 칸 오른쪽의 첫 빈칸, 없으면 왼쪽부터 첫 빈칸, 다 찼으면 ''. */
+  function nextEmptyBox(from) {
+    var i0 = Math.max(0, APPR_BOXES.indexOf(from));
+    var order = APPR_BOXES.slice(i0).concat(APPR_BOXES.slice(0, i0));
+    return order.filter(function (b) { return !draftAt(b); })[0] || '';
+  }
   function addApprover(u) {
-    if (!u || DRAFT.length >= 4) return;
-    if (DRAFT.some(function (s) { return s.approver === u; })) return;
-    DRAFT.push({ approver: u, box: BOXES[Math.min(DRAFT.length + 1, BOXES.length - 1)] });
+    if (!u || u === myName()) return;
+    var box = APPR_BOX || nextEmptyBox(APPR_BOXES[0]);
+    if (!box) { toast('칸이 다 찼습니다. 바꿀 칸의 × 를 눌러 비운 뒤 넣어 주세요.', true); return; }
+    // 같은 사람이 다른 칸에 있었으면 그 칸에서 옮긴다.
+    DRAFT = DRAFT.filter(function (s) { return s.box !== box && s.approver !== u; });
+    DRAFT.push({ approver: u, box: box });
+    tidyDraft();
     APPR_Q = '';                       // 다음 사람을 바로 칠 수 있게 비운다
+    APPR_BOX = nextEmptyBox(box);
     renderSubmit();
-    var box = $('apprQ');
-    if (box) box.focus();
+    var q = $('apprQ');
+    if (q) q.focus();
   }
 
   function renderSubmit() {
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
     SUBMIT.token = null; SUBMIT.send = null;
+    tidyDraft();
+    if (APPR_BOX && draftAt(APPR_BOX)) APPR_BOX = '';
     // ★ 관리자는 TRIPS 에 전 직원 운행이 들어 있다. 예전에는 그 합계를 그대로
     //   보여 줘서 "1,842건 · ₩12,400,000" 같은 회사 전체 숫자가 자기 결재 금액인
     //   양 보였다. 서버가 굳히는 snapshot 은 본인 것이므로 화면만 거짓말했다.
     var T = totals(TRIPS.filter(function (t) { return t.username === myName(); }), { who: myName() });
-    var pickable = Object.keys(PEOPLE).filter(function (u) { return u !== myName(); })
-      .sort(function (x, y) { return nameOf(x).localeCompare(nameOf(y), 'ko'); });
 
     $('pTitle').textContent = cycleName(CYC.y, CYC.m) + ' 결재 상신';
     $('pSub').textContent = cycleSpan(CYC.y, CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.cost);
 
-    var h = '<div class="aline-list">';
-    h += '<div class="arow"><span class="aseq me">본</span>' +
-      '<span class="awho"><b>' + esc(ME.name || myName()) + '</b><span>' +
-      esc([personOf(myName()).dept, personOf(myName()).position].filter(Boolean).join(' · ')) +
-      '</span></span><span class="abox">담당</span></div>';
-
-    DRAFT.forEach(function (s, i) {
-      var u = personOf(s.approver);
-      h += '<div class="arow"><span class="aseq">' + (i + 1) + '</span><span class="awho">';
-      if (s.pick && !s.approver) {
-        h += '<select class="apick" data-idx="' + i + '" aria-label="' + (i + 1) + '단계 ' + esc(s.pick) + ' 고르기"><option value="">— ' + esc(s.pick) + ' 고르기 —</option>' +
-          (s.candidates || []).map(function (c) {
-            return '<option value="' + esc(c) + '">' + esc(nameOf(c)) + ' · ' + esc(personOf(c).position || '') + '</option>';
-          }).join('') + '</select>';
+    // ── 결재란: 운행기록부에 찍히는 모양 그대로 ──
+    var me0 = personOf(myName());
+    var h = '<div class="agrid" role="group" aria-label="결재란">' +
+      '<div class="ag-lab" aria-hidden="true">결<br>재</div>' +
+      '<div class="ag-cell me"><div class="ag-h">담당</div><div class="ag-b"><b>' + esc(ME.name || myName()) + '</b>' +
+      '<small>' + esc(me0.position || '본인') + '</small></div></div>';
+    APPR_BOXES.forEach(function (b) {
+      var s = draftAt(b), on = APPR_BOX === b;
+      if (s) {
+        var u = personOf(s.approver);
+        h += '<div class="ag-cell set' + (on ? ' on' : '') + '"><div class="ag-h">' + esc(b) + '</div>' +
+          '<div class="ag-b"><b>' + esc(u.name || s.approver) + '</b><small>' + esc(u.position || '') + '</small>' +
+          '<button class="ag-x" data-agclr="' + esc(b) + '" aria-label="' + esc(b) + ' 칸 비우기">' + ic('close', 11) + '</button></div></div>';
       } else {
-        h += '<b>' + esc(u.name || s.approver) + '</b><span>' +
-          esc([u.dept, u.position].filter(Boolean).join(' · ')) + '</span>';
+        h += '<button class="ag-cell empty' + (on ? ' on' : '') + '" data-agbox="' + esc(b) + '" aria-pressed="' + (on ? 'true' : 'false') + '" ' +
+          'aria-label="' + esc(b) + ' 칸 — 비어 있음(건너뜀). 눌러서 이름 넣기">' +
+          '<span class="ag-h">' + esc(b) + '</span><span class="ag-b"><span class="ag-pick">' + (on ? '이름 입력' : '눌러서 넣기') + '</span></span></button>';
       }
-      h += '</span><select class="abox" data-box="' + i + '" aria-label="' + (i + 1) + '단계 결재란 칸">' +
-        BOXES.slice(1).map(function (b) {
-          return '<option value="' + esc(b) + '"' + (s.box === b ? ' selected' : '') + '>' + esc(b) + '</option>';
-        }).join('') + '</select>' +
-        '<button class="iconbtn sm" data-del="' + i + '" aria-label="' + (i + 1) + '단계 결재자 빼기">' + ic('close', 14) + '</button></div>';
     });
     h += '</div>';
+    // 결재 순서 — 채워진 칸을 왼쪽부터.
+    h += '<div class="ag-order">' + (DRAFT.length
+      ? '결재 순서: ' + DRAFT.map(function (s, i) { return (i + 1) + '. ' + esc(nameOf(s.approver)) + '(' + esc(s.box) + ')'; }).join(' → ')
+      : '아직 넣은 분이 없습니다. 결재받을 칸을 누르고 이름을 넣어 주세요.') + '</div>';
 
-    if (DRAFT.length < 4) {
+    // 이름 넣기 — 고른 칸에 들어간다.
+    if (APPR_BOX) {
       // ★ 예전에는 61명짜리 <select> 였다. 마감일에 그 목록을 훑어 고르는 것은
       //   할 짓이 아니다. 이름을 두어 글자만 쳐도 좁혀지게 바꿨다.
       //   부서·직급으로도 찾힌다("광역", "팀장").
       h += '<div class="aadd">' +
-        '<input id="apprQ" autocomplete="off" aria-label="결재자 찾아 넣기" placeholder="결재자 이름을 쓰세요 (예: ' +
-        esc(nameOf(pickable[0] || '')) + ')" value="' + esc(APPR_Q) + '">' +
+        '<input id="apprQ" autocomplete="off" aria-label="' + esc(APPR_BOX) + ' 칸에 넣을 분 찾기" placeholder="「' + esc(APPR_BOX) +
+        '」 칸에 넣을 분의 이름을 쓰세요" value="' + esc(APPR_Q) + '">' +
         '<div class="acand" id="apprCand">' + apprCandHtml() + '</div></div>';
     }
+
+    var prev = previousSteps();
+    if (prev && !DRAFT.length) {
+      h += '<div style="margin-top:10px"><button class="btn sm" id="btnPrevLine">' + ic('list', 13) + '지난번 결재선 불러오기 — ' +
+        esc(prev.map(function (s) { return nameOf(s.approver) + '(' + s.box + ')'; }).join(' → ')) + '</button></div>';
+    }
+    h += '<div class="anote" style="margin-top:10px">결재받을 <b>칸을 누르고 이름</b>을 넣으세요. <b>비워 둔 칸은 빗금(/)</b>으로 찍히고 건너뜁니다. ' +
+      '결재는 왼쪽 칸부터 차례로 진행됩니다.</div>';
 
     var warn = [];
     if (T.unk) warn.push('통행료 미확정 ' + n0(T.unk) + '건이 0원으로 올라갑니다');
@@ -2223,7 +2244,7 @@
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
       (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' +
-        '결재선은 조직도(센터·파트장 → 팀장 → 사업부장)에서 자동으로 채워집니다. 빼거나 더하실 수 있습니다.</div>') +
+        '결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 지난번 결재선을 불러올 수도 있습니다.</div>') +
       (locked && EXT.apprExtra ? EXT.apprExtra(a) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 주기의 운행·영수증을 고칠 수 없습니다. ' +
         '고치려면 <b>회수</b>한 뒤 수정해 다시 상신하세요' +
@@ -5226,13 +5247,28 @@
 
     /* ── 결재 ── */
     if (e.target.closest('#btnOpenSubmit')) { openSubmit(); return; }
+    if (e.target.closest('#btnPrevLine')) {
+      var pv = previousSteps();
+      if (pv) { DRAFT = pv.slice(); APPR_Q = ''; APPR_BOX = ''; renderSubmit(); }
+      return;
+    }
     if (e.target.closest('#btnApprPdf')) { doPrint(); return; }
-    if ((el = e.target.closest('[data-del]'))) {
-      DRAFT.splice(+el.dataset.del, 1); renderSubmit(); return;
+    // 결재란 칸 — 빈칸을 누르면 그 칸에 넣을 이름을 받는다. × 는 그 칸을 비운다(빗금 · 건너뜀).
+    if ((el = e.target.closest('[data-agbox]'))) {
+      APPR_BOX = el.dataset.agbox; APPR_Q = ''; renderSubmit();
+      var qb = $('apprQ'); if (qb) qb.focus();
+      return;
+    }
+    if ((el = e.target.closest('[data-agclr]'))) {
+      var cb = el.dataset.agclr;
+      DRAFT = DRAFT.filter(function (s) { return s.box !== cb; });
+      APPR_BOX = cb; APPR_Q = ''; renderSubmit();
+      var qc = $('apprQ'); if (qc) qc.focus();
+      return;
     }
     if (e.target.closest('#btnSubmitAppr')) {
       var bad = DRAFT.filter(function (s) { return !s.approver; });
-      if (!DRAFT.length) { toast('결재자를 한 명 이상 지정해 주세요.', true); return; }
+      if (!DRAFT.length) { toast('결재받을 분을 한 칸 이상 넣어 주세요.', true); return; }
       if (bad.length) { toast('아직 고르지 않은 결재자가 있습니다.', true); return; }
       var sb = $('btnSubmitAppr');
       if (sb.disabled) return;
@@ -5328,13 +5364,6 @@
       return;
     }
     // ── 상신 창 ──
-    if (e.target.classList.contains('apick')) {
-      DRAFT[+e.target.dataset.idx].approver = e.target.value;
-      renderSubmit(); return;
-    }
-    if (e.target.dataset && e.target.dataset.box !== undefined) {
-      DRAFT[+e.target.dataset.box].box = e.target.value; return;
-    }
   });
   // 날짜 좁히기: 끝을 시작보다 앞으로 넣으면 조건은 바로잡아 걸리는데(dateBounds) 칸에는 거꾸로 남는다.
   // 치는 도중에 칸 값을 바꾸면 방해가 되므로, 칸을 떠날 때 보이는 순서를 맞춘다.
@@ -5626,13 +5655,12 @@
         return {
           ME: ME, VIEW: VIEW, CYC: CYC, CYCKEY: CYCKEY(), LOADED: LOADED,
           TRIPS: TRIPS, ALL_TRIPS: ALL_TRIPS, EVID: EVID, ALL_EVID: ALL_EVID,
-          USERS: USERS, PEOPLE: PEOPLE, APPR: APPR, LINES: LINES, ORG: ORG, ACCT: ACCT
+          USERS: USERS, PEOPLE: PEOPLE, APPR: APPR, ORG: ORG, ACCT: ACCT
         };
       },
       // 목적을 고르는 창 없이 문서를 만들 때는 늘 일반업무만 담는다(지난번에 고른 체크박스를 따르지 않는다).
       bizOnly: function () { PRINT_PURPOSES = [BUSINESS]; },
       expectCost: expectCost, sheetSumWarn: sheetSumWarn,
-      setLines: function (rows) { LINES = {}; (rows || []).forEach(function (l) { LINES[l.dept] = l; }); },
       setOrg: function (rows) { ORG = rows || []; }
     };
     (window.DrvExtQ || []).forEach(function (make) {
@@ -5640,7 +5668,7 @@
       try { x = make(C) || {}; } catch (e) { console.error('확장 모듈을 붙이지 못했습니다:', e); return; }
       Object.keys(x.views || {}).forEach(function (k) { VIEWS[k] = x.views[k]; });
       (x.admin || []).forEach(function (k) { if (ADMIN_VIEWS.indexOf(k) < 0) ADMIN_VIEWS.push(k); });
-      ['apprExtra', 'wantSummaries', 'beforeSubmit', 'sumText', 'lineForUser'].forEach(function (k) { if (x[k]) EXT[k] = x[k]; });
+      ['apprExtra', 'wantSummaries', 'beforeSubmit', 'sumText'].forEach(function (k) { if (x[k]) EXT[k] = x[k]; });
       if (x.onCycle) EXT.onCycle.push(x.onCycle);
       if (x.dirty) EXT.dirty.push(x.dirty);
     });

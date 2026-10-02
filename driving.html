@@ -582,6 +582,44 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 
 /* 상신 창 */
 .aline-list{border-top:1px solid var(--ink-100);margin-top:4px}
+/* ── 상신 창의 결재란 — 운행기록부에 찍히는 모양 그대로(결 재 | 담당 | 팀장 | 실장 | 사업부장 | 대표이사) ──
+   빈칸은 빗금(/)이 그어진 채로 보인다 — 문서에도 그렇게 찍히고 그 단계는 건너뛴다. */
+.agrid{display:grid;grid-template-columns:28px repeat(5,minmax(0,1fr));margin-top:8px;border:1px solid var(--ink-700);
+  border-radius:4px;overflow:hidden;background:var(--surface)}
+.ag-lab{display:grid;place-items:center;background:var(--ink-100);font-size:12px;font-weight:500;color:var(--ink-800);
+  border-right:1px solid var(--ink-700);line-height:1.5;text-align:center}
+.ag-cell{display:flex;flex-direction:column;min-width:0;border:0;border-right:1px solid var(--ink-700);padding:0;margin:0;
+  background:none;font:inherit;text-align:center;color:inherit}
+.ag-cell:last-child{border-right:0}
+.ag-h{display:block;padding:6px 2px;background:var(--ink-100);border-bottom:1px solid var(--ink-700);font-size:12px;font-weight:500;
+  color:var(--ink-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-b{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:62px;padding:6px 4px}
+.ag-b b{font-size:13px;font-weight:500;color:var(--ink-900);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-b small{font-size:11px;color:var(--ink-600)}
+.ag-cell.empty{cursor:pointer}
+.ag-cell.empty .ag-b{background:linear-gradient(to top right,transparent calc(50% - .6px),var(--ink-400) calc(50% - .6px),
+  var(--ink-400) calc(50% + .6px),transparent calc(50% + .6px))}
+.ag-pick{font-size:11px;color:var(--ink-600);background:var(--surface);padding:1px 5px;border-radius:4px}
+.ag-cell.empty:hover .ag-b{background-color:var(--sunken)}
+.ag-cell.on .ag-b{box-shadow:inset 0 0 0 2px var(--red);background-color:var(--red-50)}
+.ag-cell.on .ag-pick{color:var(--red-700);font-weight:500}
+.ag-cell.me .ag-b{background:var(--sunken)}
+.ag-cell:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.ag-x{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;background:none;color:var(--ink-500);
+  cursor:pointer;display:grid;place-items:center}
+.ag-x:hover{background:var(--ink-100);color:var(--ink-900)}
+.ag-order{margin-top:8px;font-size:12.5px;color:var(--ink-700);line-height:1.6}
+.ag-pick{white-space:nowrap}
+/* 폰: 칸이 좁다(약 55px). 빈칸 안내 글자는 고른 칸에만 짧게, × 는 칸 위 모서리로 — 이름에 겹치지 않게. */
+@media (max-width:480px){
+  .ag-h{font-size:11px;padding:5px 1px}
+  .ag-b{min-height:58px;padding:14px 2px 6px}
+  .ag-b b{font-size:12px}
+  .ag-b small{font-size:10.5px}
+  .ag-pick{display:none;font-size:10.5px;padding:1px 3px}
+  .ag-cell.on .ag-pick{display:inline}
+  .ag-x{top:1px;right:1px;width:16px;height:16px}
+}
 .arow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--ink-100)}
 .aseq{width:24px;height:24px;border-radius:50%;background:var(--ink-100);color:var(--ink-500);
   display:grid;place-items:center;font-size:11.5px;font-weight:500;flex:none}
@@ -953,7 +991,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조 (전체)</a>
       <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>전체 정산</a>
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
-      <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>조직도 · 결재선</a>
+      <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>조직도</a>
       <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 안전운전</a>
       <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
