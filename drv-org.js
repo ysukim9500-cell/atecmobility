@@ -79,7 +79,7 @@
     var people = org.filter(function (o) {
       if (!inNode(o, SEL)) return false;
       if (!q) return true;
-      return [o.name, o.rank, o.role, o.duty, o.team, o.unit, o.username || ''].join(' ').toLowerCase().indexOf(q) >= 0;
+      return [o.name, o.rank, o.role, o.duty, o.team, o.unit, o.username || '', o.email || ''].join(' ').toLowerCase().indexOf(q) >= 0;
     });
     right += '<div class="bar" style="margin-top:14px"><label class="field">' + ic('search', 14) +
       '<input id="orgQ" aria-label="사람 찾기" placeholder="이름·직급·업무로 찾기" value="' + esc(Q) + '"></label>' +
@@ -117,7 +117,7 @@
     var S = C.state();
     var o = id ? S.ORG.filter(function (x) { return String(x.id) === String(id); })[0] : null;
     var p = parts(SEL);
-    var v = o || { division: p[0] || '', team: p[1] || '', unit: p[2] || '', name: '', rank: '', role: '', duty: '', username: '', outsourced: false };
+    var v = o || { division: p[0] || '', team: p[1] || '', unit: p[2] || '', name: '', rank: '', role: '', duty: '', username: '', email: '', outsourced: false };
     var uniq = function (f) {
       var s = {};
       S.ORG.forEach(function (x) { if (x[f]) s[x[f]] = 1; });
@@ -149,6 +149,8 @@
         dl('dlRole', ['사업부장', '공장장', '실장', '팀장', '센터장', '파트장']),
         '참고용입니다(센터장·팀장 등). 없으면 비워 둡니다. 결재선은 직원이 상신할 때 직접 고릅니다', 'oRole') +
       fld('담당 업무', '<input class="inp" id="oDuty" maxlength="80" value="' + esc(v.duty) + '">', null, 'oDuty') +
+      fld('회사 메일', '<input class="inp" id="oEmail" type="email" maxlength="80" value="' + esc(v.email || '') + '">',
+        '팀즈 아이디와 같은 메일. 결재 차례가 오면 이 주소로 팀즈 개인 채팅 알림을 보냅니다', 'oEmail') +
       fld('앱 계정', '<select class="inp" id="oUser"><option value="">없음 (아직 가입 전)</option>' +
         accts.map(function (u) {
           var pp = S.PEOPLE[u] || {};
@@ -166,7 +168,7 @@
   /** 사람 창에 지금 들어 있는 값(고친 것이 있는지 견주는 데 쓴다). */
   var P_INIT = '';
   function personSig() {
-    return ['oName', 'oDiv', 'oTeam', 'oUnit', 'oRank', 'oRole', 'oDuty', 'oUser'].map(function (i) {
+    return ['oName', 'oDiv', 'oTeam', 'oUnit', 'oRank', 'oRole', 'oDuty', 'oEmail', 'oUser'].map(function (i) {
       return String(($(i) || {}).value || '');
     }).join('\u0001') + '\u0001' + ((($('oOut') || {}).checked) ? 1 : 0);
   }
@@ -191,11 +193,12 @@
     var val = function (i) { return String(($(i) || {}).value || '').trim(); };
     var row = {
       name: val('oName'), division: val('oDiv'), team: val('oTeam'), unit: val('oUnit'),
-      rank: val('oRank'), role: val('oRole'), duty: val('oDuty'),
+      rank: val('oRank'), role: val('oRole'), duty: val('oDuty'), email: val('oEmail').toLowerCase() || null,
       username: val('oUser') || null, outsourced: !!($('oOut') || {}).checked,
       updated_by: C.myName(), updated_at: new Date().toISOString()
     };
     if (!row.name) { C.toast('이름을 넣어 주세요.', true); $('oName').focus(); return; }
+    if (row.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email)) { C.toast('메일 주소 모양이 아닙니다.', true); $('oEmail').focus(); return; }
     if (!row.division) { C.toast('본부를 넣어 주세요.', true); $('oDiv').focus(); return; }
     if (row.unit && !row.team && row.division) {
       // 팀 없이 파트만 있는 구조(예: 용인공장 › 자재파트)는 팀 자리에 적는다 — 나무가 두 갈래로 갈리지 않게.

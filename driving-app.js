@@ -1622,6 +1622,16 @@
    * (2026-10-02 검증로봇 · 사용자 결정). 서버(approval-act)도 같은 규칙으로 거부한다.
    * 후보 관리는 관리 › 조직도에서: 사람 추가 · 앱 계정 잇기 · 목록에서 내리기.
    */
+  /** 조직도에서 이 계정의 행(결재자 고르기에 소속·직급·직책을 보인다). */
+  function orgOf(u) {
+    for (var i = 0; i < ORG.length; i++) if (ORG[i].username === u && ORG[i].active !== false) return ORG[i];
+    return null;
+  }
+  function orgLabel(u) {
+    var o = orgOf(u), p = personOf(u);
+    if (!o) return [p.dept, p.position].filter(Boolean).join(' · ');
+    return [[o.team, o.unit].filter(Boolean).join(' ') || o.division, o.rank, o.role].filter(Boolean).join(' · ');
+  }
   function canApprove(u) {
     return !!PEOPLE[u] && ORG.some(function (o) { return o.username === u && o.active !== false; });
   }
@@ -1693,7 +1703,9 @@
     if (q) {
       list = list.filter(function (u) {
         var p = personOf(u);
-        return [nameOf(u), u, p.dept || '', p.position || ''].join(' ').toLowerCase().indexOf(q) >= 0;
+        var o = orgOf(u) || {};
+        return [nameOf(u), u, p.dept || '', p.position || '', o.division || '', o.team || '', o.unit || '', o.rank || '', o.role || '']
+          .join(' ').toLowerCase().indexOf(q) >= 0;
       });
     }
     return list.sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
@@ -1712,7 +1724,7 @@
       var p = personOf(u);
       return '<button class="acand-i' + (i === 0 ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
         '<b>' + esc(nameOf(u)) + '</b>' +
-        '<span>' + esc([p.dept, p.position].filter(Boolean).join(' · ') || u) + '</span>' +
+        '<span>' + esc(orgLabel(u) || u) + '</span>' +
         (i === 0 && APPR_Q.trim() ? '<span class="acent">Enter</span>' : '') + '</button>';
     }).join('') +
       (all.length > show.length
