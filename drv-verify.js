@@ -106,6 +106,18 @@
     A02: ['evid', '영수증에서 보기'], A03: ['evid', '영수증에서 보기'], A04: ['evid', '영수증에서 보기'],
     A05: ['trips', '운행일지에서 보기'], A06: ['evid', '영수증에서 보기']
   };
+  /** AI(Gemini)가 사진을 읽어 낸 항목인가 — 코드가 A 로 시작한다(A00 은 '읽지 않음' 안내). */
+  function isAi(it) { return /^A0[1-9]/.test(String(it && it.code || '')); }
+  /** Gemini 표시. 구글 공식 로고 파일이 아니라, 같은 색감의 반짝임 모양 + 이름이다. */
+  function gemBadge(label) {
+    return '<span class="gem" title="Google Gemini 가 사진을 읽어 찾은 항목">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="#4C8DF6"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs>' +
+      '<path fill="url(#gemg)" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>' +
+      (label || 'Gemini') + '</span>';
+  }
+  /** 지금 화면의 검증 항목(「바로 고치기」가 번호로 찾는다). */
+  var VITEMS = [];
   /** links 가 참이면 항목마다 '고치러 가기' 버튼을 붙인다(본인 검증 화면에서만). */
   function itemsHtml(items, links) {
     if (!items || !items.length) {
@@ -114,11 +126,59 @@
     }
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, fx = links && it.level !== 'info' ? FIX[it.code] : null;
-      return '<div class="vitem v-' + esc(it.level) + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + esc(it.title) + '</div>' +
-        '<div class="vd">' + esc(it.detail) + '</div></div>' +
-        (fx ? '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>' : '') + '</div>';
+      var refs = it.refs || {}, nRef = (refs.trips || []).length + (refs.evid || []).length;
+      var go = '';
+      if (links && it.code === 'R02') go = '<button class="btn sm vgo" data-v="tollfill">통행료 채우기' + ic('chev', 12) + '</button>';
+      else if (links && nRef) {
+        VITEMS.push(it);
+        go = '<button class="btn sm vgo vfix" data-vfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>';
+      } else if (fx) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
+      return '<div class="vitem v-' + esc(it.level) + (isAi(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
+        '<div class="vb"><div class="vt">' + esc(it.title) + (isAi(it) ? ' ' + gemBadge() : '') + '</div>' +
+        '<div class="vd">' + esc(it.detail) + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
+  }
+  /** 「바로 고치기」 — 항목이 가리키는 운행·영수증을 한 창에 모아 거기서 바로 고친다.
+   *  운행 하나뿐이면 곧장 그 운행의 고치기 창을 연다. 영수증은 웹에서 지우고 다시 올릴 수 있다(값 고치기는 앱). */
+  function openFix(it) {
+    if (!it) return;
+    var S = C.state(), refs = it.refs || {};
+    var tid = (refs.trips || []).map(String), eid = (refs.evid || []).map(String);
+    var trips = S.TRIPS.filter(function (t) { return tid.indexOf(String(t.id)) >= 0; })
+      .sort(function (a, b) { return a.start_time - b.start_time; });
+    var evs = S.EVID.filter(function (e) { return eid.indexOf(String(e.id)) >= 0; })
+      .sort(function (a, b) { return a.date_millis - b.date_millis; });
+    if (trips.length === 1 && !eid.length) { C.openEdit(trips[0].id); return; }
+    if (!trips.length && !evs.length) { C.toast('가리키는 운행·영수증을 찾지 못했습니다. 기간을 확인하거나 「다시 검증」을 눌러 주세요.', true); return; }
+    var mine = C.myName();
+    var body = '<div class="anote">' + esc(it.detail) + '</div>';
+    if (trips.length) {
+      body += '<div class="fixh">운행 ' + n0(trips.length) + '건</div><div class="fixl">' + trips.map(function (t) {
+        var cost = [];
+        if (Number(t.parking_cost) > 0) cost.push('주차 ' + n0(t.parking_cost));
+        if (Number(t.toll_cost) > 0) cost.push('통행료 ' + n0(t.toll_cost));
+        return '<div class="fixi"><div class="fixt"><b>' + C.md(t.start_time) + ' ' + C.hm(t.start_time) + '</b> ' +
+          esc(t.plate_no || '') + ' · ' + esc(t.purpose || '목적 없음') +
+          '<div class="dim">' + esc([t.visit_place, t.end_address].filter(Boolean)[0] || '') +
+          ' · 계기판 ' + n0(t.start_odometer) + ' → ' + n0(t.end_odometer) + (cost.length ? ' · ' + cost.join(' · ') : '') + '</div></div>' +
+          '<button class="btn sm pri" data-edit="' + esc(t.id) + '">운행 고치기</button></div>';
+      }).join('') + '</div>';
+    }
+    if (evs.length) {
+      body += '<div class="fixh">영수증·사진 ' + n0(evs.length) + '건</div><div class="fixl">' + evs.map(function (e) {
+        var canDel = e.username === mine && !C.evLocked(e);
+        return '<div class="fixi">' + (e.photo_path
+            ? '<a class="fixph" target="_blank" rel="noopener" href="' + esc(C.photoUrl(e.photo_path)) + '"><img alt="" loading="lazy" src="' + esc(C.photoUrl(e.photo_path)) + '"></a>'
+            : '<span class="fixph none">사진 없음</span>') +
+          '<div class="fixt"><b>' + C.md(e.date_millis) + ' ' + esc(e.category || '기타') + ' ' + n0(e.amount) + '원</b>' +
+          '<div class="dim">' + esc([e.vehicle_plate, e.memo].filter(Boolean).join(' · ')) + '</div></div>' +
+          (e.photo_path ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(C.photoUrl(e.photo_path)) + '">사진 크게</a>' : '') +
+          (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') + '</div>';
+      }).join('') + '</div>' +
+        '<div class="fhint" style="margin-top:8px">영수증의 금액·날짜·구분은 앱에서 고치거나, 여기서 지운 뒤 「증빙」에서 다시 올려 주세요.</div>';
+    }
+    C.openPanel('바로 고치기 — ' + it.title, (isAi(it) ? 'Gemini 가 사진을 읽어 찾은 항목 · ' : '') + '고친 뒤 「다시 검증」을 눌러 주세요',
+      body, '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
   }
   function sumText(s) {
     if (!s) return '';
@@ -156,10 +216,11 @@
       return h + C.skeleton();
     }
     var row = ROWS[k], busy = RUN.busy && RUN.who === k;
+    VITEMS = [];
     var a = C.myAppr(), locked = a && (a.status === 'submitted' || a.status === 'approved');
     var s = row && row.summary, items = (row && row.result && row.result.items) || [];
     var verdict, clean = '';
-    if (busy) verdict = esc(RUN.note || '검증하는 중…');
+    if (busy) verdict = '<span class="gemrun">' + gemBadge('Gemini') + '</span>' + esc(RUN.note || '검증하는 중…');
     else if (!row) verdict = '아직 검증하지 않았습니다';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
@@ -180,7 +241,7 @@
         fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '고칠 것은 아님') +
         fact('사진 판독', row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
-          row.ai ? 'AI 가 읽은 영수증·계기판' : 'AI 미설정 — 규칙 검증만') +
+          row.ai ? 'AI 가 읽은 영수증·계기판' : 'AI 미설정 — 규칙 검증만', false, row.ai) +
         '</div>' : '') +
       '<div class="vact">' + btn +
       '<button class="btn" data-pdf="">' + ic('dl', 14) + (locked ? '결재 문서 PDF' : 'PDF 미리보기') + '</button>' +
@@ -202,12 +263,12 @@
         '<div class="d">계기판이 이어지는지, 영수증 금액이 입력과 같은지, 같은 영수증을 두 번 올리지 않았는지 봅니다.<br>' +
         '맞지 않는 곳이 있어도 상신은 할 수 있습니다 — 결재자가 같이 봅니다.</div></div></div>';
     }
-    h += '<div class="anote">금액 계산은 규칙으로만 합니다. AI 는 사진을 읽어 <b>입력값과 다른 곳을 표시</b>할 뿐, 값을 바꾸지 않습니다. ' +
-      '고친 뒤에는 「다시 검증」을 눌러 주세요.</div>';
+    h += '<div class="anote">금액 계산은 규칙으로만 합니다. ' + gemBadge('Gemini AI') + ' 는 사진을 읽어 <b>입력값과 다른 곳을 표시</b>할 뿐, 값을 바꾸지 않습니다. ' +
+      '「바로 고치기」로 고친 뒤에는 「다시 검증」을 눌러 주세요.</div>';
     return h;
 
-    function fact(kk, v, sub, alert) {
-      return '<div class="fact"><div class="k">' + esc(kk) + '</div>' +
+    function fact(kk, v, sub, alert, gem) {
+      return '<div class="fact"><div class="k">' + esc(kk) + (gem ? ' ' + gemBadge() : '') + '</div>' +
         '<div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
         '<div class="sub">' + esc(sub || '') + '</div></div>';
     }
@@ -680,6 +741,7 @@
   document.addEventListener('click', function (e) {
     var el;
     if (e.target.closest('[data-vrun]')) { startRun(C.myName()); return; }
+    if ((el = e.target.closest('[data-vfix]'))) { openFix(VITEMS[+el.dataset.vfix]); return; }
     if ((el = e.target.closest('[data-vrunfor]'))) {
       var u = el.dataset.vrunfor, S = C.state(), k = keyOf(u, S.CYCKEY);
       if (RUN.busy) return;

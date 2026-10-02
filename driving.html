@@ -240,6 +240,25 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .vt{font-size:13.5px;font-weight:500;color:var(--ink-900)}
 .vd{font-size:12.5px;color:var(--ink-600);margin-top:3px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}
 .vitem .vgo{flex:none;align-self:center}
+.vitem .vgo.vfix{border-color:var(--red);color:var(--red);font-weight:600}
+/* Gemini(AI) 표시 — 같은 색감의 반짝임 + 이름. AI 가 찾은 항목은 왼쪽 띠도 보라빛으로 */
+.gem{display:inline-flex;align-items:center;gap:3px;vertical-align:1px;font-size:10.5px;font-weight:600;letter-spacing:.01em;
+  padding:1px 7px 1px 5px;border-radius:999px;white-space:nowrap;color:#5b4bb5;
+  background:linear-gradient(90deg,rgba(76,141,246,.12),rgba(155,114,203,.14),rgba(217,101,112,.12));border:1px solid rgba(155,114,203,.28)}
+.vitem.v-ai:not(.v-bad){box-shadow:inset 3px 0 0 #9B72CB}
+.gemrun{display:inline-block;margin-right:8px;vertical-align:4px}
+.gemrun svg{animation:gemspin 1.6s linear infinite}
+@keyframes gemspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.gemrun svg{animation:none}}
+/* 바로 고치기 창 */
+.fixh{margin:14px 0 6px;font-size:12px;font-weight:600;color:var(--ink-500)}
+.fixl{border:1px solid var(--ink-100);border-radius:8px}
+.fixi{display:flex;gap:10px;align-items:center;padding:10px 12px;flex-wrap:wrap}
+.fixi+.fixi{border-top:1px solid var(--ink-100)}
+.fixt{flex:1;min-width:180px;font-size:13px}
+.fixt .dim{font-size:12px;margin-top:2px}
+.fixph{flex:none;width:56px;height:56px;border-radius:6px;overflow:hidden;border:1px solid var(--ink-100);display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--ink-400)}
+.fixph img{width:100%;height:100%;object-fit:cover}
 .vsum{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px}
 .vsub{font-size:12px;color:var(--ink-600);margin:14px 2px 7px}
 /* 검증 요약 딱지: "검증" 라벨 + 등급별 색(빨강은 불일치에만) */

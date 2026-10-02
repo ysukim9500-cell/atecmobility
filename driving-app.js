@@ -5918,7 +5918,7 @@
       nameOf: nameOf, personOf: personOf, myName: myName, myAppr: myAppr, apprOf: apprOf,
       cycleRange: cycleRange, cycleName: cycleName, cycleSpan: cycleSpan,
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
-      pdfDocFor: pdfDocFor, fillSigns: fillSigns, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
+      pdfDocFor: pdfDocFor, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       state: function () {
         return {
