@@ -848,8 +848,11 @@
     return EVID.filter(function (e) { var d = Number(e.date_millis); return d >= r.lo && d < r.hi; });
   }
   function eduMonthKey() {
-    // 서버 index.ts 245행: 마감일이 속한 달 = 교육 회차 키. 보고 있는 주기를 따른다.
-    return CYC.y + '-' + pad(CYC.m);
+    // ★ 교육 회차 키 = 시청 기간이 **시작하는 달**(앱 EduMonth.key: 21일 이후면 이번 달, 20일까지는 전달).
+    //   보고 있는 정산 주기 CYC 는 **끝나는 달**로 부르므로(9/21~10/20 = 10월분) 한 달을 뺀다.
+    //   예전에는 CYC 를 그대로 써서 웹이 앱보다 한 회차 앞을 보여 주고, 의무 대상자에게 '대상 아님'이라 했다.
+    var c = addCycle(CYC, -1);
+    return c.y + '-' + pad(c.m);
   }
   function myName() { return (ME && (ME.username || ME.app_username)) || ''; }
   function eduTodo() {
@@ -1500,9 +1503,25 @@
         return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length;
       }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
     if (!past) return null;
-    var out = past.steps.filter(function (s) { return s.approver && s.approver !== mine && PEOPLE[s.approver]; })
-      .map(function (s) { return { approver: s.approver, box: s.box }; });
+    // 버튼에 적는 것과 실제로 불러오는 것이 같아야 한다 — 지금 규칙(칸마다 한 명 · 한 사람은 한 칸 ·
+    // 결재할 수 있는 사람)으로 미리 걸러 둔다. 예전 화면에서 만든 결재선은 칸이 겹치거나 비어 있을 수 있다.
+    var seenB = {}, seenU = {};
+    var out = past.steps.filter(function (s) {
+      if (!s.approver || s.approver === mine || !canApprove(s.approver)) return false;
+      if (APPR_BOXES.indexOf(s.box) < 0 || seenB[s.box] || seenU[s.approver]) return false;
+      seenB[s.box] = 1; seenU[s.approver] = 1; return true;
+    }).map(function (s) { return { approver: s.approver, box: s.box }; })
+      .sort(function (x, y) { return APPR_BOXES.indexOf(x.box) - APPR_BOXES.indexOf(y.box); });
     return out.length ? out : null;
+  }
+  /**
+   * 결재자로 고를 수 있는 사람 — 조직도에 올라 있고(내리지 않음) 앱 계정이 연결된 사람.
+   * 앱 계정은 누구나 만들 수 있어, 아무 계정이나 고르게 두면 가짜 계정을 결재자로 넣어 스스로 승인할 수 있다
+   * (2026-10-02 검증로봇 · 사용자 결정). 서버(approval-act)도 같은 규칙으로 거부한다.
+   * 후보 관리는 관리 › 조직도에서: 사람 추가 · 앱 계정 잇기 · 목록에서 내리기.
+   */
+  function canApprove(u) {
+    return !!PEOPLE[u] && ORG.some(function (o) { return o.username === u && o.active !== false; });
   }
 
   function apprStatusText(a) {
@@ -1548,9 +1567,10 @@
       toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
     }
     // 빈 칸으로 연다 — 결재받을 분은 상신자가 이름을 넣어 고른다. 지난번 것은 버튼으로 불러온다.
-    DRAFT = [];
+    // 이 주기에 넣다 만 결재선이 있으면 되살린다 — 창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게.
+    DRAFT = (DRAFT_KEEP[CYCKEY()] || []).slice();
     APPR_Q = '';
-    APPR_BOX = APPR_BOXES[0];           // 「팀장」 칸부터 — 바로 이름을 칠 수 있게
+    APPR_BOX = DRAFT.length ? nextEmptyBox(APPR_BOXES[0]) : APPR_BOXES[0];           // 「팀장」 칸부터 — 바로 이름을 칠 수 있게
     renderSubmit();
     var box = $('apprQ'); if (box) box.focus();
   }
@@ -1562,7 +1582,7 @@
     var q = APPR_Q.trim().toLowerCase();
     var used = DRAFT.map(function (s) { return s.approver; }).filter(Boolean);
     var list = Object.keys(PEOPLE).filter(function (u) {
-      return u !== myName() && used.indexOf(u) < 0;
+      return u !== myName() && used.indexOf(u) < 0 && canApprove(u);
     });
     if (q) {
       list = list.filter(function (u) {
@@ -1578,7 +1598,8 @@
     if (!all.length) {
       return '<div class="acnone">' +
         (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.'
-          : '더 넣을 사람이 없습니다.') + '</div>';
+          : '더 넣을 사람이 없습니다.') +
+        '<br><span style="font-size:11.5px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 찾힙니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
     }
     var show = all.slice(0, 8);
     return show.map(function (u, i) {
@@ -1586,7 +1607,7 @@
       return '<button class="acand-i' + (i === 0 ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
         '<b>' + esc(nameOf(u)) + '</b>' +
         '<span>' + esc([p.dept, p.position].filter(Boolean).join(' · ') || u) + '</span>' +
-        (i === 0 ? '<span class="acent">Enter</span>' : '') + '</button>';
+        (i === 0 && APPR_Q.trim() ? '<span class="acent">Enter</span>' : '') + '</button>';
     }).join('') +
       (all.length > show.length
         ? '<div class="acnone">그 밖에 ' + n0(all.length - show.length) + '명 — 더 쳐서 좁혀 주세요.</div>'
@@ -1630,10 +1651,13 @@
     if (q) q.focus();
   }
 
+  /** 주기별로 넣다 만 결재선(상신 창을 닫아도 남는다, 상신하면 비운다). */
+  var DRAFT_KEEP = {};
   function renderSubmit() {
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
     SUBMIT.token = null; SUBMIT.send = null;
     tidyDraft();
+    DRAFT_KEEP[CYCKEY()] = DRAFT.slice();
     if (APPR_BOX && draftAt(APPR_BOX)) APPR_BOX = '';
     // ★ 관리자는 TRIPS 에 전 직원 운행이 들어 있다. 예전에는 그 합계를 그대로
     //   보여 줘서 "1,842건 · ₩12,400,000" 같은 회사 전체 숫자가 자기 결재 금액인
@@ -2005,8 +2029,20 @@
   }
   /** 잠겼을 때 무엇을 하면 되는지. */
   function lockHow(u) {
-    return cycleApproved(u) ? '고치시려면 결재자에게 문의해 주세요.'
-      : '고치시려면 마감 현황에서 <b>회수</b>한 뒤 수정해 다시 상신하세요.';
+    if (cycleApproved(u)) return '결재가 끝나 확정됐습니다. 정정이 필요하면 관리자에게 문의해 주세요.';
+    var a = APPR.filter(function (x) { return x.username === u && x.cycle === CYCKEY() && x.status === 'submitted'; })[0];
+    return a ? withdrawHow(a) : '고치시려면 마감 현황에서 <b>회수</b>한 뒤 수정해 다시 상신하세요.';
+  }
+  /**
+   * 결재 중인 건을 고치려면 무엇을 해야 하는지. 아무도 승인하지 않았으면 회수, 한 분이라도 승인했으면
+   * 회수가 막히므로 '지금 차례인 분에게 반려를 요청'(그분만 반려할 수 있다).
+   */
+  function withdrawHow(a) {
+    var anyDone = (a.steps || []).some(function (x) { return x.result; });
+    if (!anyDone) return '고치시려면 마감 현황에서 <b>회수</b>한 뒤 수정해 다시 상신하세요.';
+    var cur = (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0];
+    return '이미 승인한 분이 있어 회수할 수 없습니다. 고치시려면 지금 차례인 <b>' +
+      esc(cur ? (cur.name || nameOf(cur.approver)) : '결재자') + '</b> 님에게 반려를 요청해 주세요.';
   }
   /** 그 사람의 가장 최근 운행 — 계기판 기본값에 쓴다. */
   function lastTripOf(u) {
@@ -2247,8 +2283,7 @@
         '결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 지난번 결재선을 불러올 수도 있습니다.</div>') +
       (locked && EXT.apprExtra ? EXT.apprExtra(a) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 주기의 운행·영수증을 고칠 수 없습니다. ' +
-        '고치려면 <b>회수</b>한 뒤 수정해 다시 상신하세요' +
-        (canWithdraw ? '.' : '(이미 결재한 분이 있어 회수할 수 없습니다 — 반려를 요청하세요).') + '</div>' : '') +
+        withdrawHow(a) + '</div>' : '') +
       '</div></section>';
   }
 
@@ -3364,7 +3399,7 @@
     var done = round.filter(function (v) { return myProg[v.id] && myProg[v.id].completed_at; }).length;
     var amTarget = EDUT.some(function (t) { return t.month === key && t.username === mine; });
 
-    var h = head('안전교육', esc(key) + ' 회차');
+    var h = head('안전교육', esc(key) + ' 회차 · 시청 기간 ' + esc(cycleSpan(CYC.y, CYC.m)));
     var verdict = !round.length ? '이번 회차 영상이 아직 없습니다'
       : done >= round.length ? '<em>이수를 마치셨습니다</em>'
         : amTarget ? '아직 <em>' + (round.length - done) + '편</em> 남았습니다'
@@ -4503,7 +4538,7 @@
   function openEdit(id) {
     var t = TRIPS.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!t) return;
-    if (apprLocked(t)) { toast('결재 중이거나 끝난 기간이라 고칠 수 없습니다. 결재 중이면 회수한 뒤 고치세요.', true); return; }
+    if (apprLocked(t)) { toast('결재 중이거나 끝난 기간이라 고칠 수 없습니다. 마감 현황에서 고치는 방법을 확인해 주세요.', true); return; }
     var canOdo = !!(ME && ME.is_admin);           // 계기판은 관리자만 (서버 trip-edit 133행)
 
     $('pTitle').textContent = md(t.start_time) + ' ' + hm(t.start_time) + ' 고치기';
@@ -5272,6 +5307,17 @@
       if (bad.length) { toast('아직 고르지 않은 결재자가 있습니다.', true); return; }
       var sb = $('btnSubmitAppr');
       if (sb.disabled) return;
+      // ★ 주기(21일~20일)가 끝나기 전이면 한 번 묻는다 — 상신하면 그 뒤 운행·영수증은 결재 문서에 들어가지 않는다
+      //   (2026-10-02 사용자 결정: 막지 않고 되묻고 허용). 「그래도 상신」 을 누르면 data-early 로 다시 들어온다.
+      var rEnd = cycleRange(CYC.y, CYC.m).hi;
+      if (Date.now() < rEnd && !sb.dataset.early) {
+        var endD = md(rEnd - 1);
+        $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">아직 주기 중입니다(' + esc(endD) +
+          '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?</span>' +
+          '<button class="btn" data-close>취소</button>' +
+          '<button class="btn pri" id="btnSubmitAppr" data-early="1">그래도 상신</button>';
+        return;
+      }
       sb.disabled = true; sb.textContent = '검증하는 중…';
       var cyc0 = CYCKEY();
       // 창을 닫거나(취소·Esc) 결재선을 고쳐 창을 다시 그리면 이 표가 바뀐다 —
@@ -5295,7 +5341,7 @@
         if (document.contains(b)) { b.disabled = true; b.textContent = '상신하는 중…'; }
         callAppr(payload, '상신했습니다.').then(function (ok) {
           // 상신되면 그 주기는 잠긴다 — 통행료 채우기에 쳐 둔 값은 더 저장할 수 없다.
-          if (ok) FILLS = {};
+          if (ok) { FILLS = {}; delete DRAFT_KEEP[cyc0]; }
           if (!ok && document.contains(b)) { b.disabled = false; b.textContent = b.id === 'btnSubmitAnyway' ? '그대로 상신' : '상신'; }
         });
       };
@@ -5454,6 +5500,9 @@
     // 결재자 찾기 — Enter 로 맨 위 후보를 넣는다.
     if (e.key === 'Enter' && e.target.id === 'apprQ') {
       e.preventDefault();
+      // ★ 한글 조합을 끝내는 Enter(맥은 신호가 두 번 온다)와 빈 검색어 Enter 는 무시한다 —
+      //   예전에는 아무것도 안 친 채 Enter 를 누르면 가나다순 첫 직원이 결재자로 들어갔다.
+      if (e.isComposing || e.keyCode === 229 || !APPR_Q.trim()) return;
       var top = apprCandidates()[0];
       if (top) addApprover(top);
       return;
