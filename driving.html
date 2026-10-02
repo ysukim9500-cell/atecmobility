@@ -98,6 +98,7 @@ tbody tr.tfdone .lead{color:var(--ink-500)}
 body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
 body.is-admin .navsec.adm{display:block}
+body.is-admin .navsec.admtog{display:flex}
 
 /* ── 로고 ────────────────────────────────────────────────────────────
    CI 원본 아트워크를 그대로 쓴다. 글꼴로 흉내 내지 않는다.
@@ -386,6 +387,18 @@ aside a.on{background:var(--red-50);color:var(--red-700);font-weight:500}
 aside a.on svg{color:var(--red)}
 aside a.on::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
   background:var(--red);border-radius:0 3px 3px 0}
+/* 마감 단계 번호 — paintPills 가 상태를 칠한다 */
+aside a.step{gap:10px}
+.stepn{flex:0 0 20px;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;
+  font-size:11px;font-weight:700;border:1.5px solid var(--ink-300);color:var(--ink-500);background:var(--surface)}
+.stepn.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.stepn.now{background:var(--red);border-color:var(--red);color:#fff}
+aside a.on .stepn:not(.done):not(.now){border-color:var(--red);color:var(--red-700)}
+.admtog{display:none;align-items:center;width:100%;border:0;background:none;text-align:left;cursor:pointer;font-family:inherit}
+.admtog svg{margin-left:6px;vertical-align:-1px;transition:transform var(--t)}
+.admtog[aria-expanded="true"] svg{transform:rotate(180deg)}
+.admtog:hover{color:var(--ink-700)}
+#admList.fold a,body.is-master #admList.fold a.mst{display:none !important}
 .pill{margin-left:auto;font-size:11px;font-weight:500;min-width:20px;height:20px;padding:0 6px;
   border-radius:999px;display:grid;place-items:center;background:var(--ink-100);color:var(--ink-500)}
 .pill.hot{background:var(--red);color:#fff;font-weight:700}
@@ -413,6 +426,43 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .verdict em{font-style:normal;color:var(--red)}
 .verdict.clean em{color:var(--ok)}
 .verdict.wait em{color:var(--warn)}   /* 결재 중·확인 필요 — 끝난 것(초록)과도, 틀린 것(빨강)과도 다르다 */
+/* A안 홈 — 5단계 막대 */
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:16px}
+.stp{display:flex;flex-direction:column;gap:6px;text-align:left;border:0;background:none;padding:0;font:inherit;cursor:pointer;color:inherit}
+.stp i{display:block;height:6px;border-radius:3px;background:var(--ink-200)}
+.stp b{font-size:12.5px;font-weight:700;color:var(--ink-800)}
+.stp span{font-size:12px;color:var(--ink-500)}
+.stp.done i{background:var(--ok)} .stp.done b{color:var(--ok)}
+.stp.now i{background:var(--red)} .stp.now b{color:var(--red)}
+.stp:hover b{text-decoration:underline}
+.stp:focus-visible{outline:2px solid var(--red);outline-offset:4px;border-radius:4px}
+.nowrow{display:flex;gap:24px;align-items:center;margin-top:22px;padding-top:20px;border-top:1px solid var(--ink-100)}
+.nowrow .nk{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--red)}
+.nowrow .verdict{margin-top:6px}
+.nowrow .nd{margin-top:6px;font-size:13px;color:var(--ink-500);line-height:1.6}
+.nowbtns{display:flex;flex-direction:column;gap:8px;flex:none;min-width:200px}
+.nowbtns .btn{justify-content:center}
+.btn.big{height:46px;padding:0 22px;font-size:14.5px;font-weight:700}
+.cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.cardx{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px;min-width:0}
+.cardx .k{font-size:12px;color:var(--ink-500)}
+.cardx .v{margin-top:4px;font-size:24px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
+.cardx .v small{font-size:13px;font-weight:400;color:var(--ink-500);margin-left:2px}
+.cardx .v.hot{color:var(--red)}
+.cardx .rows{margin-top:10px;display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.cardx .rows div{display:flex;gap:8px}.cardx .rows div span{flex:1}
+.cardx .rows b{color:var(--ink-800);font-weight:500}
+.cardx .lk{display:inline-block;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--red);background:none;border:0;padding:0;cursor:pointer;font-family:inherit}
+/* 같은 단계로 묶인 화면 사이의 탭 */
+.vtabs{display:flex;gap:4px;margin:-10px 0 20px;border-bottom:1px solid var(--ink-200)}
+.vtabs button{border:0;background:none;font:inherit;font-size:13.5px;padding:9px 14px;color:var(--ink-500);cursor:pointer;
+  box-shadow:inset 0 -2px 0 transparent;margin-bottom:-1px}
+.vtabs button.on{color:var(--red-700);font-weight:700;box-shadow:inset 0 -2px 0 var(--red)}
+.vtabs button:hover{color:var(--ink-900)}
+/* 단계 화면 맨 아래 — 다음 단계로 */
+.nextstep{display:flex;align-items:center;gap:12px;margin-top:28px;padding:16px 20px;border:1px dashed var(--ink-300);border-radius:var(--r)}
+.nextstep .t{flex:1;font-size:13px;color:var(--ink-500)}
+.nextstep .t b{color:var(--ink-800)}
 .track{margin-top:22px;height:5px;border-radius:99px;background:var(--ink-100);overflow:hidden}
 .track i{display:block;height:100%;border-radius:99px;background:var(--red);
   transition:width .8s var(--ease)}
@@ -879,7 +929,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
      남겼는데, 이제 로고 한 덩어리라 숨길 조각이 없다 — 높이로 줄인다. */
   .logo-mark{height:12px}
   .utxt{display:none}
-  .cycle{padding:0 10px;gap:6px}
+  .cycle{padding:0 10px;gap:6px;white-space:nowrap}
   .cycle .tag,.cycle .yr{display:none}
   .cycnav{width:24px}
   #cycPop{position:fixed;top:calc(var(--head) + 6px);right:12px;left:12px;width:auto}
@@ -890,6 +940,14 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
   .hero{padding:20px 18px;border-radius:var(--r)}
   .verdict{font-size:21px}
   .facts{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}
+  .steps{grid-template-columns:1fr;gap:8px}
+  .stp{flex-direction:row;align-items:center;gap:10px}
+  .stp i{width:6px;height:28px;flex:none}
+  .nowrow{flex-direction:column;align-items:stretch}
+  .nowbtns{min-width:0}
+  .cards3{grid-template-columns:1fr}
+  .vtabs{overflow-x:auto}
+  .nextstep{flex-wrap:wrap}
   .fact .v{font-size:18px}
   #panel .sheet{width:100%;top:auto;height:92dvh;border-radius:var(--r-lg) var(--r-lg) 0 0;
     animation:up .3s var(--ease)}
@@ -993,27 +1051,26 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
            아래 '관리' 는 관리자에게만 보이고 전 직원이 나온다. 같은 화면을
            범위만 바꿔 쓰므로, 어느 쪽을 보고 있는지 제목으로 구분한다. -->
     <aside id="nav">
-      <!-- 마감 작업 순서대로: 현황 → 점검 → 통행료 → 증빙 → 정산. 그 밖의 것은 아래 묶음. -->
-      <div class="navsec">마감 작업</div>
-      <a tabindex="0" role="button" data-v="close" class="on"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
-      <a tabindex="0" role="button" data-v="trips"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행일지<span class="pill" id="pTrips" hidden></span></a>
-      <a tabindex="0" role="button" data-v="check"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>기록 점검<span class="pill" id="pCheck" hidden></span></a>
-      <a tabindex="0" role="button" data-v="tollfill"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>통행료 채우기<span class="pill" id="pToll" hidden></span></a>
-      <a tabindex="0" role="button" data-v="hipass"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>하이패스 대조</a>
-      <a tabindex="0" role="button" data-v="evid"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>증빙<span class="pill" id="pEvid" hidden></span></a>
-      <a tabindex="0" role="button" data-v="verify"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증</a>
-      <a tabindex="0" role="button" data-v="settle"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산·엑셀</a>
-      <div class="navsec">그 밖에</div>
+      <!-- A안(2026-10-02): 홈 · 결재함을 맨 위에, 마감은 실제 순서대로 1~5 단계. 단계 동그라미는 paintPills 가 칠한다
+           (완료 = 초록 ✓, 지금 할 단계 = 빨강, 남은 단계 = 테두리). data-alt 는 같은 단계로 묶인 화면(탭).
+           「내 계정」은 오른쪽 위 이름을 누르면 열린다. -->
+      <a tabindex="0" role="button" data-v="close" class="on"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>이번 달 마감</a>
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
+      <div class="navsec">마감 단계</div>
+      <a tabindex="0" role="button" data-v="trips" data-alt="check" class="step"><span class="stepn" id="sn1">1</span>운행 기록<span class="pill" id="pCheck" hidden></span></a>
+      <a tabindex="0" role="button" data-v="tollfill" data-alt="hipass" class="step"><span class="stepn" id="sn2">2</span>통행료<span class="pill" id="pToll" hidden></span></a>
+      <a tabindex="0" role="button" data-v="evid" class="step"><span class="stepn" id="sn3">3</span>영수증<span class="pill" id="pEvid" hidden></span></a>
+      <a tabindex="0" role="button" data-v="verify" class="step"><span class="stepn" id="sn4">4</span>검증·상신</a>
+      <a tabindex="0" role="button" data-v="settle" class="step"><span class="stepn" id="sn5">5</span>정산·엑셀</a>
+      <div class="navsec">안전</div>
       <a tabindex="0" role="button" data-v="safety"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
-      <a tabindex="0" role="button" data-v="account"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>내 계정</a>
-
-      <div class="navsec adm">관리</div>
+      <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
+      <div id="admList" class="fold">
       <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 마감 현황</a>
       <a tabindex="0" role="button" data-v="a_trips" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 운행일지</a>
       <a tabindex="0" role="button" data-v="a_check" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>전체 기록 점검</a>
-      <a tabindex="0" role="button" data-v="a_evid" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>전체 증빙</a>
+      <a tabindex="0" role="button" data-v="a_evid" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>전체 영수증</a>
       <a tabindex="0" role="button" data-v="a_verify" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>전체 검증</a>
       <a tabindex="0" role="button" data-v="a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조 (전체)</a>
       <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>전체 정산</a>
@@ -1023,6 +1080,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 안전운전</a>
       <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
       <a tabindex="0" role="button" data-v="perm" class="adm mst"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>권한 관리</a>
+      </div>
     </aside>
 
     <main id="main"><div class="inner" id="inner"></div></main>
