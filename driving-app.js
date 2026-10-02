@@ -1382,13 +1382,16 @@
         nameOf(a).localeCompare(nameOf(b), 'ko');
     });
     var admins = list.filter(function (u) { return USERS[u].is_admin; }).length;
-    var h = head('권한 관리', list.length + '명 · 관리자 ' + admins + '명');
+    var MGRS = ACCT.managers || [], master = !!ACCT.is_master;
+    var h = head('권한 관리', list.length + '명 · 관리자 ' + admins + '명 · 권한 주는 관리자 ' + MGRS.length + '명');
     h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;' +
       'line-height:1.9;color:var(--ink-3)">' +
       '<b style="color:var(--ink-2)">운행일지 관리자</b>는 전 직원의 운행·정산·증빙을 보고, ' +
       '계기판을 고칠 수 있습니다.<br>' +
       '바꿀 때마다 <b>본인 비밀번호</b>를 한 번 더 확인합니다 — 자리를 비운 사이 남이 ' +
-      '권한을 주는 일을 막기 위해서입니다.</div></section>';
+      '권한을 주는 일을 막기 위해서입니다.<br>' +
+      '<b style="color:var(--ink-2)">권한 주는 관리자</b>는 마스터 계정이 지정합니다. 이 화면에서 다른 직원을 관리자로 ' +
+      '지정·해제하고 비밀번호를 초기화할 수 있습니다(마스터 계정과 다른 권한 주는 관리자는 바꿀 수 없습니다).</div></section>';
     h += sect('직원', list.length + '명', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
       '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th></th></tr></thead><tbody>' +
@@ -1398,13 +1401,17 @@
           '<td><span class="lead">' + esc(x.name || u) + '</span></td>' +
           '<td class="dim">' + esc(u) + '</td>' +
           '<td class="dim">' + esc(x.dept || '—') + '</td>' +
-          '<td>' + (x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
+          '<td>' + (u === 'ysukim' ? '<span class="st bad">마스터</span>'
+            : MGRS.indexOf(u) >= 0 ? '<span class="st bad">권한 주는 관리자</span>'
+            : x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
-          // 마스터 계정 자신은 바꿀 수 없다(서버 RPC 가 거부한다). 버튼을 아예 안 보인다.
-          (u === myName()
-            ? '<span class="dim">본인 계정</span>'
+          // 본인 · 마스터 · (마스터가 아니면) 다른 권한 주는 관리자는 바꿀 수 없다(서버가 거부한다). 버튼을 아예 안 보인다.
+          (u === myName() ? '<span class="dim">본인 계정</span>'
+            : u === 'ysukim' || (!master && MGRS.indexOf(u) >= 0) ? '<span class="dim">바꿀 수 없음</span>'
             : '<button class="btn sm" data-perm="' + esc(u) + '" data-on="' + (x.is_admin ? '0' : '1') + '">' +
               (x.is_admin ? '관리자 해제' : '관리자 지정') + '</button> ' +
+              (master ? '<button class="btn sm" data-permmgr="' + esc(u) + '" data-on="' + (MGRS.indexOf(u) >= 0 ? '0' : '1') + '">' +
+                (MGRS.indexOf(u) >= 0 ? '권한 주기 해제' : '권한 주기 허용') + '</button> ' : '') +
               '<button class="btn sm" data-pwreset="' + esc(u) + '">비밀번호 초기화</button>') +
           '</td></tr>';
       }).join('') + '</tbody></table></div></div>');
@@ -1414,8 +1421,8 @@
   /** 권한·비밀번호를 바꾸기 전에 본인 비밀번호를 확인받는 창. */
   function openPermConfirm(kind, target, enabled) {
     var nm = nameOf(target);
-    $('pTitle').textContent = kind === 'admin'
-      ? (enabled ? '관리자 지정' : '관리자 해제') : '비밀번호 초기화';
+    $('pTitle').textContent = kind === 'admin' ? (enabled ? '관리자 지정' : '관리자 해제')
+      : kind === 'mgr' ? (enabled ? '권한 주기 허용' : '권한 주기 해제') : '비밀번호 초기화';
     $('pSub').textContent = nm + ' (' + target + ')';
     var body = '<div class="form">';
     if (kind === 'pw') {
@@ -1423,6 +1430,11 @@
         '<input class="inp" type="text" id="rsNew" autocomplete="off" placeholder="4자 이상">' +
         '<div class="fhint">본인에게 직접 알려 주셔야 합니다. ' +
         '<b>앱과 웹이 같은 비밀번호</b>를 씁니다.</div></div></div>';
+    } else if (kind === 'mgr') {
+      body += '<div class="anote">' + esc(nm) + ' 님을 <b>' +
+        (enabled ? '권한 주는 관리자로 지정' : '권한 주는 관리자에서 해제') + '</b>합니다.' +
+        (enabled ? ' 운행일지 관리자도 함께 켜지고, 「권한 관리」에서 다른 직원을 관리자로 지정·해제하고 비밀번호를 초기화할 수 있게 됩니다.'
+          : ' 운행일지 관리자 권한은 그대로 남습니다.') + '</div>';
     } else {
       body += '<div class="anote">' + esc(nm) + ' 님을 <b>' +
         (enabled ? '운행일지 관리자로 지정' : '관리자에서 해제') + '</b>합니다.' +
@@ -1444,8 +1456,8 @@
   function runPerm(kind, target, enabled) {
     var mine = ($('rsMine') || {}).value || '';
     if (!mine) { toast('본인 비밀번호를 넣어 주세요.', true); return; }
-    var payload = { action: kind === 'admin' ? 'set_admin' : 'reset_password', target: target, password: mine };
-    if (kind === 'admin') payload.enabled = enabled;
+    var payload = { action: kind === 'admin' ? 'set_admin' : kind === 'mgr' ? 'set_manager' : 'reset_password', target: target, password: mine };
+    if (kind === 'admin' || kind === 'mgr') payload.enabled = enabled;
     else {
       var np = ($('rsNew') || {}).value || '';
       if (np.length < 4) { toast('새 비밀번호는 4자 이상이어야 합니다.', true); return; }
@@ -1460,6 +1472,11 @@
           toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return;
         }
         if (kind === 'admin' && USERS[target]) USERS[target].is_admin = enabled;
+        if (kind === 'mgr') {
+          var ml = (ACCT.managers || []).filter(function (x) { return x !== target; });
+          if (enabled) { ml.push(target); if (USERS[target]) USERS[target].is_admin = true; }
+          ACCT.managers = ml;
+        }
         closePanel(); render();
         toast(res.j.message || '처리했습니다.');
       }).catch(function () {
@@ -1527,6 +1544,10 @@
   function apprStatusText(a) {
     if (!a) return { t: '아직 상신하지 않았습니다', cls: '' };
     if (a.status === 'approved') return { t: '결재 완료', cls: 'ok' };
+    if (a.status === 'rejected' && reopenInfo(a)) {
+      var ro = reopenInfo(a);
+      return { t: '정정 중 — 관리자(' + nameOf(ro.reopened_by) + ')' + (ro.reopen_reason ? ' · ' + ro.reopen_reason : '') + ' — 고친 뒤 다시 상신하세요', cls: 'bad' };
+    }
     if (a.status === 'rejected') {
       var r = (a.steps || []).filter(function (s) { return s.result === 'rejected'; })[0];
       // 관리자 권한 반려는 그 칸의 결재자가 한 것이 아니다 — 이름을 바꿔 적는다.
@@ -1776,7 +1797,8 @@
         ((s.rate_miss || []).length ? kv('주의', '<span class="st bad">유류단가 미등록 — 기본 단가 159원/km 로 계산</span>') : '')
       : '';
     APPR_BACK = null;
-    var title = act === 'approve' ? '승인' : act === 'reject' ? '반려' : act === 'force_reject' ? '관리자 반려' : '상신 회수';
+    var title = act === 'approve' ? '승인' : act === 'reject' ? '반려' : act === 'force_reject' ? '관리자 반려'
+      : act === 'reopen' ? '정정 열기' : '상신 회수';
     var body = '';
     if (act === 'withdraw') {
       body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>이 주기의 운행·영수증을 다시 고칠 수 있게</b> 됩니다. ' +
@@ -1784,13 +1806,16 @@
     } else {
       body = sumHtml + apprTrack(a) + (EXT.apprExtra ? EXT.apprExtra(a) : '') +
         '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="apprWhy">' +
-        (act === 'approve' ? '의견' : '반려 사유') + '</label><div class="fbody">' +
+        (act === 'approve' ? '의견' : act === 'reopen' ? '정정 사유' : '반려 사유') + '</label><div class="fbody">' +
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
         (act === 'approve' ? '선택 — 남기면 상신자가 볼 수 있습니다.' : '무엇을 고쳐야 하는지 적어 주세요. 상신자에게 그대로 전달됩니다.') +
         '"></textarea></div></div>' +
         '<div class="anote">' + (act === 'approve'
           ? '승인하면 결재란에 <b>이름과 날짜</b>가 찍힙니다. 위 금액과 검증 결과는 <b>상신 때 저장된 값</b>입니다. ' +
             '마지막 결재자가 승인하면 결재 완료본을 받을 수 있습니다.'
+          : act === 'reopen'
+            ? '결재가 끝난 건을 <b>정정하도록 다시 엽니다</b>. 잠금이 풀려 상신자가 고친 뒤 다시 상신하고, 결재선을 처음부터 다시 탑니다. ' +
+              '지금의 결재 완료본(결재선·금액·문서)은 <b>이력에 그대로 남습니다</b>. 누가 왜 열었는지도 기록됩니다.'
           : act === 'force_reject'
             ? '결재자가 자리에 없어 결재가 멈췄을 때 쓰는 <b>관리자 권한 반려</b>입니다. 승인을 대신할 수는 없습니다. ' +
               '반려하면 이 주기의 잠금이 풀려 상신자가 고쳐서 다시 올릴 수 있고, 누가 반려했는지 기록에 남습니다.'
@@ -1800,7 +1825,7 @@
       body,
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnApprGo" data-act="' + esc(act) + '" data-id="' + a.id + '">' +
-      (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : '반려') + '</button>');
+      (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : '반려') + '</button>');
     if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
   }
 
@@ -1851,6 +1876,12 @@
     }
     return h;
   }
+  /** 결재 완료 건을 정정으로 다시 열 수 있는가 — 운행일지 관리자만(서버 approval-act 'reopen' 도 같은 판정). */
+  function canReopen(a) { return !!(ME && ME.is_admin && a && a.status === 'approved'); }
+  /** 결재 건 상태 이력에서 '정정 열기'가 있었으면 그 단계(누가·왜). */
+  function reopenInfo(a) {
+    return (a && (a.steps || []).filter(function (x) { return x.reopened_by; })[0]) || null;
+  }
   /** 결재함 '그 밖의 건' 상태 필터. */
   var INBOX_F = 'all';
   function apprCard(a) {
@@ -1871,8 +1902,9 @@
       apprTrack(a) +
       // 검증 요약 · 결재 문서(고정본) — drv-verify.js 가 채운다.
       (EXT.apprExtra ? EXT.apprExtra(a) : '') +
-      (canAct || canWithdraw
+      (canAct || canWithdraw || canReopen(a)
         ? '<div class="aact">' +
+          (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '">정정 열기</button>' : '') +
           (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '">회수</button>' : '') +
           (canAct ? '<button class="btn sm" data-appr="reject" data-id="' + a.id + '">반려</button>' +
             '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '">승인</button>' : '') +
@@ -5273,6 +5305,9 @@
     if ((el = e.target.closest('[data-pwreset]'))) {
       openPermConfirm('pw', el.dataset.pwreset, false); return;
     }
+    if ((el = e.target.closest('[data-permmgr]'))) {
+      openPermConfirm('mgr', el.dataset.permmgr, el.dataset.on === '1'); return;
+    }
     if ((el = e.target.closest('#btnPermGo'))) {
       runPerm(el.dataset.kind, el.dataset.target, el.dataset.on === '1'); return;
     }
@@ -5375,7 +5410,9 @@
     if ((el = e.target.closest('#btnApprGo'))) {
       var act = el.dataset.act, id = +el.dataset.id;
       var why = String(($('apprWhy') || {}).value || '').trim();
-      if ((act === 'reject' || act === 'force_reject') && !why) { toast('반려 사유를 적어 주세요.', true); if ($('apprWhy')) $('apprWhy').focus(); return; }
+      if ((act === 'reject' || act === 'force_reject' || act === 'reopen') && !why) {
+        toast(act === 'reopen' ? '정정 사유를 적어 주세요.' : '반려 사유를 적어 주세요.', true); if ($('apprWhy')) $('apprWhy').focus(); return;
+      }
       if (el.disabled) return;
       el.disabled = true;
       var p2 = { action: act, id: id };
