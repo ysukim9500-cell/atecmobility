@@ -502,7 +502,8 @@
     var mine = function () { return PDF_JOB === job && !!$('pdfNote') && $('panel').classList.contains('open'); };
     var note = function (t) { var el = $('pdfNote'); if (el && PDF_JOB === job) el.textContent = t; };
     var loaded = 0;
-    return ensureLibs().then(function (lib) {
+    // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
+    return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
       note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
       return window.SheetPdf.build({
         meta: o.meta, sheets: o.doc.sheets, verify: o.verify || null,

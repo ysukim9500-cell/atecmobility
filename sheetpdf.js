@@ -356,7 +356,18 @@
       var v = boxes[b];
       if (!v) { c.cell(bx, top + hdH, boxW, sgH, { slash: true }); return; }
       c.cell(bx, top + hdH, boxW, sgH, { t: '' });
-      if (v.name) {
+      var sgi = v.sign && c.signs && c.signs[v.sign];
+      if (v.name && sgi) {
+        // 서명·도장 그림을 칸 위쪽에 맞춰 넣고(비율 유지), 날짜는 그 아래.
+        var mw = boxW - 2 * MM, mh = sgH - (v.date ? 4.2 * MM : 1.6 * MM);
+        var k = Math.min(mw / sgi.width, mh / sgi.height), iw = sgi.width * k, ih = sgi.height * k;
+        var iy0 = top + hdH + 0.8 * MM + (mh - ih) / 2;
+        c.page.drawImage(sgi, { x: bx + (boxW - iw) / 2, y: PH - iy0 - ih, width: iw, height: ih });
+        if (v.date) {
+          var ds0 = c.clean(v.date), dw0 = c.fR.widthOfTextAtSize(ds0, 6.5);
+          c.page.drawText(ds0, { x: bx + (boxW - dw0) / 2, y: PH - (top + hdH + sgH - 1.3 * MM), size: 6.5, font: c.fR, color: c.gray(0.33) });
+        }
+      } else if (v.name) {
         var lay = c.layout({ t: v.name, size: 8.5, padX: 0.8 * MM }, boxW);
         var f = c.fR, nm = lay.lines[0], tw = f.widthOfTextAtSize(nm, lay.size);
         var mid = top + hdH + sgH / 2;
@@ -740,6 +751,24 @@
       for (var w = 0; w < Math.min(4, paths.length); w++) ws.push(worker());
       return Promise.all(ws).then(function () { return pdf; });
     }).then(function (pdf) {
+      // 결재란 서명 그림(PNG data URL) — 같은 그림은 한 번만 넣는다.
+      c.signs = {};
+      var urls = [];
+      (doc.sheets || []).forEach(function (sh) {
+        Object.keys(sh.boxes || {}).forEach(function (k) {
+          var v = sh.boxes[k];
+          if (v && v.sign && urls.indexOf(v.sign) < 0) urls.push(v.sign);
+        });
+      });
+      return Promise.all(urls.map(function (u) {
+        var m = /^data:image\/png;base64,(.+)$/.exec(u);
+        if (!m) return null;
+        var bin = atob(m[1]), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return pdf.embedPng(bytes).then(function (img) { c.signs[u] = img; },
+          function () { c.issue('image', '서명 그림을 넣지 못함'); });
+      })).then(function () { return pdf; });
+    }).then(function (pdf) {
       var totals = [];
       (doc.sheets || []).forEach(function (sh) { totals.push(drawSheet(c, sh)); });
       if (doc.verify) drawVerify(c, doc.verify, meta);
@@ -755,6 +784,6 @@
 
   return {
     build: build, basePay: basePay, sheetTotals: sheetTotals, exifOrientation: exifOrientation,
-    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.1.1'
+    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.2.0'
   };
 });

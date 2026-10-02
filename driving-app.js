@@ -577,6 +577,8 @@
     HP = { groups: [], batch: '', busy: false, note: '' };
     // FILLS 는 여기서 안 버린다. loadAll 은 저장·증빙 올리기 뒤에도 돌기 때문에,
     // 여기서 비우면 증빙 한 장 올리고 온 사이에 30칸이 사라진다. 기간을 바꿀 때(setPeriod)만 비운다.
+    // 내 서명(상신 전 문서의 담당 칸에 찍는다). 한 번만 받는다.
+    if (MYSIGN === undefined) loadMySign();
     var r = viewRange();
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
@@ -1330,6 +1332,8 @@
       kv('운행일지 관리자', ME.is_admin ? '예' : '아니오') +
       '</tbody></table></div>');
 
+    h += sect('결재 서명', null, '', signPanel());
+
     h += sect('비밀번호 바꾸기', null, '',
       '<div class="panel" style="padding:20px"><div class="form">' +
       frow('현재 비밀번호', '<input class="inp pw" type="password" id="pwCur" autocomplete="current-password">') +
@@ -1347,6 +1351,87 @@
         '</label><div class="fbody">' + body +
         (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
     }
+  }
+
+  /** 「내 계정」의 결재 서명 칸. 지금 서명(또는 기본 도장)을 보이고, 파일을 올리거나 기본 도장으로 되돌린다. */
+  function signPanel() {
+    if (MYSIGN === undefined) { loadMySign().then(render); }
+    var nm = personOf(myName()).name || myName();
+    var cur = MYSIGN && MYSIGN.image ? MYSIGN.image : stampPng(nm);
+    var shown = SIGN_DRAFT || cur;
+    return '<div class="panel" style="padding:20px"><div class="signrow">' +
+      '<div class="signbox"><img id="signPreview" alt="결재 서명" src="' + shown + '"></div>' +
+      '<div class="signtx">' +
+      (SIGN_DRAFT
+        ? '<b>이 서명으로 저장할까요?</b><div class="fhint">흰 배경은 투명하게 바꾸고 여백은 잘라 냈습니다.</div>' +
+          '<div class="signbtn"><button class="btn pri" id="btnSignSave">이 서명으로 저장</button> ' +
+          '<button class="btn" id="btnSignCancel">취소</button></div>'
+        : '<b>' + (MYSIGN && MYSIGN.image ? '올린 서명을 쓰고 있습니다' : '기본 도장(이름)을 쓰고 있습니다') + '</b>' +
+          '<div class="fhint">상신·승인하면 결재란에 이 그림과 날짜가 찍힙니다. 서명·도장 파일(JPG·PNG·PDF)을 올리면 그것으로 바뀝니다. ' +
+          '바꿔도 <b>이미 결재된 문서는 그대로</b>입니다.</div>' +
+          '<div class="signbtn"><label class="btn" for="signFile">' + ic('stamp') + '서명·도장 파일 올리기</label>' +
+          '<input type="file" id="signFile" accept="image/png,image/jpeg,application/pdf,.pdf" hidden> ' +
+          (MYSIGN && MYSIGN.image ? '<button class="btn" id="btnSignReset">기본 도장으로 되돌리기</button>' : '') +
+          '</div>') +
+      '</div></div></div>';
+  }
+  /** 고른 파일(JPG·PNG·PDF 첫 쪽) → 흰 배경을 투명하게, 여백을 잘라, 최대 360×180 PNG. */
+  function fileToSign(file) {
+    var isPdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+    var src = isPdf
+      ? loadPdfJs().then(function (pdfjs) {
+          return file.arrayBuffer().then(function (buf) { return pdfjs.getDocument({ data: buf }).promise; })
+            .then(function (d) { return d.getPage(1); })
+            .then(function (pg) {
+              var vp = pg.getViewport({ scale: 2 }), cv = document.createElement('canvas');
+              cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+              var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+              return pg.render({ canvasContext: g, viewport: vp }).promise.then(function () { return cv; });
+            });
+        })
+      : new Promise(function (ok, no) {
+          var url = URL.createObjectURL(file), im = new Image();
+          im.onload = function () {
+            var k = Math.min(1, 2400 / Math.max(im.naturalWidth, im.naturalHeight));
+            var cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(im.naturalWidth * k)); cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+            var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+            g.drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); ok(cv);
+          };
+          im.onerror = function () { URL.revokeObjectURL(url); no(new Error('그림 파일을 읽지 못했습니다')); };
+          im.src = url;
+        });
+    return src.then(function (cv) {
+      var W = cv.width, H = cv.height, g = cv.getContext('2d'), img = g.getImageData(0, 0, W, H), d = img.data;
+      var x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+        var i = (y * W + x) * 4, lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        if (d[i + 3] < 20 || lum > 215) { d[i + 3] = 0; continue; }
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+      if (x1 < 0) throw new Error('파일에서 서명을 찾지 못했습니다(흰 바탕만 있습니다)');
+      g.putImageData(img, 0, 0);
+      var pad = 4, cw = x1 - x0 + 1 + pad * 2, ch = y1 - y0 + 1 + pad * 2;
+      var k = Math.min(1, 360 / cw, 180 / ch);
+      var out = document.createElement('canvas');
+      out.width = Math.max(1, Math.round(cw * k)); out.height = Math.max(1, Math.round(ch * k));
+      out.getContext('2d').drawImage(cv, x0 - pad, y0 - pad, cw, ch, 0, 0, out.width, out.height);
+      var png = out.toDataURL('image/png');
+      if (png.length > 390000) throw new Error('서명 그림이 너무 복잡합니다. 서명만 잘라서 올려 주세요');
+      return png;
+    });
+  }
+  function saveSign(image) {
+    var b = $('btnSignSave') || $('btnSignReset'); if (b) b.disabled = true;
+    return apiRetry('/rest/v1/driving_signatures', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ username: myName(), image: image })
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
+      if (!rows || !rows[0]) { if (b) b.disabled = false; toast('서명을 저장하지 못했습니다. 잠시 뒤에 다시 해 주세요.', true); return; }
+      MYSIGN = rows[0]; SIGNS[MYSIGN.id] = MYSIGN.image || ''; SIGN_DRAFT = null;
+      toast(image ? '서명을 저장했습니다. 이제부터 상신·승인하는 문서에 찍힙니다.' : '기본 도장으로 되돌렸습니다.');
+      render();
+    }).catch(function () { if (b) b.disabled = false; toast('서명을 저장하지 못했습니다.', true); });
   }
 
   function savePassword() {
@@ -3758,18 +3843,14 @@
     if (parts.length < 2) parts = [];
 
     // ── 결재란 ── (칸 배정은 결재선을 따르고, 해당 없는 칸은 빗금)
-    var boxMap = { 담당: { name: u.name || mine, at: a && a.submitted_at } };
-    ((a && a.steps) || []).forEach(function (s) {
-      if (s.box && FORM_BOXES.indexOf(s.box) > 0) {
-        // ★ 승인한 칸에만 이름·날짜를 찍는다.
-        //   아직 결재 안 했거나 반려한 사람의 이름을 찍으면 서명처럼 보여
-        //   사내 결재 문서가 위조로 오해된다(2026-09-15 지적). 그 칸은 비워서
-        //   앱 엑셀처럼 도장을 찍을 수 있게 둔다.
-        boxMap[s.box] = (s.result === 'approved')
-          ? { name: s.name || s.approver, at: s.acted_at }
-          : { name: '', at: null };
-      }
-    });
+    // ★ 승인한 칸에만 서명·날짜를 찍는다(boxesOf).
+    //   아직 결재 안 했거나 반려한 사람의 이름을 찍으면 서명처럼 보여
+    //   사내 결재 문서가 위조로 오해된다(2026-09-15 지적). 그 칸은 비워서
+    //   앱 엑셀처럼 도장을 찍을 수 있게 둔다.
+    var boxMap = boxesOf(a, u, mine);
+    var signIds = Object.keys(boxMap).map(function (k) { return boxMap[k].signId; })
+      .filter(function (id) { return id && SIGNS[id] === undefined && !SIGN_ASKED[id]; });
+    if (signIds.length) loadSigns(signIds).then(render);
 
     var h = '<section class="psheet">';
     h += '<h1 class="ptitle">차량운행내역기록부</h1>';
@@ -3786,8 +3867,9 @@
       FORM_BOXES.map(function (b) {
         var v = boxMap[b];
         if (!v) return '<td class="pslash"></td>';
-        return '<td class="psign">' + esc(v.name) +
-          (v.at ? '<span>' + md(Date.parse(v.at)) + '</span>' : '') + '</td>';
+        var sg = signOf(v);
+        return '<td class="psign">' + (sg ? '<img class="pstamp" alt="' + esc(v.name) + '" src="' + sg + '">' : esc(v.name)) +
+          (v.date ? '<span>' + esc(v.date) + '</span>' : '') + '</td>';
       }).join('') + '</tr></tbody></table></div>';
 
     h += '<table class="psum"><tbody><tr>' +
@@ -5271,6 +5353,9 @@
     }
     if ((el = e.target.closest('#btnPrintPaper'))) { runPrint(el.dataset.who); return; }
     if (e.target.closest('#btnPwSave')) { savePassword(); return; }
+    if (e.target.closest('#btnSignSave')) { if (SIGN_DRAFT) saveSign(SIGN_DRAFT); return; }
+    if (e.target.closest('#btnSignCancel')) { SIGN_DRAFT = null; render(); return; }
+    if (e.target.closest('#btnSignReset')) { saveSign(null); return; }
     if ((el = e.target.closest('[data-addappr]'))) { addApprover(el.dataset.addappr); return; }
     // ★ render() 를 부르지 않는다. 표를 다시 그리면 스크롤이 맨 위로 튀어
     //   47줄짜리를 채우려면 매번 다시 내려가야 했다(하이패스 쪽과 같은 이유).
@@ -5422,6 +5507,16 @@
     }
   });
   document.addEventListener('change', function (e) {
+    if (e.target.id === 'signFile') {
+      var f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      if (f.size > 20e6) { toast('파일이 너무 큽니다(20MB 이하).', true); return; }
+      toast('서명을 읽는 중…');
+      fileToSign(f).then(function (png) { SIGN_DRAFT = png; render(); },
+        function (err) { toast((err && err.message) || '서명을 읽지 못했습니다.', true); });
+      return;
+    }
     if (e.target.id === 'selWho') { FILT.who = e.target.value; PAGES = {}; renderKeepFocus('selWho'); return; }
     if (e.target.id === 'selPurp') { FILT.purp = e.target.value; PAGES = {}; renderKeepFocus('selPurp'); return; }
     if (e.target.id === 'dfFrom' || e.target.id === 'dfTo') {
@@ -5566,14 +5661,90 @@
     return APPR.filter(function (a) { return a.username === u && a.cycle === cyc; })[0] || null;
   }
   /** 결재란 — printSheet 와 같은 규칙. 승인한 칸에만 이름·날짜를 찍는다(안 한 칸은 비움, 없는 칸은 빗금). */
+  /* ══════════════════ 결재 서명 (2026-10-02) ══════════════════
+     기본은 이름으로 그린 빨간 원형 도장. 「내 계정」에서 서명·도장 파일(jpg·png·pdf)을 올리면 그것을 쓴다.
+     서버(approval-act)가 상신·승인하는 순간의 서명 행 id 를 결재 건에 적는다(snapshot.sign_id, steps[].sign_id)
+     — 나중에 서명을 바꿔도 이미 결재된 문서는 그대로다. id 가 없으면(기본 도장·예전 건) 이름 도장. */
+  var SIGNS = {};          // 서명 행 id → PNG data URL ('' = 받았는데 비어 있음)
+  var SIGN_ASKED = {};     // 받으러 간 id — 같은 id 를 두 번 받지 않는다
+  var STAMPS = {};         // 이름 → 도장 PNG data URL
+  var MYSIGN;              // 내 마지막 서명 행 { id, image } · null = 없음 · undefined = 아직 안 받음
+  var SIGN_DRAFT = null;   // 올리기 전 미리보기 PNG
+
+  /** 이름 도장 — 빨간 원 안에 흰 글씨(성명 + '인'). 세 글자면 「김윤/수인」 두 줄. */
+  function stampPng(name) {
+    name = String(name || '').replace(/\s+/g, '');
+    if (!name) return '';
+    if (STAMPS[name]) return STAMPS[name];
+    var ch = Array.from(name), lines;
+    if (ch.length <= 2) lines = [ch.join(''), '인'];
+    else if (ch.length === 3) lines = [ch[0] + ch[1], ch[2] + '인'];
+    else if (ch.length === 4) lines = [ch[0] + ch[1], ch[2] + ch[3], '인'];
+    else lines = [ch.slice(0, Math.ceil(ch.length / 2)).join(''), ch.slice(Math.ceil(ch.length / 2)).join('') + '인'];
+    var S = 240, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    var g = cv.getContext('2d');
+    g.fillStyle = '#E2353B';
+    g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2); g.fill();
+    var widest = lines.reduce(function (m, l) { return Math.max(m, Array.from(l).length); }, 1);
+    var fs = Math.floor(Math.min(S * 0.62 / widest, S * (lines.length > 2 ? 0.25 : 0.33)));
+    g.fillStyle = '#FFFFFF'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 ' + fs + 'px "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+    var lh = fs * 1.02, y0 = S / 2 - lh * (lines.length - 1) / 2 + fs * 0.04;
+    lines.forEach(function (l, i) { g.fillText(l, S / 2, y0 + i * lh); });
+    return (STAMPS[name] = cv.toDataURL('image/png'));
+  }
+  /** 서명 행들을 받아 둔다(이미 받았거나 받으러 간 것은 건너뜀). */
+  function loadSigns(ids) {
+    var need = (ids || []).filter(function (id) { return id && SIGNS[id] === undefined && !SIGN_ASKED[id]; });
+    if (!need.length) return Promise.resolve();
+    need.forEach(function (id) { SIGN_ASKED[id] = 1; });
+    return fetchAll('/rest/v1/driving_signatures?select=id,image&id=in.(' + need.join(',') + ')')
+      .then(function (rows) {
+        (rows || []).forEach(function (r) { SIGNS[r.id] = r.image || ''; });
+        need.forEach(function (id) { if (SIGNS[id] === undefined) SIGNS[id] = ''; });
+      }).catch(function () { need.forEach(function (id) { delete SIGN_ASKED[id]; }); });
+  }
+  function loadMySign() {
+    if (!myName()) return Promise.resolve();
+    return apiRetry('/rest/v1/driving_signatures?select=id,image&username=eq.' + encodeURIComponent(myName()) +
+      '&order=id.desc&limit=1').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rows) {
+        if (!rows) return;
+        MYSIGN = rows[0] || null;
+        if (MYSIGN) SIGNS[MYSIGN.id] = MYSIGN.image || '';
+      }).catch(function () { });
+  }
+  /** 결재란 한 칸에 찍을 그림. 올린 서명이 있으면 그것, 아니면 이름 도장. */
+  function signOf(v) {
+    if (!v || !v.name) return '';
+    return (v.signId && SIGNS[v.signId]) || stampPng(v.name);
+  }
+  /** 문서 재료(pdfDocFor)의 결재란 칸마다 서명 그림을 채운다 — PDF 를 만들기 직전에 부른다. */
+  function fillSigns(doc) {
+    var ids = [];
+    (doc && doc.sheets || []).forEach(function (sh) {
+      Object.keys(sh.boxes || {}).forEach(function (k) { var v = sh.boxes[k]; if (v && v.signId) ids.push(v.signId); });
+    });
+    return loadSigns(ids).then(function () {
+      (doc && doc.sheets || []).forEach(function (sh) {
+        Object.keys(sh.boxes || {}).forEach(function (k) { var v = sh.boxes[k]; if (v) v.sign = signOf(v); });
+      });
+      return doc;
+    });
+  }
+
   function boxesOf(a, u, mine) {
     var at = a && a.submitted_at ? Date.parse(a.submitted_at) : NaN;
-    var b = { 담당: { name: u.name || mine, date: isFinite(at) ? md(at) : '' } };
+    // 담당 칸: 상신된 건이면 상신 때 서명, 상신 전 미리보기면 지금 내 서명.
+    var live = !a || a.status === 'withdrawn' || a.status === 'rejected';
+    var mySign = live && mine === myName() && MYSIGN && MYSIGN.image ? MYSIGN.id : null;
+    var b = { 담당: { name: u.name || mine, date: isFinite(at) ? md(at) : '',
+      signId: live ? mySign : ((a.snapshot || {}).sign_id || null) } };
     ((a && a.steps) || []).forEach(function (s) {
       if (s.box && FORM_BOXES.indexOf(s.box) > 0) {
         var t = s.acted_at ? Date.parse(s.acted_at) : NaN;
         b[s.box] = s.result === 'approved'
-          ? { name: s.name || s.approver, date: isFinite(t) ? md(t) : '' }
+          ? { name: s.name || s.approver, date: isFinite(t) ? md(t) : '', signId: s.sign_id || null }
           : { name: '', date: '' };
       }
     });
@@ -5735,7 +5906,7 @@
       nameOf: nameOf, personOf: personOf, myName: myName, myAppr: myAppr, apprOf: apprOf,
       cycleRange: cycleRange, cycleName: cycleName, cycleSpan: cycleSpan,
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
-      pdfDocFor: pdfDocFor, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
+      pdfDocFor: pdfDocFor, fillSigns: fillSigns, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       state: function () {
         return {
