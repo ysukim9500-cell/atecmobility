@@ -868,6 +868,7 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .drop .dt{font-size:14.5px;font-weight:500;color:var(--ink-900)}
 .drop .dd{font-size:12.5px;color:var(--ink-400);margin-top:4px}
 .drop label.btn{cursor:pointer}
+.finall{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-600);margin-right:6px;cursor:pointer}
 /* 영수증 올리기 — Gemini (2026-10-06) */
 .drop.gemdrop{border:1.5px solid transparent;
   background:linear-gradient(var(--surface),var(--surface)) padding-box,
@@ -1183,6 +1184,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
+      <a tabindex="0" role="button" data-v="a_final" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
       <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 마감 현황</a>
       <a tabindex="0" role="button" data-v="a_trips" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 운행일지</a>
       <a tabindex="0" role="button" data-v="a_check" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>전체 기록 점검</a>

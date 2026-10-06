@@ -802,6 +802,8 @@
       return;
     }
     if ((el = e.target.closest('[data-fzpdf]'))) { pdfFrozen(el.dataset.fzpdf); return; }
+    if (e.target.closest('[data-finpdf]')) { finBundle(); return; }
+    if (e.target.closest('[data-fincsv]')) { finCsv(); return; }
     if ((el = e.target.closest('[data-pdfok]'))) {
       setPreviewed(el.dataset.pdfok, true);
       C.closePanel();
@@ -820,9 +822,201 @@
     }
   });
 
+  /* ══════════════════ 결재 완료 출력 (관리자, 2026-10-06) ══════════════════
+     한 주기의 결재가 끝난 문서를 모아 본다 — 한 사람씩 PDF·엑셀, 고른 사람들을 PDF 한 파일로 묶어 받기,
+     금액 요약표(CSV). 결재 중·아직 상신 안 한 사람도 같이 보여 누구를 챙겨야 하는지 알게 한다.
+     문서는 모두 상신 때 저장한 고정본(driving_frozen)으로 만든다 — 결재자가 본 그 문서다. */
+  var FINSEL = {}, FINJOB = null;
+  function viewFinal() {
+    var S = C.state();
+    if (!S.LOADED) return C.head('결재 완료 출력') + C.skeleton();
+    if (C.isMulti()) return C.singleOnly('결재 완료 출력', '출력');
+    var cyc = S.CYCKEY, cname = C.cycleName(S.CYC.y, S.CYC.m);
+    var list = S.APPR.filter(function (a) { return a.cycle === cyc; });
+    var done = list.filter(function (a) { return a.status === 'approved'; })
+      .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
+    var going = list.filter(function (a) { return a.status === 'submitted'; });
+    var back = list.filter(function (a) { return a.status === 'rejected' || a.status === 'withdrawn'; });
+    var r = C.cycleRange(S.CYC.y, S.CYC.m), has = {};
+    (S.ALL_TRIPS || []).forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi && S.USERS[t.username]) has[t.username] = 1; });
+    (S.ALL_EVID || []).forEach(function (e) { var d = Number(e.date_millis); if (d >= r.lo && d < r.hi && S.USERS[e.username]) has[e.username] = 1; });
+    var sent = {}; list.forEach(function (a) { if (a.status === 'approved' || a.status === 'submitted') sent[a.username] = 1; });
+    var notYet = Object.keys(has).filter(function (u) { return !sent[u]; })
+      .sort(function (x, y) { return C.nameOf(x).localeCompare(C.nameOf(y), 'ko'); });
+    var total = done.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0);
+    // 고른 것 중 이 주기의 결재 완료 건만 남긴다(주기를 바꾸면 고른 것이 섞이지 않게).
+    var okIds = {}; done.forEach(function (a) { okIds[a.id] = 1; });
+    Object.keys(FINSEL).forEach(function (k) { if (!okIds[k]) delete FINSEL[k]; });
+    var nSel = Object.keys(FINSEL).length;
+
+    var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력합니다');
+    var fact = function (k, v, sub, alert) {
+      return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
+        '<div class="sub">' + esc(sub || '') + '</div></div>';
+    };
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' +
+      esc(cname) + ' · ' + esc(C.cycleSpan(S.CYC.y, S.CYC.m)) + '</div>' +
+      '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + C.won(total) + '</p>' +
+      '<div class="facts">' +
+      fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') +
+      fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
+      fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) +
+      fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '운행·영수증이 있는데 상신 전', notYet.length > 0) +
+      '</div></div>';
+
+    // ── 결재 완료 — 출력 ──
+    var tools = done.length
+      ? '<label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
+        '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
+        (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
+        '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>'
+      : '';
+    h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length
+      ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>이름</th><th>소속</th>' +
+        '<th>결재 완료</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
+        done.map(function (a) {
+          var p = S.USERS[a.username] || {};
+          var line = (a.steps || []).map(function (s) { return (s.name || C.nameOf(s.approver)) + '(' + (s.box || '') + ')'; }).join(' → ');
+          return '<tr><td><input type="checkbox" data-finsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') +
+            ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
+            '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
+            '<td class="dim">' + esc(p.dept || '—') + '</td>' +
+            '<td class="dim">' + (a.closed_at ? esc(whenText(a.closed_at)) : '—') + '</td>' +
+            '<td class="n total">' + n0((a.snapshot || {}).cost) + '</td>' +
+            '<td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
+            '<td class="n" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
+            '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button></td></tr>';
+        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="3">결재 완료 ' + n0(done.length) + '명 합계</td>' +
+        '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
+      : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
+
+    if (going.length) {
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+        '<th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th></tr></thead><tbody>' +
+        going.map(function (a) {
+          var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
+          return '<tr><td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
+            '<td class="dim">' + (a.submitted_at ? esc(whenText(a.submitted_at)) : '') + '</td>' +
+            '<td class="n">' + n0((a.snapshot || {}).cost) + '</td>' +
+            '<td>' + esc((cur.name || C.nameOf(cur.approver || '')) + (cur.box ? ' (' + cur.box + ')' : '')) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>');
+    }
+    if (back.length || notYet.length) {
+      h += C.sect('챙겨야 할 사람', n0(back.length + notYet.length) + '명', '', '<div class="panel" style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:8px">' +
+        back.map(function (a) { return '<span class="st bad">' + esc(C.nameOf(a.username)) + ' · ' + (a.status === 'rejected' ? '반려' : '회수') + '</span>'; }).join('') +
+        notYet.map(function (u) { return '<span class="st warn">' + esc(C.nameOf(u)) + ' · 상신 전</span>'; }).join('') + '</div>');
+    }
+    return h;
+  }
+
+  /** 고른 결재 완료 건들을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 차례대로 이어 붙인다. */
+  function finBundle() {
+    var S = C.state();
+    var ids = Object.keys(FINSEL);
+    var list = ids.map(apprById).filter(function (a) { return a && a.status === 'approved'; })
+      .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
+    if (!list.length || FINJOB) return;
+    var job = FINJOB = { stop: false };
+    var cname = C.cycleName(S.CYC.y, S.CYC.m);
+    C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + n0(list.length) + '명',
+      '<div class="pdfwait"><div class="spin"></div><div id="finNote" role="status">준비하는 중…</div>' +
+      '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
+    var note = function (t) { var el = $('finNote'); if (el) el.textContent = t; };
+    var parts = [], skipped = [];
+    var one = function (i) {
+      if (i >= list.length) return Promise.resolve();
+      var a = list[i];
+      note((i + 1) + ' / ' + list.length + ' · ' + C.nameOf(a.username) + ' 님 문서를 만드는 중…');
+      return fetchFrozen(a).then(function (fz) {
+        if (!fz) { skipped.push(C.nameOf(a.username)); return; }
+        var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
+        var vv = fz.verify || null;
+        var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
+        return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
+          return window.SheetPdf.build({
+            meta: { name: name, cycleName: cycName(a.cycle), mark: '',
+              docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') },
+            sheets: doc.sheets, verify: vv ? { ranAt: whenText(vv.ran_at), ai: !!vv.ai, summary: vv.summary, items: vv.items || [] } : null,
+            scans: doc.scans, photos: doc.photos
+          }, {
+            PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
+            loadImage: function (p) { return loadPhoto(p, 1500); }
+          });
+        }).then(function (res) { parts.push(res.bytes); });
+      }).catch(function () { skipped.push(C.nameOf(a.username)); })
+        .then(function () { if (FINJOB === job) return one(i + 1); });
+    };
+    one(0).then(function () {
+      if (FINJOB !== job) return null;
+      if (!parts.length) throw new Error('만든 문서가 없습니다');
+      note('한 파일로 묶는 중…');
+      var P = window.PDFLib;
+      return P.PDFDocument.create().then(function (out) {
+        var chain = Promise.resolve();
+        parts.forEach(function (b) {
+          chain = chain.then(function () { return P.PDFDocument.load(b); })
+            .then(function (src) { return out.copyPages(src, src.getPageIndices()); })
+            .then(function (pages) { pages.forEach(function (pg) { out.addPage(pg); }); });
+        });
+        return chain.then(function () { out.setTitle('운행기록부 결재 완료본 ' + cname); return out.save(); })
+          .then(function (bytes) { return { bytes: bytes, pages: out.getPageCount() }; });
+      });
+    }).then(function (res) {
+      FINJOB = null;
+      if (!res || !$('finNote')) { C.render(); return; }
+      var blob = new Blob([res.bytes], { type: 'application/pdf' });
+      PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); });
+      var url = URL.createObjectURL(blob); PDF_URLS = [url];
+      var file = '운행기록부_결재완료_' + S.CYCKEY + '_' + parts.length + '명.pdf';
+      $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
+        '<div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
+        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) +
+          ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다</span></div>') + '</div>';
+      $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
+        '<a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
+        '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
+      C.render();
+    }).catch(function (e) {
+      FINJOB = null;
+      if ($('finNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>묶지 못했습니다: ' + esc((e && e.message) || '') + '</span></div>';
+      C.render();
+    });
+    C.render();
+  }
+  /** 결재 완료 금액 요약표(엑셀에서 바로 열리게 BOM 붙은 CSV). */
+  function finCsv() {
+    var S = C.state(), cyc = S.CYCKEY;
+    var done = S.APPR.filter(function (a) { return a.cycle === cyc && a.status === 'approved'; });
+    var NL = String.fromCharCode(13, 10);
+    var q = function (v) { var s = String(v == null ? '' : v); return /[",]/.test(s) || s.indexOf(NL) >= 0 ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    var rows = [['이름', '아이디', '소속', '결재 완료', '유류비', '통행료', '주차', '금액 합계', '결재 번호']];
+    var sum = 0;
+    done.forEach(function (a) {
+      var sn = a.snapshot || {}, p = S.USERS[a.username] || {};
+      sum += Number(sn.cost) || 0;
+      rows.push([C.nameOf(a.username), a.username, p.dept || '', a.closed_at ? whenText(a.closed_at) : '',
+        Math.round(sn.fuel || 0), Math.round(sn.toll || 0), Math.round(sn.parking || 0), Math.round(sn.cost || 0), a.id]);
+    });
+    rows.push(['합계', '', '', '', '', '', '', Math.round(sum), '']);
+    var text = String.fromCharCode(0xFEFF) + rows.map(function (r) { return r.map(q).join(','); }).join(NL) + NL;
+    C.saveBlob(new TextEncoder().encode(text), '결재완료_금액요약_' + cyc + '.csv');
+    C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
+  }
+
+  // 결재 완료 출력 — 고르기 칸
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.matches && t.matches('[data-finsel]')) { if (t.checked) FINSEL[t.dataset.finsel] = 1; else delete FINSEL[t.dataset.finsel]; C.render(); return; }
+    if (t.id === 'finAll') {
+      var S = C.state();
+      S.APPR.forEach(function (a) { if (a.cycle === S.CYCKEY && a.status === 'approved') { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
+      C.render();
+    }
+  });
   return {
-    views: { verify: viewVerify, a_verify: viewVerifyAll },
-    admin: ['a_verify'],
+    views: { verify: viewVerify, a_verify: viewVerifyAll, a_final: viewFinal },
+    admin: ['a_verify', 'a_final'],
     apprExtra: apprExtra, wantSummaries: wantSummaries, beforeSubmit: beforeSubmit,
     sumText: sumText, pdfFrozen: pdfFrozen, xlsxFrozen: xlsxFrozen,
     // ★ 주기가 바뀌어도 돌고 있는 검증은 그대로 둔다. 여기서 '안 도는 중'으로 풀면 같은 검증이 겹쳐 돈다.
