@@ -251,6 +251,20 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .gemrun svg{animation:gemspin 1.6s linear infinite}
 @keyframes gemspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.gemrun svg{animation:none}}
+/* 검증 버튼 — Gemini 아이콘, 도는 동안 회전 + 빛이 지나간다 */
+.gembtn{gap:7px}
+.gembtn .gemico{flex:none;transition:transform .25s var(--ease)}
+.gembtn:not([disabled]):hover .gemico{transform:rotate(45deg) scale(1.12)}
+.gembtn.pri .gemico path{fill:#fff}
+.btn.gembtn.running{position:relative;overflow:hidden;opacity:1;border-color:#C9B5EA;color:#5b4bb5;
+  background:linear-gradient(90deg,#EEF3FE,#F4EEFC,#FCEFF1)}
+.gembtn.running .gemico{animation:gemspin 1.4s linear infinite,gempulse 1.4s ease-in-out infinite}
+.gembtn.running::after{content:"";position:absolute;top:0;bottom:0;left:0;width:60%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);animation:gemshine 1.6s linear infinite}
+.gembtn.running .gl{position:relative;z-index:1;font-variant-numeric:tabular-nums}
+@keyframes gemshine{from{transform:translateX(-120%)}to{transform:translateX(220%)}}
+@keyframes gempulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.gembtn.running .gemico,.gembtn.running::after{animation:none}}
 /* 바로 고치기 창 */
 .fixh{margin:14px 0 6px;font-size:12px;font-weight:600;color:var(--ink-500)}
 .fixl{border:1px solid var(--ink-100);border-radius:8px}

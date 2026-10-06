@@ -116,6 +116,21 @@
       '<path fill="url(#gemg)" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>' +
       (label || 'Gemini') + '</span>';
   }
+  /** Gemini 반짝임 아이콘(버튼용). 그라데이션 id 가 겹치면 두 번째부터 색이 빠질 수 있어 부를 때마다 새 id. */
+  var GEM_N = 0;
+  function gemIcon(size) {
+    var id = 'gemi' + (++GEM_N);
+    return '<svg class="gemico" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="' + id +
+      '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4C8DF6"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/>' +
+      '</linearGradient></defs><path fill="url(#' + id + ')" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>';
+  }
+  /** 검증 버튼 — 도는 동안(running) 아이콘이 돌고 빛이 지나가며 진행 글자를 보여 준다. */
+  function gemBtn(attrs, label, running, extraCls) {
+    // 도는 동안은 빨간 기본 버튼 모양을 빼고 Gemini 색으로만 보인다.
+    var cls = running ? String(extraCls || '').replace(' pri', '') : (extraCls || '');
+    return '<button class="btn gembtn' + cls + (running ? ' running' : '') + '" ' + attrs +
+      (running ? ' aria-busy="true"' : '') + '>' + gemIcon(running ? 16 : 15) + '<span class="gl">' + esc(label) + '</span></button>';
+  }
   /** 지금 화면의 검증 항목(「바로 고치기」가 번호로 찾는다). */
   var VITEMS = [];
   /** links 가 참이면 항목마다 '고치러 가기' 버튼을 붙인다(본인 검증 화면에서만). */
@@ -227,8 +242,9 @@
     else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
 
     // 검증은 한 번에 하나만 돈다. 다른 주기 것이 돌고 있으면 그렇다고 말한다(눌러도 반응이 없으면 고장으로 보인다).
-    var btn = '<button class="btn' + (row || locked ? '' : ' pri') + '" data-vrun' + (RUN.busy ? ' disabled' : '') + '>' + ic('scan', 14) +
-      (busy ? '검증하는 중…' : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증' : '검증 실행') + '</button>';
+    var btn = gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
+      busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증' : '검증 실행',
+      busy, row || locked ? '' : ' pri');
     // 검증을 봤으면 다음 할 일은 상신이다 — 마감 현황으로 돌아가야 한다는 것을 알 길이 없었다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     var submitBtn = row && canSubmit && !busy
@@ -284,7 +300,10 @@
       RUN.note = t;
       // 화면 전체를 다시 그리지 않는다. 그 사이 다른 주기로 넘어갔으면 남의 판정 줄에 쓰지 않는다.
       var st = C.state(), v = document.querySelector('.hero .verdict');
-      if (v && st.VIEW === 'verify' && st.CYCKEY === cyc && !C.isMulti()) v.textContent = t;
+      if (v && st.VIEW === 'verify' && st.CYCKEY === cyc && !C.isMulti()) {
+        v.textContent = t;
+        var gl = document.querySelector('[data-vrun] .gl'); if (gl) gl.textContent = t;   // 버튼에도 진행 상황
+      }
     });
     RUN.p = p;
     p.then(function (row) {
@@ -352,8 +371,7 @@
             esc({ approved: '결재 완료', submitted: '결재 중', rejected: '반려', withdrawn: '회수' }[x.a.status] || '') + '</span>' : '<span class="dim">상신 전</span>') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           (x.r ? '<button class="btn sm" data-vshow="' + esc(x.u) + '">결과 보기</button> ' : '') +
-          '<button class="btn sm" data-vrunfor="' + esc(x.u) + '"' + (RUN.busy ? ' disabled' : '') + '>' +
-          (busy ? '검증 중…' : x.r ? '다시 검증' : '검증') + '</button>' +
+          gemBtn('data-vrunfor="' + esc(x.u) + '"' + (RUN.busy ? ' disabled' : ''), busy ? '읽는 중…' : x.r ? '다시 검증' : '검증', busy, ' sm') +
           // 결재자가 자리에 없어 결재가 멈췄을 때의 탈출구 — 사유가 기록에 남는다.
           (stuck ? ' <button class="btn sm" data-appr="force_reject" data-id="' + x.a.id + '" title="결재가 멈췄을 때 관리자 권한으로 반려합니다">관리자 반려</button>' : '') +
           // 결재가 끝난 건의 정정 — 잠금을 풀어 다시 상신하게 한다(완료본은 이력에 남는다).
