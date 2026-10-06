@@ -110,7 +110,9 @@
     R05: ['trips', '운행일지에서 보기'], R06: ['evid', '영수증에서 보기'], R07: ['evid', '영수증에서 보기'],
     R08: ['evid', '영수증에서 보기'], R09: ['evid', '영수증에서 보기'], A01: ['evid', '영수증에서 보기'],
     A02: ['evid', '영수증에서 보기'], A03: ['evid', '영수증에서 보기'], A04: ['evid', '영수증에서 보기'],
-    A05: ['trips', '운행일지에서 보기'], A06: ['evid', '영수증에서 보기']
+    A05: ['trips', '운행일지에서 보기'], A06: ['evid', '영수증에서 보기'], A07: ['evid', '영수증에서 보기'],
+    // 2026-10-06 — R10 은 운행에 적은 금액을 지우는 것, R11·R12 는 영수증·계기판 사진을 올리는 것
+    R10: ['trips', '운행일지에서 보기'], R11: ['evid', '주유 영수증 올리기'], R12: ['evid', '계기판 사진 올리기']
   };
   /** AI(Gemini)가 사진을 읽어 낸 항목인가 — 코드가 A 로 시작한다(A00 은 '읽지 않음' 안내). */
   function isAi(it) { return /^A0[1-9]/.test(String(it && it.code || '')); }
@@ -150,6 +152,8 @@
       var refs = it.refs || {}, nRef = (refs.trips || []).length + (refs.evid || []).length;
       var go = '';
       if (links && it.code === 'R02') go = '<button class="btn sm vgo" data-v="tollfill">통행료 채우기' + ic('chev', 12) + '</button>';
+      // 주유 영수증·계기판 사진이 모자란 것은 고칠 기록이 아니라 올릴 것이 없는 것 — 영수증 화면으로 보낸다.
+      else if (fx && (it.code === 'R11' || it.code === 'R12')) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
       else if (links && nRef) {
         VITEMS.push(it);
         go = '<button class="btn sm vgo vfix" data-vfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>';
