@@ -3206,6 +3206,16 @@
     EVUP.items.forEach(function (it) { if (it.crop && it.crop.url) URL.revokeObjectURL(it.crop.url); });
   }
 
+  /** Gemini 반짝임(같은 색감의 모양 — 공식 로고 파일 아님). 그라데이션 id 는 부를 때마다 새로. */
+  var GEMSVG_N = 0;
+  function gemSvg(size, cls) {
+    var id = 'gsv' + (++GEMSVG_N);
+    return '<svg class="gemico' + (cls ? ' ' + cls : '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4C8DF6"/>' +
+      '<stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs>' +
+      '<path fill="url(#' + id + ')" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>';
+  }
+  function gemTag(t) { return '<span class="gem">' + gemSvg(12) + esc(t || 'Gemini') + '</span>'; }
   function openEvUpload() {
     if (isMulti()) { toast('영수증은 한 주기씩 올립니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
     if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 주기에는 올릴 수 없습니다.', true); return; }
@@ -3219,9 +3229,10 @@
     $('pTitle').textContent = '영수증 올리기';
     $('pSub').textContent = cycleName(CYC.y, CYC.m) + ' · ' + cycleSpan(CYC.y, CYC.m);
     $('pBody').innerHTML =
-      '<div class="drop" id="evDrop" style="margin:0 0 14px">' +
-      '<div class="dico">' + ic('receipt', 22) + '</div>' +
-      '<div class="dt">영수증 사진이나 스캔 PDF 를 올려 주세요</div>' +
+      '<div class="drop gemdrop" id="evDrop" style="margin:0 0 14px">' +
+      '<div class="gemorb">' + gemSvg(28) + '</div>' +
+      '<div class="gemchip">' + gemSvg(12) + 'Gemini AI 판독</div>' +
+      '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 구분·날짜·금액을 읽어 드립니다</div>' +
       '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
       '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
@@ -3249,7 +3260,7 @@
     askAi().then(function (on) {
       var el = $('evAiNote');
       if (el) el.innerHTML = on
-        ? 'AI 가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드립니다. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
+        ? gemTag('Gemini AI') + ' 가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드립니다. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
         : 'AI 판독이 꺼져 있어 구분·날짜·금액을 직접 넣습니다. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b> 로 줄을 늘리세요.';
     });
   }
@@ -3550,7 +3561,7 @@
     var b = $('btnEvGo'), f = $('evFill');
     if (!n) {
       box.innerHTML = '';
-      if (b) { b.disabled = true; b.textContent = '올리기'; }
+      if (b) { b.disabled = true; b.classList.remove('gembtn', 'running'); b.textContent = '올리기'; }
       if (f) f.hidden = true;
       return;
     }
@@ -3573,7 +3584,8 @@
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
           return '<tr data-evrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
-            '<td colspan="4"><span class="spin sm"></span> AI 가 이 장에서 영수증을 찾는 중…</td>' +
+            '<td colspan="4"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">Gemini</b> 가 이 장에서 영수증을 읽는 중…</span>' +
+            '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
             '<td class="n"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
         }
         return '<tr data-evrow="' + i + '" class="' + (first ? 'pgfirst' : '') + (it.ai ? ' evai' : '') + '">' +
@@ -3589,18 +3601,20 @@
           'placeholder="원" aria-label="' + (i + 1) + '번째 금액" value="' + esc(it.amt ? n0(it.amt) : '') + '"></td>' +
           '<td><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
           esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' +
-          (it.hint ? '<div class="evhint">' + (it.ai ? '<b>AI</b> ' : '') + esc(it.hint) + '</div>'
-            : (it.ai ? '<div class="evhint ok"><b>AI</b> 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) + '</td>' +
+          (it.hint ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(it.hint) + '</div>'
+            : (it.ai ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
       n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · 영수증 ' + n0(n) + '건' +
-      (running ? ' · <b>AI 가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
+      (running ? ' · <b class="gemtxt">Gemini 가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
     if (b) {
       b.disabled = running > 0;
-      b.textContent = running ? 'AI 가 읽는 중…' : n0(n) + '건 올리기';
+      // 읽는 동안은 Gemini 색으로 돌며 빛이 지나간다(검증 버튼과 같은 모양).
+      b.classList.toggle('gembtn', running > 0); b.classList.toggle('running', running > 0);
+      b.innerHTML = running ? gemSvg(16) + '<span class="gl">Gemini 가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
     }
     // 채울 빈 칸이 있을 때만 보인다.
     if (f) f.hidden = n < 2 || running > 0 || !EVUP.items.some(function (x, i) { return i && (!x.cat || (!x.date && !x.ai)); });

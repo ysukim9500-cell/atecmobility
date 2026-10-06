@@ -841,6 +841,31 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .drop .dt{font-size:14.5px;font-weight:500;color:var(--ink-900)}
 .drop .dd{font-size:12.5px;color:var(--ink-400);margin-top:4px}
 .drop label.btn{cursor:pointer}
+/* 영수증 올리기 — Gemini (2026-10-06) */
+.drop.gemdrop{border:1.5px solid transparent;
+  background:linear-gradient(var(--surface),var(--surface)) padding-box,
+    linear-gradient(120deg,#4C8DF6,#9B72CB 55%,#D96570) border-box;
+  box-shadow:0 0 0 0 rgba(155,114,203,.0);animation:gemglow 3.2s ease-in-out infinite}
+.drop.gemdrop.over{background:linear-gradient(#F6F2FD,#F6F2FD) padding-box,linear-gradient(120deg,#4C8DF6,#9B72CB 55%,#D96570) border-box}
+@keyframes gemglow{0%,100%{box-shadow:0 0 0 0 rgba(155,114,203,0)}50%{box-shadow:0 0 18px 2px rgba(155,114,203,.22)}}
+.gemorb{width:52px;height:52px;margin:0 auto 10px;border-radius:999px;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 30%,#fff,#F1EDFA 60%,#E7E0F7);box-shadow:0 4px 14px -4px rgba(155,114,203,.45)}
+.gemorb .gemico{animation:gemfloat 3.2s ease-in-out infinite}
+@keyframes gemfloat{0%,100%{transform:rotate(0) scale(1)}50%{transform:rotate(45deg) scale(1.12)}}
+.gemchip{display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;
+  color:#5b4bb5;background:linear-gradient(90deg,rgba(76,141,246,.12),rgba(155,114,203,.15),rgba(217,101,112,.12));border:1px solid rgba(155,114,203,.3)}
+.gemtxt{background:linear-gradient(90deg,#4C8DF6,#9B72CB,#D96570);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gemread{position:relative;display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px;color:#5b4bb5;font-size:13px}
+.gemread .gemshim{position:absolute;left:0;right:0;bottom:2px;height:4px;border-radius:4px;overflow:hidden;
+  background:linear-gradient(90deg,#EEF3FE,#F4EEFC,#FCEFF1)}
+.gemread .gemshim::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,#9B72CB,transparent);
+  animation:gemshim 1.4s linear infinite}
+.gemread .gemshim.s2{bottom:-5px;opacity:.5}
+.gemread .gemshim.s2::after{animation-delay:.35s}
+@keyframes gemshim{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+.gemico.spinning{animation:gemspin 1.4s linear infinite}
+tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,203,.06),rgba(217,101,112,.04))}
+@media (prefers-reduced-motion:reduce){.drop.gemdrop,.gemorb .gemico,.gemread .gemshim::after,.gemico.spinning{animation:none}}
 
 .hpnote{display:flex;gap:10px;align-items:flex-start;padding:13px 16px;border-radius:var(--r-sm);
   background:var(--ink-50);border:1px solid var(--ink-200);font-size:13px;color:var(--ink-700);
