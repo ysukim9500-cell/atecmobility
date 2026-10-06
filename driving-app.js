@@ -602,7 +602,7 @@
 
     var fresh = soft && STATIC_AT && Date.now() - STATIC_AT < CACHE_MS;
     var staticP = fresh ? Promise.resolve(null) : Promise.all([
-      fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type'),
+      fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status'),
       fetchAll('/rest/v1/app_vehicles?select=*'),
       fetchAll('/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path&order=id.asc'),
       fetchAll('/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc'),
@@ -631,7 +631,8 @@
       // fetchAll 은 41,000행에서 멈춘다. 닿았으면 잘렸다는 것을 숨기지 않는다.
       if (ALL_TRIPS.length >= 41000) toast('운행이 너무 많아 일부만 불러왔습니다. 기간을 줄여 주세요.', true);
       if (out) {
-        USERS = {}; (out[0] || []).forEach(function (u) { USERS[u.username] = u; });
+        // 업무 결재 포털 가입 대기·거절 계정은 직원으로 치지 않는다(가입 신청은 「권한 관리」에 따로 나온다).
+        USERS = {}; (out[0] || []).forEach(function (u) { if (!u.signup_status || u.signup_status === 'active') USERS[u.username] = u; });
         VEHICLES = out[1] || [];
         ALL_EVID = out[2] || [];
         EDUV = out[3] || []; EDUP = out[4] || []; EDUT = out[5] || [];
@@ -1498,6 +1499,74 @@
   }
 
   /* ══════════════════ 권한 관리 (마스터 계정만) ══════════════════ */
+  /* ── 업무 결재 포털(work.html) 가입 신청 — 승인·거절 (2026-10-02, 10-06 보강) ──
+     승인하면 그 아이디로 포털·운행일지 웹·앱에 로그인할 수 있다. 승인·거절 모두 본인 비밀번호를 다시 묻는다.
+     ★ 조직도에는 자동으로 잇지 않는다 — 신청서의 회사 메일은 본인 확인이 안 된 값이라, 남의 메일로 가입해
+       결재자 자리를 가로챌 수 있었다(2026-10-06 검증로봇). 결재자로 쓰려면 관리자가 「조직도」에서 직접 잇는다. */
+  var SIGNUPS = null, SIGNUP_BUSY = '';
+  function loadSignups() {
+    return apiRetry('/functions/v1/driving-account', { method: 'POST', body: JSON.stringify({ action: 'signups' }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) { SIGNUPS = res.ok && res.j && res.j.list ? res.j.list : []; if (VIEW === 'perm') render(); })
+      .catch(function () { SIGNUPS = []; });
+  }
+  function signupSect() {
+    if (SIGNUPS === null) { loadSignups(); return ''; }
+    if (!SIGNUPS.length) return '';
+    return sect('가입 신청', SIGNUPS.length + '건', '',
+      '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+      '<th>이름</th><th>아이디</th><th>부서 · 직급</th><th>회사 메일</th><th>차량</th><th>신청</th><th></th></tr></thead><tbody>' +
+      SIGNUPS.map(function (x) {
+        var busy = SIGNUP_BUSY === x.username;
+        return '<tr><td><span class="lead">' + esc(x.name || '') + '</span></td>' +
+          '<td class="mono">' + esc(x.username) + '</td>' +
+          '<td class="dim">' + esc([x.dept, x.position].filter(Boolean).join(' · ') || '—') + '</td>' +
+          '<td class="dim">' + esc(x.email || '—') + '</td>' +
+          '<td class="dim">' + esc(x.plate_no || '없음(결재만)') + '</td>' +
+          '<td class="dim">' + (x.signup_at ? md(Date.parse(x.signup_at)) : '—') + '</td>' +
+          '<td class="n" style="white-space:nowrap">' +
+          '<button class="btn sm pri" data-signup="' + esc(x.username) + '" data-ok="1"' + (busy ? ' disabled' : '') + '>승인</button> ' +
+          '<button class="btn sm" data-signup="' + esc(x.username) + '" data-ok="0"' + (busy ? ' disabled' : '') + '>거절</button></td></tr>';
+      }).join('') + '</tbody></table></div></div>' +
+      '<div class="anote">업무 결재 포털에서 들어온 신청입니다. 승인하면 그 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다. ' +
+      '적힌 회사 메일은 <b>본인 확인이 안 된 값</b>입니다. 결재자로 고를 수 있게 하려면, 본인이 맞는지 확인한 뒤 ' +
+      '「조직도」에서 그 사람을 열어 앱 계정을 이 아이디로 이어 주세요.</div>');
+  }
+  /** 승인·거절 확인 창 — 누구를 어떻게 하는지 보여 주고 본인 비밀번호를 받는다. */
+  function openSignupConfirm(u, ok) {
+    var x = (SIGNUPS || []).filter(function (r) { return r.username === u; })[0] || { username: u };
+    $('pTitle').textContent = ok ? '가입 승인' : '가입 거절';
+    $('pSub').textContent = (x.name || '') + ' (' + u + ')';
+    $('pBody').innerHTML = '<div class="form"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
+      (ok ? '승인' : '거절') + '</b>합니다.' +
+      (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다. 결재자로 쓰려면 「조직도」에서 직접 이어 주세요.'
+        : ' 거절하면 이 아이디로는 로그인할 수 없고, 적어 낸 차량번호는 비웁니다.') + '</div>' +
+      '<div class="frow"><label class="flab" for="suMine">본인 비밀번호</label><div class="fbody">' +
+      '<input class="inp" type="password" id="suMine" autocomplete="current-password">' +
+      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호입니다.</div></div></div></div>';
+    $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnSignupGo" data-u="' + esc(u) + '" data-ok="' + (ok ? '1' : '0') + '">' + (ok ? '승인' : '거절') + '</button>';
+    $('panel').classList.add('open');
+    var f = $('suMine'); if (f) f.focus();
+  }
+  function decideSignup(u, ok) {
+    var mine = ($('suMine') || {}).value || '';
+    if (!mine) { toast('본인 비밀번호를 넣어 주세요.', true); return; }
+    var go = $('btnSignupGo'); if (go) go.disabled = true;
+    SIGNUP_BUSY = u;
+    apiRetry('/functions/v1/driving-account', { method: 'POST', body: JSON.stringify({ action: 'decide_signup', target: u, ok: ok, password: mine }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        SIGNUP_BUSY = '';
+        if (go) go.disabled = false;
+        if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return; }
+        toast(res.j.message || '처리했습니다.');
+        closePanel();
+        SIGNUPS = null;
+        // 승인한 사람이 직원 목록·조직도에 바로 보이게 다시 받는다.
+        if (res.ok && ok) loadAll(); else render();
+      }).catch(function () { SIGNUP_BUSY = ''; if (go) go.disabled = false; toast('처리하지 못했습니다.', true); });
+  }
   function viewPerm() {
     if (!LOADED) return head('권한 관리') + skeleton();
     var list = Object.keys(USERS).sort(function (a, b) {
@@ -1516,6 +1585,7 @@
       '권한을 주는 일을 막기 위해서입니다.<br>' +
       '<b style="color:var(--ink-2)">권한 주는 관리자</b>는 마스터 계정이 지정합니다. 이 화면에서 다른 직원을 관리자로 ' +
       '지정·해제하고 비밀번호를 초기화할 수 있습니다(마스터 계정과 다른 권한 주는 관리자는 바꿀 수 없습니다).</div></section>';
+    h += signupSect();
     h += sect('직원', list.length + '명', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
       '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th></th></tr></thead><tbody>' +
@@ -5573,6 +5643,8 @@
     if ((el = e.target.closest('[data-pwreset]'))) {
       openPermConfirm('pw', el.dataset.pwreset, false); return;
     }
+    if ((el = e.target.closest('[data-signup]'))) { openSignupConfirm(el.dataset.signup, el.dataset.ok === '1'); return; }
+    if ((el = e.target.closest('#btnSignupGo'))) { decideSignup(el.dataset.u, el.dataset.ok === '1'); return; }
     if ((el = e.target.closest('[data-permmgr]'))) {
       openPermConfirm('mgr', el.dataset.permmgr, el.dataset.on === '1'); return;
     }
@@ -5835,6 +5907,9 @@
   });
   $('loginBtn').addEventListener('click', doLogin);
   function signOut() {
+    // 서버의 갱신 토큰도 끊는다(2026-10-06). 응답을 기다리지 않는다.
+    var at = ss(K_AT);
+    if (at) { try { fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at }, keepalive: true }).catch(function () { }); } catch (e) { } }
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
     location.reload();
   }

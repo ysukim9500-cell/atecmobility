@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>업무 결재 포털 · ATEC 에이텍모빌리티</title>
+<meta name="description" content="운행일지와 결재 시스템을 한 번의 로그인으로 쓰는 에이텍모빌리티 업무 결재 포털">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<!--
+  업무 결재 포털 (2026-10-02)
+  · 통합 관제 포털(index.html)과 같은 틀(머리띠 · 큰 첫 화면 · 시스템 선택 카드)을 따르되 CSS 는 토큰 한 벌로 새로 쓴다.
+  · 로그인은 운행일지 앱 계정(driving-auth). 로그인하면 운행일지(driving.html)와 같은 세션 키(drv_*)를 쓰므로
+    운행일지 카드를 누르면 다시 로그인하지 않는다. 탭을 닫으면 로그아웃(sessionStorage).
+  · 회원가입은 승인 대기로 들어가고, 운행일지 「권한 관리」에서 승인한다.
+  · 이 리포는 공개다 — 직원 이름·자료를 이 파일에 넣지 않는다.
+-->
+<style>
+:root{
+  --red:#D70051; --red-700:#A3003D; --red-50:#FCEEF3;
+  --ink:#111111; --ink-2:#2F3941; --grey:#5A666F; --grey-2:#6B7882; --line:#D9D9D9; --line-2:#ECEEF0;
+  --bg:#FFFFFF; --soft:#F6F6F7; --ok:#0C7A57; --warn:#96620A; --warn-50:#FCF5E9;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:"Noto Sans KR","Malgun Gothic",-apple-system,sans-serif;color:var(--ink);background:var(--bg);
+  word-break:keep-all;-webkit-text-size-adjust:100%;font-variant-numeric:tabular-nums}
+a{color:inherit}
+button,input{font-family:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--ink)}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.btn.pri:hover{background:var(--red-700);border-color:var(--red-700)}
+.btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.btn.ghost:hover{border-color:#fff}
+.btn.white{background:#fff;border-color:#fff;color:var(--ink)}
+.btn[disabled]{opacity:.55;cursor:default}
+
+/* ── 머리띠 ── */
+.top{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line-2)}
+.top .wrap{height:64px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:14px;text-decoration:none}
+.brand img{height:22px;width:auto;display:block}
+.brand .bar{width:1px;height:18px;background:var(--line)}
+.brand .nm{font-size:12px;font-weight:700;color:var(--grey);letter-spacing:.02em;white-space:nowrap}
+.top .sp{flex:1}
+.top .lnk{background:none;border:0;font-size:13.5px;font-weight:700;color:var(--ink-2);cursor:pointer;padding:10px 8px}
+.top .btn{height:38px;padding:0 16px;font-size:13px}
+.ub{display:flex;align-items:center;gap:10px;font-size:13px}
+.ub .who{line-height:1.3;text-align:right}
+.ub .who b{display:block;font-size:13.5px}
+.ub .who span{font-size:11.5px;color:var(--grey-2)}
+.tag{display:inline-block;margin-left:6px;padding:1px 6px;font-size:10.5px;font-weight:700;color:var(--red);border:1px solid var(--red)}
+
+/* ── 첫 화면 ── */
+.hero{position:relative;color:#fff;overflow:hidden;background:#111}
+.hero::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,rgba(17,17,17,.97) 0%,rgba(17,17,17,.86) 52%,rgba(215,0,81,.55) 100%)}
+.hero::after{content:"";position:absolute;inset:0;opacity:.18;
+  background-image:linear-gradient(rgba(255,255,255,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.18) 1px,transparent 1px);
+  background-size:34px 34px}
+.hero .wrap{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:48px;align-items:center;padding-block:84px 92px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.06);font-size:12px;font-weight:700;letter-spacing:.02em}
+.chip i{width:7px;height:7px;border-radius:50%;background:#7CE0B0}
+.hero h1{margin:22px 0 0;font-size:clamp(34px,5.6vw,56px);line-height:1.15;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
+.hero h1 em{font-style:normal;color:#F4B8D0}
+.hero p.lead{margin:20px 0 0;max-width:34em;font-size:16px;line-height:1.75;color:rgba(255,255,255,.78)}
+.hero .cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+/* 오른쪽 — 예시 화면(실제 자료 아님) */
+.demo{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);padding:20px 22px;backdrop-filter:blur(4px)}
+.demo .dh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7)}
+.demo .dh .sp{flex:1}
+.demo .ex{font-size:10.5px;padding:2px 7px;border:1px solid rgba(255,255,255,.3)}
+.demo .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid rgba(255,255,255,.1);font-size:13px}
+.demo .row:first-of-type{border-top:0}
+.demo .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none;border:1.5px solid rgba(255,255,255,.4)}
+.demo .n.done{background:#0FA36E;border-color:#0FA36E}
+.demo .n.now{background:var(--red);border-color:var(--red)}
+.demo .t{flex:1}
+.demo .s{font-size:11.5px;color:rgba(255,255,255,.6)}
+.demo .alert{margin-top:10px;padding:10px 12px;background:rgba(215,0,81,.22);border:1px solid rgba(244,184,208,.35);font-size:12.5px}
+
+/* ── 구역 공통 ── */
+.sec{padding-block:84px}
+.sec.soft{background:var(--soft)}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.16em;color:var(--red)}
+.sec h2{margin:10px 0 0;font-size:clamp(24px,3.2vw,34px);font-weight:800;letter-spacing:-.025em;text-wrap:balance}
+.sec .sub{margin:12px 0 0;color:var(--grey);font-size:15px;line-height:1.7}
+
+/* 시스템 카드(소개용) */
+.cards{margin-top:36px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.card{background:#fff;border:1px solid var(--line);padding:26px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .ico{width:48px;height:48px;display:grid;place-items:center;background:var(--ink);color:#fff}
+.card.dim .ico{background:#C7CDD1}
+.card h3{margin:6px 0 0;font-size:16.5px;font-weight:800}
+.card p{margin:0;font-size:13.5px;line-height:1.7;color:var(--grey)}
+.soon{display:inline-block;align-self:flex-start;margin-top:auto;padding:3px 8px;font-size:11.5px;font-weight:700;color:var(--grey);border:1px solid var(--line)}
+.card.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card.dark p{color:rgba(255,255,255,.75)}
+
+/* 사용 순서 */
+.steps{margin-top:36px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:2px solid var(--ink)}
+.steps > div{padding:24px 24px 0 0}
+.steps .k{font-size:12px;font-weight:800;color:var(--red);letter-spacing:.08em}
+.steps h3{margin:8px 0 6px;font-size:16px;font-weight:800}
+.steps p{margin:0;font-size:13.5px;line-height:1.7;color:var(--grey)}
+
+footer{border-top:1px solid var(--line-2);background:var(--soft)}
+footer .wrap{display:flex;gap:16px;align-items:center;padding-block:22px;font-size:12px;color:var(--grey)}
+footer .sp{flex:1}
+
+/* ── 로그인 뒤: 시스템 선택 ── */
+#appRoot{display:none}
+body.in #landing{display:none}
+body.in #appRoot{display:block}
+.pick{padding-block:44px 64px}
+.pick h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.pick .sub{margin:6px 0 0;font-size:13.5px;color:var(--grey)}
+.rule{height:2px;background:var(--red);margin-top:16px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.launch{position:relative;display:flex;flex-direction:column;gap:8px;padding:28px 32px 30px;border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);text-decoration:none;color:inherit;min-height:210px;background:#fff}
+.grid > .launch:nth-child(3n){border-right:0}
+a.launch:hover{background:var(--soft)}
+a.launch:hover::before{content:"";position:absolute;left:0;top:0;width:10px;height:10px;background:var(--red)}
+.launch .ico{width:40px;height:40px;display:grid;place-items:center;background:var(--ink);color:#fff;margin-bottom:8px}
+.launch.off .ico{background:#C7CDD1}
+.launch h2{margin:0;font-size:16.5px;font-weight:800}
+.launch p{margin:0;font-size:13px;line-height:1.7;color:var(--grey)}
+.launch .go{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;color:var(--red)}
+a.launch:hover .go svg{transform:translateX(4px)}
+.launch .go svg{transition:transform .15s}
+.launch.off .go{color:var(--grey-2)}
+.notice{margin-top:22px;display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--warn-50);border:1px solid #EAD9B5;font-size:13.5px;color:#6A4708}
+.notice .sp{flex:1}
+.notice[hidden]{display:none}
+
+/* ── 창(로그인·가입) ── */
+.veil{position:fixed;inset:0;z-index:50;background:rgba(17,17,17,.55);display:none;align-items:center;justify-content:center;padding:20px}
+.veil.open{display:flex}
+.modal{position:relative;width:100%;max-width:440px;max-height:calc(100dvh - 40px);overflow:auto;background:#fff;padding:36px 34px 28px}
+.modal.wide{max-width:560px}
+.modal .x{position:absolute;right:12px;top:12px;width:40px;height:40px;border:0;background:none;cursor:pointer;color:var(--grey);font-size:22px;line-height:1}
+.modal .mhead{text-align:center}
+.modal .mhead img{height:24px}
+.modal .mhead div{margin-top:8px;font-size:12px;font-weight:700;color:var(--grey)}
+.modal h2{margin:26px 0 14px;font-size:16px;font-weight:800}
+.fld{display:block;margin-bottom:10px}
+.fld > span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.fld > span em{font-style:normal;color:var(--red)}
+.fld > span small{font-weight:400;color:var(--grey-2)}
+.inp{width:100%;height:46px;padding:0 14px;border:1px solid var(--line);background:#F7F9FC;font-size:16px;color:var(--ink)}
+.inp:focus{border-color:var(--ink);background:#fff;outline:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg{margin:6px 0 10px;padding:10px 12px;font-size:13px;line-height:1.6;background:var(--red-50);color:var(--red-700)}
+.msg.ok{background:#EAF6F1;color:var(--ok)}
+.msg[hidden]{display:none}
+.modal .btn.pri{width:100%;height:48px;margin-top:6px;font-size:15px}
+.links{display:flex;justify-content:space-between;gap:10px;margin-top:18px;font-size:12.5px;color:var(--grey)}
+.links button{background:none;border:0;padding:6px 0;font-size:12.5px;cursor:pointer;color:var(--grey)}
+.links button.em{color:var(--red);font-weight:800}
+.hint{margin:4px 0 12px;font-size:12px;line-height:1.6;color:var(--grey-2)}
+
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr;padding-block:56px 64px}
+  .cards,.steps{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
+  .launch{border-right:0;min-height:0}
+  .top .lnk.wideonly{display:none}
+  .ub .who span{display:none}
+}
+@media (max-width:480px){
+  .wrap{padding-inline:16px}
+  .brand img{height:14px}
+  .brand{gap:9px}
+  .brand .nm{font-size:11px}
+  .modal{padding:30px 20px 22px}
+  .two{grid-template-columns:1fr}
+  .demo{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 로그인 전 ═══════════ -->
+<div id="landing">
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="#" aria-label="업무 결재 포털 처음으로"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><span class="bar"></span><span class="nm">업무 결재 포털</span></a>
+      <span class="sp"></span>
+      <button class="lnk wideonly" type="button" data-open="signup">회원가입</button>
+      <button class="btn pri" type="button" data-open="login">로그인</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="chip"><i></i>운행일지 · 결재 · 정산 통합 업무</span>
+        <h1>결재를 기다리지 않고<br><em>한 번에 끝냅니다</em></h1>
+        <p class="lead">운행일지 마감부터 결재 상신, 승인과 정산까지. 에이텍모빌리티 직원이 쓰는 결재 시스템을 한 번의 로그인으로 오갑니다.</p>
+        <div class="cta">
+          <button class="btn white" type="button" data-open="login">로그인하고 시작하기</button>
+          <a class="btn ghost" href="#systems">시스템 둘러보기 ↓</a>
+        </div>
+      </div>
+      <div class="demo" aria-label="예시 화면">
+        <div class="dh">이번 달 마감<span class="sp"></span><span class="ex">예시 화면</span></div>
+        <div class="row"><span class="n done">✓</span><span class="t">운행 기록</span><span class="s">완료</span></div>
+        <div class="row"><span class="n now">2</span><span class="t">통행료</span><span class="s">지금 할 일</span></div>
+        <div class="row"><span class="n">3</span><span class="t">영수증</span><span class="s">남음</span></div>
+        <div class="row"><span class="n">4</span><span class="t">검증 · 상신</span><span class="s">남음</span></div>
+        <div class="row"><span class="n">5</span><span class="t">정산 · 엑셀</span><span class="s">결재 후</span></div>
+        <div class="alert">결재 차례가 되면 팀즈 개인 채팅으로 알려 드립니다.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="systems">
+    <div class="wrap">
+      <div class="eyebrow">INTEGRATED SYSTEMS</div>
+      <h2>하나의 로그인, 세 개의 결재 시스템</h2>
+      <p class="sub">권한에 따라 필요한 시스템만 보입니다. 새 시스템은 같은 계정으로 바로 이어서 씁니다.</p>
+      <div class="cards">
+        <article class="card">
+          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
+          <h3>운행일지 (ATEC DRIVING)</h3>
+          <p>앱으로 기록한 업무 운행을 주기마다 마감합니다. 통행료·영수증을 정리하고 AI 검증을 거쳐 결재를 올립니다.</p>
+        </article>
+        <article class="card dim">
+          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
+          <h3>결재 시스템 2</h3>
+          <p>새 결재 시스템이 준비되고 있습니다. 같은 계정과 같은 결재함으로 이어집니다.</p>
+          <span class="soon">준비 중</span>
+        </article>
+        <article class="card dim">
+          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
+          <h3>결재 시스템 3</h3>
+          <p>새 결재 시스템이 준비되고 있습니다. 같은 계정과 같은 결재함으로 이어집니다.</p>
+          <span class="soon">준비 중</span>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec soft">
+    <div class="wrap">
+      <div class="eyebrow">HOW IT WORKS</div>
+      <h2>가입부터 결재까지 세 단계</h2>
+      <div class="steps">
+        <div><div class="k">STEP 01</div><h3>가입 신청</h3><p>운행일지 앱을 이미 쓰고 있다면 그 아이디로 바로 로그인하세요. 처음이면 회원가입을 신청합니다.</p></div>
+        <div><div class="k">STEP 02</div><h3>관리자 승인</h3><p>관리자가 승인하면 로그인할 수 있습니다. 승인 전에는 포털·앱 모두 로그인되지 않습니다.</p></div>
+        <div><div class="k">STEP 03</div><h3>시스템 선택</h3><p>로그인한 뒤 쓸 시스템을 고릅니다. 시스템을 옮겨 다녀도 다시 로그인하지 않습니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer><div class="wrap"><span>ATEC 에이텍모빌리티 · 업무 결재 포털</span><span class="sp"></span><span>정도 · 혁신 · 협업</span></div></footer>
+</div>
+
+<!-- ═══════════ 로그인 뒤 ═══════════ -->
+<div id="appRoot">
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="#" aria-label="업무 결재 포털"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><span class="bar"></span><span class="nm">업무 결재 포털</span></a>
+      <span class="sp"></span>
+      <div class="ub">
+        <div class="who"><b id="uName">—</b><span id="uMeta"></span></div>
+        <a class="btn" href="driving.html#/account" style="height:36px;padding:0 12px;font-size:12.5px">내 계정</a>
+        <button class="btn" type="button" id="btnOut" style="height:36px;padding:0 12px;font-size:12.5px">로그아웃</button>
+      </div>
+    </div>
+  </header>
+  <main class="wrap pick">
+    <h1>시스템 선택</h1>
+    <p class="sub">사용할 시스템을 고르세요. 권한에 따라 필요한 카드만 보입니다.</p>
+    <div class="notice" id="signupNote" hidden>
+      <span id="signupNoteT"></span><span class="sp"></span>
+      <a class="btn" href="driving.html#/perm" style="height:34px;font-size:12.5px">가입 승인하기</a>
+    </div>
+    <div class="rule"></div>
+    <div class="grid">
+      <a class="launch" href="driving.html">
+        <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
+        <h2>운행일지 (ATEC DRIVING)</h2>
+        <p>이번 달 마감 · 통행료 · 영수증 · AI 검증 · 결재 상신과 결재함</p>
+        <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+      <div class="launch off" aria-disabled="true">
+        <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
+        <h2>결재 시스템 2</h2>
+        <p>준비하고 있습니다. 열리면 이 자리에서 바로 들어갈 수 있습니다.</p>
+        <span class="go">준비 중</span>
+      </div>
+      <div class="launch off" aria-disabled="true">
+        <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
+        <h2>결재 시스템 3</h2>
+        <p>준비하고 있습니다. 열리면 이 자리에서 바로 들어갈 수 있습니다.</p>
+        <span class="go">준비 중</span>
+      </div>
+    </div>
+  </main>
+  <footer><div class="wrap"><span>ATEC 에이텍모빌리티 · 업무 결재 포털 · 탭을 닫으면 로그아웃됩니다</span><span class="sp"></span><span>정도 · 혁신 · 협업</span></div></footer>
+</div>
+
+<!-- ═══════════ 로그인 창 ═══════════ -->
+<div class="veil" id="vLogin">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tLogin">
+    <button class="x" type="button" data-close aria-label="닫기">×</button>
+    <div class="mhead"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><div>업무 결재 포털</div></div>
+    <h2 id="tLogin">로그인</h2>
+    <form id="fLogin" novalidate>
+      <label class="fld"><span>아이디 <small>(운행일지 앱 아이디)</small></span>
+        <input class="inp" id="liUser" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+      <label class="fld"><span>비밀번호</span>
+        <input class="inp" id="liPw" type="password" autocomplete="current-password" required></label>
+      <div class="msg" id="liMsg" role="alert" hidden></div>
+      <button class="btn pri" type="submit" id="liBtn">로그인</button>
+    </form>
+    <div class="links">
+      <button type="button" id="btnForgot">비밀번호를 잊으셨나요?</button>
+      <span>계정이 없으신가요? <button type="button" class="em" data-open="signup">회원가입</button></span>
+    </div>
+    <div class="hint" id="forgotT" hidden>비밀번호는 운행일지 관리자가 초기화해 드립니다. 관리자에게 아이디를 알려 주시면 임시 비밀번호를 받을 수 있습니다.</div>
+  </div>
+</div>
+
+<!-- ═══════════ 회원가입 창 ═══════════ -->
+<div class="veil" id="vSignup">
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="tSignup">
+    <button class="x" type="button" data-close aria-label="닫기">×</button>
+    <div class="mhead"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><div>업무 결재 포털</div></div>
+    <h2 id="tSignup">회원가입 신청</h2>
+    <p class="hint">운행일지 앱을 이미 쓰고 있다면 가입하지 말고 <b>그 아이디로 로그인</b>하세요. 가입은 관리자 승인 뒤에 쓸 수 있습니다.</p>
+    <form id="fSignup" novalidate>
+      <label class="fld"><span>아이디 <em>*</em> <small>영문·숫자·. _ - 3~30자</small></span>
+        <input class="inp" id="suUser" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="30" required></label>
+      <div class="two">
+        <label class="fld"><span>비밀번호 <em>*</em> <small>4자 이상</small></span>
+          <input class="inp" id="suPw" type="password" autocomplete="new-password" required></label>
+        <label class="fld"><span>비밀번호 확인 <em>*</em></span>
+          <input class="inp" id="suPw2" type="password" autocomplete="new-password" required></label>
+      </div>
+      <div class="two">
+        <label class="fld"><span>이름 <em>*</em></span><input class="inp" id="suName" autocomplete="name" maxlength="30" required></label>
+        <label class="fld"><span>직급</span><input class="inp" id="suPos" maxlength="30" placeholder="예) 책임"></label>
+      </div>
+      <label class="fld"><span>부서</span><input class="inp" id="suDept" maxlength="60" placeholder="예) 수도권버스지원팀"></label>
+      <label class="fld"><span>회사 메일 <small>(팀즈 결재 알림을 받을 주소)</small></span>
+        <input class="inp" id="suMail" type="email" autocomplete="email" maxlength="80" placeholder="아이디@atecmobility.com"></label>
+      <label class="fld"><span>차량번호 <small>(운전하는 분만 — 결재만 하시면 비워 두세요)</small></span>
+        <input class="inp" id="suPlate" maxlength="20" placeholder="예) 12가3456"></label>
+      <div class="msg" id="suMsg" role="alert" hidden></div>
+      <button class="btn pri" type="submit" id="suBtn">가입 신청</button>
+    </form>
+    <div class="links"><span></span><span>이미 계정이 있으신가요? <button type="button" class="em" data-open="login">로그인</button></span></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var SB = 'https://eiyksjcqntenmetmhmij.supabase.co';
+  var KEY = 'sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
+  // ★ 운행일지(driving.html)와 같은 세션 키 — 여기서 로그인하면 운행일지에 다시 로그인하지 않는다.
+  var K_AT = 'drv_at', K_RT = 'drv_rt', K_ME = 'drv_me';
+  var $ = function (id) { return document.getElementById(id); };
+  var ss = function (k, v) {
+    try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); }
+    catch (e) { return null; }
+  };
+  var me = function () { try { return JSON.parse(ss(K_ME) || 'null'); } catch (e) { return null; } };
+
+  /* ── 창 열고 닫기 ── */
+  var lastFocus = null;
+  function openModal(which) {
+    closeModals();
+    lastFocus = document.activeElement;
+    var v = $(which === 'signup' ? 'vSignup' : 'vLogin');
+    v.classList.add('open');
+    var f = v.querySelector('input'); if (f) setTimeout(function () { f.focus(); }, 30);
+  }
+  function closeModals() {
+    ['vLogin', 'vSignup'].forEach(function (id) { $(id).classList.remove('open'); });
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) { } }
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-open]');
+    if (t) { e.preventDefault(); openModal(t.getAttribute('data-open')); return; }
+    if (e.target.closest('[data-close]')) { closeModals(); return; }
+    // 바탕을 눌러도 닫지 않는다 — 입력 중에 잘못 눌러 적은 것이 사라지지 않게(통합 관제 포털과 같은 방침).
+  });
+  document.addEventListener('keydown', function (e) {
+    var open = document.querySelector('.veil.open');
+    if (!open) return;
+    if (e.key === 'Escape') { closeModals(); return; }
+    if (e.key === 'Tab') {        // 창 안에서만 돈다
+      // 비활성·숨은 것은 빼고 센다 — 보내는 중 마지막 버튼이 꺼지면 Tab 이 창 밖으로 빠져나갔다.
+      var f = Array.prototype.filter.call(open.querySelectorAll('button,input,a[href]'), function (x) { return !x.disabled && x.offsetParent !== null; });
+      if (!f.length) return;
+      var a = f[0], z = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+  });
+  $('btnForgot').addEventListener('click', function () { $('forgotT').hidden = !$('forgotT').hidden; });
+
+  function msg(id, text, ok) { var m = $(id); m.textContent = text; m.className = 'msg' + (ok ? ' ok' : ''); m.hidden = !text; }
+  function post(path, body, token) {
+    var h = { apikey: KEY, 'Content-Type': 'application/json' };
+    if (token) h.Authorization = 'Bearer ' + token;
+    return fetch(SB + path, { method: 'POST', headers: h, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); });
+  }
+
+  /* ── 로그인 ── */
+  $('fLogin').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = $('liUser').value.trim(), p = $('liPw').value, b = $('liBtn');
+    if (!u || !p) { msg('liMsg', '아이디와 비밀번호를 입력해 주세요.'); return; }
+    b.disabled = true; b.textContent = '확인하는 중…'; msg('liMsg', '');
+    post('/functions/v1/driving-auth', { username: u, password: p }).then(function (res) {
+      b.disabled = false; b.textContent = '로그인';
+      if (!res.ok || !res.j || !res.j.ok) {
+        var t = (res.j && res.j.error) || '로그인에 실패했습니다.';
+        if (res.status === 401 && u.indexOf('@') > 0) t += ' — 메일 주소가 아니라 운행일지 아이디를 넣어 주세요.';
+        msg('liMsg', t); return;
+      }
+      ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token); ss(K_ME, JSON.stringify(res.j.profile));
+      $('liPw').value = '';
+      closeModals(); enter();
+    }).catch(function () {
+      b.disabled = false; b.textContent = '로그인';
+      msg('liMsg', '서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
+    });
+  });
+
+  /* ── 회원가입 ── */
+  $('fSignup').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = function (id) { return $(id).value.trim(); };
+    var u = v('suUser'), p = $('suPw').value, p2 = $('suPw2').value, n = v('suName'), mail = v('suMail');
+    if (!/^[A-Za-z0-9._-]{3,30}$/.test(u)) { msg('suMsg', '아이디는 영문·숫자·. _ - 로 3~30자입니다.'); $('suUser').focus(); return; }
+    if (p.length < 4) { msg('suMsg', '비밀번호는 4자 이상입니다.'); $('suPw').focus(); return; }
+    if (p !== p2) { msg('suMsg', '비밀번호 확인이 다릅니다.'); $('suPw2').focus(); return; }
+    if (!n) { msg('suMsg', '이름을 넣어 주세요.'); $('suName').focus(); return; }
+    if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { msg('suMsg', '메일 주소 모양이 아닙니다.'); $('suMail').focus(); return; }
+    var b = $('suBtn'); b.disabled = true; b.textContent = '보내는 중…'; msg('suMsg', '');
+    post('/functions/v1/driving-auth', { action: 'signup', username: u, password: p, name: n,
+      dept: v('suDept'), position: v('suPos'), email: mail, plate: v('suPlate') }).then(function (res) {
+      b.disabled = false; b.textContent = '가입 신청';
+      if (!res.ok || !res.j || !res.j.ok) { msg('suMsg', (res.j && res.j.error) || '가입 신청을 받지 못했습니다.'); return; }
+      $('fSignup').reset();
+      msg('suMsg', res.j.message || '가입 신청을 받았습니다. 관리자가 승인하면 로그인할 수 있습니다.', true);
+    }).catch(function () {
+      b.disabled = false; b.textContent = '가입 신청';
+      msg('suMsg', '서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
+    });
+  });
+
+  /* ── 로그인 뒤 ── */
+  function enter() {
+    var m = me(); if (!m) return;
+    document.body.classList.add('in');
+    $('uName').textContent = m.name || m.username || '';
+    $('uMeta').textContent = [m.dept, m.position].filter(Boolean).join(' · ');
+    if (m.is_admin) { var t = document.createElement('span'); t.className = 'tag'; t.textContent = '관리자'; $('uName').appendChild(t); }
+    window.scrollTo(0, 0);
+    // 권한 관리를 맡은 관리자에게는 가입 신청이 있으면 알린다.
+    post('/functions/v1/driving-account', { action: 'signups' }, ss(K_AT)).then(function (res) {
+      var n = res.ok && res.j && res.j.list ? res.j.list.length : 0;
+      if (n) { $('signupNoteT').textContent = '가입 승인을 기다리는 신청이 ' + n + '건 있습니다.'; $('signupNote').hidden = false; }
+    }).catch(function () { });
+  }
+  function leave() {
+    // 서버의 갱신 토큰도 끊는다(창만 지우면 토큰이 살아 있다). 실패해도 화면은 로그아웃한다.
+    var at = ss(K_AT);
+    if (at) fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).catch(function () { });
+    ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
+    document.body.classList.remove('in');
+    $('signupNote').hidden = true;
+  }
+  $('btnOut').addEventListener('click', function () { leave(); });
+
+  /** 저장된 세션이 아직 살아 있는지 서버에 확인한다(만료면 한 번 갱신, 안 되면 로그아웃 상태로). */
+  function boot() {
+    var at = ss(K_AT), rt = ss(K_RT);
+    if (!at || !me()) return;
+    fetch(SB + '/auth/v1/user', { headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).then(function (r) {
+      if (r.ok) { enter(); return; }
+      if (!rt) { leave(); return; }
+      return fetch(SB + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt })
+      }).then(function (x) { return x.ok ? x.json() : null; }).then(function (j) {
+        if (j && j.access_token) { ss(K_AT, j.access_token); ss(K_RT, j.refresh_token || rt); enter(); }
+        else leave();
+      });
+    }).catch(function () { });
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
