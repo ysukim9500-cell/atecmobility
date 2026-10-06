@@ -478,7 +478,7 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .verdict.clean em{color:var(--ok)}
 .verdict.wait em{color:var(--warn)}   /* 결재 중·확인 필요 — 끝난 것(초록)과도, 틀린 것(빨강)과도 다르다 */
 /* A안 홈 — 5단계 막대 */
-.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:16px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}
 .stp{display:flex;flex-direction:column;gap:6px;text-align:left;border:0;background:none;padding:0;font:inherit;cursor:pointer;color:inherit}
 .stp i{display:block;height:6px;border-radius:3px;background:var(--ink-200)}
 .stp b{font-size:14px;font-weight:700;color:var(--ink-800)}
@@ -513,6 +513,33 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
   box-shadow:inset 0 -2px 0 transparent;margin-bottom:-1px}
 .vtabs button.on{color:var(--red-700);font-weight:700;box-shadow:inset 0 -2px 0 var(--red)}
 .vtabs button:hover{color:var(--ink-900)}
+/* 영수증·통행료 — 주차 → 통행료 → 주유 → 계기판 차례 (2026-10-06) */
+.evsubs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.evs{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 8px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);
+  font:inherit;font-size:13.5px;color:var(--ink-500);cursor:pointer}
+.evs i{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700;border:1.5px solid var(--ink-300)}
+.evs b{font-weight:700;color:var(--ink-800)}
+.evs span{font-size:12px}
+.evs.done{color:var(--ok);border-color:#BFE3D4} .evs.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.evs.now{border-color:var(--red);background:var(--red-50);color:var(--red-700)}
+.evs.now b{color:var(--red-700)} .evs.now i{background:var(--red);border-color:var(--red);color:#fff;animation:ringnow 1.8s ease-out infinite}
+.evs:hover{border-color:var(--ink-400)}
+.evsarrow{color:var(--ink-300);font-size:18px}
+.evsubcard{border:1px solid var(--ink-200);border-radius:var(--r);background:var(--surface);padding:18px 20px}
+.evsh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.evsh b{font-size:17px;color:var(--ink-900)}
+.evsh .dim{font-size:13px;flex-basis:100%}
+.evsn{font-size:12px;font-weight:700;color:var(--red);letter-spacing:.04em}
+.tollpick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.tchoice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px 18px;border:1.5px solid var(--ink-200);
+  border-radius:var(--r);background:var(--sunken);font:inherit;cursor:pointer;transition:border-color var(--t),transform var(--t),box-shadow var(--t)}
+.tchoice:hover{border-color:var(--red);transform:translateY(-2px);box-shadow:var(--pop)}
+.tchoice .tci{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--red-50);color:var(--red)}
+.tchoice b{font-size:15px;color:var(--ink-900)}
+.tchoice span{font-size:12.5px;color:var(--ink-500);line-height:1.6}
+.tchoice em{font-style:normal;color:var(--ok);font-weight:700}
+.evsact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+@media (max-width:900px){.tollpick{grid-template-columns:1fr}.evsarrow{display:none}}
 /* 단계를 옮길 때 — 다음은 오른쪽에서, 이전은 왼쪽에서 밀려 들어온다 */
 .stepfx.fwd{animation:slidefwd .38s var(--ease)}
 .stepfx.back{animation:slideback .38s var(--ease)}
@@ -1148,10 +1175,9 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
       <div class="navsec">마감 단계</div>
       <a tabindex="0" role="button" data-v="trips" data-alt="check" class="step"><span class="stepn" id="sn1">1</span>운행 기록<span class="pill" id="pCheck" hidden></span></a>
-      <a tabindex="0" role="button" data-v="tollfill" data-alt="hipass" class="step"><span class="stepn" id="sn2">2</span>통행료<span class="pill" id="pToll" hidden></span></a>
-      <a tabindex="0" role="button" data-v="evid" class="step"><span class="stepn" id="sn3">3</span>영수증<span class="pill" id="pEvid" hidden></span></a>
-      <a tabindex="0" role="button" data-v="verify" class="step"><span class="stepn" id="sn4">4</span>검증·상신</a>
-      <a tabindex="0" role="button" data-v="settle" class="step"><span class="stepn" id="sn5">5</span>정산·엑셀</a>
+      <a tabindex="0" role="button" data-v="evid" data-alt="tollfill,hipass" class="step"><span class="stepn" id="sn2">2</span>영수증·통행료<span class="pill" id="pToll" hidden></span></a>
+      <a tabindex="0" role="button" data-v="verify" class="step"><span class="stepn" id="sn3">3</span>검증·상신</a>
+      <a tabindex="0" role="button" data-v="settle" class="step"><span class="stepn" id="sn4">4</span>정산·엑셀</a>
       <div class="navsec">안전</div>
       <a tabindex="0" role="button" data-v="safety"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>

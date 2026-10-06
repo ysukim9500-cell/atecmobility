@@ -835,9 +835,58 @@
      이제는 모두 ① 운행 기록에서 시작해 「다음 단계」를 눌러야 넘어가고, 「이전 단계」로 되돌아갈 수 있다.
      위치는 서버 driving_step_progress(본인 것만)에 둔다 — PC 를 바꿔도 같다. 못 읽으면 ①. */
   var STEP_P = {}, STEP_ASKED = {};
-  var STEP_NAMES = ['운행 기록', '통행료', '영수증', '검증·상신', '정산·엑셀'];
-  var STEP_VIEW = ['trips', 'tollfill', 'evid', 'verify', 'settle'];
-  var STEP_OF = { trips: 1, check: 1, tollfill: 2, hipass: 2, evid: 3, verify: 4, settle: 5 };
+  // 통행료는 영수증 단계 안으로 합쳤다(2026-10-06 사용자 요청) — 영수증 안에서 주차 → 통행료 → 주유 → 계기판 순서.
+  var STEP_NAMES = ['운행 기록', '영수증·통행료', '검증·상신', '정산·엑셀'];
+  var STEP_VIEW = ['trips', 'evid', 'verify', 'settle'];
+  var STEP_OF = { trips: 1, check: 1, evid: 2, tollfill: 2, hipass: 2, verify: 3, settle: 4 };
+  /* ── 영수증 단계 안의 순서 ── */
+  var EV_SUBS = ['주차', '통행료', '주유', '계기판'];
+  var EV_SUB_DESC = {
+    '주차': '주차 영수증을 올립니다. 운행에 주차비를 이미 적었다면 같은 결제를 또 올리지 마세요(두 번 더해집니다).',
+    '통행료': '통행료는 하이패스 이용내역 PDF로 한 번에 맞추거나, 구간별로 직접 채웁니다. 현금·카드 영수증이 있으면 올립니다.',
+    '주유': '주유 영수증은 증빙용입니다. 유류비는 거리 × 단가로 따로 계산됩니다.',
+    '계기판': '월초·월말 계기판 사진을 올립니다. 운행 기록의 계기판 숫자와 맞는지 확인하는 데 씁니다.'
+  };
+  var EVSUB_FX = '';
+  function evSub() { var v = 0; try { v = +sessionStorage.getItem('drv.evsub.' + CYCKEY()) || 0; } catch (e) { } return Math.max(0, Math.min(3, v)); }
+  function setEvSub(i, fx) {
+    i = Math.max(0, Math.min(3, i));
+    try { sessionStorage.setItem('drv.evsub.' + CYCKEY(), String(i)); } catch (e) { }
+    EVSUB_FX = fx || '';
+    EVF.cat = EV_SUBS[i]; EVF.touched = false;
+  }
+  /** 영수증 화면 위 — 주차 → 통행료 → 주유 → 계기판 차례와 지금 차례의 할 일. */
+  function evSubHtml(by, unk) {
+    var cur = evSub(), name = EV_SUBS[cur];
+    var steps = '<div class="evsubs" role="list">' + EV_SUBS.map(function (c, i) {
+      var st = i < cur ? 'done' : i === cur ? 'now' : '';
+      var n = (by[c] || {}).n || 0;
+      return '<button role="listitem" class="evs ' + st + '" data-evsub="' + i + '"' + (st === 'now' ? ' aria-current="step"' : '') + '>' +
+        '<i>' + (st === 'done' ? '✓' : i + 1) + '</i><b>' + esc(c) + '</b><span>' + n0(n) + '건</span></button>' +
+        (i < 3 ? '<span class="evsarrow" aria-hidden="true">›</span>' : '');
+    }).join('') + '</div>';
+    var body = '<div class="evsubcard' + (EVSUB_FX ? ' stepfx ' + EVSUB_FX : '') + '">' +
+      '<div class="evsh"><span class="evsn">' + (cur + 1) + ' / 4</span><b>' + esc(name) + '</b>' +
+      '<span class="dim">' + esc(EV_SUB_DESC[name]) + '</span></div>';
+    if (name === '통행료') {
+      body += '<div class="tollpick">' +
+        '<button class="tchoice" data-v="hipass"><span class="tci">' + ic('receipt', 20) + '</span><b>하이패스 PDF로 대조</b>' +
+        '<span>한국도로공사 이용내역 PDF를 올리면 운행과 자동으로 맞춥니다. <em>가장 정확합니다</em></span></button>' +
+        '<button class="tchoice" data-v="tollfill"><span class="tci">' + ic('ticket', 20) + '</span><b>통행료 직접 채우기' +
+        (unk ? ' <span class="pill hot" style="display:inline-grid;margin-left:4px">' + n0(unk) + '</span>' : '') + '</b>' +
+        '<span>' + (unk ? '아직 정해지지 않은 업무 운행 ' + n0(unk) + '건을 구간별로 한 번에 채웁니다.' : '미확정 통행료가 없습니다. 확인만 하시면 됩니다.') + '</span></button>' +
+        '</div>';
+    }
+    body += '<div class="evsact">' +
+      (cycleLocked(myName()) || isMulti() ? '' : '<button class="btn" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) + esc(name) + ' 영수증 올리기</button>') +
+      '<span style="flex:1"></span>' +
+      (cur > 0 ? '<button class="btn" data-evsubmove="-1">← ' + esc(EV_SUBS[cur - 1]) + '</button>' : '') +
+      (cur < 3 ? '<button class="btn pri cta" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
+        : '<span class="dim" style="font-size:12.5px">마지막 차례입니다 — 맨 아래 「3 검증·상신 →」으로 넘어가세요.</span>') +
+      '</div></div>';
+    EVSUB_FX = '';
+    return '<section class="sect">' + steps + body + '</section>';
+  }
   function stepNow() { return STEP_P[CYCKEY()] || 1; }
   function loadStep() {
     var k = CYCKEY();
@@ -865,7 +914,8 @@
     if (to < 1 || to > 5) return;
     var p = stepNow();
     // 다음: 진행 위치를 앞으로(뒤로 끌어내리지 않는다). 이전: 지금 단계를 다시 열어 그 뒤는 안 한 것으로.
-    if (dir > 0) saveStep(Math.max(p, Math.min(to, 4)));
+    if (dir > 0) saveStep(Math.max(p, Math.min(to, 3)));
+    if (to === 2) setEvSub(dir > 0 ? 0 : 3);       // 영수증 단계에 들어오면 앞으로 올 땐 주차부터, 되돌아올 땐 계기판부터
     else if (p >= from) saveStep(to);
     STEP_FX = dir > 0 ? 'fwd' : 'back';
     go(STEP_VIEW[to - 1]);
@@ -891,19 +941,18 @@
       { v: 'trips', t: '운행 기록', n: fixBad,
         sub: !my.length ? '운행 없음' : fixBad ? '고칠 것 ' + n0(fixBad) + '건'
           : fix ? '확인 ' + n0(fix) + '건 · ' + n0(my.length) + '건' : n0(my.length) + '건 · ' + km(kmSum) + ' km' },
-      { v: 'tollfill', t: '통행료', n: unk, sub: unk ? '미확정 ' + n0(unk) + '건' : '모두 확정' },
-      { v: 'evid', t: '영수증', n: 0,
-        sub: !ev.length ? '없음' : n0(ev.length) + '장' + (noPhoto ? ' · 사진 없음 ' + n0(noPhoto) : '') },
+      { v: 'evid', t: '영수증·통행료', n: unk,
+        sub: (ev.length ? '영수증 ' + n0(ev.length) + '장' : '영수증 없음') + (unk ? ' · 통행료 미확정 ' + n0(unk) : '') },
       { v: 'verify', t: '검증·상신', n: 0,
         sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '결재 중' : st === 'rejected' ? '반려됨 — 다시 상신' : '아직 안 함' },
       { v: 'settle', t: '정산·엑셀', n: 0, sub: st === 'approved' ? '받을 수 있음' : '결재 후' }
     ];
     var cur = -1;
     if (sent) {
-      steps.forEach(function (x, i) { x.state = st === 'approved' || i < 4 ? 'done' : 'todo'; });
+      steps.forEach(function (x, i) { x.state = st === 'approved' || i < 3 ? 'done' : 'todo'; });
     } else {
       // 사람이 진행한 위치를 따른다(① 부터). 상신 전에는 ④ 검증·상신까지만.
-      cur = Math.min(stepNow(), 4) - 1;
+      cur = Math.min(stepNow(), 3) - 1;
       steps.forEach(function (x, j) { x.state = j < cur ? 'done' : j === cur ? 'now' : 'todo'; });
     }
     return { steps: steps, cur: cur, sent: sent, status: st, trips: my, ev: ev, unk: unk, fix: fix, fixBad: fixBad, noPhoto: noPhoto };
@@ -2547,15 +2596,11 @@
         : '운행 ' + n0(S.trips.length) + '건이 맞는지 보고, 맨 아래 「다음 단계」를 누르세요.';
       btns = S.fixBad ? big('check', '기록 ' + n0(S.fixBad) + '건 고치기') + sub('trips', '운행일지 보기') : big('trips', '운행 기록 확인하기');
     } else if (cur === 1) {
-      verdict = S.unk ? '통행료 <em>' + n0(S.unk) + '건</em>을 정리하세요' : '<em>② 통행료</em>를 확인하세요';
-      desc = S.unk ? '하이패스 이용내역 PDF를 올리면 대부분 자동으로 맞춰집니다. 남는 것만 직접 넣고 「다음 단계」를 누르세요.'
-        : '통행료가 모두 정해졌습니다. 확인한 뒤 「다음 단계」를 누르세요.';
-      btns = big('tollfill', S.unk ? '통행료 ' + n0(S.unk) + '건 정리하기' : '통행료 확인하기') + sub('hipass', '하이패스 PDF로 맞추기');
-    } else if (cur === 2) {
-      verdict = '<em>③ 영수증</em>을 확인하세요';
-      desc = (S.noPhoto ? '사진 없는 영수증 ' + n0(S.noPhoto) + '건이 있습니다(앱에서 사진을 붙일 수 있습니다). ' : '') +
-        '주차·통행료 영수증이 빠지지 않았는지 보고 「다음 단계」를 누르세요.';
-      btns = big('evid', '영수증 확인하기');
+      verdict = '<em>② 영수증·통행료</em>를 차례대로 정리하세요';
+      desc = '주차 → 통행료 → 주유 → 계기판 순서로 하나씩 확인합니다.' +
+        (S.unk ? ' 통행료 미확정 ' + n0(S.unk) + '건은 「통행료」 차례에서 하이패스 대조나 직접 채우기로 정리합니다.' : '') +
+        (S.noPhoto ? ' 사진 없는 영수증 ' + n0(S.noPhoto) + '건이 있습니다(앱에서 사진을 붙일 수 있습니다).' : '');
+      btns = big('evid', '영수증·통행료 정리하기');
     } else {
       verdict = st === 'rejected' ? '반려됐습니다 — 고쳐서 <em>다시 상신</em>하세요' : '<em>기록이 정리됐습니다</em> — 검증하고 상신하세요';
       desc = closed ? 'AI 가 영수증 사진과 입력값을 맞춰 본 뒤 결재선을 골라 상신합니다.'
@@ -2568,7 +2613,7 @@
       esc(cycleName(CYC.y, CYC.m)) + ' · ' + esc(cycleSpan(CYC.y, CYC.m)) + ' · ' + esc(when) + '</div>' +
       '<div class="steps">' + S.steps.map(function (x, i) {
         // 상신한 뒤의 1~3단계는 '완료'가 아니라 '상신됨' — 남은 것이 있었으면 그대로(0원 등) 올라간 것이다.
-        var lab = (i + 1) + ' ' + x.t + (x.state === 'done' ? (S.sent && i < 3 ? ' · 상신됨' : ' · 완료') : x.state === 'now' ? ' · 지금 할 일' : '');
+        var lab = (i + 1) + ' ' + x.t + (x.state === 'done' ? (S.sent && i < 2 ? ' · 상신됨' : ' · 완료') : x.state === 'now' ? ' · 지금 할 일' : '');
         return '<button class="stp ' + x.state + '" data-v="' + x.v + '"' + (x.state === 'now' ? ' aria-current="step"' : '') +
           '><i></i><b>' + esc(lab) + '</b><span>' + esc(x.sub) + '</span></button>';
       }).join('') + '</div>' +
@@ -3074,8 +3119,15 @@
     // 전체(관리) 화면은 여러 사람이 섞여 있다 — 잠금은 사람마다 다르므로 줄 단위로 본다.
     var mine = myName();
     var locked = !isAll() && !isMulti() && cycleLocked(mine);
-    var h = head(scopeTitle('영수증'), esc(viewName()) +
+    var h = head(scopeTitle(isAll() ? '영수증' : '영수증·통행료'), esc(viewName()) +
       ' · 앱에서 올린 것과 여기서 올린 것이 함께 모입니다');
+    var stepMode = !isAll() && !isMulti();
+    var unkMine = stepMode ? ALL_TRIPS.filter(function (t) { return t.username === mine && (t.purpose || '') === BUSINESS && isUnknownToll(t); }).length : 0;
+    var byAll = {};
+    all.forEach(function (e) { var c = e.category || '기타'; byAll[c] = byAll[c] || { n: 0 }; byAll[c].n++; });
+    // 사람이 구분 칸(전체·주차…)을 직접 고르기 전에는 지금 차례의 구분으로 좁혀 보인다.
+    if (stepMode && !EVF.touched) EVF.cat = EV_SUBS[evSub()];
+    if (stepMode) h += evSubHtml(byAll, unkMine);
 
     // 스캐너로 뜬 영수증을 올리는 자리. 잠긴 주기는 서버가 막으므로
     // 버튼도 두지 않는다 — 올리게 해 놓고 저장에서 튕기면 안 된다.
@@ -3216,13 +3268,13 @@
       '<path fill="url(#' + id + ')" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>';
   }
   function gemTag(t) { return '<span class="gem">' + gemSvg(12) + esc(t || 'Gemini') + '</span>'; }
-  function openEvUpload() {
+  function openEvUpload(defCat) {
     if (isMulti()) { toast('영수증은 한 주기씩 올립니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
     if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 주기에는 올릴 수 없습니다.', true); return; }
     // 올리는 중에 뒤로가기로 창이 닫혔을 수 있다. 그 사이 새 창을 열면 돌고 있는 올리기가 새 목록을 건드린다.
     if (EV_SENDING) { toast('앞서 누른 영수증을 아직 올리는 중입니다. 끝난 뒤 다시 열어 주세요.'); return; }
     evFreeUrls();
-    EVUP = { busy: false, items: [], pages: [], sent: false };
+    EVUP = { busy: false, items: [], pages: [], sent: false, defCat: EV_CATS.indexOf(defCat) >= 0 ? defCat : '' };
     var r = cycleRange(CYC.y, CYC.m);
     var my = personOf(myName());
     var cars = myPlates();
@@ -3418,7 +3470,7 @@
   /** 빈 줄 하나. 날짜는 오늘(보는 주기 밖이면 주기 안으로 당긴다 — 미래 주기를 보며 올리면 전부 튕겼다).
    *  ★ 구분은 비워 둔다. 예전 기본값 '주유' 는 주차 영수증을 안 바꾸고 올리면 정산에서 빠지게 했다. */
   function evBlankItem(pi) {
-    return { page: pi, cat: '', amt: '', memo: '', hint: '', crop: null, ai: false,
+    return { page: pi, cat: EVUP.defCat || '', amt: '', memo: '', hint: '', crop: null, ai: false,
       date: ymd(Math.max(EVUP.lo, Math.min(Date.now(), EVUP.hi - 1))) };
   }
 
@@ -3489,7 +3541,7 @@
             var rows = recs.map(function (x, k) {
               var it = evBlankItem(pi);
               it.ai = true; it.crop = crops[k];
-              it.cat = KIND_CAT[x.kind] || '';
+              it.cat = KIND_CAT[x.kind] || EVUP.defCat || '';
               var hint = [];
               if (x.merchant) { it.memo = String(x.merchant).slice(0, 60); }
               if (x.date) {
@@ -5334,7 +5386,7 @@
   var TAB_SET = {
     rec: [['trips', '운행일지'], ['check', '기록 점검']],
     arec: [['a_trips', '전체 운행일지'], ['a_check', '전체 기록 점검']],
-    toll: [['tollfill', '통행료 채우기'], ['hipass', '하이패스 PDF 대조']]
+    toll: [['evid', '← 영수증 차례로'], ['tollfill', '통행료 직접 채우기'], ['hipass', '하이패스 PDF 대조']]
   };
   var NEXT_OF = {
     trips: ['tollfill', '2 통행료로'], check: ['tollfill', '2 통행료로'],
@@ -5352,8 +5404,8 @@
       html = j >= 0 ? html.slice(0, j + 6) + tabs + html.slice(j + 6) : tabs + html;
     }
     var sn = STEP_OF[VIEW];
-    if (sn && sn <= 4 && !isAll() && !isMulti() && !cycleLocked(myName())) {
-      var S = stepInfo(), p = Math.min(stepNow(), 4);
+    if (sn && sn <= 3 && !isAll() && !isMulti() && !cycleLocked(myName())) {
+      var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
       var note = sn < p ? '<b>이미 지난 단계</b>입니다. 고친 뒤 「다음 단계」로 다시 넘어가세요.'
         : sn > p ? '앞 단계부터 진행해 주세요 — 지금은 <b>' + p + ' ' + esc(STEP_NAMES[p - 1]) + '</b> 단계입니다.'
@@ -5363,7 +5415,7 @@
         // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만.
         (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + ' ' + esc(STEP_NAMES[p - 1]) + '(지금 단계)로 →</button>' : '') +
         (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
-        (sn < 4 && sn <= p ? '<button class="btn pri' + (sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
+        (sn < 3 && sn <= p ? '<button class="btn pri' + (sn === 2 && evSub() < 3 ? '' : sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
           (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
     // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
@@ -5416,6 +5468,7 @@
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
+    if (v === 'evid' && !isMulti()) { EVF.cat = EV_SUBS[evSub()]; EVF.touched = false; }   // 영수증·통행료 단계: 지금 차례의 구분부터
     // ★ 하이패스 대조 결과도 반드시 버린다. 안 버리면 관리 화면에서 맞춰 둔
     //   남의 운행이 개인 화면에 그대로 남고(이름 칸은 사라져 남의 것인 줄도 모른다),
     //   '확정하기' 를 누르면 남의 운행에 통행료가 써진다.
@@ -5541,7 +5594,7 @@
       DATEF = { from: dq[0] || '', to: dq[1] || '' }; PAGES = {};
       render(); return;
     }
-    if ((el = e.target.closest('[data-evcat]'))) { EVF.cat = el.dataset.evcat; render(); return; }
+    if ((el = e.target.closest('[data-evcat]'))) { EVF.cat = el.dataset.evcat; EVF.touched = true; render(); return; }
     if (e.target.closest('[data-fclear]')) { clearFilters(); render(); return; }
     if ((el = e.target.closest('[data-inboxf]'))) { INBOX_F = el.dataset.inboxf; render(); return; }
     // PDF 미리보기 — 창에서 고른 목적을 먼저 반영한다. PDF 는 이어서 drv-verify.js 가 만든다.
@@ -5614,7 +5667,18 @@
       FILT.car = car; FILT.chip = 'all';
       render(); return;
     }
-    if (e.target.closest('#btnEvUp')) { openEvUpload(); return; }
+    if (e.target.closest('#btnEvUp')) { openEvUpload(VIEW === 'evid' ? EV_SUBS[evSub()] : ''); return; }
+    if ((el = e.target.closest('[data-evupcat]'))) { openEvUpload(el.dataset.evupcat); return; }
+    if ((el = e.target.closest('[data-evsub]'))) {
+      var ni = +el.dataset.evsub, ci = evSub();
+      setEvSub(ni, ni > ci ? 'fwd' : ni < ci ? 'back' : ''); render(); return;
+    }
+    if ((el = e.target.closest('[data-evsubmove]'))) {
+      var d = +el.dataset.evsubmove, ti = evSub() + d;
+      setEvSub(ti, d > 0 ? 'fwd' : 'back');
+      toast(d > 0 ? (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례입니다.' : (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례로 돌아왔습니다.');
+      render(); return;
+    }
     if (e.target.closest('#btnEvGo')) { runEvUpload(); return; }
     if ((el = e.target.closest('[data-evrm]'))) {
       if (EVUP.busy) return;
