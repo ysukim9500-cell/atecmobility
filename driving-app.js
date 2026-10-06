@@ -1721,8 +1721,8 @@
     var seenB = {}, seenU = {};
     var out = past.steps.filter(function (s) {
       if (!s.approver || s.approver === mine || !canApprove(s.approver)) return false;
-      if (APPR_BOXES.indexOf(s.box) < 0 || seenB[s.box] || seenU[s.approver]) return false;
-      seenB[s.box] = 1; seenU[s.approver] = 1; return true;
+      if (APPR_BOXES.indexOf(s.box) < 0 || seenB[s.box]) return false;
+      seenB[s.box] = 1; return true;
     }).map(function (s) { return { approver: s.approver, box: s.box }; })
       .sort(function (x, y) { return APPR_BOXES.indexOf(x.box) - APPR_BOXES.indexOf(y.box); });
     return out.length ? out : null;
@@ -1809,7 +1809,8 @@
     var q = APPR_Q.trim().toLowerCase();
     var used = DRAFT.map(function (s) { return s.approver; }).filter(Boolean);
     var list = Object.keys(PEOPLE).filter(function (u) {
-      return u !== myName() && used.indexOf(u) < 0 && canApprove(u);
+      // 이미 다른 칸에 넣은 분도 다시 고를 수 있다(겸직). 후보에 '이미 ○○ 칸'이라고 적어 준다.
+      return u !== myName() && canApprove(u);
     });
     if (q) {
       list = list.filter(function (u) {
@@ -1836,6 +1837,10 @@
       return '<button class="acand-i' + (i === 0 ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
         '<b>' + esc(nameOf(u)) + '</b>' +
         '<span>' + esc(orgLabel(u) || u) + '</span>' +
+        (function () {
+          var at = DRAFT.filter(function (d) { return d.approver === u; }).map(function (d) { return d.box; });
+          return at.length ? '<span class="st warn" style="margin-left:6px">이미 ' + esc(at.join('·')) + ' 칸</span>' : '';
+        })() +
         (i === 0 && APPR_Q.trim() ? '<span class="acent">Enter</span>' : '') + '</button>';
     }).join('') +
       (all.length > show.length
@@ -1855,8 +1860,9 @@
   function tidyDraft() {
     var seenBox = {}, seenU = {};
     DRAFT = DRAFT.filter(function (s) {
-      if (!s.approver || APPR_BOXES.indexOf(s.box) < 0 || seenBox[s.box] || seenU[s.approver]) return false;
-      seenBox[s.box] = 1; seenU[s.approver] = 1; return true;
+      // 같은 분을 여러 칸에 넣을 수 있다(2026-10-06) — 한 칸에 한 분만 지킨다.
+      if (!s.approver || APPR_BOXES.indexOf(s.box) < 0 || seenBox[s.box]) return false;
+      seenBox[s.box] = 1; return true;
     }).sort(function (x, y) { return APPR_BOXES.indexOf(x.box) - APPR_BOXES.indexOf(y.box); });
   }
   /** 다음에 넣을 칸 — 지금 칸 오른쪽의 첫 빈칸, 없으면 왼쪽부터 첫 빈칸, 다 찼으면 ''. */
@@ -1869,8 +1875,8 @@
     if (!u || u === myName()) return;
     var box = APPR_BOX || nextEmptyBox(APPR_BOXES[0]);
     if (!box) { toast('칸이 다 찼습니다. 바꿀 칸의 × 를 눌러 비운 뒤 넣어 주세요.', true); return; }
-    // 같은 사람이 다른 칸에 있었으면 그 칸에서 옮긴다.
-    DRAFT = DRAFT.filter(function (s) { return s.box !== box && s.approver !== u; });
+    // 같은 분이 다른 칸에 있어도 그대로 둔다(한 분이 여러 칸을 맡을 수 있다). 이 칸에 있던 분만 바꾼다.
+    DRAFT = DRAFT.filter(function (s) { return s.box !== box; });
     DRAFT.push({ approver: u, box: box });
     tidyDraft();
     APPR_Q = '';                       // 다음 사람을 바로 칠 수 있게 비운다
