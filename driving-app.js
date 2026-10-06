@@ -875,6 +875,8 @@
       var stt = isMulti() ? '' : x.state;
       el.className = 'stepn' + (stt ? ' ' + stt : '');
       el.textContent = stt === 'done' ? '✓' : String(i + 1);
+      // 지금 할 단계는 메뉴 줄 전체가 깜빡이며 눈에 띄게(2026-10-06).
+      if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('isnow', stt === 'now');
     });
     set('pEdu', eduTodo(), eduTodo() > 0);
     set('pInbox', inbox().length, inbox().length > 0);

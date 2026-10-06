@@ -28,6 +28,12 @@
   /* ══════════════════ 검증 결과 보관 ══════════════════ */
   // 키 = 아이디|주기. undefined = 아직 안 물어봄 · null = 검증한 적 없음 · 객체 = 마지막 결과
   var ROWS = {}, ASKING = {}, RUN = { busy: false, note: '', who: '' };
+  /** 검증 뒤 PDF 미리보기를 확인했는가(사람·주기별). 다시 검증하면 다시 확인한다. 탭을 닫으면 잊는다. */
+  var PREVIEWED = (function () { try { return JSON.parse(sessionStorage.getItem('drv.previewed') || '{}'); } catch (e) { return {}; } })();
+  function setPreviewed(k, on) {
+    if (on) PREVIEWED[k] = 1; else delete PREVIEWED[k];
+    try { sessionStorage.setItem('drv.previewed', JSON.stringify(PREVIEWED)); } catch (e) { }
+  }
   var ALLROWS = { key: '', list: null };          // 전체 검증(관리) — 주기별 최신 한 줄씩
   function keyOf(u, cyc) { return u + '|' + cyc; }
   /** "2026-09" → "2026년 9월분". 다른 화면과 같은 이름으로 부른다. */
@@ -242,13 +248,23 @@
     else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
 
     // 검증은 한 번에 하나만 돈다. 다른 주기 것이 돌고 있으면 그렇다고 말한다(눌러도 반응이 없으면 고장으로 보인다).
+    // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
+    var seen = !!PREVIEWED[k];
+    var stage = locked ? 0 : !row ? 1 : !seen ? 2 : 3;
     var btn = gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
       busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증' : '검증 실행',
-      busy, row || locked ? '' : ' pri');
+      busy, (row || locked ? '' : ' pri') + (stage === 1 && !busy ? ' cta' : ''));
     // 검증을 봤으면 다음 할 일은 상신이다 — 마감 현황으로 돌아가야 한다는 것을 알 길이 없었다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     var submitBtn = row && canSubmit && !busy
-      ? '<button class="btn pri" id="btnOpenSubmit">' + (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '';
+      ? '<button class="btn' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit"' +
+        (stage === 2 ? ' title="PDF 미리보기로 문서를 확인한 뒤 상신하세요"' : '') + '>' +
+        (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '';
+    var guide = locked || busy ? '' : '<ol class="vguide" aria-label="상신 순서">' +
+      [['검증', 1], ['PDF 미리보기로 확인', 2], ['결재 상신', 3]].map(function (g) {
+        var st = stage > g[1] ? 'done' : stage === g[1] ? 'now' : '';
+        return '<li class="' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '><i>' + (st === 'done' ? '✓' : g[1]) + '</i>' + g[0] + '</li>';
+      }).join('') + '</ol>';
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
       (row ? '마지막 검증 ' + esc(whenText(row.created_at)) : '검증 전') + '</div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
@@ -259,8 +275,8 @@
         fact('사진 판독', row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
           row.ai ? 'AI 가 읽은 영수증·계기판' : 'AI 미설정 — 규칙 검증만', false, row.ai) +
         '</div>' : '') +
-      '<div class="vact">' + btn +
-      '<button class="btn" data-pdf="">' + ic('dl', 14) + (locked ? '결재 문서 PDF' : 'PDF 미리보기') + '</button>' +
+      guide + '<div class="vact">' + btn +
+      '<button class="btn' + (stage === 2 ? ' cta' : '') + '" data-pdf="">' + ic('dl', 14) + (locked ? '결재 문서 PDF' : stage === 2 ? 'PDF 미리보기로 확인' : 'PDF 미리보기') + '</button>' +
       (submitBtn ? '<span style="flex:1"></span>' + submitBtn : '') + '</div></div>';
 
     if (locked) {
@@ -308,6 +324,7 @@
     RUN.p = p;
     p.then(function (row) {
       ROWS[k] = row || null;
+      setPreviewed(k, false);
       ALLROWS.list = null;
       C.toast(row ? '검증했습니다 — ' + sumText(row.summary) : '검증했습니다.');
     }).catch(function (e) {
@@ -630,7 +647,9 @@
         '<div class="anote">' + (o.note || MARK_NOTE[mk] || MARK_NOTE['']) + '</div></div>';
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(o.file) + '">' + ic('dl', 14) + '내려받기</a>' +
-        '<a class="btn pri" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
+        '<a class="btn' + (o.okKey ? '' : ' pri') + '" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>' +
+        // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
+        (o.okKey ? '<button class="btn pri cta" data-pdfok="' + esc(o.okKey) + '">확인 완료 → 결재 상신</button>' : '');
       var op = $('pdfOpen'); if (op) { try { op.focus(); } catch (e) { } }
       return res;
     }).catch(function (e) {
@@ -667,6 +686,7 @@
         file: '운행기록부_' + safeName(C.nameOf(u)) + '_' + cyc + (done ? '_결재완료' : old ? '_결재중' : '_미리보기') + '.pdf',
         note: old ? '이 결재 건은 상신 때 저장한 자료가 없어(예전 방식) <b>지금 자료</b>로 만들었습니다.' : null,
         expect: expect, expectName: old ? '상신 때 집계한 금액' : '화면 합계',
+        okKey: !old && u === C.myName() ? k : '',
         meta: { name: C.nameOf(u), cycleName: C.cycleName(S.CYC.y, S.CYC.m), mark: mark,
           docNo: old ? '결재 #' + ap.id + ' · 지금 자료로 ' + now + ' 출력' : '상신 전 미리보기 · ' + now + ' 출력' }
       }).catch(function () { });
@@ -782,6 +802,13 @@
       return;
     }
     if ((el = e.target.closest('[data-fzpdf]'))) { pdfFrozen(el.dataset.fzpdf); return; }
+    if ((el = e.target.closest('[data-pdfok]'))) {
+      setPreviewed(el.dataset.pdfok, true);
+      C.closePanel();
+      if (C.state().VIEW !== 'verify') C.go('verify'); else C.render();
+      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (er) { } } }, 60);
+      return;
+    }
     if ((el = e.target.closest('[data-fzxlsx]'))) { xlsxFrozen(el.dataset.fzxlsx); return; }
     if ((el = e.target.closest('[data-pdf]'))) {
       // 상신했거나 결재가 끝난 주기는 상신 때 저장한 자료가 정본이다(없으면 pdfFrozen 이 지금 자료로 넘긴다).

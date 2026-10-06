@@ -408,6 +408,26 @@ aside a.step{gap:10px}
 .stepn.done{background:var(--ok);border-color:var(--ok);color:#fff}
 .stepn.now{background:var(--red);border-color:var(--red);color:#fff}
 aside a.on .stepn:not(.done):not(.now){border-color:var(--red);color:var(--red-700)}
+/* 지금 할 단계 — 크게, 깜빡이며(2026-10-06) */
+aside a.step{height:42px;font-size:14px}
+aside a.step .stepn{flex-basis:22px;width:22px;height:22px;font-size:11.5px}
+aside a.step.isnow{font-weight:700;color:var(--red-700);animation:navnow 1.8s ease-in-out infinite}
+aside a.step.isnow .stepn{animation:ringnow 1.8s ease-out infinite}
+@keyframes navnow{0%,100%{background:transparent}50%{background:var(--red-50)}}
+@keyframes ringnow{0%{box-shadow:0 0 0 0 rgba(215,0,81,.55)}70%{box-shadow:0 0 0 8px rgba(215,0,81,0)}100%{box-shadow:0 0 0 0 rgba(215,0,81,0)}}
+/* 눌러야 할 버튼 하나 — 테두리 빛이 퍼진다 */
+.btn.cta{animation:ctapulse 1.8s ease-out infinite}
+.btn.cta:not(.pri){border-color:var(--red);color:var(--red-700);font-weight:700}
+@keyframes ctapulse{0%{box-shadow:0 0 0 0 rgba(215,0,81,.5)}70%{box-shadow:0 0 0 10px rgba(215,0,81,0)}100%{box-shadow:0 0 0 0 rgba(215,0,81,0)}}
+/* 검증 화면 상신 순서 */
+.vguide{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:18px 0 0;padding:0;font-size:13px;color:var(--ink-500)}
+.vguide li{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 6px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface)}
+.vguide li i{width:22px;height:22px;border-radius:999px;display:grid;place-items:center;font-style:normal;font-size:11.5px;font-weight:700;
+  border:1.5px solid var(--ink-300);color:var(--ink-500)}
+.vguide li.done{color:var(--ok)} .vguide li.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.vguide li.now{color:var(--red-700);font-weight:700;border-color:var(--red);background:var(--red-50)}
+.vguide li.now i{background:var(--red);border-color:var(--red);color:#fff;animation:ringnow 1.8s ease-out infinite}
+@media (prefers-reduced-motion:reduce){aside a.step.isnow,aside a.step.isnow .stepn,.btn.cta,.vguide li.now i{animation:none}}
 .admtog{display:none;align-items:center;width:100%;border:0;background:none;text-align:left;cursor:pointer;font-family:inherit}
 .admtog svg{margin-left:6px;vertical-align:-1px;transition:transform var(--t)}
 .admtog[aria-expanded="true"] svg{transform:rotate(180deg)}
@@ -444,8 +464,11 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:16px}
 .stp{display:flex;flex-direction:column;gap:6px;text-align:left;border:0;background:none;padding:0;font:inherit;cursor:pointer;color:inherit}
 .stp i{display:block;height:6px;border-radius:3px;background:var(--ink-200)}
-.stp b{font-size:12.5px;font-weight:700;color:var(--ink-800)}
-.stp span{font-size:12px;color:var(--ink-500)}
+.stp b{font-size:14px;font-weight:700;color:var(--ink-800)}
+.stp span{font-size:13px;color:var(--ink-500)}
+.stp.now i{animation:barnow 1.8s ease-in-out infinite}
+@keyframes barnow{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.stp.now i{animation:none}}
 .stp.done i{background:var(--ok)} .stp.done b{color:var(--ok)}
 .stp.now i{background:var(--red)} .stp.now b{color:var(--red)}
 .stp:hover b{text-decoration:underline}
