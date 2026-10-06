@@ -579,6 +579,7 @@
     // 여기서 비우면 증빙 한 장 올리고 온 사이에 30칸이 사라진다. 기간을 바꿀 때(setPeriod)만 비운다.
     // 내 서명(상신 전 문서의 담당 칸에 찍는다). 한 번만 받는다.
     if (MYSIGN === undefined) loadMySign();
+    loadStep();
     var r = viewRange();
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
@@ -829,6 +830,49 @@
    * 상신 전에는 고칠 것이 남은 첫 단계가 '지금 할 일'(now), 그 앞은 완료(done), 뒤는 남음(todo).
    * 같은 미확정 통행료가 1단계와 2단계에 두 번 세어지지 않게 한다(검증로봇: "할 일이 10건처럼 보인다").
    */
+  /* ── 마감 단계 진행 위치 (2026-10-06) ──
+     예전에는 고칠 것이 없으면 누르지 않아도 ✓ 가 붙어 단계가 저절로 넘어갔다("누르지도 않았는데 영수증까지 가 있다").
+     이제는 모두 ① 운행 기록에서 시작해 「다음 단계」를 눌러야 넘어가고, 「이전 단계」로 되돌아갈 수 있다.
+     위치는 서버 driving_step_progress(본인 것만)에 둔다 — PC 를 바꿔도 같다. 못 읽으면 ①. */
+  var STEP_P = {}, STEP_ASKED = {};
+  var STEP_NAMES = ['운행 기록', '통행료', '영수증', '검증·상신', '정산·엑셀'];
+  var STEP_VIEW = ['trips', 'tollfill', 'evid', 'verify', 'settle'];
+  var STEP_OF = { trips: 1, check: 1, tollfill: 2, hipass: 2, evid: 3, verify: 4, settle: 5 };
+  function stepNow() { return STEP_P[CYCKEY()] || 1; }
+  function loadStep() {
+    var k = CYCKEY();
+    if (isMulti() || STEP_ASKED[k] || !myName()) return;
+    STEP_ASKED[k] = 1;
+    apiRetry('/rest/v1/driving_step_progress?select=step&username=eq.' + encodeURIComponent(myName()) + '&cycle=eq.' + k)
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        STEP_P[k] = rows && rows[0] ? Number(rows[0].step) || 1 : 1;
+        paintPills(); if (k === CYCKEY() && !$('panel').classList.contains('open')) render();
+      }).catch(function () { delete STEP_ASKED[k]; });
+  }
+  function saveStep(n) {
+    var k = CYCKEY();
+    STEP_P[k] = n;
+    apiRetry('/rest/v1/driving_step_progress?on_conflict=username,cycle', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ username: myName(), cycle: k, step: n, updated_at: new Date().toISOString() })
+    }).then(function (r) { if (!r.ok) toast('단계 위치를 저장하지 못했습니다(이 화면에서는 그대로 보입니다).', true); })
+      .catch(function () { });
+  }
+  /** 다음·이전 단계로. dir = +1 | -1, from = 지금 보고 있는 단계(1~5). 화면이 그 방향으로 밀려 들어온다. */
+  function moveStep(from, dir) {
+    var to = from + dir;
+    if (to < 1 || to > 5) return;
+    var p = stepNow();
+    // 다음: 진행 위치를 앞으로(뒤로 끌어내리지 않는다). 이전: 지금 단계를 다시 열어 그 뒤는 안 한 것으로.
+    if (dir > 0) saveStep(Math.max(p, Math.min(to, 4)));
+    else if (p >= from) saveStep(to);
+    STEP_FX = dir > 0 ? 'fwd' : 'back';
+    go(STEP_VIEW[to - 1]);
+    paintPills();                      // 메뉴 동그라미도 바로 바꾼다(톡 튀는 효과)
+    toast(dir > 0 ? (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 넘어갔습니다.') : (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 돌아왔습니다. 고친 뒤 다시 「다음 단계」를 눌러 주세요.'));
+  }
+  var STEP_FX = '';
   function stepInfo() {
     var mine = myName(), r = viewRange();
     var my = ALL_TRIPS.filter(function (t) { return t.username === mine; });
@@ -858,8 +902,8 @@
     if (sent) {
       steps.forEach(function (x, i) { x.state = st === 'approved' || i < 4 ? 'done' : 'todo'; });
     } else {
-      for (var i = 0; i < 3; i++) if (steps[i].n > 0 || (i === 0 && !my.length && !ev.length)) { cur = i; break; }
-      if (cur < 0) cur = 3;
+      // 사람이 진행한 위치를 따른다(① 부터). 상신 전에는 ④ 검증·상신까지만.
+      cur = Math.min(stepNow(), 4) - 1;
       steps.forEach(function (x, j) { x.state = j < cur ? 'done' : j === cur ? 'now' : 'todo'; });
     }
     return { steps: steps, cur: cur, sent: sent, status: st, trips: my, ev: ev, unk: unk, fix: fix, fixBad: fixBad, noPhoto: noPhoto };
@@ -873,7 +917,8 @@
     S.steps.forEach(function (x, i) {
       var el = $('sn' + (i + 1)); if (!el) return;
       var stt = isMulti() ? '' : x.state;
-      el.className = 'stepn' + (stt ? ' ' + stt : '');
+      var was = el.className;
+      el.className = 'stepn' + (stt ? ' ' + stt : '') + (was && was !== 'stepn' && was.indexOf(stt || '§') < 0 ? ' pop' : '');
       el.textContent = stt === 'done' ? '✓' : String(i + 1);
       // 지금 할 단계는 메뉴 줄 전체가 깜빡이며 눈에 띄게(2026-10-06).
       if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('isnow', stt === 'now');
@@ -2497,17 +2542,20 @@
       verdict = '아직 기록된 운행이 없습니다'; clean = ' clean';
       desc = '앱에서 운행을 기록하면 여기에 모입니다.';
     } else if (cur === 0) {
-      verdict = '운행 기록 <em>' + n0(S.fixBad) + '건</em>을 먼저 손보세요';
-      desc = '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다.';
-      btns = big('check', '기록 ' + n0(S.fixBad) + '건 고치기');
+      verdict = S.fixBad ? '운행 기록 <em>' + n0(S.fixBad) + '건</em>을 먼저 손보세요' : '<em>① 운행 기록</em>을 확인하세요';
+      desc = S.fixBad ? '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 고친 뒤 「다음 단계」를 누르세요.'
+        : '운행 ' + n0(S.trips.length) + '건이 맞는지 보고, 맨 아래 「다음 단계」를 누르세요.';
+      btns = S.fixBad ? big('check', '기록 ' + n0(S.fixBad) + '건 고치기') + sub('trips', '운행일지 보기') : big('trips', '운행 기록 확인하기');
     } else if (cur === 1) {
-      verdict = '통행료 <em>' + n0(S.unk) + '건</em>을 정리하면 영수증 단계로 넘어갑니다';
-      desc = '하이패스 이용내역 PDF를 올리면 대부분 자동으로 맞춰집니다. 남는 것만 직접 넣으세요.';
-      btns = big('tollfill', '통행료 ' + n0(S.unk) + '건 정리하기') + sub('hipass', '하이패스 PDF로 맞추기');
+      verdict = S.unk ? '통행료 <em>' + n0(S.unk) + '건</em>을 정리하세요' : '<em>② 통행료</em>를 확인하세요';
+      desc = S.unk ? '하이패스 이용내역 PDF를 올리면 대부분 자동으로 맞춰집니다. 남는 것만 직접 넣고 「다음 단계」를 누르세요.'
+        : '통행료가 모두 정해졌습니다. 확인한 뒤 「다음 단계」를 누르세요.';
+      btns = big('tollfill', S.unk ? '통행료 ' + n0(S.unk) + '건 정리하기' : '통행료 확인하기') + sub('hipass', '하이패스 PDF로 맞추기');
     } else if (cur === 2) {
-      verdict = '영수증 사진 <em>' + n0(S.noPhoto) + '건</em>이 빠졌습니다';
-      desc = '금액만 있고 사진이 없으면 결재 문서에 빈 칸으로 나갑니다.';
-      btns = big('evid', '영수증 사진 올리기');
+      verdict = '<em>③ 영수증</em>을 확인하세요';
+      desc = (S.noPhoto ? '사진 없는 영수증 ' + n0(S.noPhoto) + '건이 있습니다(앱에서 사진을 붙일 수 있습니다). ' : '') +
+        '주차·통행료 영수증이 빠지지 않았는지 보고 「다음 단계」를 누르세요.';
+      btns = big('evid', '영수증 확인하기');
     } else {
       verdict = st === 'rejected' ? '반려됐습니다 — 고쳐서 <em>다시 상신</em>하세요' : '<em>기록이 정리됐습니다</em> — 검증하고 상신하세요';
       desc = closed ? 'AI 가 영수증 사진과 입력값을 맞춰 본 뒤 결재선을 골라 상신합니다.'
@@ -5289,17 +5337,23 @@
       var i = html.indexOf('<div class="phead">'), j = i >= 0 ? html.indexOf('</div>', i) : -1;
       html = j >= 0 ? html.slice(0, j + 6) + tabs + html.slice(j + 6) : tabs + html;
     }
-    var nx = NEXT_OF[VIEW];
-    if (nx && !isAll() && !isMulti() && !cycleLocked(myName())) {
-      // 앞 단계(지금 화면까지)에 남은 일이 있으면 같이 알린다 — 그래도 넘어갈 수는 있다.
-      var S = stepInfo(), upto = { tollfill: 1, evid: 2, verify: 3 }[nx[0]] || 0;
-      var left = S.sent ? [] : S.steps.slice(0, upto).filter(function (x) { return x.n > 0; })
-        .map(function (x) { return x.t + ' ' + n0(x.n) + '건'; });
-      html += '<div class="nextstep"><span class="t">' + (left.length
-        ? '아직 남은 일: <b>' + esc(left.join(' · ')) + '</b> — 그래도 다음 단계로 갈 수 있습니다.'
-        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.') + '</span>' +
-        '<button class="btn pri" data-v="' + nx[0] + '">' + esc(nx[1]) + ' →</button></div>';
+    var sn = STEP_OF[VIEW];
+    if (sn && sn <= 4 && !isAll() && !isMulti() && !cycleLocked(myName())) {
+      var S = stepInfo(), p = Math.min(stepNow(), 4);
+      var here = S.steps[sn - 1];
+      var note = sn < p ? '<b>이미 지난 단계</b>입니다. 고친 뒤 「다음 단계」로 다시 넘어가세요.'
+        : sn > p ? '앞 단계부터 진행해 주세요 — 지금은 <b>' + p + ' ' + esc(STEP_NAMES[p - 1]) + '</b> 단계입니다.'
+        : here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 다음 단계로 갈 수 있습니다.'
+        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요. 잘못 넘어갔으면 「이전 단계」로 돌아오면 됩니다.';
+      html += '<div class="nextstep"><span class="stepbadge">' + sn + '</span><span class="t">' + note + '</span>' +
+        // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만.
+        (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + ' ' + esc(STEP_NAMES[p - 1]) + '(지금 단계)로 →</button>' : '') +
+        (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
+        (sn < 4 && sn <= p ? '<button class="btn pri' + (sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
+          (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
+    // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
+    if (STEP_FX) { html = '<div class="stepfx ' + STEP_FX + '">' + html + '</div>'; STEP_FX = ''; }
     return html;
   }
   /** 관리 묶음은 평소 접어 둔다. 관리 화면에 있거나 펼쳐 둔 적이 있으면 편다. */
@@ -5662,6 +5716,7 @@
     if (e.target.closest('#burger')) { document.body.classList.toggle('nav-open'); return; }
     // 내 프로필 버튼은 개인 자리다 — 관리 화면으로 보내지 않는다(직원 현황은 관리 메뉴에 있다).
     if (e.target.closest('#uBtn')) { go('account'); return; }
+    if ((el = e.target.closest('[data-stepmove]'))) { moveStep(+el.dataset.from, +el.dataset.stepmove); return; }
     if (e.target.closest('#admTog')) {
       ADM_OPEN = $('admList').classList.contains('fold'); ADM_CLICK_VIEW = ADM_OPEN ? '' : VIEW;
       try { localStorage.setItem('drv.admopen', ADM_OPEN ? '1' : '0'); } catch (er) { }
@@ -6228,4 +6283,5 @@
   // 로그인 전이면 업무 결재 포털로 보낸다(보던 주소는 로그인 뒤 돌아오게). ?direct=1 이면 예전 로그인 화면을 쓴다.
   if (ss(K_AT) && me()) enter();
   else if (!window.__VERIFY__ && !/[?&]direct=1/.test(location.search)) toPortal(location.hash);
+  else document.body.classList.add('showlogin');
 })();

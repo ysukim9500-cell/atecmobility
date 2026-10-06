@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>업무 결재 포털 · ATEC 에이텍모빌리티</title>
 <meta name="description" content="운행일지와 결재 시스템을 한 번의 로그인으로 쓰는 에이텍모빌리티 업무 결재 포털">
+<script>
+/* 로그인돼 있으면 확인이 끝날 때까지 첫 화면을 그리지 않는다 — 새로 고침 때 로그인 전 화면이 깜빡이지 않게(2026-10-06). */
+try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) document.documentElement.classList.add("booting"); } catch (e) { }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
 <!--
@@ -115,6 +119,7 @@ footer .sp{flex:1}
 
 /* ── 로그인 뒤: 시스템 선택 ── */
 #appRoot{display:none}
+html.booting #landing,html.booting #appRoot{visibility:hidden}
 body.in #landing{display:none}
 body.in #appRoot{display:block}
 .pick{padding-block:44px 64px}
@@ -496,21 +501,24 @@ a.launch:hover .go svg{transform:translateX(4px)}
   /** 저장된 세션이 아직 살아 있는지 서버에 확인한다(만료면 한 번 갱신, 안 되면 로그아웃 상태로). */
   function boot() {
     var at = ss(K_AT), rt = ss(K_RT);
+    var done = function () { document.documentElement.classList.remove('booting'); };
+    setTimeout(done, 4000);             // 서버가 늦어도 4초 뒤에는 화면을 보인다
     if (!at || !me()) {
       // 운행일지에서 넘어왔으면 로그인 창을 바로 연다.
       if (NEXT) { openModal('login'); msg('liMsg', '로그인하면 보시던 운행일지 화면으로 돌아갑니다.', true); }
       return;
     }
     fetch(SB + '/auth/v1/user', { headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).then(function (r) {
-      if (r.ok) { enter(); return; }
-      if (!rt) { leave(); return; }
+      if (r.ok) { enter(); done(); return; }
+      if (!rt) { leave(); done(); return; }
       return fetch(SB + '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt })
       }).then(function (x) { return x.ok ? x.json() : null; }).then(function (j) {
         if (j && j.access_token) { ss(K_AT, j.access_token); ss(K_RT, j.refresh_token || rt); enter(); }
         else leave();
+        done();
       });
-    }).catch(function () { });
+    }).catch(function () { done(); });
   }
   boot();
 })();
