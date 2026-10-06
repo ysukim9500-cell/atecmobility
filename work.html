@@ -353,8 +353,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
       <label class="fld"><span>부서</span><input class="inp" id="suDept" maxlength="60" placeholder="예) 수도권버스지원팀"></label>
       <label class="fld"><span>회사 메일 <small>(팀즈 결재 알림을 받을 주소)</small></span>
         <input class="inp" id="suMail" type="email" autocomplete="email" maxlength="80" placeholder="아이디@atecmobility.com"></label>
-      <label class="fld"><span>차량번호 <small>(운전하는 분만 — 결재만 하시면 비워 두세요)</small></span>
-        <input class="inp" id="suPlate" maxlength="20" placeholder="예) 12가3456"></label>
+      <p class="hint">차량번호는 받지 않습니다. 운행일지를 쓰실 분은 승인 뒤 <b>운행일지 앱 › 차량 관리</b>에서 차량을 추가하세요.</p>
       <div class="msg" id="suMsg" role="alert" hidden></div>
       <button class="btn pri" type="submit" id="suBtn">가입 신청</button>
     </form>
@@ -452,7 +451,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
     if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { msg('suMsg', '메일 주소 모양이 아닙니다.'); $('suMail').focus(); return; }
     var b = $('suBtn'); b.disabled = true; b.textContent = '보내는 중…'; msg('suMsg', '');
     post('/functions/v1/driving-auth', { action: 'signup', username: u, password: p, name: n,
-      dept: v('suDept'), position: v('suPos'), email: mail, plate: v('suPlate') }).then(function (res) {
+      dept: v('suDept'), position: v('suPos'), email: mail }).then(function (res) {
       b.disabled = false; b.textContent = '가입 신청';
       if (!res.ok || !res.j || !res.j.ok) { msg('suMsg', (res.j && res.j.error) || '가입 신청을 받지 못했습니다.'); return; }
       $('fSignup').reset();
@@ -464,10 +463,17 @@ a.launch:hover .go svg{transform:translateX(4px)}
   });
 
   /* ── 로그인 뒤 ── */
+  // 운행일지에서 로그인이 필요해 넘어온 경우(driving.html → work.html?next=#/…): 로그인하면 그 화면으로 돌려보낸다.
+  // 운행일지 안의 화면 주소(#/…)만 받는다 — 다른 사이트로 보내는 데 쓰이지 않게.
+  var NEXT = (function () {
+    try { var n = new URLSearchParams(location.search).get('next') || ''; return /^#\/[A-Za-z0-9_\/-]*$/.test(n) ? n : ''; }
+    catch (e) { return ''; }
+  })();
   function enter() {
     var m = me(); if (!m) return;
+    if (NEXT) { location.replace('driving.html' + NEXT); return; }
     document.body.classList.add('in');
-    $('uName').textContent = m.name || m.username || '';
+    $('uName').textContent = m.name || m.username || '';   // 다시 들어와도 '관리자' 표시가 겹치지 않게 매번 새로 쓴다
     $('uMeta').textContent = [m.dept, m.position].filter(Boolean).join(' · ');
     if (m.is_admin) { var t = document.createElement('span'); t.className = 'tag'; t.textContent = '관리자'; $('uName').appendChild(t); }
     window.scrollTo(0, 0);
@@ -490,7 +496,11 @@ a.launch:hover .go svg{transform:translateX(4px)}
   /** 저장된 세션이 아직 살아 있는지 서버에 확인한다(만료면 한 번 갱신, 안 되면 로그아웃 상태로). */
   function boot() {
     var at = ss(K_AT), rt = ss(K_RT);
-    if (!at || !me()) return;
+    if (!at || !me()) {
+      // 운행일지에서 넘어왔으면 로그인 창을 바로 연다.
+      if (NEXT) { openModal('login'); msg('liMsg', '로그인하면 보시던 운행일지 화면으로 돌아갑니다.', true); }
+      return;
+    }
     fetch(SB + '/auth/v1/user', { headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).then(function (r) {
       if (r.ok) { enter(); return; }
       if (!rt) { leave(); return; }

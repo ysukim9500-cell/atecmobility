@@ -5906,12 +5906,18 @@
     }
   });
   $('loginBtn').addEventListener('click', doLogin);
-  function signOut() {
+  /** 로그인은 업무 결재 포털(work.html)에서 한다(2026-10-06). next = 로그인 뒤 돌아올 운행일지 화면(#/…). */
+  function toPortal(next) {
+    var n = /^#\/[A-Za-z0-9_\/-]*$/.test(next || '') ? next : '';
+    location.replace('work.html' + (n ? '?next=' + encodeURIComponent(n) : ''));
+  }
+  function signOut(e) {
     // 서버의 갱신 토큰도 끊는다(2026-10-06). 응답을 기다리지 않는다.
     var at = ss(K_AT);
     if (at) { try { fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at }, keepalive: true }).catch(function () { }); } catch (e) { } }
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
-    location.reload();
+    // 직접 로그아웃이면 포털 첫 화면, 로그인이 만료된 것이면 다시 로그인한 뒤 보던 화면으로 돌아오게.
+    toPortal(e && e.type === 'click' ? '' : location.hash);
   }
   $('logoutBtn').addEventListener('click', signOut);
 
@@ -6211,5 +6217,7 @@
   }
 
   /* ══════════════════ 시작 ══════════════════ */
+  // 로그인 전이면 업무 결재 포털로 보낸다(보던 주소는 로그인 뒤 돌아오게). ?direct=1 이면 예전 로그인 화면을 쓴다.
   if (ss(K_AT) && me()) enter();
+  else if (!window.__VERIFY__ && !/[?&]direct=1/.test(location.search)) toPortal(location.hash);
 })();
