@@ -530,11 +530,70 @@
     }
     var chip = f && f.verify ? '<button class="vchip" data-fzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' +
       sumChip(f.verify.summary) + '</button>' : '';
-    return '<div class="aext">' + chip +
+    return apprBrief(a, f) + '<div class="aext">' + chip +
       '<span style="flex:1"></span>' +
       '<button class="btn sm" data-fzpdf="' + a.id + '">' + ic('dl', 13) +
       (done ? '결재 완료본 PDF' : live ? '결재 문서 PDF' : '상신했던 문서 PDF') + '</button>' +
       (done ? '<button class="btn sm" data-fzxlsx="' + a.id + '">결재 완료본 엑셀</button>' : '') +
+      '</div>';
+  }
+
+  /**
+   * 결재 요약(2026-10-07 사용자) — 결재자가 문서를 열지 않고도 승인할 수 있게, 상신 때 굳힌 금액·검증 결과와
+   * 전월 대비를 한눈에. 결재 중(내 차례 포함)·완료 건에만 붙인다. 숫자는 모두 상신 때 서버가 굳힌 값(snapshot·고정본 검증)이다.
+   */
+  function apprBrief(a, f) {
+    if (!a || a.status !== 'submitted') return '';         // 결재 중인 건만(완료 건은 조용히)
+    var s = a.snapshot || {};
+    if (s.cost == null) return '';
+    var won = C.won, cost = Number(s.cost) || 0;
+    // 전월 — 같은 사람의 바로 앞 주기 결재(완료 또는 결재 중). 볼 권한이 없으면 목록에 없다.
+    var cy = String(a.cycle || '').split('-').map(Number), py = cy[0], pm = cy[1] - 1;
+    if (pm < 1) { pm = 12; py--; }
+    var pkey = py + '-' + (pm < 10 ? '0' : '') + pm;
+    var prev = (C.state().APPR || []).filter(function (x) {
+      return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') && x.snapshot && x.snapshot.cost != null;
+    })[0];
+    var cmp = '';
+    var bigJump = false;
+    if (prev) {
+      var pc = Number(prev.snapshot.cost) || 0, d = cost - pc, pct = pc ? Math.round(d / pc * 100) : null;
+      bigJump = pc > 0 && d > 50000 && pct >= 50;
+      cmp = '<div class="abf"><span class="k">전월(' + pm + '월분) 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' +
+        (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + Math.abs(pct) + '%)</small>' : '') + '</b>' +
+        '<span class="sub">' + pm + '월분 ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + ' km</span></div>';
+    } else {
+      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + pm + '월분 결재 기록이 없습니다</span></div>';
+    }
+    // 검증(상신 때 굳힌 결과)
+    var v = f && f.verify, vs = (v && v.summary) || null;
+    var items = ((v && (v.items || (v.result && v.result.items))) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
+    var checks = [];
+    if (vs) {
+      checks.push(vs.bad ? ['bad', '검증 불일치 ' + n0(vs.bad) + '건'] : vs.warn ? ['warn', '검증 확인 필요 ' + n0(vs.warn) + '건'] : ['ok', '검증 이상 없음']);
+      if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
+    } else if (f === undefined) checks.push(['dim', '검증 결과 불러오는 중…']);
+    else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
+    checks.push(s.toll_unknown ? ['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 계산)'] : ['ok', '통행료 모두 확정']);
+    if (s.rate_miss) checks.push(['warn', '유류 단가 미등록 ' + n0(s.rate_miss) + '건(기본 단가)']);
+    if (bigJump) checks.push(['warn', '전월보다 비용이 크게 늘었습니다']);
+    var nBad = checks.filter(function (c) { return c[0] === 'bad'; }).length, nWarn = checks.filter(function (c) { return c[0] === 'warn'; }).length;
+    var verdict = nBad ? ['bad', '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요']
+      : nWarn ? ['warn', '대체로 정상입니다 — 아래 확인 항목만 살펴봐 주세요']
+      : ['ok', '금액·검증 모두 이상 없습니다 — 문서를 열지 않고 승인하셔도 됩니다'];
+    var perKm = Number(s.biz_km) > 0 ? Math.round((Number(s.fuel) || 0) / Number(s.biz_km)) : 0;
+    return '<div class="abrief ' + verdict[0] + '">' +
+      '<div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
+      '<div class="abgrid">' +
+      '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">유류 ' + won(s.fuel) + ' · 통행 ' + won(s.toll) + ' · 주차 ' + won(s.parking) + '</span></div>' +
+      '<div class="abf"><span class="k">운행</span><b>' + n0(s.trips) + '<small>건</small> · ' + C.km(s.km) + '<small>km</small></b><span class="sub">업무 ' + C.km(s.biz_km) + ' km' + (perKm ? ' · 유류 ' + n0(perKm) + '원/km' : '') + '</span></div>' +
+      cmp +
+      '<div class="abf"><span class="k">영수증</span><b>' + n0(s.ev_n || 0) + '<small>장</small></b><span class="sub">주차 ' + won(s.ev_parking || 0) + ' · 통행 ' + won(s.ev_toll || 0) + ' 포함</span></div>' +
+      '</div>' +
+      '<div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
+      (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
+        return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
+      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 아래 「검증」을 눌러 전부 보기</li>' : '') + '</ul>' : '') +
       '</div>';
   }
 
