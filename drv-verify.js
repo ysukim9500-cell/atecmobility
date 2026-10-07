@@ -712,7 +712,8 @@
   function makePdf(o) {
     var scanPaths = {};
     (o.doc.scans || []).forEach(function (s) { scanPaths[s.path] = 1; });
-    var nImg = Object.keys(scanPaths).length + (o.doc.photos || []).length;
+    // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
+    var nImg = o.nImg != null ? o.nImg : Object.keys(scanPaths).length + (o.doc.photos || []).length;
     C.openPanel(o.title, o.sub,
       '<div class="pdfwait"><div class="spin"></div><div id="pdfNote" role="status">PDF 를 만드는 중입니다…</div>' +
       '<div class="dim" style="margin-top:6px">' + (nImg ? '사진 ' + n0(nImg) + '장을 넣습니다. ' : '') +
@@ -727,6 +728,11 @@
     // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
     return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
       note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
+      if (o.build) {
+        return o.build(lib, function (p) {
+          return loadPhoto(p, 1500).then(function (b) { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); return b; });
+        });
+      }
       return window.SheetPdf.build({
         meta: o.meta, sheets: o.doc.sheets, verify: o.verify || null,
         scans: o.doc.scans, photos: o.doc.photos
@@ -768,7 +774,7 @@
       }
       var mk = o.meta.mark || '';
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
-        '<div class="dim">' + mb + ' MB · 운행기록부 ' + n0((o.doc.sheets || []).length) + '장' +
+        '<div class="dim">' + mb + ' MB · ' + (o.stat || '운행기록부 ' + n0((o.doc.sheets || []).length) + '장') +
         (o.verify ? ' · 검증 결과' : '') + (nImg ? ' · 영수증 사진 ' + n0(nImg) + '장' : '') + '</div>' + chk +
         '<div class="anote">' + (o.note || MARK_NOTE[mk] || MARK_NOTE['']) + '</div></div>';
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
@@ -777,7 +783,7 @@
           (o.okKey ? '① 열어서 보기' : '열기 · 인쇄') + '</a>' +
         // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
         // 2026-10-07: 문서를 먼저 열어 봐야 「확인 완료」가 눌린다(열기·내려받기 중 하나).
-        (o.okKey ? '<button class="btn" id="pdfOkBtn" data-pdfok="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">② 확인 완료 → 결재 상신</button>' : '');
+        (o.okKey ? '<button class="btn" id="pdfOkBtn" ' + (o.okAttr || 'data-pdfok') + '="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">② 확인 완료 → 결재 상신</button>' : '');
       if (o.okKey) {
         $('pBody').insertAdjacentHTML('beforeend', '<div class="hpnote" id="pdfStepNote" style="margin-top:14px">' + ic('alert', 15) +
           '<span><b>① 열어서 보기</b>로 문서를 끝까지 확인한 뒤 <b>② 확인 완료 → 결재 상신</b>을 눌러 주세요.</span></div>');
@@ -1206,6 +1212,12 @@
       C.render();
     }
   });
+  // 개인경비(drv-expense.js)가 같은 모양·같은 순서를 쓰도록 내어 준다 — 결과 창·Gemini 단추·검증 딱지·사진 받기.
+  C.vx = {
+    makePdf: makePdf, ensureLibs: ensureLibs, loadPhoto: loadPhoto, pool: pool, safeName: safeName,
+    gemBtn: gemBtn, gemBadge: gemBadge, sumChip: sumChip, sumText: sumText, whenText: whenText, showItems: showItems,
+    pdfUrls: function () { return PDF_URLS; }, setPdfUrls: function (a) { PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); }); PDF_URLS = a || []; }
+  };
   return {
     views: { verify: viewVerify, a_verify: viewVerifyAll, a_final: viewFinal },
     onGo: function (v) { if (v === 'verify') FRESH = {}; },

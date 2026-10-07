@@ -347,9 +347,30 @@
         c.cell(MX + thW, iy, infoW - thW, hh, vo, vl);
         iy += hh;
       });
-    var ax = MX + infoW + gap, labW = 7 * MM, boxW = 17 * MM, hdH = 5.8 * MM, sgH = 13 * MM;
+    var boxBottom = drawBoxes(c, MX + infoW + gap, top, sh.boxes);
+    c.y = Math.max(iy, boxBottom) + 4 * MM;
+
+    // ── 요약 한 줄 ──
+    var sw = [30, 28, 30, 28, 34, 40].map(function (m) { return m * MM; });
+    c.row([
+      { w: sw[0], t: '총 운행거리(Km)', size: 8.5, align: 'center', fill: 0.95 },
+      { w: sw[1], t: n0(t.km), size: 8.5, align: 'right', padX: 2.4 * MM },
+      { w: sw[2], t: '기본지급액(원)', size: 8.5, align: 'center', fill: 0.95 },
+      { w: sw[3], t: n0(basePay(t.km)), size: 8.5, align: 'right', padX: 2.4 * MM },
+      { w: sw[4], t: '■ 유류 기준단가', size: 8.5, align: 'center', fill: 0.95 },
+      { w: sw[5], t: sh.quarterLabel || '', size: 8.5, align: 'right', padX: 2.4 * MM }
+    ], { minH: 7 * MM });
+    c.y += 3 * MM;
+    return drawSheetBody(c, sh, calc, t);
+  }
+
+  /** 결재란(담당·팀장·실장·사업부장·대표이사) — 운행기록부·개인경비 명세가 같이 쓴다. (ax, top) 은 왼쪽 위. 아래 끝 y 를 돌려준다.
+   *  boxes[칸] = { name, date, sign } · 칸이 없으면 빗금(건너뜀) · name 이 비면 빈칸(아직 결재 전). */
+  var BOX_W = (7 + 17 * 5) * MM;
+  function drawBoxes(c, ax, top, boxesIn) {
+    var labW = 7 * MM, boxW = 17 * MM, hdH = 5.8 * MM, sgH = 13 * MM;
     c.cell(ax, top, labW, hdH + sgH, { lines: ['결', '재'], size: 8, align: 'center', fill: 0.95 });
-    var boxes = sh.boxes || {};
+    var boxes = boxesIn || {};
     BOXES.forEach(function (b, i) {
       var bx = ax + labW + i * boxW;
       c.cell(bx, top, boxW, hdH, { t: b, size: 8, align: 'center', fill: 0.95 });
@@ -379,20 +400,10 @@
         }
       }
     });
-    c.y = Math.max(iy, top + hdH + sgH) + 4 * MM;
+    return top + hdH + sgH;
+  }
 
-    // ── 요약 한 줄 ──
-    var sw = [30, 28, 30, 28, 34, 40].map(function (m) { return m * MM; });
-    c.row([
-      { w: sw[0], t: '총 운행거리(Km)', size: 8.5, align: 'center', fill: 0.95 },
-      { w: sw[1], t: n0(t.km), size: 8.5, align: 'right', padX: 2.4 * MM },
-      { w: sw[2], t: '기본지급액(원)', size: 8.5, align: 'center', fill: 0.95 },
-      { w: sw[3], t: n0(basePay(t.km)), size: 8.5, align: 'right', padX: 2.4 * MM },
-      { w: sw[4], t: '■ 유류 기준단가', size: 8.5, align: 'center', fill: 0.95 },
-      { w: sw[5], t: sh.quarterLabel || '', size: 8.5, align: 'right', padX: 2.4 * MM }
-    ], { minH: 7 * MM });
-    c.y += 3 * MM;
-
+  function drawSheetBody(c, sh, calc, t) {
     // ── 운행 내역 ──
     drawTableHead(c);
     var brk = function () { contHeader(c, sh); };
@@ -782,8 +793,170 @@
     });
   }
 
+  // ─────────────────────────── 개인경비 지출 명세 (2026-10-07) ───────────────────────────
+  /* 사용자 양식(docs/expense/개인경비 지출명세서_양식.xlsx)과 같은 짜임:
+       제목 「개인경비 지출 명세」 · 부서·이름 · 결재란(운행기록부와 같은 5칸)
+       표 = 순번 · 날짜 · 사용처 · 금액 · 사용내역 · 비고, <소모품비>·<식비>·<기타비용> 묶음마다 줄·소계, 합계
+       「* 해당 증빙은 명세서 기재순으로 별첨」 → 증빙 쪽(영수증 2×2, 명세 순서, 사진마다 날짜·구분·금액·사용처·사용내역)
+     doc = { meta, person:{dept,name}, periodLabel, boxes, verify,
+             items:[{ date, category, merchant, amount, usage, note, path }] }   ← 이미 명세 순서(구분 → 날짜)로 정렬해 넘긴다 */
+  var X_CATS = ['소모품비', '식비', '기타비용'];
+  var XCOLS = [11, 22, 44, 25, 56, 32].map(function (w) { return w / 190 * CW; });
+  var XHEAD = ['순번', '날 짜', '사용처', '금액', '사용내역', '비고'];
+  /** 구분별 묶음. 세 구분은 늘 이 순서로 나온다(비어 있어도). 모르는 구분은 기타비용에 넣는다. */
+  function expenseGroups(items) {
+    var gs = X_CATS.map(function (cat) { return { cat: cat, list: [], sum: 0 }; });
+    (items || []).forEach(function (it) {
+      var i = X_CATS.indexOf(it.category); gs[i < 0 ? 2 : i].list.push(it);
+    });
+    gs.forEach(function (g) { g.sum = g.list.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0); });
+    return gs;
+  }
+  function drawExpense(c, d) {
+    var gs = expenseGroups(d.items), total = gs.reduce(function (s, g) { return s + g.sum; }, 0);
+    var p = d.person || {};
+    c.newPage();
+    var tw = c.text('개인경비 지출 명세', MX + CW / 2, c.y, { size: 17, bold: true, align: 'center' });
+    c.page.drawLine({ start: { x: MX + CW / 2 - tw / 2, y: PH - (c.y + 17 * 1.02) }, end: { x: MX + CW / 2 + tw / 2, y: PH - (c.y + 17 * 1.02) }, thickness: 0.8, color: c.black });
+    c.y += 17 * 1.25 + 4.5 * MM;
+    c.text(d.periodLabel || '', MX + CW / 2, c.y, { size: 9, align: 'center', color: 0.2 });
+    c.y += 9 * LH + 4 * MM;
+
+    var top = c.y, gap = 5 * MM, infoW = CW - BOX_W - gap, thW = 24 * MM, iy = top;
+    [['부 서', p.dept], ['성 명', p.name], ['합 계', won(total) + '  (' + n0((d.items || []).length) + '건)']].forEach(function (kv) {
+      var vo = { t: kv[1] || '', size: 9, padX: 2.4 * MM, padY: 0.8 * MM, wrap: true, maxLines: 2 };
+      var vl = c.layout(vo, infoW - thW), hh = Math.max(6.2 * MM, vl.h);
+      c.cell(MX, iy, thW, hh, { t: kv[0], size: 9, align: 'center', fill: 0.95 });
+      c.cell(MX + thW, iy, infoW - thW, hh, vo, vl);
+      iy += hh;
+    });
+    var bb = drawBoxes(c, MX + infoW + gap, top, d.boxes);
+    c.y = Math.max(iy, bb) + 5 * MM;
+
+    var head = function () {
+      c.row(XHEAD.map(function (h, i) { return { w: XCOLS[i], t: h, size: 8.4, bold: true, align: 'center', fill: 0.93 }; }), { minH: 7 * MM });
+    };
+    var brk = function () {
+      c.newPage();
+      c.text('개인경비 지출 명세 (계속)', MX, c.y, { size: 9.5, bold: true });
+      c.text([p.name, d.periodLabel].filter(Boolean).join(' · '), MX + CW, c.y + 0.8, { size: 8, align: 'right', color: 0.2, maxW: CW * 0.6 });
+      c.y += 9.5 * LH + 1.5 * MM;
+      head();
+    };
+    var span = function (a, b) { var s = 0; for (var i = a; i <= b; i++) s += XCOLS[i]; return s; };
+    head();
+    gs.forEach(function (g) {
+      c.row([{ w: CW, t: '<' + g.cat + '>', size: 8.6, bold: true, padX: 2.4 * MM, fill: 0.97 }], { onBreak: brk, minH: 6.4 * MM });
+      var rows = g.list.length ? g.list : [null];
+      rows.forEach(function (it, k) {
+        if (!it) { c.row(XCOLS.map(function (w) { return { w: w, t: '' }; }), { onBreak: brk, minH: 6.4 * MM }); return; }
+        c.row([
+          { w: XCOLS[0], t: String(k + 1), size: 8, align: 'center' },
+          { w: XCOLS[1], t: it.date || '', size: 8, align: 'center' },
+          { w: XCOLS[2], t: it.merchant || '', size: 8, wrap: true, maxLines: 3, padX: 1.6 * MM },
+          { w: XCOLS[3], t: n0(it.amount), size: 8, align: 'right', padX: 2 * MM },
+          { w: XCOLS[4], t: it.usage || '', size: 8, wrap: true, maxLines: 4, padX: 1.6 * MM },
+          { w: XCOLS[5], t: it.note || '', size: 8, wrap: true, maxLines: 3, padX: 1.6 * MM }
+        ], { onBreak: brk, minH: 6.4 * MM });
+      });
+      c.row([
+        { w: XCOLS[0], t: '' }, { w: XCOLS[1], t: '' },
+        { w: XCOLS[2], t: '소계', size: 8.2, bold: true, align: 'center', fill: 0.97 },
+        { w: XCOLS[3], t: n0(g.sum), size: 8.2, bold: true, align: 'right', padX: 2 * MM, fill: 0.97 },
+        { w: XCOLS[4], t: '' }, { w: XCOLS[5], t: '' }
+      ], { onBreak: brk, minH: 6.4 * MM });
+    });
+    if (c.y + 7 * MM + 10 * MM > LIMIT) brk();
+    c.row([
+      { w: span(0, 2), t: '합계', size: 9, bold: true, align: 'center', fill: 0.88 },
+      { w: XCOLS[3], t: n0(total), size: 9, bold: true, align: 'right', padX: 2 * MM, fill: 0.88 },
+      { w: span(4, 5), t: '', fill: 0.88 }
+    ], { minH: 7.4 * MM });
+    c.y += 2.5 * MM;
+    c.text('* 해당 증빙은 명세서 기재순으로 별첨', MX, c.y, { size: 8.5, color: 0.15 });
+    c.y += 8.5 * LH;
+    return { all: total, groups: gs.map(function (g) { return { cat: g.cat, n: g.list.length, sum: g.sum }; }) };
+  }
+  /** 증빙 — 영수증 사진 한 쪽에 넷(2×2), 명세 순서. 사진 아래 날짜·구분·금액·사용처·사용내역. */
+  function drawExpensePhotos(c, items, imgs, meta) {
+    var list = items.filter(function (it) { return it.path; });
+    if (!list.length) return;
+    var per = 4, pages = Math.ceil(list.length / per);
+    var all = list.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    for (var i = 0; i < list.length; i += per) {
+      var chunk = list.slice(i, i + per);
+      var sum = chunk.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+      receiptHead(c, '증빙 (영수증)', meta, i / per + 1, pages,
+        pages > 1 ? '이 쪽 소계 ' + won(sum) + ' · 전체 ' + n0(list.length) + '건 ' + won(all) : '합계 ' + n0(list.length) + '건 ' + won(all));
+      var top = c.y, gap = 4 * MM, capH = 7.6 * LH * 2 + 1.2 * MM;
+      var cw = (CW - gap) / 2, ch = (LIMIT - top - gap) / 2;
+      chunk.forEach(function (e, k) {
+        var cx = MX + (k % 2) * (cw + gap), cy = top + Math.floor(k / 2) * (ch + gap);
+        drawPhoto(c, imgs[e.path], cx, cy, cw, ch - capH);
+        var cap = (i + k + 1) + '. ' + [e.date || '', e.category || '', won(e.amount), e.merchant || '', e.usage || ''].filter(Boolean).join(' · ');
+        var lay = c.layout({ t: cap, size: 7.6, wrap: true, maxLines: 2, padX: 0, padY: 0 }, cw);
+        if (lay.lines.length > 2) { lay.lines = lay.lines.slice(0, 2); lay.h = 2 * lay.size * LH; }
+        c.cell(cx, cy + ch - capH + 1.2 * MM, cw, lay.h, { border: false, align: 'center', color: 0.2, valign: 'top' }, lay);
+      });
+      c.y = LIMIT;
+    }
+  }
+  /** 개인경비 지출결의 PDF 한 권. deps 는 build 와 같다. 돌려주는 totals[0].all = 명세 합계. */
+  function buildExpense(doc, deps) {
+    var lib = deps.PDFLib, c, imgs = {};
+    var meta = doc.meta || {};
+    return lib.PDFDocument.create().then(function (pdf) {
+      pdf.registerFontkit(deps.fontkit);
+      pdf.setTitle('개인경비 지출 명세 ' + (meta.name || '') + ' ' + (meta.cycleName || ''));
+      pdf.setAuthor('ATEC Driving');
+      pdf.setProducer('ATEC Driving sheetpdf');
+      return Promise.all([   // ★ subset:false — build() 와 같은 까닭(한글 합성 글리프)
+        pdf.embedFont(deps.fontRegular, { subset: false }),
+        pdf.embedFont(deps.fontBold, { subset: false })
+      ]).then(function (f) { c = new Ctx(pdf, lib, f[0], f[1], doc); return pdf; });
+    }).then(function (pdf) {
+      var paths = [];
+      (doc.items || []).forEach(function (it) { if (it.path && paths.indexOf(it.path) < 0) paths.push(it.path); });
+      var one = function (p) {
+        return Promise.resolve().then(function () { return deps.loadImage ? deps.loadImage(p) : null; })
+          .then(function (bytes) {
+            if (!bytes || !bytes.length) { c.issue('image', '사진을 불러오지 못함: ' + p); return; }
+            var isPng = bytes[0] === 0x89 && bytes[1] === 0x50, isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+            if (!isPng && !isJpg) { c.issue('image', 'JPEG·PNG 가 아닌 사진: ' + p); return; }
+            return (isPng ? pdf.embedPng(bytes) : pdf.embedJpg(bytes)).then(function (img) {
+              imgs[p] = { img: img, orient: isJpg ? exifOrientation(bytes) : 1 };
+            });
+          }).catch(function (e) { c.issue('image', '사진 처리 실패: ' + p + ' (' + (e && e.message || e) + ')'); });
+      };
+      var next = 0, ws = [];
+      var worker = function () { if (next >= paths.length) return Promise.resolve(); return one(paths[next++]).then(worker); };
+      for (var w = 0; w < Math.min(4, paths.length); w++) ws.push(worker());
+      return Promise.all(ws).then(function () { return pdf; });
+    }).then(function (pdf) {
+      c.signs = {};
+      var urls = [];
+      Object.keys(doc.boxes || {}).forEach(function (k) { var v = doc.boxes[k]; if (v && v.sign && urls.indexOf(v.sign) < 0) urls.push(v.sign); });
+      return Promise.all(urls.map(function (u) {
+        var m = /^data:image\/png;base64,(.+)$/.exec(u);
+        if (!m) return null;
+        var bin = atob(m[1]), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return pdf.embedPng(bytes).then(function (img) { c.signs[u] = img; }, function () { c.issue('image', '서명 그림을 넣지 못함'); });
+      })).then(function () { return pdf; });
+    }).then(function (pdf) {
+      var t = drawExpense(c, doc);
+      drawExpensePhotos(c, doc.items || [], imgs, meta);
+      if (doc.verify) drawVerify(c, doc.verify, meta);
+      var n = finishPages(c, meta);
+      return pdf.save().then(function (bytes) {
+        return { bytes: bytes, pages: n, issues: c.issues, stats: c.stats, totals: [t] };
+      });
+    });
+  }
+
   return {
     build: build, basePay: basePay, sheetTotals: sheetTotals, exifOrientation: exifOrientation,
-    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.2.0'
+    buildExpense: buildExpense, expenseGroups: expenseGroups, EXPENSE_CATS: X_CATS,
+    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.3.0'
   };
 });

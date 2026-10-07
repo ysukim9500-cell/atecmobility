@@ -115,7 +115,36 @@ body.is-admin a.adm{display:flex}
 body.is-admin .navsec.adm,body.is-admin .admsec.adm{display:block}
 body.is-admin .navsec.admtog{display:flex}
 /* 결재만 하는 계정(운행일지 안 씀, 2026-10-07) — 메뉴는 결재함만 */
-body.nodrv #nav > a:not([data-v="inbox"]),body.nodrv #nav > .navsec{display:none}
+body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav),body.nodrv #nav > .navsec:not(.xnav){display:none}
+
+/* ── 개인경비 지출결의(2026-10-07) ── */
+.akind{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;
+  background:var(--ink-100);color:var(--ink-600);flex:none}
+.akind.x{background:#EEF4FF;color:#2F5BB7;border:1px solid #CFDDF7}
+.xcalp{padding:12px}
+.xcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.xcal .xw{font-size:11.5px;font-weight:600;color:var(--ink-500);text-align:center;padding:2px 0 4px}
+.xcal .xw.sun,.xcal .xd.sun .xn{color:var(--red-700)} .xcal .xw.sat,.xcal .xd.sat .xn{color:#2F5BB7}
+.xcal .xd{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:62px;padding:6px 8px;border:1px solid var(--ink-100);
+  border-radius:var(--r-sm);background:var(--surface);font-family:inherit;text-align:left;cursor:pointer;min-width:0}
+.xcal .xd.off{border:0;background:none;cursor:default}
+.xcal .xd:hover:not(.off){border-color:var(--ink-300)}
+.xcal .xd.has{background:var(--ink-50,#F7F8F9);border-color:var(--ink-200)}
+.xcal .xd.today{box-shadow:inset 0 0 0 1.5px var(--ink-400)}
+.xcal .xd.on{border-color:var(--red);background:var(--red-50);box-shadow:0 0 0 2px var(--red-50)}
+.xcal .xd:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+.xcal .xn{font-size:12px;font-weight:600;color:var(--ink-700)}
+.xcal .xc{font-size:11px;color:var(--ink-500)}
+.xcal .xa{font-size:12.5px;font-weight:700;color:var(--ink-900);font-variant-numeric:tabular-nums;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.xcal .xm{display:inline-grid;place-items:center;width:14px;height:14px;border-radius:999px;background:var(--warn);color:#fff;font-style:normal;font-size:10px;font-weight:800}
+@media (max-width:720px){.xcal{gap:3px}.xcal .xd{min-height:48px;padding:4px}.xcal .xa{font-size:10.5px}.xcal .xc{font-size:10px}}
+table.xtab tr.xsec td{background:var(--sunken)}
+table.xtab tr.xsub td{font-weight:700;background:var(--sunken);font-size:12.5px}
+table.xtab tr.xover td{background:#FFFBF2}
+.xmeal{white-space:normal;font-size:11.5px;margin-top:2px}
+.xephoto{margin:0 0 14px}
+.xephoto img{max-width:100%;max-height:300px;border-radius:var(--r-sm);border:1px solid var(--line);display:block}
+table.xup td .inp{font-size:13px}
 
 /* ── 로고 ────────────────────────────────────────────────────────────
    CI 원본 아트워크를 그대로 쓴다. 글꼴로 흉내 내지 않는다.
@@ -201,6 +230,7 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cyc .cycle:hover{background:var(--red-100,#FBDDE4);border-color:var(--red)}
 .cyc .cycle .tag{font-size:12px;font-weight:500;color:var(--ink-600)}
 .cyc:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 주기";color:var(--red-700);font-weight:700}
+.cyc.xper:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 기간"}
 .cyc.past .cycle{border-color:var(--warn);background:var(--warn-50)}
 .cyc.past .cycle svg{color:var(--warn)}
 .cyc.past .cycle .tag::after{font-weight:700}
@@ -1406,6 +1436,10 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <div class="navsec">안전</div>
       <a tabindex="0" role="button" data-v="safety"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
+      <!-- 개인경비 지출결의(2026-10-07) — 운전 안 하는 직원도 보인다(xnav). 기간은 20일~19일. -->
+      <div class="navsec xnav">개인경비</div>
+      <a tabindex="0" role="button" data-v="x_month" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>이번 달 경비</a>
+      <a tabindex="0" role="button" data-v="x_verify" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증·상신</a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
       <div class="admsec adm">결재·마감</div>
@@ -1416,6 +1450,10 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <div class="admsec adm">기록</div>
       <a tabindex="0" role="button" data-v="a_trips" data-alt="a_check,a_evid,a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행·영수증 기록</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
+      <div class="admsec adm">개인경비</div>
+      <a tabindex="0" role="button" data-v="xa_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>개인경비 현황</a>
+      <a tabindex="0" role="button" data-v="xa_list" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 내역</a>
+      <a tabindex="0" role="button" data-v="xa_final" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
       <div class="admsec adm">사람·설정</div>
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>조직도</a>
@@ -1454,6 +1492,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <script src="sheetpdf.js"></script>
 <script src="drv-verify.js"></script>
 <script src="drv-org.js"></script>
+<script src="drv-expense.js"></script>
 <script src="driving-app.js"></script>
 </body>
 </html>

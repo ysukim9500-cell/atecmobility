@@ -233,7 +233,16 @@
   var APPR = [], PEOPLE = {};               // 결재 건 · 사람 목록(이름·부서·직급)
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
-  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [], onGo: [] };
+  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [], onGo: [],
+    // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(period)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
+    kinds: {}, period: null, load: [], orgUsers: null };
+  /** 지금 화면이 다른 기간 규칙(개인경비 20~19일)을 쓰는가 — 그 규칙, 아니면 null. */
+  function pv() { return EXT.period && EXT.period.views.indexOf(VIEW) >= 0 ? EXT.period : null; }
+  /** 지금 화면 기준 '이번 주기'. 개인경비 화면은 20일에 넘어간다. */
+  function curCyc(view) {
+    var p = EXT.period && EXT.period.views.indexOf(view || VIEW) >= 0 ? EXT.period : null;
+    return p ? p.current() : currentCycle();
+  }
   /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
   function notifyGo(v, prev) { EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } }); }
   var LOADED = false, LOADING = false, AUDIT = null;
@@ -397,9 +406,12 @@
       $('cycleTag').textContent = cyclesInView().length + '주기 · 조회 전용';
     } else {
       $('cycleTxt').innerHTML = '<span class="yr">' + CYC.y + '년 </span>' + CYC.m + '월분';
-      $('cycleTag').textContent = cycleSpan(CYC.y, CYC.m);
+      // 개인경비 화면은 20일~19일 — 같은 달 이름에 그 범위를 보인다(「09.20 – 10.19 · 이번 기간」).
+      var P0 = pv();
+      $('cycleTag').textContent = P0 ? P0.span(CYC.y, CYC.m) : cycleSpan(CYC.y, CYC.m);
     }
-    var cur = currentCycle();
+    $('cycleBox').classList.toggle('xper', !!pv());          // 「· 이번 기간」(CSS) — 개인경비 화면
+    var cur = curCyc();
     var last = RANGE ? RANGE.to : CYC;
     $('cycNext').disabled = cmpCycle(last, cur) >= 0;
     $('cycleBox').classList.toggle('multi', !!RANGE);
@@ -416,6 +428,7 @@
   /** 이번 주기가 아닌 기간을 보고 있으면 모든 화면 맨 위에 띠 — 일지·영수증·정산이 모두 그 기간 기준이다. */
   function cycleBand() {
     var cur = currentCycle();
+    if (pv() && !RANGE) return pv().band ? pv().band() : '';
     if (RANGE) {
       return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(RANGE.from.y + '년 ' + RANGE.from.m + '월분 – ' + RANGE.to.y + '년 ' + RANGE.to.m + '월분</b>') +
         ' (' + cyclesInView().length + '주기)을 한꺼번에 보고 있습니다 — 조회만 되고 고칠 수 없습니다.</span>' +
@@ -436,7 +449,9 @@
     return m ? '<span class="st ' + m[1] + '">' + m[0] + '</span>' : '';
   }
   function paintCyclePop() {
-    var cur = currentCycle(), h = '';
+    var cur = curCyc(), h = '', P1 = pv();
+    var spanOf = function (c) { return P1 ? P1.span(c.y, c.m) : cycleSpan(c.y, c.m); };
+    var tagOf = function (k) { return P1 && P1.tag ? P1.tag(k) : myApprTag(k); };
     var q = function (label, attr, on) {
       return '<button class="cpq' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" ' + attr + '>' + label + '</button>';
     };
@@ -461,8 +476,8 @@
     for (var i = 0; i < 24; i++) {
       var c = addCycle(cur, -i), on = !RANGE && cmpCycle(CYC, c) === 0;
       h += '<button class="cpi' + (on ? ' on' : '') + '"' + (on ? ' aria-current="true"' : '') + ' data-cyc="' + c.y + '-' + c.m + '">' +
-        '<b>' + c.y + '년 ' + c.m + '월분</b><span class="dim">' + cycleSpan(c.y, c.m) + '</span>' +
-        (i === 0 ? '<span class="kind">이번</span>' : '') + '<span style="flex:1"></span>' + myApprTag(cycKey(c)) + '</button>';
+        '<b>' + c.y + '년 ' + c.m + '월분</b><span class="dim">' + spanOf(c) + '</span>' +
+        (i === 0 ? '<span class="kind">이번</span>' : '') + '<span style="flex:1"></span>' + tagOf(cycKey(c)) + '</button>';
     }
     h += '</div>';
     for (var k = 0; k < 36; k++) {
@@ -553,7 +568,7 @@
     }
     else {
       var c = addCycle(CYC, n);
-      if (cmpCycle(c, currentCycle()) > 0) return;
+      if (cmpCycle(c, curCyc()) > 0) return;
       setPeriod({ cyc: c });
     }
   }
@@ -627,6 +642,10 @@
         '&start_time=gte.' + r.lo + '&start_time=lt.' + r.hi + '&order=start_time.desc,id.desc')
         .then(function (rows) { TRIP_CACHE[ck] = { rows: rows || [], at: Date.now() }; return rows; });
 
+    // 확장 모듈(개인경비)이 같이 받을 것 — 실패해도 운행일지 적재는 그대로 끝나게 모듈 안에서 삼킨다.
+    var extP = Promise.all(EXT.load.map(function (fn) {
+      try { return Promise.resolve(fn(soft)).catch(function (e) { console.error(e); }); } catch (e) { return null; }
+    }));
     var fresh = soft && STATIC_AT && Date.now() - STATIC_AT < CACHE_MS;
     var staticP = fresh ? Promise.resolve(null) : Promise.all([
       fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status,uses_driving'),
@@ -646,7 +665,7 @@
       fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc')
     ]);
 
-    Promise.all([tripsP, staticP]).then(function (both) {
+    Promise.all([tripsP, staticP, extP]).then(function (both) {
       // ★ 반드시 아무것도 대입하기 전에 버린다. 예전에는 아래 대입이 전부 끝난 뒤에
       //   가드가 있어서, 늦게 온 응답이 데이터는 덮어쓰고 다시 그리기만 건너뛰었다.
       //   그러면 머리띠는 8월분인데 숫자는 9월분인 화면이 된다(21일 마감에 서버가
@@ -1684,6 +1703,11 @@
       kv('차량번호', esc(u.plate_no || '—')) +
       kv('차 종', esc(u.vehicle_type || '—')) +
       kv('운행일지 관리자', ME.is_admin ? '예' : '아니오') +
+      // 2026-10-07 — 업무용 차량을 운전하는가(운행일지 씀/안 씀). 바꾸는 것은 관리자가 「권한 관리」에서 한다.
+      kv('업무용 차량 운전', (usesDriving(myName())
+        ? '<b>운전합니다</b> <span class="dim">— 운행일지와 개인경비를 모두 씁니다</span>'
+        : '<b>운전하지 않습니다</b> <span class="dim">— 개인경비 지출결의와 결재만 씁니다</span>') +
+        '<div class="fhint">나중에 바뀌면 관리자에게 말씀하시면 바꿔 드립니다.</div>') +
       '</tbody></table></div>');
 
     h += sect('결재 서명', null, '', signPanel());
@@ -1829,14 +1853,14 @@
     if (!SIGNUPS.length) return '';
     return sect('가입 신청', SIGNUPS.length + '건', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>아이디</th><th>부서 · 직급</th><th>회사 메일</th><th>운행일지</th><th>신청</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>아이디</th><th>부서 · 직급</th><th>회사 메일</th><th>업무용 차량</th><th>신청</th><th></th></tr></thead><tbody>' +
       SIGNUPS.map(function (x) {
         var busy = SIGNUP_BUSY === x.username;
         return '<tr><td><span class="lead">' + esc(x.name || '') + '</span></td>' +
           '<td class="mono">' + esc(x.username) + '</td>' +
           '<td class="dim">' + esc([x.dept, x.position].filter(Boolean).join(' · ') || '—') + '</td>' +
           '<td class="dim">' + esc(x.email || '—') + '</td>' +
-          '<td class="dim">' + (x.uses_driving === false ? '안 씀(결재만)' : '씀') + '</td>' +
+          '<td class="dim">' + (x.uses_driving === false ? '운전 안 함(개인경비·결재만)' : '운전함') + '</td>' +
           '<td class="dim">' + (x.signup_at ? md(Date.parse(x.signup_at)) : '—') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           '<button class="btn sm pri" data-signup="' + esc(x.username) + '" data-ok="1"' + (busy ? ' disabled' : '') + '>승인</button> ' +
@@ -1875,7 +1899,7 @@
     $('pBody').innerHTML = '<div class="form"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
       (ok ? '승인' : '거절') + '</b>합니다.' +
       (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다.' +
-          (x.uses_driving === false ? ' <b>운행일지를 안 쓰는 분</b>이라 운행일지에서는 결재함만 보입니다.' : '')
+          (x.uses_driving === false ? ' <b>업무용 차량을 운전하지 않는 분</b>이라 개인경비·결재함만 보입니다.' : '')
         : ' 거절하면 이 아이디로는 로그인할 수 없고, 적어 낸 차량번호는 비웁니다.') + '</div>' +
       // ★ 결재자로 고를 수 있게 하려면 조직도에 이어야 한다(결재자 = 조직도에 있고 계정이 이어진 사람, 2026-10-02 결정).
       //   관리자가 본인 확인 뒤 직접 고른다 — 이름만 같다고 자동으로 잇지 않는다(가로채기 방지, 10/6 검증로봇).
@@ -2003,7 +2027,7 @@
       '<span class="permcnt" id="permCnt"></span></div>';
     h += sect('직원', '<span id="permN">' + list.length + '명</span>', '', bar +
       '<div class="panel"><div class="scroll tall" data-rows><table id="permT"><thead><tr>' +
-      '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th>업무용 차량</th><th></th></tr></thead><tbody>' +
       list.map(function (u) {
         var x = USERS[u], op = orgPath(u), oo = orgOf(u) || {};
         var hay = [x.name || '', u, x.dept || '', op.div, op.team, op.unit, oo.rank || '', oo.role || '', x.position || ''].join(' ').toLowerCase();
@@ -2018,6 +2042,10 @@
           '<td>' + (u === ACCT.master ? '<span class="st bad">마스터</span>'
             : MGRS.indexOf(u) >= 0 ? '<span class="st bad">권한 주는 관리자</span>'
             : x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
+          // 운전함 / 운전 안 함(개인경비·결재만) — 누르면 바꾼다(관리자 RPC).
+          '<td style="white-space:nowrap">' + (x.uses_driving === false
+            ? '<span class="st dim">운전 안 함</span> <button class="btn sm" data-drvset="' + esc(u) + '" data-on="1">운전함으로</button>'
+            : '<span class="st ok">운전함</span> <button class="btn sm" data-drvset="' + esc(u) + '" data-on="0">운전 안 함으로</button>') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           // 본인 · 마스터 · (마스터가 아니면) 다른 권한 주는 관리자는 바꿀 수 없다(서버가 거부한다). 버튼을 아예 안 보인다.
           (u === myName() ? '<span class="dim">본인 계정</span>'
@@ -2028,7 +2056,7 @@
                 (MGRS.indexOf(u) >= 0 ? '권한 주기 해제' : '권한 주기 허용') + '</button> ' : '') +
               '<button class="btn sm" data-pwreset="' + esc(u) + '">비밀번호 초기화</button>') +
           '</td></tr>';
-      }).join('') + '<tr class="permnone" hidden><td colspan="5"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없습니다.</div>' +
+      }).join('') + '<tr class="permnone" hidden><td colspan="6"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없습니다.</div>' +
         '<div class="d">이름 두 글자, 아이디 일부, 「대전센터」 같은 소속으로도 찾을 수 있습니다.</div></div></td></tr>' +
       '</tbody></table></div></div>');
     setTimeout(permFilter, 0);              // 그린 뒤 지금 찾기·거르기를 적용
@@ -2131,6 +2159,48 @@
       });
   }
 
+  /* ── 업무용 차량 운전함/안 함 (2026-10-07 개인경비) ──
+     app_users.uses_driving. false 면 운행일지 화면을 감추고 결재함·개인경비·내 계정만 보인다.
+     바꾸는 것은 관리자 RPC(driving_set_uses_driving, 로그인 토큰으로 관리자인지 서버가 본다). */
+  function usesDriving(u) {
+    var x = USERS[u];
+    if (x && x.uses_driving === false) return false;
+    if (u === myName() && ME && ME.uses_driving === false) return false;
+    return true;
+  }
+  function openDrvSet(target, on) {
+    var nm = nameOf(target);
+    openPanel(on ? '운전함으로 바꾸기' : '운전 안 함으로 바꾸기', nm + ' (' + target + ')',
+      '<div class="anote" style="margin-top:0">' + esc(nm) + ' 님을 <b>' + (on ? '업무용 차량을 운전하는 직원' : '운전하지 않는 직원') + '</b>으로 바꿉니다. ' +
+      (on ? '운행일지와 개인경비를 모두 쓰게 됩니다(앱은 다시 로그인하면 바뀝니다).'
+        : '운행일지 화면이 감춰지고 <b>개인경비 지출결의·결재함·내 계정</b>만 보입니다. 이미 있는 운행 기록은 지워지지 않습니다.') + '</div>',
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnDrvSetGo" data-target="' + esc(target) + '" data-on="' + (on ? '1' : '0') + '">바꾸기</button>');
+  }
+  function runDrvSet(target, on) {
+    var btn = $('btnDrvSetGo'); if (btn) { btn.disabled = true; btn.textContent = '바꾸는 중…'; }
+    apiRetry('/rest/v1/rpc/driving_set_uses_driving', {
+      // 서버(2026-10-07): p_actor = 나, 돌려주는 값 'ok' | 'NOT_ALLOWED' | 'BAD_TARGET' | 'BAD_INPUT'
+      method: 'POST', body: JSON.stringify({ p_actor: myName(), p_target: target, p_value: !!on })
+    }).then(function (r) {
+      return r.text().then(function (t) { var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { j = t; } return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      var code = typeof res.j === 'string' ? res.j : '';
+      if (!res.ok || code !== 'ok') {
+        if (btn) { btn.disabled = false; btn.textContent = '바꾸기'; }
+        toast(code === 'NOT_ALLOWED' ? '운행일지 관리자만 바꿀 수 있습니다.'
+          : code === 'BAD_TARGET' ? '그 계정을 찾지 못했습니다.'
+          : (res.j && (res.j.message || res.j.error)) || '바꾸지 못했습니다. 잠시 뒤 다시 해 보세요.', true); return;
+      }
+      if (USERS[target]) USERS[target].uses_driving = !!on;
+      closePanel(); render();
+      toast(nameOf(target) + ' 님을 ' + (on ? '「운전함」' : '「운전 안 함」') + '으로 바꿨습니다.');
+    }).catch(function () {
+      if (btn) { btn.disabled = false; btn.textContent = '바꾸기'; }
+      toast('바꾸지 못했습니다.', true);
+    });
+  }
+
   /* ══════════════════ 결재 ══════════════════
      결재 단위는 사람 × 마감주기. 운행 건별로 결재하지 않는다.
      결재선은 조직도에서 자동으로 채워 주되 잠그지 않는다 — 빼고 더할 수 있다.  */
@@ -2141,10 +2211,30 @@
     var k = cycle || CYCKEY(), mine = myName();
     return APPR.filter(function (a) { return a.username === mine && a.cycle === k; })[0] || null;
   }
+  /* ── 결재 문서 종류(2026-10-07 개인경비) ──
+     운행일지 결재 건은 APPR, 확장 모듈의 결재 건(개인경비)은 EXT.kinds[종류].rows() 에 있고 a._kind 가 붙어 있다.
+     번호(id)는 표마다 따로 매기므로 겹칠 수 있다 — 결재 건을 찾을 때는 늘 종류와 함께 찾는다. */
+  function kindOf(a) { return (a && a._kind) || ''; }
+  function kindDef(k) { return (k && EXT.kinds[k]) || null; }
+  function extAppr() {
+    var out = [];
+    Object.keys(EXT.kinds).forEach(function (k) { try { out = out.concat(EXT.kinds[k].rows() || []); } catch (e) { } });
+    return out;
+  }
+  /** 결재함이 보는 결재 건 전부 — 운행일지 + 확장. 확장 건이 있으면 상신 시각 최근 순으로 섞는다. */
+  function allAppr() {
+    var x = extAppr();
+    if (!x.length) return APPR;
+    return APPR.concat(x).sort(function (a, b) { return String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')); });
+  }
+  function apprFind(id, kind) {
+    var kd = kindDef(kind), list = kd ? (kd.rows() || []) : APPR;
+    return list.filter(function (x) { return x.id === id; })[0] || null;
+  }
   /** 내 차례인 결재 건. 관리자라도 결재선에 없으면 안 나온다(대결 불가). */
   function inbox() {
     var mine = myName();
-    return APPR.filter(function (a) {
+    return allAppr().filter(function (a) {
       if (a.status !== 'submitted') return false;
       var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0];
       return cur && cur.approver === mine;
@@ -2160,11 +2250,16 @@
    *   부서별 고정 결재선·조직도 자동 결재선으로 미리 채우지 않는다. 상신 창은 빈 칸으로 열린다.
    */
   function previousSteps() {
-    var mine = myName(), cur = myAppr();
-    var past = (cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length) ? cur
-      : APPR.filter(function (a) {
+    var mine = myName(), kd = kindDef(SUB_KIND);
+    var cur = kd ? kd.mine(CYCKEY()) : myAppr();
+    var latest = function (list) {
+      return list.filter(function (a) {
         return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length;
       }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
+    };
+    // 개인경비는 개인경비 결재 건에서 먼저 찾고, 처음 올리는 것이면 운행일지 때의 결재선을 불러온다.
+    var past = (cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length) ? cur
+      : kd ? (latest(kd.rows() || []) || latest(APPR)) : latest(APPR);
     if (!past) return null;
     // 버튼에 적는 것과 실제로 불러오는 것이 같아야 한다 — 지금 규칙(칸마다 한 명 · 한 사람은 한 칸 ·
     // 결재할 수 있는 사람)으로 미리 걸러 둔다. 예전 화면에서 만든 결재선은 칸이 겹치거나 비어 있을 수 있다.
@@ -2277,7 +2372,10 @@
   /** 관리 화면 위 「보는 범위」 줄 — 사업부 › 팀 › 파트·센터. 고를 수 있는 값은 지금 자료에 있는 사람 기준. */
   function orgBarHtml() {
     var r = viewRange(), seen = {};
-    ALL_TRIPS.forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi) seen[t.username] = 1; });
+    // 확장 화면(개인경비 관리)은 그 기간에 경비를 쓴·상신한 사람으로 고를 값을 만든다.
+    var xu = EXT.orgUsers ? EXT.orgUsers(VIEW) : null;
+    if (xu) xu.list.forEach(function (u) { seen[u] = 1; });
+    else ALL_TRIPS.forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi) seen[t.username] = 1; });
     var us = Object.keys(seen);
     var cnt = function (f) { var c = {}; us.forEach(function (u) { var p = orgPath(u); if (f(p)) { var v = f(p); c[v] = (c[v] || 0) + 1; } }); return c; };
     var divs = cnt(function (p) { return p.div || '-'; });
@@ -2299,7 +2397,7 @@
       '<label class="osel"><span>팀</span><select id="ofTeam"' + (Object.keys(teams).length ? '' : ' disabled') + '>' + opt(teams, ORGF.team, '전체') + '</select></label>' +
       '<span class="oarr" aria-hidden="true">›</span>' +
       '<label class="osel"><span>파트·센터</span><select id="ofUnit"' + (Object.keys(units).length ? '' : ' disabled') + '>' + opt(units, ORGF.unit, '전체') + '</select></label>' +
-      '<span class="ocnt">운행한 사람 <b>' + n0(shown) + '</b>' + (orgFilterOn() ? ' / ' + n0(us.length) : '') + '명</span>' +
+      '<span class="ocnt">' + (xu ? esc(xu.label) : '운행한 사람') + ' <b>' + n0(shown) + '</b>' + (orgFilterOn() ? ' / ' + n0(us.length) : '') + '명</span>' +
       (orgFilterOn() ? '<button class="btn sm" id="ofClear">' + ic('close', 12) + '범위 지우기</button>' : '') +
       '</div>';
   }
@@ -2351,15 +2449,19 @@
   }
 
   /* ── 상신 창 ── */
-  function openSubmit() {
+  /** 상신 창이 다루는 결재 문서 종류. '' = 운행일지, 'expense' = 개인경비(EXT.kinds). */
+  var SUB_KIND = '';
+  function draftKey() { return (SUB_KIND ? SUB_KIND + ':' : '') + CYCKEY(); }
+  function openSubmit(kind) {
+    SUB_KIND = kindDef(kind) ? kind : '';
     if (isMulti()) { toast('상신은 한 주기씩 합니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
-    var a = myAppr();
+    var a = SUB_KIND ? kindDef(SUB_KIND).mine(CYCKEY()) : myAppr();
     if (a && (a.status === 'submitted' || a.status === 'approved')) {
       toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
     }
     // 빈 칸으로 연다 — 결재받을 분은 상신자가 이름을 넣어 고른다. 지난번 것은 버튼으로 불러온다.
     // 이 주기에 넣다 만 결재선이 있으면 되살린다 — 창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게.
-    DRAFT = (DRAFT_KEEP[CYCKEY()] || []).slice();
+    DRAFT = (DRAFT_KEEP[draftKey()] || []).slice();
     APPR_Q = '';
     APPR_BOX = DRAFT.length ? nextEmptyBox(APPR_BOXES[0]) : APPR_BOXES[0];           // 「팀장」 칸부터 — 바로 이름을 칠 수 있게
     renderSubmit();
@@ -2503,15 +2605,16 @@
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
     SUBMIT.token = null; SUBMIT.send = null;
     tidyDraft();
-    DRAFT_KEEP[CYCKEY()] = DRAFT.slice();
+    DRAFT_KEEP[draftKey()] = DRAFT.slice();
     if (APPR_BOX && draftAt(APPR_BOX)) APPR_BOX = '';
+    var KD = kindDef(SUB_KIND), KH = KD ? KD.submitHead() : null;
     // ★ 관리자는 TRIPS 에 전 직원 운행이 들어 있다. 예전에는 그 합계를 그대로
     //   보여 줘서 "1,842건 · ₩12,400,000" 같은 회사 전체 숫자가 자기 결재 금액인
     //   양 보였다. 서버가 굳히는 snapshot 은 본인 것이므로 화면만 거짓말했다.
-    var T = totals(TRIPS.filter(function (t) { return t.username === myName(); }), { who: myName() });
+    var T = KD ? null : totals(TRIPS.filter(function (t) { return t.username === myName(); }), { who: myName() });
 
-    $('pTitle').textContent = cycleName(CYC.y, CYC.m) + ' 결재 상신';
-    $('pSub').textContent = cycleSpan(CYC.y, CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.cost);
+    $('pTitle').textContent = KD ? KH.title : cycleName(CYC.y, CYC.m) + ' 결재 상신';
+    $('pSub').textContent = KD ? KH.sub : cycleSpan(CYC.y, CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.cost);
 
     // ── 결재란: 운행기록부에 찍히는 모양 그대로 ──
     var me0 = personOf(myName());
@@ -2558,6 +2661,8 @@
       '결재는 왼쪽 칸부터 차례로 진행됩니다.</div>';
 
     var warn = [];
+    if (KD) warn = KH.warn || [];
+    else {
     if (T.unk) warn.push('통행료 미확정 ' + n0(T.unk) + '건이 0원으로 올라갑니다');
     // ★ 상신은 **내 운행**을 올리는 것이다. audit() 는 지금 화면 범위(관리자면 전 직원)를 봐서,
     //   '전체 마감 현황 → 내 것 결재 상신' 에서 회사 전체 건수가 경고로 떴다(2026-09-23 검증로봇).
@@ -2566,11 +2671,13 @@
     var A = auditOf(ALL_TRIPS.filter(function (t) { return t.username === mineU; }))
       .filter(function (f) { return f.sev === 'bad' && f.n > 0; });
     if (A.length) warn.push('점검에서 ' + A.reduce(function (s, f) { return s + f.n; }, 0) + '건이 걸려 있습니다');
+    }
     if (warn.length) {
       h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(warn.join(' · ')) + '</span></div>';
     }
     h += '<div class="anote">상신하면 <b>지금 자료가 그대로 저장</b>되고, 결재자는 그 자료를 봅니다. ' +
-      '상신 뒤에는 이 주기의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ' +
+      (KD ? '상신 뒤에는 이 기간의 경비를 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. '
+        : '상신 뒤에는 이 주기의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ') +
       '상신을 누르면 먼저 검증을 돌리고, 맞지 않는 곳이 있으면 올리기 전에 한 번 보여 드립니다.</div>';
 
     $('pBody').innerHTML = h;
@@ -2591,6 +2698,13 @@
           (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) : ''), res.j.warning);
         closePanel();
         TRIP_CACHE = {};                   // 잠금 상태가 바뀌었다 — 다른 주기 캐시도 믿지 않는다
+        // 개인경비 결재 건이면 그 모듈이 자기 결재 목록을 다시 받는다.
+        var kd = kindDef(payload && payload.kind);
+        if (kd) {
+          return Promise.resolve(kd.reload ? kd.reload() : null)
+            .then(function () { paintPills(); render(); return true; })
+            .catch(function () { toast('처리는 됐습니다. 목록을 다시 불러옵니다.'); loadAll(); return true; });
+        }
         // 처리는 이미 끝났다. 뒤이은 목록 재조회가 실패해도 '연결 실패' 로 오인시키지 않는다 —
         // 그러면 사용자가 상신을 다시 눌러 헷갈린다. 전체를 다시 불러오게 한다.
         return fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc')
@@ -2606,13 +2720,14 @@
    * 승인·반려·회수 확인 창. 결재자는 여기서 금액 요약·검증 결과를 보고, 결재 문서(PDF)를 열어 본 뒤 누른다.
    * 예전에는 카드의 [승인]이 한 번 클릭으로 확정됐고 내역을 볼 길이 없었다.
    */
-  function openApprAct(act, id) {
-    var a = APPR.filter(function (x) { return x.id === id; })[0];
+  function openApprAct(act, id, kind) {
+    var a = apprFind(id, kind), kd = kindDef(kind);
     if (!a) { toast('결재 건을 찾지 못했습니다. 새로고침해 주세요.', true); return; }
     var s = a.snapshot || {}, cy = String(a.cycle || '').split('-');
     var cname = cy.length === 2 ? cycleName(+cy[0], +cy[1]) : a.cycle;
+    if (kd && kd.cycName) cname = kd.cycName(a);
     var kv = function (k, v) { return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; };
-    var sumHtml = s.trips != null
+    var sumHtml = kd ? (kd.sumHtml ? kd.sumHtml(a) : '') : s.trips != null
       ? kv('운행', '<b>' + n0(s.trips) + '건</b> · ' + km(s.km) + ' km (업무 ' + km(s.biz_km) + ' km)') +
         kv('유류비', won(s.fuel)) +
         kv('통행료', won(s.toll) + (s.toll_unknown ? ' <span class="st warn">미확정 ' + n0(s.toll_unknown) + '건은 0원</span>' : '') +
@@ -2626,10 +2741,11 @@
       : act === 'reopen' ? '정정 열기' : '상신 회수';
     var body = '';
     if (act === 'withdraw') {
-      body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>이 주기의 운행·영수증을 다시 고칠 수 있게</b> 됩니다. ' +
+      body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>' +
+        (kd ? '이 기간의 경비를 다시 고칠 수 있게' : '이 주기의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
         '고친 뒤 다시 상신하면 그때의 자료로 새로 고정됩니다.</div>' + apprTrack(a);
     } else {
-      body = sumHtml + apprTrack(a) + (EXT.apprExtra ? EXT.apprExtra(a) : '') +
+      body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
         '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="apprWhy">' +
         (act === 'approve' ? '의견' : act === 'reopen' ? '정정 사유' : '반려 사유') + '</label><div class="fbody">' +
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
@@ -2646,10 +2762,10 @@
               '반려하면 이 주기의 잠금이 풀려 상신자가 고쳐서 다시 올릴 수 있고, 누가 반려했는지 기록에 남습니다.'
             : '반려하면 상신자가 자료를 고쳐 다시 올릴 수 있습니다.') + '</div>';
     }
-    openPanel(nameOf(a.username) + ' · ' + title, cname,
+    openPanel(nameOf(a.username) + ' · ' + (kd ? kd.tag + ' ' : '') + title, cname,
       body,
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="btnApprGo" data-act="' + esc(act) + '" data-id="' + a.id + '">' +
+      '<button class="btn pri" id="btnApprGo" data-act="' + esc(act) + '" data-id="' + a.id + '"' + (kd ? ' data-kind="' + esc(kind) + '"' : '') + '>' +
       (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : '반려') + '</button>');
     if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
   }
@@ -2662,7 +2778,7 @@
     //   거르지 않으면 남의 결재 진행상황과 금액이 '그 밖의 건' 으로 나열됐다.
     //   내가 올린 것과 내가 결재선에 든 것만 남긴다.
     var meNow = myName();
-    var others = APPR.filter(function (a) {
+    var others = allAppr().filter(function (a) {
       if (mine.indexOf(a) >= 0) return false;
       if (a.username === meNow) return true;
       return (a.steps || []).some(function (s) { return s && s.approver === meNow; });
@@ -2673,9 +2789,15 @@
     var shown = others.filter(function (a) { return st === 'all' || a.status === st; });
     var CAP = 80;
     // 카드에 붙는 검증 요약·결재 문서 버튼은 고정본에서 온다 — 보이는 건만 한 번에 물어본다.
+    // 번호는 종류마다 따로 매긴다 — 운행일지 것은 운행일지 모듈에, 개인경비 것은 개인경비 모듈에 묻는다.
+    var vis = mine.concat(shown.slice(0, CAP));
     if (EXT.wantSummaries) {
-      EXT.wantSummaries(mine.concat(shown.slice(0, CAP)).map(function (a) { return a.id; }));
+      EXT.wantSummaries(vis.filter(function (a) { return !kindOf(a); }).map(function (a) { return a.id; }));
     }
+    Object.keys(EXT.kinds).forEach(function (k) {
+      var kd = EXT.kinds[k];
+      if (kd.wantSummaries) kd.wantSummaries(vis.filter(function (a) { return kindOf(a) === k; }).map(function (a) { return a.id; }));
+    });
 
     var h = head('결재함', mine.length ? '내 차례 ' + mine.length + '건' : '내 차례인 건이 없습니다');
     if (mine.length) {
@@ -2716,23 +2838,28 @@
     var canWithdraw = a.username === myName() && a.status === 'submitted' &&
       !(a.steps || []).some(function (x) { return x.result; });
     var cy = String(a.cycle || '').split('-');
-    return '<div class="acard">' +
-      '<div class="ahd"><b>' + esc(nameOf(a.username)) + '</b>' +
+    // 결재 문서 종류(개인경비 등)가 붙어 있으면 한 결재함에서 어느 문서인지 딱지로 가른다.
+    var kd = kindDef(kindOf(a)), anyKind = Object.keys(EXT.kinds).length > 0;
+    var kattr = kd ? ' data-kind="' + esc(kindOf(a)) + '"' : '';
+    return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '">' +
+      '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' x' : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
+      '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
       '<span class="acyc">' + esc(cy.length === 2 ? cycleName(+cy[0], +cy[1]) : a.cycle + '분') + '</span>' +
       '<span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +
-      (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '') +
+      (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
+        : (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '')) +
       '</div>' +
       apprTrack(a) +
-      // 검증 요약 · 결재 문서(고정본) — drv-verify.js 가 채운다.
-      (EXT.apprExtra ? EXT.apprExtra(a) : '') +
+      // 검증 요약 · 결재 문서(고정본) — drv-verify.js(운행일지) · drv-expense.js(개인경비)가 채운다.
+      (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
       (canAct || canWithdraw || canReopen(a)
         ? '<div class="aact">' +
-          (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '">정정 열기</button>' : '') +
-          (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '">회수</button>' : '') +
-          (canAct ? '<button class="btn sm" data-appr="reject" data-id="' + a.id + '">반려</button>' +
-            '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '">승인</button>' : '') +
+          (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
+          (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '"' + kattr + '>회수</button>' : '') +
+          (canAct ? '<button class="btn sm" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
+            '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button>' : '') +
           '</div>'
         : '') +
       '</div>';
@@ -6205,13 +6332,25 @@
     var u = USERS[myName()];
     return ME.uses_driving === false || !!(u && u.uses_driving === false);
   }
-  var NODRV_VIEWS = ['inbox', 'account'];      // 결재만 하는 사람이 들어갈 수 있는 화면
+  // 운전 안 하는 사람이 들어갈 수 있는 화면 — 결재함 · 내 계정 · 개인경비(2026-10-07)
+  var NODRV_VIEWS = ['inbox', 'account', 'x_month', 'x_verify'];
+  /** 운전 안 하는 사람의 첫 화면 — 결재할 것이 있으면 결재함, 아니면 개인경비. */
+  function ndLanding() {
+    if (inbox().length) return 'inbox';
+    return VIEWS.x_month ? 'x_month' : 'inbox';
+  }
+  var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
   function render() {
-    // 결재만 하는 사람은 결재함·내 계정만 — 다른 화면 주소로 와도 결재함으로 돌린다.
+    // 운전 안 하는 사람은 결재함·개인경비·내 계정만 — 다른 화면 주소로 와도 그리로 돌린다.
     var nd = noDriving();
     document.body.classList.toggle('nodrv', nd);
-    if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) { VIEW = 'inbox'; applyScope(); writeHash(); }
+    if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) { VIEW = ndLanding(); ND_AUTO = !LOADED; applyScope(); writeHash(); }
+    else if (nd && ND_AUTO && LOADED) {
+      ND_AUTO = false;
+      if (VIEW !== 'inbox' && inbox().length) { VIEW = 'inbox'; applyScope(); writeHash(); }
+    }
+    if (ME) paintCycle();          // 화면마다 기간 규칙이 다를 수 있다(개인경비 20~19일)
     // 적재가 실패했으면 스켈레톤 대신 사유와 다시 시도 버튼을 보여 준다.
     $('inner').innerHTML = LOAD_ERR
       ? '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
@@ -6244,7 +6383,7 @@
     if (ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) return;
     // 권한 관리는 관리자 중에서도 마스터 계정만(서버 RPC 가 그렇게 못 박혀 있다).
     if (v === 'perm' && !ACCT.can_manage_admin) return;
-    if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = 'inbox';
+    if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = ndLanding();
     if (v !== VIEW && !KEEP_ORG && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
     KEEP_ORG = false;
     if (v !== VIEW) notifyGo(v, VIEW);
@@ -6280,7 +6419,7 @@
       if (h.b) setPeriod({ range: { from: h.a, to: h.b } }, { silent: true });
       else setPeriod({ cyc: h.a }, { silent: true });
       // 앞날의 주기를 주소에 적어 와도 이번 주기까지만 간다.
-      if (!RANGE && cmpCycle(CYC, currentCycle()) > 0) setPeriod({ cyc: currentCycle() }, { silent: true });
+      if (!RANGE && cmpCycle(CYC, curCyc(h.view)) > 0) setPeriod({ cyc: curCyc(h.view) }, { silent: true });
       changed = hashOf().split('/')[2] !== before;
     }
     var v = h.view;
@@ -6580,6 +6719,8 @@
     if ((el = e.target.closest('[data-perm]'))) {
       openPermConfirm('admin', el.dataset.perm, el.dataset.on === '1'); return;
     }
+    if ((el = e.target.closest('[data-drvset]'))) { openDrvSet(el.dataset.drvset, el.dataset.on === '1'); return; }
+    if ((el = e.target.closest('#btnDrvSetGo'))) { if (!el.disabled) runDrvSet(el.dataset.target, el.dataset.on === '1'); return; }
     if ((el = e.target.closest('[data-pwreset]'))) {
       openPermConfirm('pw', el.dataset.pwreset, false); return;
     }
@@ -6602,7 +6743,7 @@
     }
 
     /* ── 결재 ── */
-    if (e.target.closest('#btnOpenSubmit')) { openSubmit(); return; }
+    if ((el = e.target.closest('#btnOpenSubmit'))) { openSubmit(el.dataset.kind || ''); return; }
     if ((el = e.target.closest('[data-orgteam]'))) {
       var tp = el.dataset.orgteam.split('|'); ORGF = { div: tp[0] || '-', team: tp[1] || '', unit: '' }; saveOrgF();
       PAGES = {}; AUDIT = null; applyScope(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
@@ -6644,11 +6785,12 @@
       if (sb.disabled) return;
       // ★ 주기(21일~20일)가 끝나기 전이면 한 번 묻는다 — 상신하면 그 뒤 운행·영수증은 결재 문서에 들어가지 않는다
       //   (2026-10-02 사용자 결정: 막지 않고 되묻고 허용). 「그래도 상신」 을 누르면 data-early 로 다시 들어온다.
-      var rEnd = cycleRange(CYC.y, CYC.m).hi;
+      var subKind = SUB_KIND, subKD = kindDef(subKind);      // 누른 순간의 문서 종류(창이 바뀌어도 그대로)
+      var rEnd = subKD ? subKD.rangeHi() : cycleRange(CYC.y, CYC.m).hi;
       if (Date.now() < rEnd && !sb.dataset.early) {
         var endD = md(rEnd - 1);
-        $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">아직 주기 중입니다(' + esc(endD) +
-          '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?</span>' +
+        $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">아직 ' + (subKD ? '기간' : '주기') + ' 중입니다(' + esc(endD) +
+          '까지). 지금 상신하면 이후 ' + (subKD ? '경비는' : '운행·영수증은') + ' 결재 문서에 들어가지 않습니다. 그래도 상신할까요?</span>' +
           '<button class="btn" data-close>취소</button>' +
           '<button class="btn pri" id="btnSubmitAppr" data-early="1">그래도 상신</button>';
         return;
@@ -6672,19 +6814,22 @@
           action: 'submit', cycle: cyc0,
           steps: DRAFT.map(function (s) { return { approver: s.approver, box: s.box }; })
         };
+        if (subKD) payload.kind = subKind;             // 개인경비 상신 — 서버가 그 기간 expense_items 를 굳힌다
         var b = $('btnSubmitAnyway') || sb;
         if (document.contains(b)) { b.disabled = true; b.textContent = '상신하는 중…'; }
         callAppr(payload, '상신했습니다.').then(function (ok) {
           // 상신되면 그 주기는 잠긴다 — 통행료 채우기에 쳐 둔 값은 더 저장할 수 없다.
-          if (ok) { FILLS = {}; delete DRAFT_KEEP[cyc0]; }
+          if (ok && subKD) delete DRAFT_KEEP[subKind + ':' + cyc0];
+          else if (ok) { FILLS = {}; delete DRAFT_KEEP[cyc0]; }
           if (!ok && document.contains(b)) { b.disabled = false; b.textContent = b.id === 'btnSubmitAnyway' ? '그대로 상신' : '상신'; }
         });
       };
       SUBMIT.send = send;
       // 검증·사진 판독이 실패해도 상신은 한다(불일치는 표시만 — 2026-10-01 결정).
       // 다만 '맞지 않는 곳'이 있으면 잠기기 전에 한 번 보여 준다 — 상신 뒤에 알면 회수해야 한다.
-      (EXT.beforeSubmit
-        ? EXT.beforeSubmit(function (t) { if (alive() && document.contains(sb)) sb.textContent = t + '…'; })
+      var bfs = subKD ? subKD.beforeSubmit : EXT.beforeSubmit;
+      (bfs
+        ? bfs(function (t) { if (alive() && document.contains(sb)) sb.textContent = t + '…'; })
         : Promise.resolve(null)).then(function (sum) {
         if (!alive()) { gone(); return; }
         if (sum && sum.bad > 0) {
@@ -6700,13 +6845,16 @@
       return;
     }
     if (e.target.closest('#btnSubmitAnyway')) { if (SUBMIT.send) SUBMIT.send(); return; }
-    if (e.target.closest('#btnSeeVerify')) { closePanel(); go('verify'); return; }
+    if (e.target.closest('#btnSeeVerify')) {
+      var svk = kindDef(SUB_KIND);
+      closePanel(); go(svk && svk.verifyView ? svk.verifyView : 'verify'); return;
+    }
     if (e.target.closest('#btnBackAppr')) {
       var bk = APPR_BACK; APPR_BACK = null;
-      if (bk) { openApprAct(bk.act, bk.id); if ($('apprWhy')) $('apprWhy').value = bk.why; }
+      if (bk) { openApprAct(bk.act, bk.id, bk.kind); if ($('apprWhy')) $('apprWhy').value = bk.why; }
       return;
     }
-    if ((el = e.target.closest('[data-appr]'))) { openApprAct(el.dataset.appr, +el.dataset.id); return; }
+    if ((el = e.target.closest('[data-appr]'))) { openApprAct(el.dataset.appr, +el.dataset.id, el.dataset.kind || ''); return; }
     if ((el = e.target.closest('#btnApprGo'))) {
       var act = el.dataset.act, id = +el.dataset.id;
       var why = String(($('apprWhy') || {}).value || '').trim();
@@ -6716,6 +6864,7 @@
       if (el.disabled) return;
       el.disabled = true;
       var p2 = { action: act, id: id };
+      if (el.dataset.kind) p2.kind = el.dataset.kind;          // 개인경비 결재 건이면 서버가 개인경비 표를 쓴다
       if (why && act !== 'withdraw') p2.comment = why;
       callAppr(p2).then(function (ok) { if (!ok && document.contains(el)) el.disabled = false; });
       return;
@@ -7214,7 +7363,7 @@
     // 결재 확인 창 위에 다른 내용(결재 문서·검증 결과)을 띄우는 것이면 돌아올 곳과 적던 의견을 맡아 둔다.
     var go0 = $('btnApprGo');
     if (go0 && $('panel').classList.contains('open')) {
-      APPR_BACK = { act: go0.dataset.act, id: +go0.dataset.id, why: String(($('apprWhy') || {}).value || '') };
+      APPR_BACK = { act: go0.dataset.act, id: +go0.dataset.id, kind: go0.dataset.kind || '', why: String(($('apprWhy') || {}).value || '') };
     }
     $('panel').classList.toggle('wide', !!wide);
     $('pTitle').textContent = title || '';
@@ -7255,7 +7404,13 @@
       setOrg: function (rows) { ORG = rows || []; },
       orgScopeName: orgScopeName,
       /** 검증을 돌린 뒤 — 영수증 화면의 사진 판독(evidence_ai)을 다시 받게 한다. */
-      aiReset: function () { AIR = {}; AIR_ASKED = {}; }
+      aiReset: function () { AIR = {}; AIR_ASKED = {}; },
+      // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
+      fileToJpegs: fileToJpegs, evCrop: evCrop, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
+      apprTrack: apprTrack, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
+      inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
+      addCycle: addCycle, cmpCycle: cmpCycle, currentCycle: currentCycle, kd: kd,
+      usesDriving: usesDriving, noDriving: noDriving
     };
     (window.DrvExtQ || []).forEach(function (make) {
       var x;
@@ -7266,6 +7421,12 @@
       if (x.onCycle) EXT.onCycle.push(x.onCycle);
       if (x.dirty) EXT.dirty.push(x.dirty);
       if (x.onGo) EXT.onGo.push(x.onGo);
+      // 개인경비(2026-10-07): 결재 문서 종류 · 기간 규칙 · 같이 받을 자료 · 「보는 범위」를 얹을 관리 화면
+      Object.keys(x.kinds || {}).forEach(function (k) { EXT.kinds[k] = x.kinds[k]; });
+      if (x.period) EXT.period = x.period;
+      if (x.load) EXT.load.push(x.load);
+      if (x.orgUsers) EXT.orgUsers = x.orgUsers;
+      (x.orgbar || []).forEach(function (k) { if (ORGBAR_VIEWS.indexOf(k) < 0) ORGBAR_VIEWS.push(k); });
     });
   })();
 
