@@ -233,7 +233,9 @@
   var APPR = [], PEOPLE = {};               // 결재 건 · 사람 목록(이름·부서·직급)
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
-  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [] };
+  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [], onGo: [] };
+  /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
+  function notifyGo(v, prev) { EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } }); }
   var LOADED = false, LOADING = false, AUDIT = null;
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
   /** driving-account 가 알려 주는 것 — 권한 관리를 할 수 있는 계정인가.
@@ -6245,6 +6247,7 @@
     if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = 'inbox';
     if (v !== VIEW && !KEEP_ORG && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
     KEEP_ORG = false;
+    if (v !== VIEW) notifyGo(v, VIEW);
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
@@ -6284,6 +6287,7 @@
     if (VIEWS[v] && !(ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) && !(v === 'perm' && !ACCT.can_manage_admin)) {
       if (VIEW !== v) {
         if (v !== VIEW && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
+        notifyGo(v, VIEW);
         VIEW = v; AUDIT = null; clearFilters();
         // go() 와 같은 이유 — 관리 화면에서 맞춰 둔 남의 대조 결과가 개인 화면에 남으면 안 된다.
         HP = { groups: [], batch: '', busy: false, note: '' };
@@ -7261,6 +7265,7 @@
       ['apprExtra', 'wantSummaries', 'beforeSubmit', 'sumText'].forEach(function (k) { if (x[k]) EXT[k] = x[k]; });
       if (x.onCycle) EXT.onCycle.push(x.onCycle);
       if (x.dirty) EXT.dirty.push(x.dirty);
+      if (x.onGo) EXT.onGo.push(x.onGo);
     });
   })();
 

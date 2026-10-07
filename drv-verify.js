@@ -28,6 +28,9 @@
   /* ══════════════════ 검증 결과 보관 ══════════════════ */
   // 키 = 아이디|주기. undefined = 아직 안 물어봄 · null = 검증한 적 없음 · 객체 = 마지막 결과
   var ROWS = {}, ASKING = {}, RUN = { busy: false, note: '', who: '' };
+  /** 이번에 검증 화면에 들어와서 검증을 돌렸는가(키별). 화면에 들어올 때마다 비운다 — 늘 ① 검증하기부터(2026-10-07 사용자).
+   *  예전 검증 결과는 아래에 그대로 보여 주지만, ②·③ 은 지금 자료로 다시 검증해야 열린다. */
+  var FRESH = {};
   /** 검증 뒤 PDF 미리보기를 확인했는가(사람·주기별). 다시 검증하면 다시 확인한다. 탭을 닫으면 잊는다. */
   var PREVIEWED = (function () { try { return JSON.parse(sessionStorage.getItem('drv.previewed') || '{}'); } catch (e) { return {}; } })();
   /** 이 사람·주기의 운행·영수증 지문 — 고치면 달라진다(PDF 확인을 다시 받게). */
@@ -279,7 +282,8 @@
     // 검증은 한 번에 하나만 돈다. 다른 주기 것이 돌고 있으면 그렇다고 말한다(눌러도 반응이 없으면 고장으로 보인다).
     // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
     var seen = previewOk(k);
-    var stage = locked ? 0 : !row ? 1 : !seen ? 2 : 3;
+    var fresh = !!FRESH[k];
+    var stage = locked ? 0 : !row || !fresh ? 1 : !seen ? 2 : 3;
     // 2026-10-07: 순서대로 큰 단추 세 칸 — ① 검증하기 → ② PDF 미리보기 → ③ 결재 상신. 앞 단계를 마쳐야 다음 칸이 열린다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     var stepCard = function (n, title, desc, button) {
@@ -291,14 +295,15 @@
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
       stepCard(1, '검증하기 ' + gemBadge('Gemini'),
         busy ? 'Gemini 가 영수증·계기판 사진을 읽고 기록과 맞춰 보는 중입니다…'
-          : row ? 'Gemini 가 사진을 읽어 대조했습니다. 고친 게 있으면 다시 눌러 주세요.'
+          : row && fresh ? 'Gemini 가 사진을 읽어 대조했습니다. 고친 게 있으면 다시 눌러 주세요.'
+          : row ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(whenText(row.created_at)) + ') 결과입니다.'
           : 'Gemini 가 영수증·계기판 사진을 읽어 운행 기록과 서로 맞는지 봅니다.',
         gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-          busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증하기' : '검증하기',
+          busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
       stepCard(2, 'PDF 미리보기',
-        row ? '결재자에게 갈 문서를 눈으로 확인합니다.' : '검증을 먼저 해 주세요.',
-        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && !busy ? '' : ' disabled') + '>' +
+        row && fresh ? '결재자에게 갈 문서를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
+        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' +
           ic('dl', 16) + 'PDF 미리보기</button>') +
       stepCard(3, '결재 상신',
         !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
@@ -363,6 +368,7 @@
     RUN.p = p;
     p.then(function (row) {
       ROWS[k] = row || null;
+      FRESH[k] = 1;
       setPreviewed(k, false);
       ALLROWS.list = null;
       if (C.aiReset) C.aiReset();                 // 영수증 화면의 사진 판독도 새로 받게
@@ -1202,6 +1208,7 @@
   });
   return {
     views: { verify: viewVerify, a_verify: viewVerifyAll, a_final: viewFinal },
+    onGo: function (v) { if (v === 'verify') FRESH = {}; },
     admin: ['a_verify', 'a_final'],
     apprExtra: apprExtra, wantSummaries: wantSummaries, beforeSubmit: beforeSubmit,
     sumText: sumText, pdfFrozen: pdfFrozen, xlsxFrozen: xlsxFrozen,
