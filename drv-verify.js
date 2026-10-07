@@ -575,7 +575,9 @@
     } else if (f === undefined) checks.push(['dim', '검증 결과 불러오는 중…']);
     else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
     checks.push(s.toll_unknown ? ['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 계산)'] : ['ok', '통행료 모두 확정']);
-    if (s.rate_miss) checks.push(['warn', '유류 단가 미등록 ' + n0(s.rate_miss) + '건(기본 단가)']);
+    // rate_miss 는 단가가 없던 「분기-지역」 목록이다(예: 2026-4-수도권). 빈 목록이면 문제없음.
+    var rm = Array.isArray(s.rate_miss) ? s.rate_miss : (Number(s.rate_miss) > 0 ? [String(s.rate_miss) + '건'] : []);
+    if (rm.length) checks.push(['warn', '유류 단가 미등록(' + rm.map(function (k) { var q = String(k).split('-'); return q.length === 3 ? q[0] + '년 ' + q[1] + '분기 ' + q[2] : k; }).join(', ') + ') — 기본 단가로 계산']);
     if (bigJump) checks.push(['warn', '전월보다 비용이 크게 늘었습니다']);
     var nBad = checks.filter(function (c) { return c[0] === 'bad'; }).length, nWarn = checks.filter(function (c) { return c[0] === 'warn'; }).length;
     var verdict = nBad ? ['bad', '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요']
