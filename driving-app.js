@@ -1639,12 +1639,11 @@
     // 동명이인을 가릴 수 있게 본부부터 적는다(2026-10-07 검증로봇 R9 — 본부 직속 줄은 이름만 보였다).
     var lab = function (o) { return o.name + ' · ' + [o.division, o.team, o.unit].filter(Boolean).join(' › ') + (o.role ? ' · ' + o.role : o.rank ? ' · ' + o.rank : ''); };
     var opt = function (o) { return '<option value="' + o.id + '">' + esc(lab(o)) + '</option>'; };
-    // ★ 이름만 같다고 미리 고르지 않는다(검증로봇 R6) — 아직 가입 안 한 결재자 이름으로 가입하면 관리자가
-    //   그대로 승인을 눌러 그 결재자 자리를 넘겨줄 수 있었다. 회사 메일까지 조직도와 같을 때만 미리 고른다.
-    var mail = String(x.email || '').trim().toLowerCase();
-    var byMail = mail ? same.filter(function (o) { return String(o.email || '').trim().toLowerCase() === mail; }) : [];
+    // ★ 미리 고르지 않는다(검증로봇 R6·2차) — 이름은 물론 회사 메일(아이디@atecmobility.com)도 추측하기 쉬워,
+    //   아직 가입 안 한 결재자로 꾸민 신청을 관리자가 그대로 승인하면 그 결재자 자리를 넘겨줄 수 있었다.
+    //   이름이 같은 사람은 맨 위에 보여 주기만 하고, 본인 확인 뒤 관리자가 직접 고른다.
     return {
-      def: byMail.length === 1 ? String(byMail[0].id) : '',
+      def: '',
       html: '<option value="">잇지 않음 — 나중에 「조직도」에서 잇기</option>' +
         '<option value="new">조직도에 새로 추가</option>' +
         (same.length ? '<optgroup label="이름이 같은 사람">' + same.map(opt).join('') + '</optgroup>' : '') +
@@ -1700,7 +1699,7 @@
     if (orgPick === 'new') {
       var tv = function (id) { return (($(id) || {}).value || '').trim(); };
       newOrg = { division: tv('suDiv'), team: tv('suTeam'), role: tv('suRole'), rank: tv('suRank'), email: tv('suOMail').toLowerCase() };
-      if (newOrg.email && !/@atecmobility\.com$/.test(newOrg.email)) { toast('알림 메일은 @atecmobility.com 주소만 됩니다. 모르면 비워 두세요.', true); $('suOMail').focus(); return; }
+      if (newOrg.email && !/^[a-z0-9._-]+@atecmobility\.com$/.test(newOrg.email)) { toast('알림 메일은 @atecmobility.com 주소만 됩니다. 모르면 비워 두세요.', true); $('suOMail').focus(); return; }
       if (!newOrg.division) { toast('조직도에 새로 넣으려면 본부를 넣어 주세요.', true); $('suDiv').focus(); return; }
     }
     var go = $('btnSignupGo'); if (go) go.disabled = true;
@@ -2405,7 +2404,7 @@
       // ★ 금액은 m.sum 이다. 예전에는 m.amount 를 더해서(그런 필드가 없다)
       //   체크를 아무리 해도 합계가 늘 ₩0 으로 보였다.
       var sum = picked.reduce(function (a, m) { return a + (Number(m.sum) || 0); }, 0);
-      var todo = (g.matched || []).filter(function (m) { return m.kind !== 'same'; });
+      var todo = (g.matched || []).filter(function (m) { return !hpDone(m); });
       var lab = $('hpSum' + gi);
       if (lab) lab.innerHTML = '남은 것 <b>' + n0(todo.length) + '건</b> · ' +
         '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum);
@@ -4813,8 +4812,8 @@
       var sum = picked.reduce(function (s, e) { return s + e.sum; }, 0);
       // ★ 값이 이미 영수증과 같은 줄은 손댈 것이 없다. 표에서 빼고 접어 둔다.
       //   안 빼면 확정해도 표가 그대로라 아무 일도 안 일어난 것처럼 보인다.
-      var todo = (g.matched || []).filter(function (e) { return e.kind !== 'same'; });
-      var done = (g.matched || []).filter(function (e) { return e.kind === 'same'; });
+      var todo = (g.matched || []).filter(function (e) { return !hpDone(e); });
+      var done = (g.matched || []).filter(hpDone);
 
       h += '<section class="sect" data-hpcard="' + gi + '"><div class="hd">' +
         '<h2>카드 ' + esc(g.card4 || '?') + '</h2>' +
@@ -5072,6 +5071,8 @@
   }
   /** 이 운행을 고칠 수 없는가. 서버(trip-edit)도 같은 판정을 한다. */
   function apprLocked(t) { return lockedAt(t.username, t.start_time); }
+  /** 하이패스 대조에서 더 할 일이 없는 줄 — 이미 하이패스로 맞췄거나, 금액은 같은데 결재가 잠겨 바꿀 수 없는 것(2026-10-07). */
+  function hpDone(e) { return e.kind === 'same' || (e.kind === 'confirm' && apprLocked(e.trip)); }
   /** 이 증빙을 지울 수 없는가. */
   function evLocked(e) { return lockedAt(e.username, e.date_millis); }
 
