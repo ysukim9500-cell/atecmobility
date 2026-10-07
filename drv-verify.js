@@ -255,20 +255,29 @@
     // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
     var seen = !!PREVIEWED[k];
     var stage = locked ? 0 : !row ? 1 : !seen ? 2 : 3;
-    var btn = gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-      busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증' : '검증 실행',
-      busy, (row || locked ? '' : ' pri') + (stage === 1 && !busy ? ' cta' : ''));
-    // 검증을 봤으면 다음 할 일은 상신이다 — 마감 현황으로 돌아가야 한다는 것을 알 길이 없었다.
+    // 2026-10-07: 순서대로 큰 단추 세 칸 — ① 검증하기 → ② PDF 미리보기 → ③ 결재 상신. 앞 단계를 마쳐야 다음 칸이 열린다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
-    var submitBtn = row && canSubmit && !busy
-      ? '<button class="btn' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit"' +
-        (stage === 2 ? ' title="PDF 미리보기로 문서를 확인한 뒤 상신하세요"' : '') + '>' +
-        (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '';
-    var guide = locked || busy ? '' : '<ol class="vguide" aria-label="상신 순서">' +
-      [['검증', 1], ['PDF 미리보기로 확인', 2], ['결재 상신', 3]].map(function (g) {
-        var st = stage > g[1] ? 'done' : stage === g[1] ? 'now' : '';
-        return '<li class="' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '><i>' + (st === 'done' ? '✓' : g[1]) + '</i>' + g[0] + '</li>';
-      }).join('') + '</ol>';
+    var stepCard = function (n, title, desc, button) {
+      var st = stage > n ? 'done' : stage === n ? 'now' : 'todo';
+      return '<li class="vstep ' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '>' +
+        '<div class="vsh"><i>' + (st === 'done' ? '✓' : n) + '</i><b>' + title + '</b></div>' +
+        '<p>' + desc + '</p>' + button + '</li>';
+    };
+    var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
+      stepCard(1, '검증하기',
+        busy ? '사진과 기록을 살펴보는 중입니다…' : row ? '고친 게 있으면 다시 눌러 주세요.' : '운행·영수증·계기판이 서로 맞는지 봅니다.',
+        gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
+          busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증하기' : '검증하기',
+          busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
+      stepCard(2, 'PDF 미리보기',
+        row ? '결재자에게 갈 문서를 눈으로 확인합니다.' : '검증을 먼저 해 주세요.',
+        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && !busy ? '' : ' disabled') + '>' +
+          ic('dl', 16) + 'PDF 미리보기</button>') +
+      stepCard(3, '결재 상신',
+        !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+        canSubmit ? '<button class="btn big' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit"' + (stage === 3 && !busy ? '' : ' disabled') + '>' +
+          (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '') +
+      '</ol>';
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
       (row ? '마지막 검증 ' + esc(whenText(row.created_at)) : '검증 전') + '</div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
@@ -279,9 +288,8 @@
         fact('사진 판독', row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
           row.ai ? 'AI 가 읽은 영수증·계기판' : 'AI 미설정 — 규칙 검증만', false, row.ai) +
         '</div>' : '') +
-      guide + '<div class="vact">' + btn +
-      '<button class="btn' + (stage === 2 ? ' cta' : '') + '" data-pdf="">' + ic('dl', 14) + (locked ? '결재 문서 PDF' : stage === 2 ? 'PDF 미리보기로 확인' : 'PDF 미리보기') + '</button>' +
-      (submitBtn ? '<span style="flex:1"></span>' + submitBtn : '') + '</div></div>';
+      (locked ? '<div class="vact">' + gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
+        busy ? (RUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') + '<button class="btn" data-pdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' : steps) + '</div>';
 
     if (locked) {
       h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' +
@@ -295,12 +303,12 @@
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('scan', 21) + '</div>' +
-        '<div class="t">「검증 실행」을 누르면 이번 주기 기록을 살펴봅니다.</div>' +
+        '<div class="t">위 ① 「검증하기」를 누르면 이번 주기 기록을 살펴봅니다.</div>' +
         '<div class="d">계기판이 이어지는지, 영수증 금액이 입력과 같은지, 같은 영수증을 두 번 올리지 않았는지 봅니다.<br>' +
         '맞지 않는 곳이 있어도 상신은 할 수 있습니다 — 결재자가 같이 봅니다.</div></div></div>';
     }
     h += '<div class="anote">금액 계산은 규칙으로만 합니다. ' + gemBadge('Gemini AI') + ' 는 사진을 읽어 <b>입력값과 다른 곳을 표시</b>할 뿐, 값을 바꾸지 않습니다. ' +
-      '「바로 고치기」로 고친 뒤에는 「다시 검증」을 눌러 주세요.</div>';
+      '「바로 고치기」로 고친 뒤에는 「다시 검증하기」를 눌러 주세요.</div>';
     return h;
 
     function fact(kk, v, sub, alert, gem) {
