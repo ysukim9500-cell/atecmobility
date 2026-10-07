@@ -835,6 +835,18 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 /* ── 입력 폼 (운행 고치기 · 추가) ────────────────────────────────── */
 .form{border-top:1px solid var(--ink-100);margin-top:4px}
 .frow{display:flex;gap:16px;padding:15px 0;border-bottom:1px solid var(--ink-100);align-items:flex-start}
+/* 운행 추가 — 필수 표시 · 장소 검색(2026-10-07) */
+.flab em.req{font-style:normal;color:var(--red);margin-left:2px}
+.placebox{position:relative}
+.placelist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--surface,#fff);border:1px solid var(--ink-200);
+  border-radius:var(--r-sm,8px);box-shadow:0 12px 28px -12px rgba(0,0,0,.25);max-height:280px;overflow:auto}
+.placeitem{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:9px 12px;border:0;
+  border-bottom:1px solid var(--ink-100);background:none;cursor:pointer;font:inherit}
+.placeitem:hover,.placeitem:focus{background:var(--ink-50,#f4f6f8);outline:none}
+.placeitem b{font-size:13.5px;color:var(--ink)}
+.placeitem span{font-size:12px;color:var(--ink-400)}
+.placemsg{padding:10px 12px;font-size:12.5px;color:var(--ink-400)}
+.cform input[type=time]{min-width:150px}
 .frow:last-child{border-bottom:0}
 .flab{flex:0 0 74px;font-size:12.5px;color:var(--ink-500);padding-top:8px}
 .flab .only{display:inline-block;font-size:10px;font-weight:500;color:var(--red);

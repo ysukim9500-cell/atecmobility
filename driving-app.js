@@ -5182,143 +5182,276 @@
   /* ══════════════════ 운행 추가 ══════════════════
      빠진 운행을 채워 넣는다. 서버가 계기판 연속성을 그 자리에서 검사하고,
      앞뒤와 1,000km 이상 벌어지면 되물어본다(175,500km 오타 같은 사고 방지). */
+  /* ══════════════════ 운행 추가 (2026-10-07 개편 — 앱 수기 입력과 같은 흐름) ══════════════════
+     · 출발지·도착지: 카카오 장소 검색(건물 이름·주소)으로 고른다 — 좌표가 남아 유류단가 지역·거리 계산에 쓰인다.
+     · 그날 운행이 있으면 「어디에 넣을지」(몇 번째)를 고른다. 시각은 그 자리로 정해지고(앱 TripSlot 과 같은 규칙),
+       출발 계기판은 앞 운행의 도착값, 도착 계기판은 도로 거리로 자동으로 채운다(고칠 수 있다).
+     · 도착이 다음 운행 출발보다 크면 이후 운행 계기판을 밀어 올린다(서버가 몇 건·몇 km 인지 되묻는다).
+     · 방문처·주차비·통행료는 반드시 고르거나 적어야 넣을 수 있다.                                         */
+  var CF = null;   // 운행 추가 창의 상태
+  var CF_STEP = 60000, CF_DAY = 86400000;
+
+  /** 그 날·그 차의 운행(시각 순). */
+  function cfDayTrips() {
+    if (!CF || !CF.date || !CF.plate) return [];
+    var s = Date.parse(CF.date + 'T00:00:00+09:00'), e = s + CF_DAY;
+    return ALL_TRIPS.filter(function (t) {
+      return t.username === CF.who && (t.plate_no || '') === CF.plate && !t.deleted_at && t.start_time >= s && t.start_time < e;
+    }).sort(function (a, b) { return a.start_time - b.start_time; });
+  }
+  /** 앱 TripSlot.computeStart 와 같은 규칙 — 고른 자리를 시각으로 옮긴다. */
+  function cfStart(dayTrips, pos) {
+    var dayS = Date.parse(CF.date + 'T00:00:00+09:00'), maxT = dayS + CF_DAY - 1;
+    if (!dayTrips.length) return dayS + 9 * 3600000;          // 빈 날은 09:00(사람이 고칠 수 있다)
+    var prev = pos > 0 ? dayTrips[pos - 1] : null, next = dayTrips[pos] || null;
+    var ts = prev ? Math.max(prev.start_time, prev.end_time || 0) + CF_STEP : next ? next.start_time - CF_STEP : dayS + 5 * CF_STEP;
+    if (ts > maxT) { var lower = prev ? prev.start_time : dayS; ts = lower + Math.floor((maxT - lower + 1) / 2); if (ts <= lower) ts = lower + 1; }
+    ts = Math.max(ts, dayS);
+    if (next && ts >= next.start_time) ts = prev ? Math.floor((prev.start_time + next.start_time) / 2) : Math.floor((dayS + next.start_time) / 2);
+    if (prev && ts <= prev.start_time) ts = prev.start_time + 1;
+    var used = {}; dayTrips.forEach(function (t) { used[t.start_time] = 1; });
+    var g = 0; while (used[ts] && g < 60000) { ts++; g++; }
+    return ts;
+  }
+  /** 이 사람·이 차량의 운행 중 ms 보다 앞선 마지막 운행. */
+  function cfPrevTrip(ms) {
+    var best = null;
+    ALL_TRIPS.forEach(function (t) {
+      if (t.username !== CF.who || (t.plate_no || '') !== CF.plate || t.deleted_at || t.start_time >= ms) return;
+      if (!best || t.start_time > best.start_time) best = t;
+    });
+    return best;
+  }
+  var hhmmOf = function (ms) { var d = new Date(Number(ms) + KST); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+  var placeShort = function (a) { return String(a || '').split(' ').slice(-2).join(' '); };
+
   function openCreate(who) {
-    // ★ 관리자가 "누구 운행"을 바꾸면 차량 목록과 계기판 기본값도 그 사람 것이어야
-    //   한다. 예전에는 늘 본인 것이라, 그대로 넣기를 누르면 남의 차·남의 계기판으로
-    //   저장됐다 — 점검 화면이 잡으려는 바로 그 사고를 이 화면이 만들었다.
     var mine = who || myName();
     var myCars = carsOf(mine);
-    var last = lastTripOf(mine);
-
-    // 날짜가 주기를 정한다. 예전에는 '보고 있는 주기' 안에서만 고르게 했는데, 달력만 막을 뿐
-    // 손으로 친 날짜는 그대로 넘어가 다른 주기에 저장되면서 지금 화면 합계에 섞였다.
-    // 이제는 최근 넉 달 안의 아무 날이나 넣을 수 있고, 어느 주기에 들어가는지 그 자리에서 알려 준다.
     var r = viewRange();
     var dstr = ymd(Math.min(Date.now(), r.hi - 1));
     var minD = ymd(cycleRange(addCycle(currentCycle(), -3).y, addCycle(currentCycle(), -3).m).lo);
     var maxD = ymd(Date.now());
     if (dstr < minD) dstr = minD;
+    CF = { who: mine, plate: myCars[0] || '', date: dstr, pos: null, from: null, to: null, route: null, odoTouched: false, timeTouched: false };
+
     $('pTitle').textContent = '운행 추가';
     $('pSub').textContent = nameOf(mine);
-
-    var h = '<div class="form">';
+    var h = '<div class="form cform">';
     if (ME.is_admin && isAll()) {
       var us = Object.keys(PEOPLE).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
       h += fld('누구 운행', '<select class="inp" id="cWho">' + us.map(function (u) {
-        return '<option value="' + esc(u) + '"' + (u === mine ? ' selected' : '') + '>' +
-          esc(nameOf(u)) + ' · ' + esc(personOf(u).dept || '') + '</option>';
+        return '<option value="' + esc(u) + '"' + (u === mine ? ' selected' : '') + '>' + esc(nameOf(u)) + ' · ' + esc(personOf(u).dept || '') + '</option>';
       }).join('') + '</select>', '관리자는 다른 분 운행도 넣을 수 있습니다');
     }
     h += fld('차량번호', myCars.length
-      ? '<select class="inp" id="cPlate">' + myCars.map(function (c) {
-          return '<option value="' + esc(c) + '">' + esc(c) + '</option>';
-        }).join('') + '<option value="__etc__">직접 입력…</option></select>' +
-        '<input class="inp" id="cPlateEtc" placeholder="차량번호" style="margin-top:8px" hidden>'
+      ? '<select class="inp" id="cPlate">' + myCars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') + '</select>'
       : '<input class="inp" id="cPlateEtc" placeholder="예) 12가3456">');
-    h += fld('날짜', '<input class="inp" type="date" id="cDate" value="' + dstr + '" min="' +
-      minD + '" max="' + maxD + '">', '<span id="cDateHint"></span>');
-    h += fld('시각', '<input class="inp num" type="time" id="cFrom" value="09:00" style="width:112px">' +
-      '<span class="arrowto">→</span>' +
-      '<input class="inp num" type="time" id="cTo" value="09:30" style="width:112px">',
-      '도착 시각을 넣으면 나중에 <b>하이패스 영수증과 맞춰볼 수 있습니다</b>');
-    h += fld('운행목적', '<div class="radios">' + PURPOSES.map(function (p) {
-      return '<label class="radio"><input type="radio" name="cPurpose" value="' + esc(p) + '"' +
-        (p === '일반업무' ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
-    }).join('') + '</div>');
-    h += fld('계기판',
-      '<input class="inp num" id="cOdoS" inputmode="numeric" placeholder="출발" value="' +
-      (last && last.end_odometer != null ? n0(last.end_odometer) : '') + '">' +
+    h += fld('날짜 <em class="req">*</em>', '<input class="inp" type="date" id="cDate" value="' + dstr + '" min="' + minD + '" max="' + maxD + '">', '<span id="cDateHint"></span>');
+    h += '<div id="cPosRow"></div>';
+    h += fld('출발지 <em class="req">*</em>', placeBox('cFrom', '건물 이름·주소로 찾기 (예: 서울버스 본사)'), '<span id="cFromHint">목록에서 골라 주세요 — 수도권·지방 유류단가를 가릅니다</span>');
+    h += fld('도착지 <em class="req">*</em>', placeBox('cTo', '건물 이름·주소로 찾기'), '<span id="cToHint">목록에서 고르면 도로 거리로 도착 계기판을 채웁니다</span>');
+    h += fld('계기판 <em class="req">*</em>',
+      '<input class="inp num" id="cOdoS" inputmode="numeric" placeholder="출발">' +
       '<span class="arrowto">→</span>' +
       '<input class="inp num" id="cOdoE" inputmode="numeric" placeholder="도착">',
-      '앞뒤 운행과 <b>1,000km 이상 벌어지면 서버가 되물어봅니다</b>');
-    // ★ 출발지 — 유류단가가 수도권/지방으로 갈린다. 예전에는 이 칸이 없어 웹에서 넣은 운행은
-    //   출발지가 늘 비었고, 서버 지역 판정이 무조건 '지방' 이 됐다(2026-09-23 검증로봇).
-    //   이 사람의 최근 출발지를 미리 채워 둔다(대개 같은 사무실에서 출발한다).
-    var lastAddr = '';
-    for (var ai = 0; ai < ALL_TRIPS.length && !lastAddr; ai++) {
-      if (ALL_TRIPS[ai].username === mine && ALL_TRIPS[ai].start_address) lastAddr = ALL_TRIPS[ai].start_address;
-    }
-    h += fld('출발지', '<input class="inp" id="cAddr" maxlength="200" placeholder="예) 서울 중구 … / 경기 성남시 …" value="' +
-      esc(lastAddr) + '">', '시·도로 시작하게 써 주세요 — <b>수도권·지방 유류단가</b>를 가릅니다');
-    h += fld('방문처', '<input class="inp" id="cVisit" maxlength="120" placeholder="선택">');
-    h += fld('주차비', '<input class="inp num" id="cPark" inputmode="numeric" placeholder="없으면 비움">' +
-      '<span class="unit">원</span>');
-    h += fld('통행료',
-      '<div class="radios"><label class="radio"><input type="radio" name="cToll" value="unknown" checked>' +
-      '<span>모름</span></label><label class="radio"><input type="radio" name="cToll" value="amount">' +
-      '<span>금액 입력</span></label></div>' +
-      '<div style="margin-top:9px"><input class="inp num" id="cToll" inputmode="numeric" placeholder="0">' +
-      '<span class="unit">원</span></div>');
-    h += '</div>';
-    h += '<div class="anote">수기로 넣은 운행은 <b>수기</b> 표시가 붙습니다. ' +
-      '주행거리는 계기판 차이로 자동 계산됩니다.</div>';
+      '<span id="cOdoHint">출발은 앞 운행의 도착값, 도착은 도로 거리로 자동으로 채웁니다(고칠 수 있습니다)</span>');
+    h += fld('시각', '<input class="inp num" type="time" id="cFromT" style="width:150px">' +
+      '<span class="arrowto">→</span><input class="inp num" type="time" id="cToT" style="width:150px">',
+      '고른 자리에 맞춰 자동으로 정해집니다. 도착 시각이 있으면 나중에 <b>하이패스 영수증과 맞춰볼 수 있습니다</b>');
+    h += fld('운행목적', '<div class="radios">' + PURPOSES.map(function (p) {
+      return '<label class="radio"><input type="radio" name="cPurpose" value="' + esc(p) + '"' + (p === '일반업무' ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
+    }).join('') + '</div>');
+    h += fld('방문처 <em class="req">*</em>', '<input class="inp" id="cVisit" maxlength="120" placeholder="예) 서울버스 본사">', '도착지를 고르면 그 이름으로 채웁니다');
+    h += fld('주차비 <em class="req">*</em>',
+      '<div class="radios"><label class="radio"><input type="radio" name="cParkM" value="none"><span>없음</span></label>' +
+      '<label class="radio"><input type="radio" name="cParkM" value="amount"><span>있음</span></label></div>' +
+      '<div style="margin-top:9px" id="cParkBox" hidden><input class="inp num" id="cPark" inputmode="numeric" placeholder="금액"><span class="unit">원</span></div>',
+      '주차비가 있으면 영수증도 올려 주세요(검증에서 확인합니다)');
+    h += fld('통행료 <em class="req">*</em>',
+      '<div class="radios"><label class="radio"><input type="radio" name="cToll" value="none"><span>없음</span></label>' +
+      '<label class="radio"><input type="radio" name="cToll" value="amount"><span>금액 입력</span></label>' +
+      '<label class="radio"><input type="radio" name="cToll" value="unknown"><span>모름</span></label></div>' +
+      '<div style="margin-top:9px" id="cTollBox" hidden><input class="inp num" id="cToll" inputmode="numeric" placeholder="0"><span class="unit">원</span></div>',
+      '<span id="cTollHint">「모름」은 나중에 자동 계산·하이패스 대조로 채웁니다</span>');
+    h += '</div><div class="anote">수기로 넣은 운행은 <b>수기</b> 표시가 붙습니다. 주행거리는 계기판 차이로 계산됩니다.</div>';
 
     $('pBody').innerHTML = h;
-    $('pFoot').innerHTML = '<span style="flex:1"></span>' +
-      '<button class="btn" data-close>취소</button>' +
-      '<button class="btn pri" id="btnCreateTrip">넣기</button>';
+    $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCreateTrip">넣기</button>';
     $('panel').classList.add('open');
-    // 사람을 바꾸면 그 사람의 차량·계기판으로 폼을 다시 연다.
-    var whoSel = $('cWho');
-    if (whoSel) whoSel.addEventListener('change', function () { openCreate(this.value); });
-    // 날짜를 바꿀 때마다 어느 주기에 들어가는지, 그 주기가 잠겼는지 알려 준다.
-    var hintDate = function () {
-      var el = $('cDateHint'), v = ($('cDate') || {}).value || '';
-      if (!el) return;
-      var ms = Date.parse(v + 'T12:00:00+09:00');
-      if (!isFinite(ms)) { el.textContent = '날짜를 골라 주세요'; return; }
-      var c = cycleOfMs(ms), lk = lockedAt(mine, ms);
-      el.innerHTML = '<b>' + esc(cycleName(c.y, c.m)) + '</b>(' + esc(cycleSpan(c.y, c.m)) + ')에 들어갑니다' +
-        (lk ? ' — <b style="color:var(--red)">결재 중이거나 끝난 주기라 넣을 수 없습니다</b>' : '');
-      var b = $('btnCreateTrip'); if (b) b.disabled = lk;
-    };
-    if ($('cDate')) { $('cDate').addEventListener('change', hintDate); $('cDate').addEventListener('input', hintDate); }
-    hintDate();
+
+    var whoSel = $('cWho'); if (whoSel) whoSel.addEventListener('change', function () { openCreate(this.value); });
+    if ($('cPlate')) $('cPlate').addEventListener('change', function () { CF.plate = this.value; cfRefresh(true); });
+    if ($('cPlateEtc')) $('cPlateEtc').addEventListener('input', function () { CF.plate = this.value.trim(); cfRefresh(true); });
+    $('cDate').addEventListener('change', function () { CF.date = this.value; CF.pos = null; cfRefresh(true); });
+    $('cOdoS').addEventListener('input', function () { CF.odoTouched = true; });
+    $('cOdoE').addEventListener('input', function () { CF.odoTouched = true; });
+    $('cFromT').addEventListener('input', function () { CF.timeTouched = true; });
+    $('cToT').addEventListener('input', function () { CF.timeTouched = true; });
+    document.querySelectorAll('input[name="cParkM"]').forEach(function (x) { x.addEventListener('change', function () { $('cParkBox').hidden = this.value !== 'amount'; if (this.value === 'amount') $('cPark').focus(); }); });
+    document.querySelectorAll('input[name="cToll"]').forEach(function (x) { x.addEventListener('change', function () { $('cTollBox').hidden = this.value !== 'amount'; if (this.value === 'amount') $('cToll').focus(); }); });
+    wirePlace('cFrom', function (p) { CF.from = p; cfRoute(); });
+    wirePlace('cTo', function (p) { CF.to = p; if (p && !$('cVisit').value.trim()) $('cVisit').value = p.name; cfRoute(); });
+    cfRefresh(true);
 
     function fld(label, body, hint) {
       return '<div class="frow"><label class="flab">' + label + '</label><div class="fbody">' + body +
         (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
     }
   }
-
-  function createTrip(force) {
-    var num = function (el) {
-      var v = String((el && el.value) || '').replace(/[^\d]/g, '');
-      return v === '' ? null : Number(v);
+  function placeBox(id, ph) {
+    return '<div class="placebox"><input class="inp" id="' + id + 'Q" autocomplete="off" maxlength="60" placeholder="' + esc(ph) + '">' +
+      '<div class="placelist" id="' + id + 'L" role="listbox" hidden></div></div>';
+  }
+  /** 장소 검색 칸 — 글자를 치면 잠깐 뒤에 찾고, 목록에서 고르면 좌표까지 정해진다. 다시 치면 고른 것이 풀린다. */
+  function wirePlace(id, onPick) {
+    var q = $(id + 'Q'), list = $(id + 'L'), timer = null, seq = 0, items = [];
+    var show = function (arr, msg) {
+      items = arr || [];
+      list.innerHTML = msg ? '<div class="placemsg">' + esc(msg) + '</div>' : items.map(function (p, i) {
+        return '<button type="button" class="placeitem" data-pi="' + i + '"><b>' + esc(p.name) + '</b><span>' + esc(p.addr) + '</span></button>';
+      }).join('');
+      list.hidden = !msg && !items.length;
     };
-    var plateSel = $('cPlate'), plateEtc = $('cPlateEtc');
-    var plate = (plateSel && plateSel.value !== '__etc__') ? plateSel.value
-      : (plateEtc ? plateEtc.value.trim() : '');
+    q.addEventListener('input', function () {
+      if (q.dataset.picked) { delete q.dataset.picked; onPick(null); }
+      clearTimeout(timer);
+      var v = q.value.trim();
+      if (v.length < 2) { show([]); return; }
+      timer = setTimeout(function () {
+        var my = ++seq;
+        show([], '찾는 중…');
+        apiRetry('/functions/v1/trip-geo', { method: 'POST', body: JSON.stringify({ action: 'search', q: v }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { if (my !== seq) return; if (!j || !j.ok) { show([], (j && j.error) || '찾지 못했습니다'); return; } show(j.list, j.list.length ? '' : '찾는 곳이 없습니다 — 다른 이름이나 주소로 찾아 보세요'); })
+          .catch(function () { if (my === seq) show([], '서버에 연결하지 못했습니다'); });
+      }, 350);
+    });
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pi]'); if (!b) return;
+      var p = items[+b.dataset.pi]; if (!p) return;
+      q.value = p.name + (p.addr ? ' · ' + p.addr : ''); q.dataset.picked = '1';
+      show([]); onPick(p);
+    });
+    q.addEventListener('blur', function () { setTimeout(function () { show([]); }, 200); });
+  }
+  /** 날짜·차량·자리가 바뀌면 자리 목록·시각·출발 계기판을 다시 맞춘다. */
+  function cfRefresh(resetPos) {
+    var hint = $('cDateHint');
+    var ms = Date.parse((CF.date || '') + 'T12:00:00+09:00');
+    var lk = isFinite(ms) && lockedAt(CF.who, ms);
+    if (hint) {
+      if (!isFinite(ms)) hint.textContent = '날짜를 골라 주세요';
+      else { var c = cycleOfMs(ms); hint.innerHTML = '<b>' + esc(cycleName(c.y, c.m)) + '</b>(' + esc(cycleSpan(c.y, c.m)) + ')에 들어갑니다' + (lk ? ' — <b style="color:var(--red)">결재 중이거나 끝난 주기라 넣을 수 없습니다</b>' : ''); }
+    }
+    var btn = $('btnCreateTrip'); if (btn) btn.disabled = !!lk;
+    var day = cfDayTrips();
+    if (resetPos || CF.pos == null || CF.pos > day.length) CF.pos = day.length;
+    // 그날 운행이 있으면 어디에 넣을지 고른다(겹치는 운행 사이 자리)
+    var row = $('cPosRow');
+    if (row) {
+      row.innerHTML = day.length ? '<div class="frow"><label class="flab">넣을 자리 <em class="req">*</em></label><div class="fbody">' +
+        '<select class="inp" id="cPos">' + [0].concat(day.map(function (_, i) { return i + 1; })).map(function (i) {
+          var lab = i === 0 ? '맨 앞 — ' + hhmmOf(day[0].start_time) + ' 운행 전'
+            : hhmmOf(day[i - 1].start_time) + ' 운행(' + esc(placeShort(day[i - 1].end_address) || day[i - 1].visit_place || day[i - 1].purpose || '') + ' 도착) 다음';
+          return '<option value="' + i + '"' + (i === CF.pos ? ' selected' : '') + '>' + lab + '</option>';
+        }).join('') + '</select><div class="fhint">이 날 운행이 ' + day.length + '건 있습니다. 어느 운행 앞뒤인지 고르면 시각·계기판이 그 자리에 맞춰집니다.</div></div></div>' : '';
+      var ps = $('cPos'); if (ps) ps.addEventListener('change', function () { CF.pos = +this.value; cfRefresh(false); });
+    }
+    if (!isFinite(ms)) return;
+    var st = cfStart(day, CF.pos);
+    if (!CF.timeTouched) {
+      $('cFromT').value = hhmmOf(st);
+      $('cToT').value = hhmmOf(st + Math.max(1, (CF.route && CF.route.min) || 30) * 60000);
+    }
+    // 출발 계기판 = 그 자리 앞 운행의 도착값(그날 맨 앞이면 그날 첫 운행의 출발값)
+    if (!CF.odoTouched) {
+      var prev = CF.pos > 0 ? day[CF.pos - 1] : (day.length ? null : cfPrevTrip(st));
+      var so = prev ? Math.round(Number(prev.end_odometer)) : day.length ? Math.round(Number(day[0].start_odometer)) : null;
+      if (so != null && isFinite(so)) $('cOdoS').value = n0(so); else $('cOdoS').value = '';
+      // 출발지 기본값 = 앞 운행의 도착지(좌표가 있으면 고른 것으로)
+      if (!CF.from && prev && prev.end_address && prev.end_lat && prev.end_lng && !$('cFromQ').value) {
+        CF.from = { name: placeShort(prev.end_address), addr: prev.end_address, lat: Number(prev.end_lat), lng: Number(prev.end_lng) };
+        $('cFromQ').value = CF.from.name + ' · ' + CF.from.addr; $('cFromQ').dataset.picked = '1';
+      }
+      cfFillEnd();
+    }
+  }
+  function cfFillEnd() {
+    if (CF.odoTouched || !CF.route || CF.route.km == null) return;
+    var so = Number(String($('cOdoS').value || '').replace(/[^\d]/g, ''));
+    if (!so && so !== 0) return;
+    $('cOdoE').value = n0(Math.round(so + CF.route.km));
+  }
+  /** 출발·도착을 모두 골랐으면 도로 거리·예상 시간·예상 통행료를 받아 채운다. */
+  function cfRoute() {
+    CF.route = null;
+    var hint = $('cOdoHint');
+    if (!CF.from || !CF.to) { if (hint) hint.textContent = '출발은 앞 운행의 도착값, 도착은 도로 거리로 자동으로 채웁니다(고칠 수 있습니다)'; return; }
+    if (hint) hint.textContent = '도로 거리를 계산하는 중…';
+    apiRetry('/functions/v1/trip-geo', { method: 'POST', body: JSON.stringify({ action: 'route', from: { lat: CF.from.lat, lng: CF.from.lng }, to: { lat: CF.to.lat, lng: CF.to.lng } }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok || j.km == null) { if (hint) hint.textContent = (j && (j.error || j.note)) || '거리를 계산하지 못했습니다 — 도착 계기판을 직접 넣어 주세요'; return; }
+        CF.route = j;
+        if (hint) hint.innerHTML = '도로 거리 <b>' + j.km + 'km</b> · 약 ' + j.min + '분 기준으로 채웠습니다(고칠 수 있습니다)';
+        cfFillEnd();
+        if (!CF.timeTouched) cfRefresh(false);
+        var th = $('cTollHint');
+        if (th) th.innerHTML = j.toll > 0
+          ? '카카오 길찾기 예상 통행료 <b>' + n0(j.toll) + '원</b> <button type="button" class="btn sm" id="cTollUse">이 금액 넣기</button>'
+          : '길찾기 경로에는 통행료가 없습니다';
+        var u = $('cTollUse');
+        if (u) u.addEventListener('click', function () {
+          var rb = document.querySelector('input[name="cToll"][value="amount"]'); rb.checked = true;
+          $('cTollBox').hidden = false; $('cToll').value = String(j.toll);
+        });
+      }).catch(function () { if (hint) hint.textContent = '거리를 계산하지 못했습니다 — 도착 계기판을 직접 넣어 주세요'; });
+  }
+
+  function createTrip(force, shift) {
+    var num = function (el) { var v = String((el && el.value) || '').replace(/[^\d]/g, ''); return v === '' ? null : Number(v); };
+    var plate = $('cPlate') ? $('cPlate').value : ($('cPlateEtc') ? $('cPlateEtc').value.trim() : '');
     if (!plate) { toast('차량번호를 넣어 주세요.', true); return; }
-
-    var date = $('cDate').value, from = $('cFrom').value, to = $('cTo').value;
-    if (!date || !from) { toast('날짜와 출발 시각을 넣어 주세요.', true); return; }
-    var toMs = function (dd, tt) {
-      var p1 = dd.split('-').map(Number), p2 = tt.split(':').map(Number);
-      return Date.UTC(p1[0], p1[1] - 1, p1[2], p2[0] || 0, p2[1] || 0) - KST;   // 입력값은 KST
-    };
-    var startMs = toMs(date, from);
+    var date = $('cDate').value;
+    if (!date) { toast('날짜를 골라 주세요.', true); $('cDate').focus(); return; }
+    if (!CF.from) { toast('출발지를 검색해서 목록에서 골라 주세요.', true); $('cFromQ').focus(); return; }
+    if (!CF.to) { toast('도착지를 검색해서 목록에서 골라 주세요.', true); $('cToQ').focus(); return; }
+    var from = $('cFromT').value, to = $('cToT').value;
+    if (!from) { toast('출발 시각을 넣어 주세요.', true); return; }
+    var toMs = function (dd, tt) { var p1 = dd.split('-').map(Number), p2 = tt.split(':').map(Number); return Date.UTC(p1[0], p1[1] - 1, p1[2], p2[0] || 0, p2[1] || 0) - KST; };
+    // 자리로 정한 시각을 그대로 쓴다(분 단위 표시라 같은 분이면 자리 순서가 흐트러지지 않게 원래 값을 쓴다).
+    var day = cfDayTrips(), auto = cfStart(day, CF.pos);
+    var startMs = (!CF.timeTouched && hhmmOf(auto) === from) ? auto : toMs(date, from);
     var endMs = to ? toMs(date, to) : startMs;
-    if (endMs < startMs) endMs += 86400e3;   // 자정을 넘긴 운행
-
+    if (endMs < startMs) endMs += 86400e3;
     var so = num($('cOdoS')), eo = num($('cOdoE'));
     if (so == null || eo == null) { toast('계기판 값을 넣어 주세요.', true); return; }
     if (eo < so) { toast('도착 계기판이 출발보다 작습니다.', true); return; }
     if (eo - so > 3000) { toast('한 운행에 3,000km 를 넘을 수 없습니다.', true); return; }
-
+    var visit = $('cVisit').value.trim();
+    if (!visit) { toast('방문처를 넣어 주세요.', true); $('cVisit').focus(); return; }
+    var parkM = (document.querySelector('input[name="cParkM"]:checked') || {}).value;
+    if (!parkM) { toast('주차비 「없음」 또는 「있음」을 골라 주세요.', true); return; }
+    var park = parkM === 'amount' ? num($('cPark')) : null;
+    if (parkM === 'amount' && !(park > 0)) { toast('주차비 금액을 넣어 주세요.', true); $('cPark').focus(); return; }
     var tollMode = (document.querySelector('input[name="cToll"]:checked') || {}).value;
+    if (!tollMode) { toast('통행료 「없음」·「금액 입력」·「모름」 중 하나를 골라 주세요.', true); return; }
+    var tollAmt = tollMode === 'amount' ? num($('cToll')) : null;
+    if (tollMode === 'amount' && !(tollAmt > 0)) { toast('통행료 금액을 넣어 주세요(없으면 「없음」).', true); $('cToll').focus(); return; }
+
     var payload = {
       username: $('cWho') ? $('cWho').value : undefined,
       plate_no: plate, start_time: startMs, end_time: endMs,
       purpose: (document.querySelector('input[name="cPurpose"]:checked') || {}).value,
       start_odometer: so, end_odometer: eo,
-      start_address: $('cAddr') ? $('cAddr').value.trim() : '',
-      visit_place: $('cVisit').value.trim(),
-      parking_cost: num($('cPark')),
-      toll: tollMode === 'amount' ? { mode: 'amount', amount: num($('cToll')) || 0 } : { mode: 'unknown' },
-      force: !!force,
+      start_address: CF.from.addr || CF.from.name, end_address: CF.to.addr || CF.to.name,
+      start_lat: CF.from.lat, start_lng: CF.from.lng, end_lat: CF.to.lat, end_lng: CF.to.lng,
+      visit_place: visit,
+      parking_cost: park,
+      toll: tollMode === 'amount' ? { mode: 'amount', amount: tollAmt } : tollMode === 'none' ? { mode: 'amount', amount: 0 } : { mode: 'unknown' },
+      force: !!force, shift: !!shift,
     };
-
     var btn = $('btnCreateTrip'); if (btn) { btn.disabled = true; btn.textContent = '넣는 중…'; }
     apiRetry('/functions/v1/trip-create', { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
@@ -5326,30 +5459,18 @@
         if (btn) { btn.disabled = false; btn.textContent = '넣기'; }
         if (!res.ok || !res.j || !res.j.ok) {
           var j = res.j || {};
-          // 계기판이 크게 벌어졌을 때만 되물어본다. 그 외 오류는 그대로 보여 준다.
-          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 넣으시겠습니까?')) {
-            createTrip(true); return;
-          }
-          toast(j.error || '넣지 못했습니다.', true); return;
+          // 뒤 운행과 겹치면 이후 운행을 밀어 올릴지 되묻는다(앱과 같은 동작)
+          if (j.needShift && window.confirm(j.error + '\n\n이 운행을 넣고 이후 운행의 계기판을 밀어 올릴까요?')) { createTrip(force, true); return; }
+          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 넣으시겠습니까?')) { createTrip(true, shift); return; }
+          if (!j.needShift) toast(j.error || '넣지 못했습니다.', true);
+          return;
         }
-        var note = '운행을 넣었습니다.';
-        TRIP_CACHE = {};                     // 다른 주기를 보다 돌아왔을 때 옛 목록이 나오지 않게
-        if (res.j.row) {
-          var vr = viewRange(), st = Number(res.j.row.start_time);
-          if (st >= vr.lo && st < vr.hi) {
-            // 서버는 start_time 내림차순으로 준다. 맨 앞에 꽂으면 08.22 가 08.21 위에 붙는다.
-            ALL_TRIPS.push(res.j.row);
-            ALL_TRIPS.sort(function (a, b) { return b.start_time - a.start_time; });
-            applyScope();
-          } else {
-            // ★ 지금 보는 기간 밖 날짜다. 목록에 넣으면 이 기간 합계·상신 금액에 섞인다.
-            var oc = cycleOfMs(st);
-            note = cycleName(oc.y, oc.m) + '에 넣었습니다(지금 보는 기간 밖이라 이 화면에는 보이지 않습니다).';
-          }
-        }
+        var note = '운행을 넣었습니다.' + (res.j.shifted ? ' 이후 운행 ' + res.j.shifted + '건의 계기판을 +' + n0(res.j.shiftKm) + 'km 밀었습니다.' : '');
+        TRIP_CACHE = {};
         AUDIT = null;
         toastOk(note, res.j.warning);
-        closePanel(); paintPills(); render();
+        closePanel();
+        loadAll();                            // 밀린 운행까지 서버 값으로 다시 받는다
       }).catch(function () {
         if (btn) { btn.disabled = false; btn.textContent = '넣기'; }
         toast('서버에 연결하지 못했습니다.', true);
