@@ -6497,18 +6497,42 @@
       .sort(function (a, b) { return a.start_time - b.start_time; });
     if (!evs.length) { toast('이번 주기에 올린 ' + cat + ' 영수증이 없습니다.'); return; }
     var bad = {}; evUnmatched(cat).forEach(function (e) { bad[e.id] = 1; });
-    var tripLabel = function (t) {
-      return md(t.start_time) + ' ' + hm(t.start_time) + ' · ' + (t.start_address || '').split(' ').slice(-1)[0] + ' → ' +
-        (t.end_address || '').split(' ').slice(-1)[0] + (t.purpose && t.purpose !== BUSINESS ? ' (' + t.purpose + ')' : '');
+    // 주소 끝 번지(488-3)만으로는 어디인지 모른다 — 동·읍·면·리 이름(없으면 도로명)을 쓴다. 「서울 강남구 역삼동 488-3」 → 역삼동
+    var area = function (a) {
+      var w = String(a || '').trim().split(/\s+/).filter(Boolean), i;
+      for (i = w.length - 1; i >= 0; i--) if (/(동|읍|면|리|가)$/.test(w[i]) && !/^\d/.test(w[i])) return w[i];
+      for (i = w.length - 1; i >= 0; i--) if (/(로|길)$/.test(w[i]) && !/^\d/.test(w[i])) return w[i];
+      return w.slice(-2).join(' ');
     };
+    var DOW = ['일', '월', '화', '수', '목', '금', '토'];
+    var dayName = function (ms) { var d = kd(ms); return (d.getUTCMonth() + 1) + '월 ' + d.getUTCDate() + '일(' + DOW[d.getUTCDay()] + ')'; };
+    var tripLabel = function (t) {
+      var from = area(t.start_address), to = area(t.end_address);
+      var km = Number(t.end_odometer) - Number(t.start_odometer);
+      var parts = [hm(t.start_time) + (t.end_time ? '~' + hm(t.end_time) : '')];
+      parts.push(t.visit_place ? '방문처 ' + t.visit_place : '방문처 없음');
+      if (from || to) parts.push((from || '?') + ' → ' + (to || '?'));
+      if (km > 0 && km < 2000) parts.push(n0(km) + 'km');
+      if (t.purpose && t.purpose !== BUSINESS) parts.push(t.purpose);
+      return parts.join('  ·  ');
+    };
+    // 같은 날 운행끼리 날짜 제목 아래 묶는다.
+    var groups = [];
+    trips.forEach(function (t) {
+      var k = ymd(t.start_time), g = groups[groups.length - 1];
+      if (!g || g.k !== k) groups.push(g = { k: k, ms: t.start_time, list: [] });
+      g.list.push(t);
+    });
     var rows = evs.map(function (e) {
-      var opts = '<option value="">날짜로 자동 맞춤 (' + esc(md(e.date_millis)) + ')</option>' + trips.map(function (t) {
-        return '<option value="' + t.id + '"' + (String(e.trip_id || '') === String(t.id) ? ' selected' : '') + '>' + esc(tripLabel(t)) + '</option>';
+      var opts = '<option value="">자동 — 영수증 날짜(' + esc(dayName(e.date_millis)) + ') 운행에 붙이기</option>' + groups.map(function (g) {
+        return '<optgroup label="' + esc(dayName(g.ms) + (g.k === ymd(e.date_millis) ? '  ← 영수증과 같은 날' : '')) + '">' + g.list.map(function (t) {
+          return '<option value="' + t.id + '"' + (String(e.trip_id || '') === String(t.id) ? ' selected' : '') + '>' + esc(tripLabel(t)) + '</option>';
+        }).join('') + '</optgroup>';
       }).join('');
-      return '<tr' + (bad[e.id] ? ' class="flagged"' : '') + '><td><span class="lead">' + esc(md(e.date_millis)) + '</span> <span class="dim">' +
-        esc(hm(e.date_millis)) + '</span>' + (bad[e.id] ? ' <span class="st warn">맞는 운행 없음</span>' : '') + '</td>' +
-        '<td class="n">' + n0(e.amount) + '</td>' +
-        '<td><select class="inp" data-evlinksel="' + e.id + '" data-was="' + esc(String(e.trip_id || '')) + '" style="height:34px;min-width:220px">' + opts + '</select></td></tr>';
+      return '<tr' + (bad[e.id] ? ' class="flagged"' : '') + '><td style="white-space:nowrap"><span class="lead">' + esc(dayName(e.date_millis)) + '</span>' +
+        (hm(e.date_millis) !== '00:00' ? ' <span class="dim">' + esc(hm(e.date_millis)) + '</span>' : '') + (bad[e.id] ? '<div><span class="st warn">맞는 운행 없음</span></div>' : '') + '</td>' +
+        '<td class="n" style="white-space:nowrap">' + n0(e.amount) + '원</td>' +
+        '<td style="width:100%"><select class="inp" data-evlinksel="' + e.id + '" data-was="' + esc(String(e.trip_id || '')) + '" style="min-width:260px">' + opts + '</select></td></tr>';
     }).join('');
     openPanel(cat + ' 영수증을 운행에 맞추기', cycleName(CYC.y, CYC.m) + ' · ' + n0(evs.length) + '건',
       '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 자동으로 붙습니다. 수기 운행의 시각이 다르거나 ' +
