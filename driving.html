@@ -111,7 +111,7 @@ tbody tr.tfdone .lead{color:var(--ink-500)}
 .mst{display:none !important}
 body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
-body.is-admin .navsec.adm{display:block}
+body.is-admin .navsec.adm,body.is-admin .admsec.adm{display:block}
 body.is-admin .navsec.admtog{display:flex}
 /* 결재만 하는 계정(운행일지 안 씀, 2026-10-07) — 메뉴는 결재함만 */
 body.nodrv #nav > a:not([data-v="inbox"]),body.nodrv #nav > .navsec{display:none}
@@ -976,6 +976,8 @@ tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,
 .mtable th{font-size:11.5px;font-weight:600;color:var(--ink-500);text-align:left;padding:8px 16px;border-top:1px solid var(--ink-100);white-space:nowrap}
 .mtable td{padding:9px 16px;border-top:1px solid var(--ink-100);vertical-align:top}
 .mtable .n{text-align:right;white-space:nowrap}
+.mtable td.mtrips{font-size:12.5px;line-height:1.55;color:var(--ink-700,#3A4146)}
+.mtable .mtrip .mt{display:inline-block;min-width:40px;font-weight:600;color:var(--ink-900);font-variant-numeric:tabular-nums}
 .mtable tr.flagged td{background:var(--red-50)}
 .mtable .mai{font-size:11.5px;color:var(--red-700);margin-top:2px;white-space:normal}
 .mres{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-500);white-space:nowrap}
@@ -1273,15 +1275,15 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
-      <div class="admsec">결재·마감</div>
+      <div class="admsec adm">결재·마감</div>
       <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
       <a tabindex="0" role="button" data-v="a_verify" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증 현황</a>
       <a tabindex="0" role="button" data-v="a_final" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
       <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산</a>
-      <div class="admsec">기록</div>
+      <div class="admsec adm">기록</div>
       <a tabindex="0" role="button" data-v="a_trips" data-alt="a_check,a_evid,a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행·영수증 기록</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
-      <div class="admsec">사람·설정</div>
+      <div class="admsec adm">사람·설정</div>
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>조직도</a>
       <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>

@@ -957,16 +957,31 @@
 
     if (cat === '주차' || cat === '통행료') {
       var days = {};
-      var slot = function (k) { return days[k] || (days[k] = { T: 0, A: 0, R: 0, rs: [] }); };
+      var slot = function (k) { return days[k] || (days[k] = { T: 0, A: 0, R: 0, rs: [], ts: [], hit: {} }); };
       biz.forEach(function (t) {
         var k = ymd(t.start_time);
+        slot(k).ts.push(t);
+        if (cat === '주차' ? Number(t.parking_cost) > 0 : tollNeed(t).manual && tollNeed(t).a > 0) slot(k).hit[t.id] = 1;
         if (cat === '주차') { var p = Number(t.parking_cost) || 0; if (p > 0) slot(k).T += p; }
         else { var tl = tollNeed(t); if (tl.a > 0) { if (tl.manual) slot(k).T += tl.a; else slot(k).A += tl.a; } }
       });
       evs.forEach(function (e) {
         var a = Number(e.amount) || 0; if (a <= 0) return;
         var s = slot(evDay(e, r)); s.R += a; s.rs.push(e);
+        var lt = linkedTrip(e, r); if (lt) s.hit[lt.id] = 1;
       });
+      // 그날 어느 운행인지 — 시각 · 방문처. 금액을 적었거나 영수증을 맞춘 운행을 먼저, 없으면 그날 업무 운행.
+      var tripsTxt = function (d) {
+        var ts = d.ts.slice().sort(function (a, b) { return a.start_time - b.start_time; });
+        var pick = ts.filter(function (t) { return d.hit[t.id]; });
+        if (!pick.length) pick = ts;
+        if (!pick.length) return '<span class="dim">그날 업무 운행 없음</span>';
+        var show = pick.slice(0, 3).map(function (t) {
+          return '<div class="mtrip"><span class="mt">' + esc(hm(t.start_time)) + '</span>' + esc(t.visit_place || placeShort(t.end_address) || '방문처 없음') +
+            (d.hit[t.id] && cat === '주차' && Number(t.parking_cost) > 0 ? ' <span class="dim">· 주차비 ' + n0(t.parking_cost) + '</span>' : '') + '</div>';
+        }).join('');
+        return show + (pick.length > 3 ? '<div class="dim">외 ' + (pick.length - 3) + '건</div>' : '');
+      };
       var keys = Object.keys(days).filter(function (k) { var d = days[k]; return d.T || d.R; }).sort();
       var nBad = 0, xl = 0, pr = 0, auto = 0;
       Object.keys(days).forEach(function (k) { auto += days[k].A; });
@@ -983,14 +998,15 @@
         else res = ok('일치');
         if (d.T > 0 || aiNote.length) nBad++;
         xl += excel; pr += d.R;
-        return '<tr' + (d.T > 0 || aiNote.length ? ' class="flagged"' : '') + '><td>' + esc(dn(k)) + '</td>' +
+        return '<tr' + (d.T > 0 || aiNote.length ? ' class="flagged"' : '') + '><td style="white-space:nowrap">' + esc(dn(k)) + '</td>' +
+          '<td class="mtrips">' + tripsTxt(d) + '</td>' +
           '<td class="n">' + (d.T ? won(d.T) : '<span class="dim">—</span>') + '</td>' +
           '<td class="n">' + (d.R ? won(d.R) + (d.rs.length > 1 ? ' <span class="dim">(' + d.rs.length + '장)</span>' : '') : '<span class="dim">없음</span>') +
             (aiNote.length ? '<div class="mai">' + esc(aiNote.join(', ')) + '</div>' : '') + '</td>' +
           '<td class="n"><b>' + won(excel) + '</b></td><td>' + res + '</td></tr>';
       }).join('');
       var word = cat === '주차' ? '주차비' : '직접 넣은 통행료';
-      var table = keys.length ? '<div class="scroll"><table class="mtable"><thead><tr><th>날짜</th><th class="n">운행에 적은 ' + (cat === '주차' ? '주차비' : '통행료') + '</th>' +
+      var table = keys.length ? '<div class="scroll"><table class="mtable"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행에 적은 ' + (cat === '주차' ? '주차비' : '통행료') + '</th>' +
         '<th class="n">영수증</th><th class="n">엑셀에 들어가는 금액</th><th>결과</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '';
       var autoNote = cat === '통행료' && auto > 0 ? ' 자동 계산·하이패스로 맞춘 통행료 ' + won(auto) + '은 영수증 없이 인정됩니다.' : '';
       if (!keys.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없습니다' : '영수증이 필요한 통행료가 없습니다', autoNote.trim(), '');
