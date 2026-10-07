@@ -137,7 +137,23 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav),body.nodrv #nav > .navsec:n
 .xcal .xc{font-size:11px;color:var(--ink-500)}
 .xcal .xa{font-size:12.5px;font-weight:700;color:var(--ink-900);font-variant-numeric:tabular-nums;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .xcal .xm{display:inline-grid;place-items:center;width:14px;height:14px;border-radius:999px;background:var(--warn);color:#fff;font-style:normal;font-size:10px;font-weight:800}
-@media (max-width:720px){.xcal{gap:3px}.xcal .xd{min-height:48px;padding:4px}.xcal .xa{font-size:10.5px}.xcal .xc{font-size:10px}}
+.xcal .xas{display:none}
+@media (max-width:720px){.xcal{gap:3px}.xcal .xd{min-height:48px;padding:4px}.xcal .xa{font-size:10.5px;letter-spacing:-.02em;text-overflow:clip}.xcal .xc{font-size:10px}
+  .xcal .xaf{display:none}.xcal .xas{display:inline}}
+/* 영수증 올리기 표 — 폰에서는 옆으로 밀지 않고 줄마다 카드처럼 쌓는다(사진 왼쪽, 칸은 오른쪽에 위아래로). */
+@media (max-width:600px){
+  .scroll table.xup{min-width:0}
+  table.xup,table.xup tbody{display:block}
+  table.xup thead{display:none}
+  table.xup tr{display:grid;grid-template-columns:56px minmax(0,1fr);gap:8px 10px;padding:12px;border-top:1px solid var(--ink-100)}
+  table.xup tbody tr:first-child{border-top:0}
+  table.xup td,table.xup td:first-child{display:block;padding:0 !important;border:0 !important;position:static !important;background:none !important}
+  table.xup td.evth{grid-row:1 / span 3;width:auto}
+  table.xup td:not(.evth){grid-column:2}
+  table.xup td .inp{width:100% !important;max-width:none}
+  table.xup td.n{text-align:right}
+  table.xup .pgno{left:3px;top:3px}
+}
 table.xtab tr.xsec td{background:var(--sunken)}
 table.xtab tr.xsub td{font-weight:700;background:var(--sunken);font-size:12.5px}
 table.xtab tr.xover td{background:#FFFBF2}
@@ -231,6 +247,7 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cyc .cycle .tag{font-size:12px;font-weight:500;color:var(--ink-600)}
 .cyc:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 주기";color:var(--red-700);font-weight:700}
 .cyc.xper:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 기간"}
+.cyc.xper.past:not(.multi) .cycle .tag::after{content:" · 지난 기간"}
 .cyc.past .cycle{border-color:var(--warn);background:var(--warn-50)}
 .cyc.past .cycle svg{color:var(--warn)}
 .cyc.past .cycle .tag::after{font-weight:700}

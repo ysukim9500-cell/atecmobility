@@ -877,9 +877,28 @@
     c.y += 8.5 * LH;
     return { all: total, groups: gs.map(function (g) { return { cat: g.cat, n: g.list.length, sum: g.sum }; }) };
   }
-  /** 증빙 — 영수증 사진 한 쪽에 넷(2×2), 명세 순서. 사진 아래 날짜·구분·금액·사용처·사용내역. */
+  /** 명세 번호 — 「식비 1」처럼 구분 + 그 구분 안의 순번. 명세 표의 순번 칸과 같은 수(사진이 없는 줄도 센다). */
+  function expenseLabels(items) {
+    var lab = new Map();
+    expenseGroups(items).forEach(function (g) { g.list.forEach(function (it, k) { lab.set(it, g.cat + ' ' + (k + 1)); }); });
+    return lab;
+  }
+  /** 한 줄에 맞춘다 — size 에서 minSize(읽을 수 있는 크기)까지만 줄이고, 그래도 넘치면 끝을 「…」로 자른다. */
+  function fitLine(c, s, size, bold, maxW, minSize) {
+    s = c.clean(s);
+    while (c.w(s, size, bold) > maxW && size > minSize) size = Math.max(minSize, size - 0.2);
+    if (c.w(s, size, bold) <= maxW) return { t: s, size: size, cut: false };
+    var ell = c.has('…') ? '…' : '...', ch = Array.from(s);
+    while (ch.length && c.w(ch.join('') + ell, size, bold) > maxW) ch.pop();
+    return { t: ch.join('').replace(/\s+$/, '') + ell, size: size, cut: true };
+  }
+  /** 증빙 — 영수증 사진 한 쪽에 넷(2×2), 명세 순서.
+   *  사진 아래 첫 줄은 늘 다 보인다: 「식비 1 · 2026-10-03 · 27,000원」(명세의 구분·순번과 같은 번호).
+   *  둘째 줄 「사용처 · 사용내역」은 길면 「…」로 줄이고, 줄인 것은 자체 점검(issues kind 'cut')에 남긴다. 7pt 아래로는 줄이지 않는다. */
   function drawExpensePhotos(c, items, imgs, meta) {
-    var list = items.filter(function (it) { return it.path; });
+    var labs = expenseLabels(items);
+    var list = [];
+    expenseGroups(items).forEach(function (g) { g.list.forEach(function (it) { if (it.path) list.push(it); }); });
     if (!list.length) return;
     var per = 4, pages = Math.ceil(list.length / per);
     var all = list.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
@@ -888,15 +907,20 @@
       var sum = chunk.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
       receiptHead(c, '증빙 (영수증)', meta, i / per + 1, pages,
         pages > 1 ? '이 쪽 소계 ' + won(sum) + ' · 전체 ' + n0(list.length) + '건 ' + won(all) : '합계 ' + n0(list.length) + '건 ' + won(all));
-      var top = c.y, gap = 4 * MM, capH = 7.6 * LH * 2 + 1.2 * MM;
+      var S1 = 8.2, S2 = 7.6, MIN = 7;
+      var top = c.y, gap = 4 * MM, capH = (S1 + S2) * LH + 1.6 * MM;
       var cw = (CW - gap) / 2, ch = (LIMIT - top - gap) / 2;
       chunk.forEach(function (e, k) {
         var cx = MX + (k % 2) * (cw + gap), cy = top + Math.floor(k / 2) * (ch + gap);
         drawPhoto(c, imgs[e.path], cx, cy, cw, ch - capH);
-        var cap = (i + k + 1) + '. ' + [e.date || '', e.category || '', won(e.amount), e.merchant || '', e.usage || ''].filter(Boolean).join(' · ');
-        var lay = c.layout({ t: cap, size: 7.6, wrap: true, maxLines: 2, padX: 0, padY: 0 }, cw);
-        if (lay.lines.length > 2) { lay.lines = lay.lines.slice(0, 2); lay.h = 2 * lay.size * LH; }
-        c.cell(cx, cy + ch - capH + 1.2 * MM, cw, lay.h, { border: false, align: 'center', color: 0.2, valign: 'top' }, lay);
+        var no = labs.get(e) || (e.category || '');
+        var l1 = fitLine(c, [no, e.date || '', n0(e.amount) + '원'].filter(Boolean).join(' · '), S1, true, cw, MIN);
+        var l2 = fitLine(c, [e.merchant || '', e.usage || ''].filter(Boolean).join(' · '), S2, false, cw, MIN);
+        if (l1.cut) c.issue('cut', '증빙 설명 첫 줄을 줄임: ' + no);
+        if (l2.cut) c.issue('cut', '증빙 설명(사용처·사용내역)을 줄임: ' + no);
+        var y1 = cy + ch - capH + 1.2 * MM;
+        c.text(l1.t, cx + cw / 2, y1, { size: l1.size, bold: true, align: 'center', color: 0.1 });
+        if (l2.t) c.text(l2.t, cx + cw / 2, y1 + S1 * LH, { size: l2.size, align: 'center', color: 0.25 });
       });
       c.y = LIMIT;
     }
@@ -945,6 +969,7 @@
       })).then(function () { return pdf; });
     }).then(function (pdf) {
       var t = drawExpense(c, doc);
+      t.pages = pdf.getPageCount();          // 지출 명세가 차지한 쪽 수(줄이 많으면 2장 이상) — 결과 창 「지출 명세 N장」
       drawExpensePhotos(c, doc.items || [], imgs, meta);
       if (doc.verify) drawVerify(c, doc.verify, meta);
       var n = finishPages(c, meta);

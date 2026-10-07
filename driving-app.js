@@ -2845,7 +2845,8 @@
       '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' x' : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
-      '<span class="acyc">' + esc(cy.length === 2 ? cycleName(+cy[0], +cy[1]) : a.cycle + '분') + '</span>' +
+      // 개인경비는 기간이 20일~19일이라 달 이름만으로는 헷갈린다 — 범위를 같이 적는다(kd.cycLabel).
+      '<span class="acyc">' + esc(kd && kd.cycLabel ? kd.cycLabel(a) : cy.length === 2 ? cycleName(+cy[0], +cy[1]) : a.cycle + '분') + '</span>' +
       '<span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +
       (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
@@ -6387,7 +6388,12 @@
     if (v !== VIEW && !KEEP_ORG && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
     KEEP_ORG = false;
     if (v !== VIEW) notifyGo(v, VIEW);
+    // ★ 개인경비(20~19일) 화면에서 20일에 넘어간 「다음 달분」을 보다가 운행일지(21~20일) 화면으로 오면
+    //   운행일지에는 아직 없는 앞날의 주기가 된다 — 그 화면의 이번 주기로 맞춘다(applyHash 와 같은 규칙).
+    //   조용히 바꾼다(silent: 주소 쓰기·다시 받기는 아래에서 한 번만).
+    var clampCyc = !RANGE && cmpCycle(CYC, curCyc(v)) > 0;
     VIEW = v;
+    if (clampCyc) setPeriod({ cyc: curCyc(v) }, { silent: true });
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
     if (v === 'evid' && !isMulti()) { EVF.cat = EV_SUBS[evSub()]; EVF.touched = false; }   // 영수증·통행료 단계: 지금 차례의 구분부터
@@ -6400,6 +6406,8 @@
     applyScope();
     document.body.classList.remove('nav-open');
     writeHash();
+    // 위에서 기간을 이번 주기로 당겼으면 그 주기 자료를 받는다.
+    if (clampCyc && LOADED) { loadAll({ soft: true }); window.scrollTo({ top: 0 }); return; }
     // 관리자가 개인 화면에서 여러 주기를 보다가(본인 것만 받아 둔 상태) 관리 화면으로 오면 전 직원 것을 받는다.
     if (LOADED && isAll() && !LOADED_ALL) { loadAll({ soft: true }); window.scrollTo({ top: 0 }); return; }
     render();

@@ -44,17 +44,19 @@
   /* ══════════════════ 식비 기준 ══════════════════ */
   /** 사용내역에서 인원 — 「외 N명」 = N+1, 「N명」 = N, 없으면 1. (서버 X07 과 같은 규칙) */
   function mealPeople(usage) {
-    var s = String(usage || ''), m = /외\s*(\d+)\s*명/.exec(s);
-    if (m && +m[1] > 0) return +m[1] + 1;
-    m = /(\d+)\s*명/.exec(s);
-    if (m && +m[1] > 0) return +m[1];
+    // 서버 mealPersons 와 글자 하나까지 같게 — 숫자는 1~2자리, 「외 N명」이 먼저(찾았는데 0 이면 1명).
+    var s = String(usage || ''), m = /외\s*(\d{1,2})\s*명/.exec(s);
+    if (m) return +m[1] >= 1 ? +m[1] + 1 : 1;
+    m = /(\d{1,2})\s*명/.exec(s);
+    if (m) return +m[1] >= 1 ? +m[1] : 1;
     return 1;
   }
-  /** 식비 줄이 1인 1끼 13,000원을 넘는가 — { n, per } 또는 null. */
+  /** 식비 줄이 1인 1끼 13,000원을 넘는가 — { n, per } 또는 null.
+   *  ★ 판정은 나눈 값 그대로(반올림 없이, 서버 a / p > 13000 과 같게). per 는 보여 줄 값(원 아래 버림). */
   function mealOver(it) {
     if (!it || it.category !== '식비') return null;
-    var n = mealPeople(it.usage), per = Math.round((Number(it.amount) || 0) / n);
-    return per > MEAL_LIMIT ? { n: n, per: per } : null;
+    var n = mealPeople(it.usage), raw = (Number(it.amount) || 0) / n;
+    return raw > MEAL_LIMIT ? { n: n, per: Math.floor(raw) } : null;
   }
   function mealTag(it) {
     var o = mealOver(it);
@@ -266,6 +268,14 @@
     return h;
   }
 
+  /** 달력 칸에 들어갈 짧은 금액 — 4,300 → 4.3천, 12,800 → 1.3만, 128,000 → 12.8만, 1,234,000 → 123만. */
+  function shortWon(v) {
+    v = Math.round(Number(v) || 0);
+    if (v < 1000) return String(v);
+    if (v < 9950) return (Math.round(v / 100) / 10).toString().replace(/\.0$/, '') + '천';
+    var m = v / 10000;
+    return (m < 100 ? (Math.round(m * 10) / 10).toString().replace(/\.0$/, '') : String(Math.round(m))) + '만';
+  }
   /** 달력 — 기간(20일~19일) 날마다 건수·금액. */
   function calHtml(rows, r) {
     var by = {};
@@ -281,7 +291,9 @@
       h += '<button class="xd' + (x ? ' has' : '') + (k === XDAY ? ' on' : '') + (k === today ? ' today' : '') + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') +
         '" data-xday="' + k + '"' + (k === XDAY ? ' aria-pressed="true"' : '') + ' aria-label="' + esc(k + (x ? ' ' + x.n + '건 ' + n0(x.sum) + '원' : ' 없음')) + '">' +
         '<span class="xn">' + lab + '</span>' +
-        (x ? '<span class="xc">' + n0(x.n) + '건' + (x.meal ? ' <i class="xm" title="식비 기준 초과">!</i>' : '') + '</span><span class="xa">' + n0(x.sum) + '</span>' : '') + '</button>';
+        (x ? '<span class="xc">' + n0(x.n) + '건' + (x.meal ? ' <i class="xm" title="식비 기준 초과">!</i>' : '') + '</span>' +
+          // 폰(칸 약 45px)에서는 「12,800」이 잘린다 — 짧은 꼴(「1.3만」·「4.3천」)을 따로 두고 CSS 로 바꿔 보인다.
+          '<span class="xa"><span class="xaf">' + n0(x.sum) + '</span><span class="xas" aria-hidden="true">' + shortWon(x.sum) + '</span></span>' : '') + '</button>';
     }
     return h + '</div></div>';
   }
@@ -454,7 +466,7 @@
       if (!it) return;
       var g = function (s) { var el = tr.querySelector(s); return el ? el.value : null; };
       var v;
-      if ((v = g('[data-xcat]')) != null) it.cat = v;
+      if ((v = g('[data-xucat]')) != null) it.cat = v;
       if ((v = g('[data-xdate]')) != null) it.date = v;
       if ((v = g('[data-xmer]')) != null) it.merchant = v;
       if ((v = g('[data-xamt]')) != null) it.amt = String(v).replace(/[^\d]/g, '');
@@ -485,7 +497,7 @@
         }
         var lab = function (t) { return ' aria-label="' + (i + 1) + '번째 ' + t + '"'; };
         return '<tr data-xrow="' + i + '" class="' + (first ? 'pgfirst' : '') + (it.ai ? ' evai' : '') + '"><td class="evth">' + thumb + '</td>' +
-          '<td><select class="inp' + (it.cat ? '' : ' need') + '" data-xcat style="width:120px"' + lab('구분') + '>' + opts(it.cat) + '</select>' +
+          '<td><select class="inp' + (it.cat ? '' : ' need') + '" data-xucat style="width:120px"' + lab('구분') + '>' + opts(it.cat) + '</select>' +
           '<input class="inp' + (it.date ? '' : ' need') + '" type="date" data-xdate style="width:150px;margin-top:6px" value="' + esc(it.date) + '" min="' + C.ymd(XUP.lo) + '" max="' + C.ymd(XUP.hi - 1) + '"' + lab('날짜') + '></td>' +
           '<td><input class="inp" data-xmer maxlength="60" style="width:100%" placeholder="사용처(상호)" value="' + esc(it.merchant) + '"' + lab('사용처') + '>' +
           '<input class="inp num' + (it.amt ? '' : ' need') + '" data-xamt inputmode="numeric" style="width:120px;margin-top:6px" placeholder="금액(원)" value="' + esc(it.amt ? n0(it.amt) : '') + '"' + lab('금액') + '></td>' +
@@ -517,7 +529,7 @@
         C.toast((i + 1) + '번째 줄' + msg, true);
         var el = document.querySelector('[data-xrow="' + i + '"] ' + sel); if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
       };
-      if (CATS.indexOf(it.cat) < 0) { bad('의 구분을 골라 주세요.', '[data-xcat]'); return; }
+      if (CATS.indexOf(it.cat) < 0) { bad('의 구분을 골라 주세요.', '[data-xucat]'); return; }
       var ms = dayMs(it.date);
       if (!isFinite(ms)) { bad('의 날짜를 골라 주세요.', '[data-xdate]'); return; }
       if (ms < XUP.lo || ms >= XUP.hi) { bad(' 날짜가 ' + cycName(XUP.cyc) + '(' + xSpanKey(XUP.cyc) + ') 밖입니다.', '[data-xdate]'); return; }
@@ -742,7 +754,7 @@
     });
     VRUN.p = p;
     p.then(function (row) {
-      VROWS[k] = row || null; FRESH[k] = 1; setPreviewed(k, false); ALLV = { key: '', list: null };
+      VROWS[k] = row || null; FRESH[k] = sig(u, cyc); setPreviewed(k, false);
       C.toast(row ? '검증했습니다 — ' + C.vx.sumText(row.summary) : '검증했습니다.');
     }).catch(function (e) { C.toast('검증하지 못했습니다: ' + ((e && e.message) || ''), true); })
       .then(function () { VRUN = { busy: false, note: '', who: '' }; C.render(); });
@@ -791,7 +803,7 @@
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
     else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
-    var seen = previewOk(k), fresh = !!FRESH[k];
+    var seen = previewOk(k), fresh = FRESH[k] != null && FRESH[k] === sig(u, cyc);   // 검증한 뒤 자료가 바뀌었으면(바로 고치기·지우기·올리기) ①부터 다시
     var stage = locked ? 0 : !row || !fresh ? 1 : !seen ? 2 : 3;
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     var card = function (n, title, desc, button) {
@@ -864,6 +876,8 @@
     });
   }
   function periodLabel(cyc) { var r = xRangeKey(cyc); return cycName(cyc) + '  (기간 : ' + C.ymd(r.lo) + ' ~ ' + C.ymd(r.hi - 1) + ')'; }
+  /** 엑셀 제목 아래 줄 — 「2026년 10월분 (2026-09-20 ~ 2026-10-19)」. */
+  function periodText(cyc) { var r = xRangeKey(cyc); return cycName(cyc) + ' (' + C.ymd(r.lo) + ' ~ ' + C.ymd(r.hi - 1) + ')'; }
   function personOf(u, fz) {
     var p = (fz && fz.person) || {}, o = C.orgPath(u), q = C.personOf(u);
     return { name: p.name || q.name || C.nameOf(u), dept: p.dept || [C.orgName(o), o.unit].filter(Boolean).join(' ') || q.dept || '', position: p.position || q.position || '' };
@@ -875,7 +889,7 @@
     var its = docItems(rows);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 개인경비', mark: mark, docNo: docNo },
-      person: p, periodLabel: periodLabel(cyc), boxes: boxes, items: its, verify: verify,
+      person: p, periodLabel: periodLabel(cyc), periodText: periodText(cyc), boxes: boxes, items: its, verify: verify,
       sheets: [{ boxes: boxes }]               // fillSigns 가 결재란 서명을 여기에 채운다(같은 객체)
     };
   }
@@ -885,7 +899,8 @@
     return C.vx.makePdf({
       doc: { sheets: d.sheets, scans: [], photos: [] }, nImg: nImg, verify: d.verify, title: o.title, sub: o.sub, file: o.file,
       note: o.note, expect: o.expect, expectName: o.expectName, okKey: o.okKey || '', okAttr: 'data-xpdfok', meta: d.meta,
-      stat: '지출 명세 1장 · ' + n0(d.items.length) + '건',
+      // 명세가 길면 2장 이상 — 실제로 그린 쪽 수(sheetpdf totals[0].pages)로 적는다.
+      stat: function (res) { var t = (res && res.totals && res.totals[0]) || {}; return '지출 명세 ' + n0(t.pages || 1) + '장 · ' + n0(d.items.length) + '건'; },
       build: function (lib, loadImage) {
         return window.SheetPdf.buildExpense(d, { PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold, loadImage: loadImage });
       }
@@ -935,91 +950,145 @@
   }
 
   /* ── 엑셀(사용자 양식) ──
-     docs/expense/개인경비 지출명세서_양식.xlsx 와 같은 칸: B~G = 순번·날짜·사용처·금액·사용내역·비고,
-     제목 B2:G3, 결재 그림 자리에는 운행일지와 같은 결재란 5칸(담당·팀장·실장·사업부장·대표이사),
-     부서·이름 띠, <소모품비>·<식비>·<기타비용> 묶음마다 줄·소계(SUM), 합계(소계의 합), 별첨 문구. A4 세로 71%. */
+     docs/expense/개인경비 지출명세서_양식.xlsx 와 같은 칸: 순번·날짜·사용처·금액·사용내역·비고,
+     제목 · 기간 줄 · 결재란 5칸(담당·팀장·실장·사업부장·대표이사, 운행일지와 같은 규칙) · 부서·이름 띠,
+     <소모품비>·<식비>·<기타비용> 묶음(가운데)마다 줄·소계(SUM), 합계(소계의 합), 별첨 문구. A4 세로, 폭에 맞춤.
+     ★ 결재란 다섯 칸을 같은 폭으로 — 열 폭을 C·D·E·F = 23.5, G+H = 23.5 로 잡고 사용내역은 F:G 를 합쳐 쓴다.
+       (양식의 열 폭 18.75·20.25·20.25·31.125·22.375 로는 칸이 들쭉날쭉해진다. 사용내역 폭 31 은 양식과 같다.)
+     ★ 소계·합계는 수식을 두고 계산한 값(<v>)도 같이 적는다 — 수식을 계산하지 않는 보기 프로그램에서도 숫자가 보인다.
+     ★ 날짜는 진짜 엑셀 날짜(일련번호 + yyyy-mm-dd), 금액은 양식과 같은 회계 서식(0 은 「-」).
+     ★ 긴 사용처·사용내역·비고는 줄을 바꿔 다 보이게 하고, 행 높이는 글자 수로 어림해 늘린다(2~6줄).
+     ★ 인쇄: 머리글 줄을 쪽마다 되풀이(Print_Titles), 인쇄 영역 B2:H끝. */
   var XL_STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0"/>' +
+    '<numFmt numFmtId="165" formatCode="_-* #,##0_-;\\-* #,##0_-;_-* &quot;-&quot;_-;_-@_-"/><numFmt numFmtId="166" formatCode="yyyy\\-mm\\-dd"/></numFmts>' +
     '<fonts count="5"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font><font><b/><u/><sz val="22"/><name val="맑은 고딕"/></font>' +
     '<font><b/><sz val="12"/><name val="맑은 고딕"/></font><font><sz val="12"/><name val="맑은 고딕"/></font></fonts>' +
     '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
     '<fill><patternFill patternType="solid"><fgColor rgb="FF9BC2E6"/><bgColor indexed="64"/></patternFill></fill>' +
     '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF99"/><bgColor indexed="64"/></patternFill></fill>' +
     '<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>' +
-    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders>' +
-    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="17">' +
+    '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+    '<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>' +
+    // 결재선에 없는 결재 칸 — 빗금(왼쪽 위 → 오른쪽 아래). 운행기록부·PDF 와 같은 뜻.
+    '<border diagonalDown="1"><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal style="thin"><color indexed="64"/></diagonal></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="19">' +
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' +                                                                                       // 0
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 1 제목
-    '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment vertical="center"/></xf>' +                                       // 2 띠
-    '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' +                    // 3 띠 글자
+    '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 2 기간 줄
+    '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1" shrinkToFit="1"/></xf>' +  // 3 부서·이름 띠
     '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 4 머리글
-    '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +                     // 5 묶음
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" shrinkToFit="1"/></xf>' +  // 6 가운데
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>' +       // 7 왼쪽
-    '<xf numFmtId="164" fontId="4" fillId="0" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' +   // 8 금액
+    '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 5 묶음(<식비> — 양식처럼 가운데)
+    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" shrinkToFit="1"/></xf>' +  // 6 가운데(순번)
+    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>' +       // 7 왼쪽(줄 바꿈)
+    '<xf numFmtId="165" fontId="4" fillId="0" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +   // 8 금액(회계)
     '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 9 소계
-    '<xf numFmtId="164" fontId="3" fillId="4" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' +  // 10 소계 금액
+    '<xf numFmtId="165" fontId="3" fillId="4" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +  // 10 소계 금액
     '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 11 합계
-    '<xf numFmtId="164" fontId="3" fillId="2" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' +  // 12 합계 금액
+    '<xf numFmtId="165" fontId="3" fillId="2" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +  // 12 합계 금액
     '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf>' +                                       // 13 별첨 문구
     '<xf numFmtId="0" fontId="1" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 14 결재 머리
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 15 결재 칸
     '<xf numFmtId="0" fontId="4" fillId="0" borderId="1"/>' +                                                                                       // 16 빈 칸
+    '<xf numFmtId="166" fontId="4" fillId="0" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center" shrinkToFit="1"/></xf>' +  // 17 날짜
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="2" applyBorder="1"/>' +                                                                       // 18 결재 칸 — 빗금
     '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  /** 'YYYY-MM-DD' → 엑셀 날짜 일련번호(1900 체계). 못 읽으면 null. */
+  function xlDate(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+    if (!m) return null;
+    return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400e3);
+  }
+  /** 글자가 칸 폭(엑셀 폭 단위)에서 몇 줄이 될지 어림한다 — 12pt 맑은 고딕, 한글은 약 2.1, 나머지 약 1.1(엑셀로 열어 본 실측에 맞춤). */
+  function xlLines(s, width) {
+    var per = Math.max(1, width - 0.5);
+    return String(s || '').split('\n').reduce(function (n, part) {
+      var u = 0;
+      Array.from(part).forEach(function (ch) {
+        var cp = ch.codePointAt(0);
+        u += (cp >= 0x1100 && cp <= 0x11FF) || (cp >= 0x2E80 && cp <= 0xA4CF) || (cp >= 0xAC00 && cp <= 0xD7A3) || (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFF00 && cp <= 0xFF60) ? 2.1 : 1.1;
+      });
+      return n + Math.max(1, Math.ceil(u / per));
+    }, 0);
+  }
+  var XL_W = { A: 3.5, B: 7.5, C: 23.5, D: 23.5, E: 23.5, F: 23.5, G: 7.5, H: 16 };   // C~F 와 G+H 가 결재 칸 하나씩(23.5 = 7.5 + 16 — 엑셀에서 잰 칸 폭 141pt 로 같다)
+  var XL_SHEET = '개인경비';
   function xlsxBytes(d) {
     var X = window.Xlsx, cell = function (col, row, s, v, o) {
       var ref = X.colName(col) + row; o = o || {};
-      if (o.f) return '<c r="' + ref + '" s="' + s + '"><f>' + X.esc(v) + '</f></c>';
+      if (o.f) return '<c r="' + ref + '" s="' + s + '"><f>' + X.esc(v) + '</f>' + (o.v != null ? '<v>' + o.v + '</v>' : '') + '</c>';
       if (v == null || v === '') return '<c r="' + ref + '" s="' + s + '"/>';
       if (o.n) return '<c r="' + ref + '" s="' + s + '"><v>' + v + '</v></c>';
       return '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t xml:space="preserve">' + X.esc(v) + '</t></is></c>';
     };
-    var B = 1, G = 6, rows = '', merges = [], r, c;
+    var B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7, rows = '', merges = [], r, c;
     var line = function (rr, ht, cells) { rows += '<row r="' + rr + '"' + (ht ? ' ht="' + ht + '" customHeight="1"' : '') + '>' + cells + '</row>'; };
     var fillRow = function (rr, s, from, to) { var h = ''; for (c = from; c <= to; c++) h += cell(c, rr, s); return h; };
-    // 제목(B2:G3)
-    line(2, 16.5, cell(B, 2, 1, '개인경비 지출 명세') + fillRow(2, 1, B + 1, G));
-    line(3, 45, fillRow(3, 1, B, G)); merges.push('B2:G3');
-    // 결재란(양식의 결재 그림 자리) — 결 재 · 담당 · 팀장 · 실장 · 사업부장 · 대표이사
-    var BX = ['담당', '팀장', '실장', '사업부장', '대표이사'];
-    line(4, 20, cell(B, 4, 14, '결 재') + BX.map(function (b, i) { return cell(B + 1 + i, 4, 14, b); }).join(''));
-    line(5, 42, cell(B, 5, 14) + BX.map(function (b, i) {
-      var v = d.boxes[b];
-      return cell(B + 1 + i, 5, 15, !v ? '/' : v.name ? v.name + (v.date ? '\n' + v.date : '') : '');
-    }).join('')); merges.push('B4:B5');
-    line(6, 8, '');
-    // 부서 · 이름 띠(F:G 에 글자)
-    line(7, 28.5, fillRow(7, 2, B, 4) + cell(5, 7, 3, '부서 :  ' + (d.person.dept || '') + '             이름 : ' + (d.person.name || '')) + cell(G, 7, 3));
-    merges.push('F7:G7');
-    line(8, 28.5, ['순번', '날 짜', '사용처', '금액', '사용내역', '비고'].map(function (t, i) { return cell(B + i, 8, 4, t); }).join(''));
-    r = 9;
-    var subs = [];
+    // 제목(B2:H3) · 기간 줄(B4:H4)
+    line(2, 16.5, cell(B, 2, 1, '개인경비 지출 명세') + fillRow(2, 1, B + 1, H));
+    line(3, 45, fillRow(3, 1, B, H)); merges.push('B2:H3');
+    line(4, 22, cell(B, 4, 2, d.periodText || '') + fillRow(4, 2, B + 1, H)); merges.push('B4:H4');
+    line(5, 6, '');
+    // 결재란 — 결 재 · 담당 · 팀장 · 실장 · 사업부장 · 대표이사(다섯 칸 같은 폭: C · D · E · F · G:H)
+    var BX = ['담당', '팀장', '실장', '사업부장', '대표이사'], BXC = [C, D, E, F, G];
+    line(6, 20, cell(B, 6, 14, '결 재') + BX.map(function (b, i) { return cell(BXC[i], 6, 14, b) + (i === 4 ? cell(H, 6, 14) : ''); }).join(''));
+    line(7, 46, cell(B, 7, 14) + BX.map(function (b, i) {
+      var v = d.boxes[b], s = v ? 15 : 18;
+      return cell(BXC[i], 7, s, !v ? '' : v.name ? v.name + (v.date ? '\n' + v.date : '') : '') + (i === 4 ? cell(H, 7, s) : '');
+    }).join(''));
+    merges.push('B6:B7', 'G6:H6', 'G7:H7');
+    line(8, 8, '');
+    // 부서 · 이름 띠(B9:H9 — 긴 부서도 잘리지 않게 한 칸으로 합치고 글자를 줄여 맞춘다)
+    line(9, 28.5, cell(B, 9, 3, '부서 :  ' + (d.person.dept || '') + '          이름 :  ' + (d.person.name || '')) + fillRow(9, 3, B + 1, H));
+    merges.push('B9:H9');
+    var HEADR = 10;
+    line(HEADR, 28.5, cell(B, HEADR, 4, '순번') + cell(C, HEADR, 4, '날 짜') + cell(D, HEADR, 4, '사용처') + cell(E, HEADR, 4, '금액') +
+      cell(F, HEADR, 4, '사용내역') + cell(G, HEADR, 4) + cell(H, HEADR, 4, '비고'));
+    merges.push('F' + HEADR + ':G' + HEADR);
+    r = HEADR + 1;
+    var subs = [], total = 0;
     window.SheetPdf.expenseGroups(d.items).forEach(function (g) {
-      line(r, 28.5, cell(B, r, 5, '<' + g.cat + '>') + fillRow(r, 5, B + 1, G)); merges.push('B' + r + ':G' + r); r++;
-      var first = r;
-      if (!g.list.length) { line(r, 28.5, cell(B, r, 6) + cell(2, r, 6) + cell(3, r, 7) + cell(4, r, 8) + cell(5, r, 7) + cell(6, r, 7)); r++; }
+      line(r, 28.5, cell(B, r, 5, '<' + g.cat + '>') + fillRow(r, 5, B + 1, H)); merges.push('B' + r + ':H' + r); r++;
+      var first = r, sum = 0;
+      if (!g.list.length) {
+        line(r, 28.5, cell(B, r, 6) + cell(C, r, 17) + cell(D, r, 7) + cell(E, r, 8) + cell(F, r, 7) + cell(G, r, 7) + cell(H, r, 7));
+        merges.push('F' + r + ':G' + r); r++;
+      }
       g.list.forEach(function (it, k) {
-        line(r, 28.5, cell(B, r, 6, String(k + 1), { n: 1 }) + cell(2, r, 6, it.date) + cell(3, r, 7, it.merchant) +
-          cell(4, r, 8, String(Math.round(it.amount)), { n: 1 }) + cell(5, r, 7, it.usage) + cell(6, r, 7, it.note));
+        var amt = Math.round(Number(it.amount) || 0), ds = xlDate(it.date);
+        sum += amt;
+        var n = Math.min(6, Math.max(xlLines(it.merchant, XL_W.D), xlLines(it.usage, XL_W.F + XL_W.G), xlLines(it.note, XL_W.H)));
+        line(r, Math.max(28.5, n * 16.5 + 8), cell(B, r, 6, String(k + 1), { n: 1 }) +
+          (ds != null ? cell(C, r, 17, String(ds), { n: 1 }) : cell(C, r, 6, it.date)) + cell(D, r, 7, it.merchant) +
+          cell(E, r, 8, String(amt), { n: 1 }) + cell(F, r, 7, it.usage) + cell(G, r, 7) + cell(H, r, 7, it.note));
+        merges.push('F' + r + ':G' + r);
         r++;
       });
-      line(r, 28.5, cell(B, r, 16) + cell(2, r, 16) + cell(3, r, 9, '소계') + cell(4, r, 10, 'SUM(E' + first + ':E' + (r - 1) + ')', { f: 1 }) + cell(5, r, 16) + cell(6, r, 16));
+      total += sum;
+      line(r, 28.5, cell(B, r, 16) + cell(C, r, 16) + cell(D, r, 9, '소계') + cell(E, r, 10, 'SUM(E' + first + ':E' + (r - 1) + ')', { f: 1, v: sum }) +
+        cell(F, r, 16) + cell(G, r, 16) + cell(H, r, 16));
+      merges.push('F' + r + ':G' + r);
       subs.push('E' + r); r++;
     });
-    line(r, 28.5, cell(B, r, 11, '합계') + cell(2, r, 11) + cell(3, r, 11) + cell(4, r, 12, subs.join('+'), { f: 1 }) + cell(5, r, 11) + cell(6, r, 11));
-    merges.push('B' + r + ':D' + r); r++;
+    line(r, 28.5, cell(B, r, 11, '합계') + cell(C, r, 11) + cell(D, r, 11) + cell(E, r, 12, subs.join('+'), { f: 1, v: total }) + cell(F, r, 11) + cell(G, r, 11) + cell(H, r, 11));
+    merges.push('B' + r + ':D' + r, 'F' + r + ':H' + r); r++;
     line(r, 0, cell(B, r, 13, '* 해당 증빙은 명세서 기재순으로 별첨'));
+    var cols = Object.keys(XL_W).map(function (L, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + XL_W[L] + '" customWidth="1"/>'; }).join('');
     var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="B2:G' + r + '"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
-      '<sheetFormatPr defaultRowHeight="17.25"/><cols><col min="1" max="1" width="3.5" customWidth="1"/><col min="2" max="2" width="7.5" customWidth="1"/>' +
-      '<col min="3" max="3" width="18.75" customWidth="1"/><col min="4" max="5" width="20.25" customWidth="1"/><col min="6" max="6" width="31.125" customWidth="1"/><col min="7" max="7" width="22.375" customWidth="1"/></cols>' +
+      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="B2:H' + r + '"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="17.25"/><cols>' + cols + '</cols>' +
       '<sheetData>' + rows + '</sheetData><mergeCells count="' + merges.length + '">' + merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join('') + '</mergeCells>' +
-      '<printOptions horizontalCentered="1"/><pageMargins left="0.08" right="0.08" top="0.39" bottom="0.39" header="0.31" footer="0.31"/>' +
-      '<pageSetup paperSize="9" scale="71" fitToHeight="0" orientation="portrait"/></worksheet>';
+      '<printOptions horizontalCentered="1"/><pageMargins left="0.24" right="0.24" top="0.39" bottom="0.39" header="0.31" footer="0.31"/>' +
+      '<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="portrait"/></worksheet>';
+    var book = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheets><sheet name="' + XL_SHEET + '" sheetId="1" r:id="rId1"/></sheets>' +
+      '<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">\'' + XL_SHEET + '\'!$B$2:$H$' + r + '</definedName>' +
+      '<definedName name="_xlnm.Print_Titles" localSheetId="0">\'' + XL_SHEET + '\'!$' + HEADR + ':$' + HEADR + '</definedName></definedNames>' +
+      '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
     return X.zip([
       { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
       { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
-      { name: 'xl/workbook.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="개인경비" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+      { name: 'xl/workbook.xml', data: book },
       { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
       { name: 'xl/styles.xml', data: XL_STYLES },
       { name: 'xl/worksheets/sheet1.xml', data: sheet }
@@ -1266,7 +1335,7 @@
     rows.slice().sort(function (a, b) { return a.date_millis - b.date_millis; }).forEach(function (it) {
       var op = C.orgPath(it.username), mo = mealOver(it);
       out.push([C.ymd(it.date_millis), C.nameOf(it.username), it.username, [C.orgName(op), op.unit].filter(Boolean).join(' · '), it.category, it.merchant || '',
-        Number(it.amount) || 0, it.usage || '', it.note || '', it.category === '식비' ? Math.round((Number(it.amount) || 0) / mealPeople(it.usage)) : '', mo ? '초과' : '']);
+        Number(it.amount) || 0, it.usage || '', it.note || '', it.category === '식비' ? Math.floor((Number(it.amount) || 0) / mealPeople(it.usage)) : '', mo ? '초과' : '']);
     });
     out.push(['합계', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '', '']);
     C.saveBlob(new TextEncoder().encode(csvText(out)), '개인경비_내역_' + S.CYCKEY + scopeSuffix() + '.csv');
@@ -1359,9 +1428,11 @@
       '<div class="pdfwait"><div class="spin"></div><div id="xFinNote" role="status">준비하는 중…</div><div class="dim" style="margin-top:6px">사람마다 영수증 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('xFinNote'); if (el) el.textContent = t; };
+    // ★ 창을 닫으면(닫기·Esc·바깥 누르기·다른 창) 그 묶음은 끝난 것이다 — 남은 사람 문서를 계속 만들지 않는다.
+    var alive = function () { if (FINJOB === job && !$('xFinNote')) { FINJOB = null; C.render(); } return FINJOB === job; };
     var parts = [], skipped = [], checks = [];
     var one = function (i) {
-      if (i >= list.length) return Promise.resolve();
+      if (i >= list.length || !alive()) return Promise.resolve();
       var a = list[i];
       note((i + 1) + ' / ' + list.length + ' · ' + C.nameOf(a.username) + ' 님 문서를 만드는 중…');
       return fetchFrozen(a).then(function (fz) {
@@ -1375,12 +1446,14 @@
           if (exp != null && Math.abs(Math.round(sum) - Math.round(Number(exp))) > 1) w.push('문서 합계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(exp) + '원');
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
           if (img) w.push('불러오지 못한 사진 ' + img + '장');
+          var cut = (res.issues || []).filter(function (x) { return x.kind === 'cut'; }).length;
+          if (cut) w.push('「…」로 줄인 증빙 설명 ' + cut + '곳');
           if (w.length) checks.push(d.person.name + ' — ' + w.join(', '));
         });
-      }).catch(function () { skipped.push(C.nameOf(a.username)); }).then(function () { if (FINJOB === job) return one(i + 1); });
+      }).catch(function () { skipped.push(C.nameOf(a.username)); }).then(function () { if (alive()) return one(i + 1); });
     };
     one(0).then(function () {
-      if (FINJOB !== job) return null;
+      if (!alive()) return null;
       if (!parts.length) throw new Error('만든 문서가 없습니다');
       note('한 파일로 묶는 중…');
       var P = window.PDFLib;
@@ -1394,6 +1467,7 @@
           .then(function (bytes) { return { bytes: bytes, pages: out.getPageCount() }; });
       });
     }).then(function (res) {
+      if (FINJOB !== job) { C.render(); return; }   // 닫혀서 그만둔 묶음(새 묶음이 돌고 있을 수도 있다)
       FINJOB = null;
       if (!res || !$('xFinNote')) { C.render(); return; }
       var blob = new Blob([res.bytes], { type: 'application/pdf' }), url = URL.createObjectURL(blob);
@@ -1407,6 +1481,7 @@
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
       C.render();
     }).catch(function (e) {
+      if (FINJOB !== job) return;
       FINJOB = null;
       if ($('xFinNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>묶지 못했습니다: ' + esc((e && e.message) || '') + '</span></div>';
       C.render();
@@ -1417,8 +1492,17 @@
   /* ══════════════════ 이벤트 ══════════════════ */
   document.addEventListener('click', function (e) {
     var el;
+    // 묶어 받기 창의 「닫기」 — 돌던 묶음을 바로 멈춘다(Esc·바깥 누르기는 다음 사람으로 넘어갈 때 alive() 가 멈춘다).
+    if (FINJOB && e.target.closest('[data-close]') && $('xFinNote')) { FINJOB = null; setTimeout(function () { C.render(); }, 0); }
     if ((el = e.target.closest('[data-xup]'))) { openUpload(el.dataset.xup || ''); return; }
-    if ((el = e.target.closest('[data-xday]'))) { XDAY = el.dataset.xday === XDAY ? '' : el.dataset.xday; C.render(); return; }
+    if ((el = e.target.closest('[data-xday]'))) {
+      // 다시 그리면 누른 단추가 새로 생긴다 — 키보드로 누르던 그 날로 포커스를 돌려준다(「기간 전체 보기」면 고르던 날로).
+      var dv = el.dataset.xday, was = XDAY;
+      XDAY = dv === XDAY ? '' : dv; C.render();
+      var back = document.querySelector('.xcal [data-xday="' + (dv || was) + '"]');
+      if (back) { try { back.focus({ preventScroll: true }); } catch (er) { } }
+      return;
+    }
     if (e.target.closest('#btnXUpGo')) { runUpload(); return; }
     if ((el = e.target.closest('[data-xrm]'))) {
       if (XUP.busy) return;
@@ -1499,6 +1583,7 @@
     extra: extra,
     wantSummaries: wantSums,
     cycName: function (a) { return cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ') · 개인경비 지출결의'; },
+    cycLabel: function (a) { return cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ')'; },
     submitHead: function () {
       var S = C.state(), x = ITEMS[itemKey(false, S.CYCKEY)], rows = ((x && x.rows) || []).filter(function (it) { return it.username === me(); });
       var T = sums(rows), warn = [];

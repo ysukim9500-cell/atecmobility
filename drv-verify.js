@@ -755,14 +755,16 @@
       var over = res.issues.filter(function (i) { return i.kind === 'overflow' || i.kind === 'tiny'; });
       var img = res.issues.filter(function (i) { return i.kind === 'image'; });
       var gly = res.issues.filter(function (i) { return i.kind === 'glyph'; });
+      var cut = res.issues.filter(function (i) { return i.kind === 'cut'; });      // 개인경비 증빙 설명을 「…」로 줄인 곳
       var chk = '';
-      if (!over.length && !img.length && !gly.length) {
+      if (!over.length && !img.length && !gly.length && !cut.length) {
         chk = '<div class="pdfok">' + ic('check', 15) + '<span>문서 점검 완료 — 잘린 글자·빠진 사진 없음</span></div>';
       } else {
         chk = '<div class="awarn">' + ic('alert', 15) + '<span>' +
           [over.length ? '글자가 칸에 꽉 찬 곳 ' + over.length + '곳(' + esc(over[0].page + '쪽') + ' 등)' : '',
             img.length ? '불러오지 못한 사진 ' + img.length + '장' : '',
-            gly.length ? '글꼴에 없어 ? 로 바꾼 글자 ' + gly.length + '종' : ''].filter(Boolean).join(' · ') +
+            gly.length ? '글꼴에 없어 ? 로 바꾼 글자 ' + gly.length + '종' : '',
+            cut.length ? '길어서 「…」로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : ''].filter(Boolean).join(' · ') +
           ' — 열어서 확인해 주세요.</span></div>';
       }
       // 문서 총계(장별 총계의 합)가 상신 때 서버가 집계한 금액과 같은가 — 다르면 결재 카드와 문서가 다른 숫자를 말한다.
@@ -774,7 +776,7 @@
       }
       var mk = o.meta.mark || '';
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
-        '<div class="dim">' + mb + ' MB · ' + (o.stat || '운행기록부 ' + n0((o.doc.sheets || []).length) + '장') +
+        '<div class="dim">' + mb + ' MB · ' + (typeof o.stat === 'function' ? o.stat(res) : o.stat || '운행기록부 ' + n0((o.doc.sheets || []).length) + '장') +
         (o.verify ? ' · 검증 결과' : '') + (nImg ? ' · 영수증 사진 ' + n0(nImg) + '장' : '') + '</div>' + chk +
         '<div class="anote">' + (o.note || MARK_NOTE[mk] || MARK_NOTE['']) + '</div></div>';
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
