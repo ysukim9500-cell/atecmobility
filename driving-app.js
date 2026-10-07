@@ -2569,6 +2569,24 @@
     }
   }
 
+  /** 이번 주기에 업무 운행했는데 계기판 사진이 없는 차량(번호판 목록). 서버 검증 R12 와 같은 기준. */
+  function odoPhotoMissing() {
+    var me = myName(), r = cycleRange(CYC.y, CYC.m);
+    var plates = [];
+    TRIPS.forEach(function (t) {
+      if (t.username !== me || t.purpose !== BUSINESS || t.end_odometer == null) return;
+      var p = t.plate_no || '';
+      if (plates.indexOf(p) < 0) plates.push(p);
+    });
+    if (!plates.length) return [];
+    var shots = EVID.filter(function (e) {
+      var d = Number(e.date_millis);
+      return e.username === me && e.category === '계기판' && (e.photo_path || '') !== '' && d >= r.lo && d < r.hi;
+    });
+    var plateOf = function (e) { return e.vehicle_plate || (plates.length === 1 ? plates[0] : null); };
+    return plates.filter(function (p) { return !shots.some(function (e) { return plateOf(e) === p; }); });
+  }
+
   /* ══════════════════ 마감 현황 ══════════════════ */
   function viewClose() {
     if (!LOADED) return head(isAll() ? '전체 마감 현황' : '이번 달 마감') + skeleton();
@@ -2612,6 +2630,18 @@
           : pp.a && pp.a.status === 'withdrawn' ? '회수한 뒤 아직 다시 상신하지 않았습니다.' : '아직 상신하지 않았습니다.') +
         '</span><button class="btn sm" data-cyc="' + pp.cyc.y + '-' + pp.cyc.m + '">' + pp.cyc.m + '월분 마감하기</button>' +
         '<button class="iconbtn" data-prevx="' + esc(pp.key) + '" aria-label="이 안내 닫기" title="이 안내 닫기">' + ic('close', 14) + '</button></div>';
+    }
+
+    // ★ 계기판 사진 안내(2026-10-07) — 이번 주기에 업무 운행한 차의 계기판 사진이 서버에 없으면 미리 알린다.
+    //   검증 R12 와 같은 기준(번호판 없는 사진은 차가 한 대일 때만 그 차로 본다). 앱에서 찍어 올렸으면 뜨지 않는다.
+    if (!isAll() && !cycleLocked(myName())) {
+      var miss = odoPhotoMissing();
+      if (miss.length) {
+        h += '<div class="hpnote warn">' + ic('gauge', 16) + '<span><b>계기판 사진</b>이 아직 없습니다' +
+          (miss.length > 1 || miss[0] ? ' (' + esc(miss.map(function (p) { return p || '차량 미지정'; }).join(', ')) + ')' : '') +
+          '. 이번 주기 <b>마지막 운행을 마친 뒤</b> 계기판을 찍어 앱이나 웹 「영수증 › 계기판」에 올려 주세요 — 검증에서 운행일지 최종 km 와 대조합니다.</span>' +
+          '<button class="btn sm" data-odoshot="1">계기판 사진 올리기</button></div>';
+      }
     }
 
     if (!isAll()) return h + homeA(T, A, badN, approved, closed, days);
@@ -5767,6 +5797,7 @@
     }
 
     if (e.target.closest('#btnCreateTrip')) { createTrip(false); return; }
+    if (e.target.closest('[data-odoshot]')) { setEvSub(3); go('evid'); return; }   // 영수증 › 계기판 차례로 바로
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
     // ★ 인쇄 버튼은 직원 행(data-person) 안에 들어 있다. 같은 핸들러 안에서
     //   행 검사가 먼저 돌면 인쇄 대신 화면 이동이 일어난다(stopPropagation 은
