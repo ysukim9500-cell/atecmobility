@@ -887,6 +887,7 @@
       body += '<div class="hpnote warn" style="margin-top:12px">' + ic('alert', 15) + '<span><b>' + esc(name) + ' 영수증 ' + n0(unm) +
         '건</b>이 날짜로 맞는 운행을 찾지 못했습니다(수기 운행 시각이 다르거나 자정을 넘긴 결제 등). 「운행에 직접 맞추기」로 어느 운행의 영수증인지 골라 주세요.</span></div>';
     }
+    body += evMatchHtml(name);
     body += '<div class="evsact">' +
       (cycleLocked(myName()) || isMulti() ? '' : '<button class="btn" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) + esc(name) + ' 영수증 올리기</button>') +
       (canLink ? '<button class="btn' + (unm ? ' pri' : '') + '" data-evlink="' + esc(name) + '">' + ic('scan', 13) + '운행에 직접 맞추기' + (unm ? ' (' + n0(unm) + ')' : '') + '</button>' : '') +
@@ -899,6 +900,157 @@
       '</div></div>';
     EVSUB_FX = '';
     return '<section class="sect">' + steps + body + '</section>';
+  }
+  /* ── 영수증 차례마다 「맞춰보기」(2026-10-07) ──
+     서버 검증(driving-verify.ts R06·R10·R11·A02·A05)과 같은 기준을 그 자리에서 보여 준다.
+       · 주차·통행료: 엑셀에 들어가는 금액(운행에 적은 금액 + 영수증)이 영수증과 같아야 한다.
+         통행료 중 자동 계산·하이패스 PDF 대조·기사 확인분은 영수증 없이 인정한다.
+       · 주유: 주유 영수증 합계 ≥ 청구 유류비(업무 거리 × 단가).
+       · 계기판: 계기판 사진 숫자 ≥ 운행일지 최종 km.
+     사진에서 읽은 숫자(AI)는 「검증하기」를 한 번 돌려야 생긴다(evidence_ai). 없으면 그렇게 안내한다. */
+  var AIR = {}, AIR_ASKED = {};
+  function loadAiReads() {
+    var k = myName() + '|' + CYCKEY();
+    if (AIR_ASKED[k] || !myName()) return;
+    AIR_ASKED[k] = 1;
+    apiRetry('/rest/v1/evidence_ai?select=evidence_id,photo_path,result&username=eq.' + encodeURIComponent(myName()))
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        (rows || []).forEach(function (x) { AIR[x.evidence_id] = x; });
+        if (VIEW === 'evid' && !$('panel').classList.contains('open')) render();
+      }).catch(function () { delete AIR_ASKED[k]; });
+  }
+  /** 이 영수증 사진에서 AI 가 읽은 결과(사진이 바뀌었으면 없음으로). */
+  function aiOf(e) { var x = AIR[e.id]; return x && x.photo_path === e.photo_path ? (x.result || {}) : null; }
+  /** 통행료 금액과 영수증이 필요한가 — 서버 tollOf 와 같다. */
+  function tollNeed(t) {
+    var st = t.toll_status, amt = t.toll_cost == null ? null : Number(t.toll_cost);
+    if (amt != null && !isFinite(amt)) amt = null;
+    var ok = (st === 'UNKNOWN' || st === 'PENDING') ? amt === null
+      : st === 'CHARGED' ? (amt !== null && amt >= 1 && amt <= TOLL_MAX)
+      : st === 'FREE_CONFIRMED' ? amt === 0
+      : st === 'MANUAL' ? (amt !== null && amt >= 0 && amt <= TOLL_MAX) : false;
+    if (!ok) { if (amt != null && amt > 0) { st = 'MANUAL'; amt = Math.min(amt, TOLL_MAX); } else { st = 'UNKNOWN'; amt = null; } }
+    if (st === 'UNKNOWN' || st === 'PENDING') return { a: 0, manual: false, hp: false };
+    var src = t.toll_source || '';
+    return { a: amt || 0, manual: st === 'MANUAL' && !(src === '하이패스 영수증' || src.indexOf('기사 확인') === 0), hp: src === '하이패스 영수증' };
+  }
+  function evMatchHtml(cat) {
+    var me = myName(), r = cycleRange(CYC.y, CYC.m);
+    loadAiReads();
+    var biz = ALL_TRIPS.filter(function (t) {
+      return t.username === me && !t.deleted_at && (t.purpose || '') === BUSINESS && t.start_time >= r.lo && t.start_time < r.hi;
+    });
+    var evs = ALL_EVID.filter(function (e) {
+      var d = Number(e.date_millis);
+      return e.username === me && e.category === cat && d >= r.lo && d < r.hi;
+    });
+    var DOW = ['일', '월', '화', '수', '목', '금', '토'];
+    var dn = function (k) { var p = k.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return (+p[1]) + '/' + (+p[2]) + '(' + DOW[d.getUTCDay()] + ')'; };
+    var ok = function (t) { return '<span class="mres ok">' + ic('check', 12) + esc(t) + '</span>'; };
+    var bad = function (t) { return '<span class="mres bad">' + esc(t) + '</span>'; };
+    var box = function (good, headline, sub, table) {
+      return '<div class="mbox ' + (good ? 'good' : 'bad') + '"><div class="mhead"><span class="mmark">' + (good ? '✓' : '!') + '</span>' +
+        '<div><b>' + headline + '</b>' + (sub ? '<div class="msub">' + sub + '</div>' : '') + '</div></div>' + (table || '') + '</div>';
+    };
+    var won = function (v) { return n0(v) + '원'; };
+
+    if (cat === '주차' || cat === '통행료') {
+      var days = {};
+      var slot = function (k) { return days[k] || (days[k] = { T: 0, A: 0, R: 0, rs: [] }); };
+      biz.forEach(function (t) {
+        var k = ymd(t.start_time);
+        if (cat === '주차') { var p = Number(t.parking_cost) || 0; if (p > 0) slot(k).T += p; }
+        else { var tl = tollNeed(t); if (tl.a > 0) { if (tl.manual) slot(k).T += tl.a; else slot(k).A += tl.a; } }
+      });
+      evs.forEach(function (e) {
+        var a = Number(e.amount) || 0; if (a <= 0) return;
+        var s = slot(evDay(e, r)); s.R += a; s.rs.push(e);
+      });
+      var keys = Object.keys(days).filter(function (k) { var d = days[k]; return d.T || d.R; }).sort();
+      var nBad = 0, xl = 0, pr = 0, auto = 0;
+      Object.keys(days).forEach(function (k) { auto += days[k].A; });
+      var rows = keys.map(function (k) {
+        var d = days[k], excel = d.T + d.R, res, aiNote = [];
+        d.rs.forEach(function (e) {
+          var ai = aiOf(e);
+          if (ai && ai.amount != null && isFinite(Number(ai.amount)) && Math.round(Number(ai.amount)) !== Number(e.amount))
+            aiNote.push('사진엔 ' + won(Math.round(Number(ai.amount))) + ' (입력 ' + won(e.amount) + ')');
+        });
+        if (d.T > 0 && !d.R) res = bad('영수증 없음');
+        else if (d.T > 0 && d.R) res = bad('두 번 더해짐');
+        else if (aiNote.length) res = bad('사진 금액과 다름');
+        else res = ok('일치');
+        if (d.T > 0 || aiNote.length) nBad++;
+        xl += excel; pr += d.R;
+        return '<tr' + (d.T > 0 || aiNote.length ? ' class="flagged"' : '') + '><td>' + esc(dn(k)) + '</td>' +
+          '<td class="n">' + (d.T ? won(d.T) : '<span class="dim">—</span>') + '</td>' +
+          '<td class="n">' + (d.R ? won(d.R) + (d.rs.length > 1 ? ' <span class="dim">(' + d.rs.length + '장)</span>' : '') : '<span class="dim">없음</span>') +
+            (aiNote.length ? '<div class="mai">' + esc(aiNote.join(', ')) + '</div>' : '') + '</td>' +
+          '<td class="n"><b>' + won(excel) + '</b></td><td>' + res + '</td></tr>';
+      }).join('');
+      var word = cat === '주차' ? '주차비' : '직접 넣은 통행료';
+      var table = keys.length ? '<div class="scroll"><table class="mtable"><thead><tr><th>날짜</th><th class="n">운행에 적은 ' + (cat === '주차' ? '주차비' : '통행료') + '</th>' +
+        '<th class="n">영수증</th><th class="n">엑셀에 들어가는 금액</th><th>결과</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '';
+      var autoNote = cat === '통행료' && auto > 0 ? ' 자동 계산·하이패스로 맞춘 통행료 ' + won(auto) + '은 영수증 없이 인정됩니다.' : '';
+      if (!keys.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없습니다' : '영수증이 필요한 통행료가 없습니다', autoNote.trim(), '');
+      return box(!nBad,
+        nBad ? '맞지 않는 날이 <em>' + n0(nBad) + '일</em> 있습니다' : '엑셀 금액과 영수증이 모두 맞습니다',
+        '엑셀 ' + (cat === '주차' ? '주차비' : '통행료(영수증 대상)') + ' ' + won(xl) + ' · 영수증 ' + won(pr) + '.' +
+          (nBad ? ' 운행에 ' + word + '를 적었다면 영수증을 올리고 운행 쪽 금액은 지워 주세요(엑셀은 둘을 더합니다). 영수증이 없으면 금액을 지워야 합니다.' : '') + autoNote,
+        table);
+    }
+    if (cat === '주유') {
+      var claim = Math.round(biz.reduce(function (a, t) { return a + tripFuel(t); }, 0));
+      var paidEv = evs.filter(function (e) { return (Number(e.amount) || 0) > 0; });
+      var paid = paidEv.reduce(function (a, e) { return a + (Number(e.amount) || 0); }, 0);
+      var kmSum = biz.reduce(function (a, t) { return a + odoKm(t); }, 0);
+      var good = claim <= paid + 1;
+      var tbl = '<div class="mcompare"><div><span>주유 영수증 합계</span><b>' + won(paid) + '</b><i>' + n0(paidEv.length) + '장</i></div>' +
+        '<div class="mop">' + (good ? '≥' : '<') + '</div>' +
+        '<div><span>엑셀 청구 유류비</span><b>' + won(claim) + '</b><i>업무 ' + n0(kmSum) + 'km × 단가</i></div></div>';
+      if (!claim && !paid) return box(true, '업무 운행 유류비가 없습니다', '', '');
+      return box(good, good ? '주유 영수증이 청구 유류비보다 많습니다 — 정상' : '청구 유류비가 주유 영수증보다 <em>' + won(claim - paid) + '</em> 많습니다',
+        good ? '실제로 넣은 기름값(영수증) 안에서 업무 유류비를 청구합니다.' : '빠진 주유 영수증을 올리거나 운행 거리·목적을 확인해 주세요.', tbl);
+    }
+    if (cat === '계기판') {
+      var plates = [];
+      biz.forEach(function (t) { if (t.end_odometer != null) { var p = t.plate_no || ''; if (plates.indexOf(p) < 0) plates.push(p); } });
+      if (!plates.length) return box(true, '이번 주기에 업무 운행이 없습니다', '', '');
+      var shots = evs.filter(function (e) { return (e.photo_path || '') !== ''; });
+      var plateOf = function (e) { return e.vehicle_plate || (plates.length === 1 ? plates[0] : null); };
+      var anyBad = 0, needRun = 0;
+      var rowsO = plates.map(function (p) {
+        var mine = shots.filter(function (e) { return plateOf(e) === p; });
+        var carT = biz.filter(function (t) { return (t.plate_no || '') === p; });
+        var lastEnd = carT.reduce(function (a, t) { return Math.max(a, Math.round(Number(t.end_odometer) || 0)); }, 0);
+        if (!mine.length) { anyBad++; return '<tr class="flagged"><td>' + esc(p || '차량 미지정') + '</td><td class="n">' + n0(lastEnd) + 'km</td><td class="n"><span class="dim">사진 없음</span></td><td>' + bad('사진을 올려 주세요') + '</td></tr>'; }
+        var hit = null;
+        mine.forEach(function (e) { var ai = aiOf(e); if (ai && ai.odometer_km != null && isFinite(Number(ai.odometer_km)) && (!hit || Number(e.date_millis) > Number(hit.e.date_millis))) hit = { e: e, v: Math.round(Number(ai.odometer_km)) }; });
+        if (!hit) { needRun++; return '<tr><td>' + esc(p || '차량 미지정') + '</td><td class="n">' + n0(lastEnd) + 'km</td><td class="n"><span class="dim">아직 안 읽음</span></td><td><span class="mres">「검증하기」 때 읽습니다</span></td></tr>'; }
+        var dk = ymd(Number(hit.e.date_millis)), fin = -1;
+        carT.forEach(function (t) {
+          var d = ymd(t.start_time), x = d < dk ? t.end_odometer : d === dk ? t.start_odometer : null;
+          if (x != null) fin = Math.max(fin, Math.round(Number(x)));
+        });
+        var after = carT.filter(function (t) { return ymd(t.start_time) > dk; }).length;
+        var diff = hit.v - fin, res;
+        if (fin < 0) res = '<span class="mres">비교할 운행 없음</span>';
+        else if (diff < -1000) { anyBad++; res = bad('사진 숫자 확인 필요'); }
+        else if (diff < -3) { anyBad++; res = bad('운행일지가 더 큼'); }
+        else res = ok('정상 (사진 ≥ 운행일지)');
+        if (after) { anyBad++; res += ' ' + bad('사진 뒤 운행 ' + after + '건 — 다시 찍어 주세요'); }
+        return '<tr' + (diff < -3 || after ? ' class="flagged"' : '') + '><td>' + esc(p || '차량 미지정') + '<div class="dim">' + esc(dn(dk)) + ' 사진</div></td>' +
+          '<td class="n">' + (fin >= 0 ? n0(fin) + 'km' : '—') + '</td><td class="n"><b>' + n0(hit.v) + 'km</b></td><td>' + res + '</td></tr>';
+      }).join('');
+      var tblO = '<div class="scroll"><table class="mtable"><thead><tr><th>차량</th><th class="n">운행일지 최종 km</th><th class="n">계기판 사진 km</th><th>결과</th></tr></thead><tbody>' + rowsO + '</tbody></table></div>';
+      return box(!anyBad && !needRun,
+        anyBad ? '맞지 않는 차가 <em>' + n0(anyBad) + '건</em> 있습니다' : needRun ? '사진 숫자를 아직 읽지 않았습니다' : '계기판 사진이 운행일지 최종 km 와 같거나 큽니다 — 정상',
+        '계기판 사진 숫자가 운행일지 마지막 km 와 <b>같거나 커야</b> 합니다(사진 찍고 조금 더 달린 것은 정상).' +
+          (needRun ? ' 사진의 숫자는 3단계 「검증하기」를 누르면 AI 가 읽어 여기에도 나옵니다.' : ''),
+        tblO);
+    }
+    return '';
   }
   function stepNow() { return STEP_P[CYCKEY()] || 1; }
   function loadStep() {

@@ -926,6 +926,26 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,203,.06),rgba(217,101,112,.04))}
 @media (prefers-reduced-motion:reduce){.drop.gemdrop,.gemorb .gemico,.gemread .gemshim::after,.gemico.spinning{animation:none}}
 
+/* 영수증 차례마다 「맞춰보기」 — 엑셀 금액 ↔ 영수증, 유류비 ↔ 주유 영수증, 운행일지 km ↔ 계기판 사진 */
+.mbox{margin-top:14px;border:1px solid var(--ink-200);border-radius:var(--r-sm);background:var(--surface);overflow:hidden}
+.mbox .mhead{display:flex;gap:11px;align-items:flex-start;padding:13px 16px}
+.mbox .mmark{width:24px;height:24px;flex:none;border-radius:999px;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff}
+.mbox.good{border-color:var(--ok)} .mbox.good .mhead{background:var(--ok-50)} .mbox.good .mmark{background:var(--ok)}
+.mbox.bad{border-color:var(--red)} .mbox.bad .mhead{background:var(--red-50)} .mbox.bad .mmark{background:var(--red)}
+.mbox .mhead b{font-size:14.5px;font-weight:700;color:var(--ink-900)} .mbox .mhead b em{font-style:normal;color:var(--red-700)}
+.mbox .msub{font-size:12.5px;line-height:1.6;color:var(--ink-600);margin-top:3px}
+.mtable{width:100%;font-size:13px;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.mtable th{font-size:11.5px;font-weight:600;color:var(--ink-500);text-align:left;padding:8px 16px;border-top:1px solid var(--ink-100);white-space:nowrap}
+.mtable td{padding:9px 16px;border-top:1px solid var(--ink-100);vertical-align:top}
+.mtable .n{text-align:right;white-space:nowrap}
+.mtable tr.flagged td{background:var(--red-50)}
+.mtable .mai{font-size:11.5px;color:var(--red-700);margin-top:2px;white-space:normal}
+.mres{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-500);white-space:nowrap}
+.mres.ok{color:var(--ok)} .mres.bad{color:var(--red-700)}
+.mcompare{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--ink-100)}
+.mcompare>div:not(.mop){display:flex;flex-direction:column;gap:2px;min-width:150px}
+.mcompare span{font-size:12px;color:var(--ink-500)} .mcompare b{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.mcompare i{font-style:normal;font-size:11.5px;color:var(--ink-400)} .mcompare .mop{font-size:22px;font-weight:700;color:var(--ink-400)}
 .hpnote{display:flex;gap:10px;align-items:flex-start;padding:13px 16px;border-radius:var(--r-sm);
   background:var(--ink-50);border:1px solid var(--ink-200);font-size:13px;color:var(--ink-700);
   margin-bottom:14px;line-height:1.6}
