@@ -11,6 +11,7 @@ try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) 
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <!--
   업무 결재 포털 (2026-10-02)
   · 통합 관제 포털(index.html)과 같은 틀(머리띠 · 큰 첫 화면 · 시스템 선택 카드)을 따르되 CSS 는 토큰 한 벌로 새로 쓴다.
@@ -203,6 +204,28 @@ a.launch:hover .go svg{transform:translateX(4px)}
   .demo{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
+/* ═══ 운행일지와 같은 모양 — 시안 A 「또렷하게」(2026-10-07) ═══
+   Pretendard, 회색 글자 한 단계 진하게, 11~12px 글씨를 13px 이상으로. 화면 전용. */
+@media screen{
+:root{--grey:#48545D;--grey-2:#5A6670}
+body{font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Malgun Gothic",-apple-system,sans-serif;letter-spacing:-.01em}
+.brand .nm{font-size:13px}
+.ub .who span{font-size:12.5px}
+.demo .dh,.demo .s{font-size:13px}
+.demo .row{font-size:14px}
+.demo .alert{font-size:13.5px}
+.card p,.steps p,.pick .sub,.launch p{font-size:14.5px}
+.soon{font-size:12.5px}
+footer .wrap{font-size:13px}
+.modal .mhead div{font-size:13px}
+.fld > span,.fld legend > span{font-size:13.5px}
+.drvpick small{font-size:13px}
+.msg{font-size:14px}
+.links,.links button{font-size:13.5px}
+.hint{font-size:13px}
+.notice{font-size:14.5px}
+.launch .go{font-size:14.5px}
+}
 </style>
 </head>
 <body>
