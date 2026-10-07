@@ -916,7 +916,9 @@
     // 다음: 진행 위치를 앞으로(뒤로 끌어내리지 않는다). 이전: 지금 단계를 다시 열어 그 뒤는 안 한 것으로.
     if (dir > 0) saveStep(Math.max(p, Math.min(to, 3)));
     if (to === 2) setEvSub(dir > 0 ? 0 : 3);       // 영수증 단계에 들어오면 앞으로 올 땐 주차부터, 되돌아올 땐 계기판부터
-    else if (p >= from) saveStep(to);
+    // ★ 이전 단계로 갈 때만 진행 위치를 그 단계로 되돌린다. 예전에는 위 if 와 else 로 묶여 2단계로 돌아갈 때
+    //   저장이 빠졌고(새로 고치면 다시 3단계), 앞으로 갈 때도 뒤로 끌어내릴 수 있었다(2026-10-06 검증로봇 2).
+    if (dir < 0 && p >= from) saveStep(to);
     STEP_FX = dir > 0 ? 'fwd' : 'back';
     go(STEP_VIEW[to - 1]);
     paintPills();                      // 메뉴 동그라미도 바로 바꾼다(톡 튀는 효과)
@@ -3804,9 +3806,19 @@
     if (!e) return;
     var btn = $('btnEvDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
     // 기록을 먼저 지운다. 파일만 남는 것이 기록만 남는 것보다 덜 위험하다.
-    apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(e.id), { method: 'DELETE' })
+    // 지운 줄을 돌려받아 실제로 지워졌는지 본다 — 서버 규칙이 막으면 0줄이 지워져도 200 이 와서
+    // "지웠습니다"라고 거짓으로 말했다(2026-10-06 검증로봇 2: 다른 탭에서 상신한 직후 등).
+    apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(e.id),
+      { method: 'DELETE', headers: { Prefer: 'return=representation' } })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
+        return r.json().then(function (rows) {
+          if (!Array.isArray(rows) || !rows.length) {
+            throw new Error('지워지지 않았습니다. 이 주기가 상신됐거나 권한이 없을 수 있습니다 — 새로 고침 후 다시 확인해 주세요');
+          }
+        });
+      })
+      .then(function () {
         // A4 스캔 원본은 여러 영수증이 함께 가리킨다. 이 줄이 마지막이었으면 원본도 지운다 —
         // 안 그러면 잘못 올린 A4 한 장이 화면에서 지울 길 없이 남는다(버킷이 공개라 주소로 열린다).
         var scanLeft = e.scan_path && ALL_EVID.some(function (x) {
@@ -3826,9 +3838,10 @@
         closePanel(); AUDIT = null; loadAll();
         toastOk('지웠습니다.', fileGone ? null : '기록은 지웠지만 사진 파일은 남았습니다.');
       })
-      .catch(function () {
+      .catch(function (err) {
         if (btn) { btn.disabled = false; btn.textContent = '지우기'; }
-        toast('지우지 못했습니다. 잠시 뒤 다시 해 보세요.', true);
+        var m = err && String(err.message || '');
+        toast(m.indexOf('지워지지 않았습니다') === 0 ? m : '지우지 못했습니다. 잠시 뒤 다시 해 보세요.', true);
       });
   }
 
@@ -4994,7 +5007,8 @@
 
     h += fld('방문처', '<input class="inp" id="eVisit" maxlength="120" value="' + esc(t.visit_place || '') + '">');
     h += fld('주차비', '<input class="inp num" id="ePark" inputmode="numeric" placeholder="없으면 비워 두세요" value="' +
-      (t.parking_cost == null ? '' : n0(t.parking_cost)) + '"><span class="unit">원</span>', '0 ~ 300,000원');
+      (t.parking_cost == null ? '' : n0(t.parking_cost)) + '"><span class="unit">원</span>',
+      '0 ~ 300,000원 · 증빙이 없거나 그날 주차 영수증으로 대신할 때는 <b>비워</b> 두세요');
 
     h += fld('통행료',
       '<div class="radios"><label class="radio"><input type="radio" name="eToll" value="amount"' +
@@ -5003,7 +5017,7 @@
       (isUnknownToll(t) ? ' checked' : '') + '><span>모름</span></label></div>' +
       '<div style="margin-top:9px"><input class="inp num" id="eToll" inputmode="numeric" value="' +
       (isUnknownToll(t) ? '' : n0(t.toll_cost)) + '"><span class="unit">원</span></div>',
-      '0 ~ 200,000원 · 0 을 넣으면 <b>면제</b>로 기록됩니다');
+      '0 ~ 200,000원 · 통행료를 <b>지우려면 0</b>을 넣으세요(증빙이 없거나, 그날 영수증 금액으로 대신할 때)');
 
     if (canOdo) {
       h += fld('계기판 <span class="only">관리자</span>',

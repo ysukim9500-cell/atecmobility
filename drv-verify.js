@@ -844,7 +844,9 @@
     var r = C.cycleRange(S.CYC.y, S.CYC.m), has = {};
     (S.ALL_TRIPS || []).forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi && S.USERS[t.username]) has[t.username] = 1; });
     (S.ALL_EVID || []).forEach(function (e) { var d = Number(e.date_millis); if (d >= r.lo && d < r.hi && S.USERS[e.username]) has[e.username] = 1; });
-    var sent = {}; list.forEach(function (a) { if (a.status === 'approved' || a.status === 'submitted') sent[a.username] = 1; });
+    // 결재 건이 있는 사람(완료·결재 중·반려·회수)은 위 목록에 이미 있다 — 「상신 전」에 또 넣지 않는다
+    // (예전에는 반려된 사람이 「반려」와 「상신 전」 두 곳에 나와 숫자가 두 번 셌다, 2026-10-06 검증로봇 5).
+    var sent = {}; list.forEach(function (a) { sent[a.username] = 1; });
     var notYet = Object.keys(has).filter(function (u) { return !sent[u]; })
       .sort(function (x, y) { return C.nameOf(x).localeCompare(C.nameOf(y), 'ko'); });
     var total = done.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0);
@@ -927,7 +929,8 @@
       '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('finNote'); if (el) el.textContent = t; };
-    var parts = [], skipped = [];
+    // checks: 한 사람씩 받는 PDF 와 같은 자체 점검 — 문서 총계 ≠ 결재 금액, 못 불러온 사진(2026-10-06 검증로봇 5)
+    var parts = [], skipped = [], checks = [];
     var one = function (i) {
       if (i >= list.length) return Promise.resolve();
       var a = list[i];
@@ -947,7 +950,17 @@
             PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
             loadImage: function (p) { return loadPhoto(p, 1500); }
           });
-        }).then(function (res) { parts.push(res.bytes); });
+        }).then(function (res) {
+          parts.push(res.bytes);
+          var snap = a.snapshot || {}, why = [];
+          var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
+          if (snap.version >= 2 && isFinite(Number(snap.cost)) && Math.abs(Math.round(sum) - Math.round(Number(snap.cost))) > 1) {
+            why.push('문서 총계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(snap.cost) + '원');
+          }
+          var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
+          if (img) why.push('불러오지 못한 사진 ' + img + '장');
+          if (why.length) checks.push(name + ' — ' + why.join(', '));
+        });
       }).catch(function () { skipped.push(C.nameOf(a.username)); })
         .then(function () { if (FINJOB === job) return one(i + 1); });
     };
@@ -976,7 +989,10 @@
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
         '<div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
         (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) +
-          ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다</span></div>') + '</div>';
+          ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '') +
+        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인 필요: ' + esc(checks.join(' · ')) +
+          ' — 그 사람은 「PDF」로 다시 받아 확인해 주세요.</span></div>' : '') +
+        (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다 — 총계·사진 점검 이상 없음</span></div>' : '') + '</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
@@ -993,16 +1009,25 @@
     var S = C.state(), cyc = S.CYCKEY;
     var done = S.APPR.filter(function (a) { return a.cycle === cyc && a.status === 'approved'; });
     var NL = String.fromCharCode(13, 10);
-    var q = function (v) { var s = String(v == null ? '' : v); return /[",]/.test(s) || s.indexOf(NL) >= 0 ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    var rows = [['이름', '아이디', '소속', '결재 완료', '유류비', '통행료', '주차', '금액 합계', '결재 번호']];
-    var sum = 0;
+    // ★ 글자 칸이 = + - @ 탭·CR 로 시작하면 엑셀이 수식으로 실행한다 — 앞에 ' 를 붙여 글자로 둔다(2026-10-06 검증로봇 5).
+    //   숫자 칸(typeof number)은 그대로. 줄바꿈(LF 하나)도 따옴표로 감싼다.
+    var q = function (v) {
+      if (typeof v === 'number') return String(v);
+      var s = String(v == null ? '' : v);
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    var rows = [['이름', '아이디', '소속', '결재 완료', '업무 km', '유류비', '통행료', '주차', '금액 합계', '결재 번호']];
+    var sum = 0, sk = 0, sf = 0, st = 0, sp = 0;
     done.forEach(function (a) {
       var sn = a.snapshot || {}, p = S.USERS[a.username] || {};
-      sum += Number(sn.cost) || 0;
+      sum += Number(sn.cost) || 0; sk += Number(sn.biz_km) || 0;
+      sf += Math.round(sn.fuel || 0); st += Math.round(sn.toll || 0); sp += Math.round(sn.parking || 0);
       rows.push([C.nameOf(a.username), a.username, p.dept || '', a.closed_at ? whenText(a.closed_at) : '',
+        Math.round((Number(sn.biz_km) || 0) * 10) / 10,
         Math.round(sn.fuel || 0), Math.round(sn.toll || 0), Math.round(sn.parking || 0), Math.round(sn.cost || 0), a.id]);
     });
-    rows.push(['합계', '', '', '', '', '', '', Math.round(sum), '']);
+    rows.push(['합계', '', '', '', Math.round(sk * 10) / 10, sf, st, sp, Math.round(sum), '']);
     var text = String.fromCharCode(0xFEFF) + rows.map(function (r) { return r.map(q).join(','); }).join(NL) + NL;
     C.saveBlob(new TextEncoder().encode(text), '결재완료_금액요약_' + cyc + '.csv');
     C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
