@@ -4993,7 +4993,8 @@
     var t = TRIPS.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!t) return;
     if (apprLocked(t)) { toast('결재 중이거나 끝난 기간이라 고칠 수 없습니다. 「이번 달 마감」에서 고치는 방법을 확인해 주세요.', true); return; }
-    var canOdo = !!(ME && ME.is_admin);           // 계기판은 관리자만 (서버 trip-edit 133행)
+    // 계기판: 본인 운행·관리자(2026-10-07 — 직원도 계기판 사진과 맞춰 직접 고친다. 서버 trip-edit 와 같은 규칙)
+    var canOdo = !!(ME && (ME.is_admin || t.username === myName()));
 
     $('pTitle').textContent = md(t.start_time) + ' ' + hm(t.start_time) + ' 고치기';
     $('pSub').textContent = nameOf(t.username) + ' · ' + (t.plate_no || '');
@@ -5020,7 +5021,7 @@
       '0 ~ 200,000원 · 통행료를 <b>지우려면 0</b>을 넣으세요(증빙이 없거나, 그날 영수증 금액으로 대신할 때)');
 
     if (canOdo) {
-      h += fld('계기판 <span class="only">관리자</span>',
+      h += fld('계기판',
         // n0(null) 은 '—' 다. 그걸 칸에 박아 두면 목적만 바꿔도 저장이 막힌다.
         '<input class="inp num" id="eOdoS" inputmode="numeric" value="' + odoVal(t.start_odometer) + '">' +
         '<span class="arrowto">→</span>' +
@@ -5254,7 +5255,7 @@
       if (isUnknownToll(t) || amt !== Number(t.toll_cost)) patch.toll = { mode: 'amount', amount: amt };
     }
 
-    if (ME && ME.is_admin && $('eOdoS')) {
+    if ($('eOdoS')) {                                    // 칸은 고칠 수 있는 사람(본인·관리자)에게만 그려진다
       var so = num($('eOdoS')), eo = num($('eOdoE'));
       var so0 = t.start_odometer == null ? null : Math.round(Number(t.start_odometer));
       var eo0 = t.end_odometer == null ? null : Math.round(Number(t.end_odometer));
