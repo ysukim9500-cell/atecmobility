@@ -30,8 +30,33 @@
   var ROWS = {}, ASKING = {}, RUN = { busy: false, note: '', who: '' };
   /** 검증 뒤 PDF 미리보기를 확인했는가(사람·주기별). 다시 검증하면 다시 확인한다. 탭을 닫으면 잊는다. */
   var PREVIEWED = (function () { try { return JSON.parse(sessionStorage.getItem('drv.previewed') || '{}'); } catch (e) { return {}; } })();
+  /** 이 사람·주기의 운행·영수증 지문 — 고치면 달라진다(PDF 확인을 다시 받게). */
+  function dataSig(k) {
+    var S = C.state(), u = k.split('|')[0], cy = k.split('|')[1].split('-');
+    var r = C.cycleRange(+cy[0], +cy[1]), h = 0, n = 0;
+    var add = function (v) { var x = String(v == null ? '' : v); for (var i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0; };
+    (S.ALL_TRIPS || []).forEach(function (t) {
+      if (t.username !== u || t.start_time < r.lo || t.start_time >= r.hi) return;
+      n++; add(t.id); add(t.start_time); add(t.end_time); add(t.start_odometer); add(t.end_odometer); add(t.purpose); add(t.toll_cost); add(t.toll_status); add(t.parking_cost); add(t.plate_no);
+    });
+    (S.ALL_EVID || []).forEach(function (e) {
+      var d = Number(e.date_millis);
+      if (e.username !== u || d < r.lo || d >= r.hi) return;
+      n++; add(e.id); add(e.amount); add(e.category); add(e.photo_path); add(e.trip_id); add(e.date_millis);
+    });
+    return n + ':' + h;
+  }
+  /** PDF 를 확인한 뒤로 자료가 그대로이고, 그 뒤에 상신한 적이 없는가. */
+  function previewOk(k) {
+    var v = PREVIEWED[k];
+    if (!v || typeof v !== 'object') return false;
+    if (v.sig !== dataSig(k)) return false;
+    var a = (C.state().APPR || []).filter(function (x) { return keyOf(x.username, x.cycle) === k; })[0];
+    if (a && a.submitted_at && Date.parse(a.submitted_at) > v.at) return false;
+    return true;
+  }
   function setPreviewed(k, on) {
-    if (on) PREVIEWED[k] = 1; else delete PREVIEWED[k];
+    if (on) PREVIEWED[k] = { at: Date.now(), sig: dataSig(k) }; else delete PREVIEWED[k];
     try { sessionStorage.setItem('drv.previewed', JSON.stringify(PREVIEWED)); } catch (e) { }
   }
   var ALLROWS = { key: '', list: null };          // 전체 검증(관리) — 주기별 최신 한 줄씩
@@ -253,7 +278,7 @@
 
     // 검증은 한 번에 하나만 돈다. 다른 주기 것이 돌고 있으면 그렇다고 말한다(눌러도 반응이 없으면 고장으로 보인다).
     // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
-    var seen = !!PREVIEWED[k];
+    var seen = previewOk(k);
     var stage = locked ? 0 : !row ? 1 : !seen ? 2 : 3;
     // 2026-10-07: 순서대로 큰 단추 세 칸 — ① 검증하기 → ② PDF 미리보기 → ③ 결재 상신. 앞 단계를 마쳐야 다음 칸이 열린다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
@@ -340,6 +365,7 @@
       ROWS[k] = row || null;
       setPreviewed(k, false);
       ALLROWS.list = null;
+      if (C.aiReset) C.aiReset();                 // 영수증 화면의 사진 판독도 새로 받게
       C.toast(row ? '검증했습니다 — ' + sumText(row.summary) : '검증했습니다.');
     }).catch(function (e) {
       C.toast('검증하지 못했습니다: ' + ((e && e.message) || ''), true);
@@ -553,8 +579,10 @@
     var cy = String(a.cycle || '').split('-').map(Number), py = cy[0], pm = cy[1] - 1;
     if (pm < 1) { pm = 12; py--; }
     var pkey = py + '-' + (pm < 10 ? '0' : '') + pm;
+    // 스냅샷 버전이 다르면(예전 방식은 영수증 미포함) 금액 기준이 달라 비교하지 않는다.
     var prev = (C.state().APPR || []).filter(function (x) {
-      return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') && x.snapshot && x.snapshot.cost != null;
+      return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') &&
+        x.snapshot && x.snapshot.cost != null && (x.snapshot.version || 1) === (s.version || 1);
     })[0];
     var cmp = '';
     var bigJump = false;
@@ -562,10 +590,10 @@
       var pc = Number(prev.snapshot.cost) || 0, d = cost - pc, pct = pc ? Math.round(d / pc * 100) : null;
       bigJump = pc > 0 && d > 50000 && pct >= 50;
       cmp = '<div class="abf"><span class="k">전월(' + pm + '월분) 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' +
-        (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + Math.abs(pct) + '%)</small>' : '') + '</b>' +
+        (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b>' +
         '<span class="sub">' + pm + '월분 ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + ' km</span></div>';
     } else {
-      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + pm + '월분 결재 기록이 없습니다</span></div>';
+      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">볼 수 있는 ' + pm + '월분 결재가 없습니다</span></div>';
     }
     // 검증(상신 때 굳힌 결과)
     var v = f && f.verify, vs = (v && v.summary) || null;
@@ -574,7 +602,7 @@
     if (vs) {
       checks.push(vs.bad ? ['bad', '검증 불일치 ' + n0(vs.bad) + '건'] : vs.warn ? ['warn', '검증 확인 필요 ' + n0(vs.warn) + '건'] : ['ok', '검증 이상 없음']);
       if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
-    } else if (f === undefined) checks.push(['dim', '검증 결과 불러오는 중…']);
+    } else if (f === undefined) checks.push(['warn', '검증 결과를 불러오는 중…']);
     else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
     checks.push(s.toll_unknown ? ['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 계산)'] : ['ok', '통행료 모두 확정']);
     // rate_miss 는 단가가 없던 「분기-지역」 목록이다(예: 2026-4-수도권). 빈 목록이면 문제없음.
@@ -582,17 +610,19 @@
     if (rm.length) checks.push(['warn', '유류 단가 미등록(' + rm.map(function (k) { var q = String(k).split('-'); return q.length === 3 ? q[0] + '년 ' + q[1] + '분기 ' + q[2] : k; }).join(', ') + ') — 기본 단가로 계산']);
     if (bigJump) checks.push(['warn', '전월보다 비용이 크게 늘었습니다']);
     var nBad = checks.filter(function (c) { return c[0] === 'bad'; }).length, nWarn = checks.filter(function (c) { return c[0] === 'warn'; }).length;
-    var verdict = nBad ? ['bad', '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요']
+    // ★ 상신 때 검증 결과를 못 받았으면(불러오는 중·실패·옛 건) 「이상 없음」이라고 하지 않는다.
+    var verdict = !vs ? ['warn', '검증 결과를 아직 받지 못했습니다 — 결재 문서를 열어 확인해 주세요']
+      : nBad ? ['bad', '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요']
       : nWarn ? ['warn', '대체로 정상입니다 — 아래 확인 항목만 살펴봐 주세요']
       : ['ok', '금액·검증 모두 이상 없습니다 — 문서를 열지 않고 승인하셔도 됩니다'];
-    var perKm = Number(s.biz_km) > 0 ? Math.round((Number(s.fuel) || 0) / Number(s.biz_km)) : 0;
+
     return '<div class="abrief ' + verdict[0] + '">' +
       '<div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
       '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">유류 ' + won(s.fuel) + ' · 통행 ' + won(s.toll) + ' · 주차 ' + won(s.parking) + '</span></div>' +
-      '<div class="abf"><span class="k">운행</span><b>' + n0(s.trips) + '<small>건</small> · ' + C.km(s.km) + '<small>km</small></b><span class="sub">업무 ' + C.km(s.biz_km) + ' km' + (perKm ? ' · 유류 ' + n0(perKm) + '원/km' : '') + '</span></div>' +
+      '<div class="abf"><span class="k">운행</span><b>' + n0(s.trips) + '<small>건</small> · ' + C.km(s.km) + '<small>km</small></b><span class="sub">업무 ' + C.km(s.biz_km) + ' km</span></div>' +
       cmp +
-      '<div class="abf"><span class="k">영수증</span><b>' + n0(s.ev_n || 0) + '<small>장</small></b><span class="sub">주차 ' + won(s.ev_parking || 0) + ' · 통행 ' + won(s.ev_toll || 0) + ' 포함</span></div>' +
+      '<div class="abf"><span class="k">주차·통행 영수증</span><b>' + (s.ev_n == null ? '—' : n0(s.ev_n) + '<small>장</small>') + '</b><span class="sub">주차 ' + won(s.ev_parking || 0) + ' · 통행 ' + won(s.ev_toll || 0) + ' 포함</span></div>' +
       '</div>' +
       '<div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
@@ -752,7 +782,9 @@
           var nt = $('pdfStepNote');
           if (nt) { nt.classList.add('ok'); nt.innerHTML = ic('check', 15) + '<span>문서를 열었습니다. 확인했으면 <b>② 확인 완료 → 결재 상신</b>을 눌러 주세요.</span>'; }
         };
-        Array.prototype.forEach.call($('pFoot').querySelectorAll('a[href="' + url + '"]'), function (a) { a.addEventListener('click', unlock); });
+        Array.prototype.forEach.call($('pFoot').querySelectorAll('a[href="' + url + '"]'), function (a) {
+          a.addEventListener('click', unlock); a.addEventListener('auxclick', unlock); a.addEventListener('contextmenu', unlock);
+        });
       }
       var op = $('pdfOpen'); if (op) { try { op.focus(); } catch (e) { } }
       return res;
@@ -1130,7 +1162,7 @@
   /** 결재 완료 금액 요약표(엑셀에서 바로 열리게 BOM 붙은 CSV). */
   function finCsv() {
     var S = C.state(), cyc = S.CYCKEY;
-    var done = S.APPR.filter(function (a) { return a.cycle === cyc && a.status === 'approved'; });
+    var done = S.APPR.filter(function (a) { return a.cycle === cyc && a.status === 'approved' && C.orgMatch(a.username); });
     var NL = String.fromCharCode(13, 10);
     // ★ 글자 칸이 = + - @ 탭·CR 로 시작하면 엑셀이 수식으로 실행한다 — 앞에 ' 를 붙여 글자로 둔다(2026-10-06 검증로봇 5).
     //   숫자 칸(typeof number)은 그대로. 줄바꿈(LF 하나)도 따옴표로 감싼다.
@@ -1146,13 +1178,15 @@
       var sn = a.snapshot || {}, p = S.USERS[a.username] || {};
       sum += Number(sn.cost) || 0; sk += Number(sn.biz_km) || 0;
       sf += Math.round(sn.fuel || 0); st += Math.round(sn.toll || 0); sp += Math.round(sn.parking || 0);
-      rows.push([C.nameOf(a.username), a.username, p.dept || '', a.closed_at ? whenText(a.closed_at) : '',
+      var op = C.orgPath(a.username);
+      rows.push([C.nameOf(a.username), a.username, [C.orgName(op), op.unit].filter(Boolean).join(' · ') || p.dept || '', a.closed_at ? whenText(a.closed_at) : '',
         Math.round((Number(sn.biz_km) || 0) * 10) / 10,
         Math.round(sn.fuel || 0), Math.round(sn.toll || 0), Math.round(sn.parking || 0), Math.round(sn.cost || 0), a.id]);
     });
     rows.push(['합계', '', '', '', Math.round(sk * 10) / 10, sf, st, sp, Math.round(sum), '']);
     var text = String.fromCharCode(0xFEFF) + rows.map(function (r) { return r.map(q).join(','); }).join(NL) + NL;
-    C.saveBlob(new TextEncoder().encode(text), '결재완료_금액요약_' + cyc + '.csv');
+    var scope = C.orgScopeName ? C.orgScopeName() : '';
+    C.saveBlob(new TextEncoder().encode(text), '결재완료_금액요약_' + cyc + (scope ? '_' + scope.replace(/[\\/:*?"<>|\s]+/g, '') : '') + '.csv');
     C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
   }
 

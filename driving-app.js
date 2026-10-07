@@ -945,7 +945,13 @@
       }).catch(function () { delete AIR_ASKED[k]; });
   }
   /** 이 영수증 사진에서 AI 가 읽은 결과(사진이 바뀌었으면 없음으로). */
-  function aiOf(e) { var x = AIR[e.id]; return x && x.photo_path === e.photo_path ? (x.result || {}) : null; }
+  function aiOf(e) {
+    var x = AIR[e.id];
+    if (!x || x.photo_path !== e.photo_path) return null;
+    var r = x.result || {};
+    if (r.legible === false || r.kind === 'unreadable' || r.kind === 'other') return null;   // 서버도 금액·km 비교에서 뺀다
+    return r;
+  }
   /** 통행료 금액과 영수증이 필요한가 — 서버 tollOf 와 같다. */
   function tollNeed(t) {
     var st = t.toll_status, amt = t.toll_cost == null ? null : Number(t.toll_cost);
@@ -981,13 +987,14 @@
 
     if (cat === '주차' || cat === '통행료') {
       var days = {};
-      var slot = function (k) { return days[k] || (days[k] = { T: 0, A: 0, R: 0, rs: [], ts: [], hit: {} }); };
+      // T = 직접 넣은 통행료(영수증 필요) · A = 자동 계산(영수증 없이 인정) · H = 하이패스 PDF 대조 · R = 영수증
+      var slot = function (k) { return days[k] || (days[k] = { T: 0, A: 0, H: 0, R: 0, rs: [], ts: [], hit: {} }); };
       biz.forEach(function (t) {
         var k = ymd(t.start_time);
         slot(k).ts.push(t);
         if (cat === '주차' ? Number(t.parking_cost) > 0 : tollNeed(t).manual && tollNeed(t).a > 0) slot(k).hit[t.id] = 1;
         if (cat === '주차') { var p = Number(t.parking_cost) || 0; if (p > 0) slot(k).T += p; }
-        else { var tl = tollNeed(t); if (tl.a > 0) { if (tl.manual) slot(k).T += tl.a; else slot(k).A += tl.a; } }
+        else { var tl = tollNeed(t); if (tl.a > 0) { if (tl.manual) slot(k).T += tl.a; else if (tl.hp) slot(k).H += tl.a; else slot(k).A += tl.a; } }
       });
       evs.forEach(function (e) {
         var a = Number(e.amount) || 0; if (a <= 0) return;
@@ -1008,23 +1015,26 @@
       };
       var keys = Object.keys(days).filter(function (k) { var d = days[k]; return d.T || d.R; }).sort();
       var nBad = 0, xl = 0, pr = 0, auto = 0;
-      Object.keys(days).forEach(function (k) { auto += days[k].A; });
+      Object.keys(days).forEach(function (k) { auto += days[k].A + days[k].H; });
       var rows = keys.map(function (k) {
-        var d = days[k], excel = d.T + d.R, res, aiNote = [];
+        // 엑셀 = 운행에 적힌 금액 전부(직접·자동·하이패스) + 영수증. 서버 R10: 영수증이 있는 날
+        //   하이패스가 아닌 운행 금액(직접 + 자동)이 있으면 같은 결제가 두 번 들어간 것이다.
+        var d = days[k], excel = d.T + d.A + d.H + d.R, dup = d.T + d.A, res, aiNote = [];
         d.rs.forEach(function (e) {
           var ai = aiOf(e);
           if (ai && ai.amount != null && isFinite(Number(ai.amount)) && Math.round(Number(ai.amount)) !== Number(e.amount))
             aiNote.push('사진엔 ' + won(Math.round(Number(ai.amount))) + ' (입력 ' + won(e.amount) + ')');
         });
+        var isBad = (d.T > 0 && !d.R) || (dup > 0 && d.R > 0) || aiNote.length > 0;
         if (d.T > 0 && !d.R) res = bad('영수증 없음');
-        else if (d.T > 0 && d.R) res = bad('두 번 더해짐');
+        else if (dup > 0 && d.R) res = bad('두 번 더해짐');
         else if (aiNote.length) res = bad('사진 금액과 다름');
         else res = ok('일치');
-        if (d.T > 0 || aiNote.length) nBad++;
+        if (isBad) nBad++;
         xl += excel; pr += d.R;
-        return '<tr' + (d.T > 0 || aiNote.length ? ' class="flagged"' : '') + '><td style="white-space:nowrap">' + esc(dn(k)) + '</td>' +
+        return '<tr' + (isBad ? ' class="flagged"' : '') + '><td style="white-space:nowrap">' + esc(dn(k)) + '</td>' +
           '<td class="mtrips">' + tripsTxt(d) + '</td>' +
-          '<td class="n">' + (d.T ? won(d.T) : '<span class="dim">—</span>') + '</td>' +
+          '<td class="n">' + (d.T + d.A + d.H ? won(d.T + d.A + d.H) + (d.A + d.H ? '<div class="dim" style="font-size:12px">' + (d.T ? '직접 ' + won(d.T) + ' · ' : '') + '자동 ' + won(d.A + d.H) + '</div>' : '') : '<span class="dim">—</span>') + '</td>' +
           '<td class="n">' + (d.R ? won(d.R) + (d.rs.length > 1 ? ' <span class="dim">(' + d.rs.length + '장)</span>' : '') : '<span class="dim">없음</span>') +
             (aiNote.length ? '<div class="mai">' + esc(aiNote.join(', ')) + '</div>' : '') + '</td>' +
           '<td class="n"><b>' + won(excel) + '</b></td><td>' + res + '</td></tr>';
@@ -1036,7 +1046,7 @@
       if (!keys.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없습니다' : '영수증이 필요한 통행료가 없습니다', autoNote.trim(), '');
       return box(!nBad,
         nBad ? '맞지 않는 날이 <em>' + n0(nBad) + '일</em> 있습니다' : '엑셀 금액과 영수증이 모두 맞습니다',
-        '엑셀 ' + (cat === '주차' ? '주차비' : '통행료(영수증 대상)') + ' ' + won(xl) + ' · 영수증 ' + won(pr) + '.' +
+        '엑셀 ' + (cat === '주차' ? '주차비' : '통행료') + ' ' + won(xl) + ' · 영수증 ' + won(pr) + '.' +
           (nBad ? ' 운행에 ' + word + '를 적었다면 영수증을 올리고 운행 쪽 금액은 지워 주세요(엑셀은 둘을 더합니다). 영수증이 없으면 금액을 지워야 합니다.' : '') + autoNote,
         table);
     }
@@ -2158,7 +2168,7 @@
     // 결재할 수 있는 사람)으로 미리 걸러 둔다. 예전 화면에서 만든 결재선은 칸이 겹치거나 비어 있을 수 있다.
     var seenB = {}, seenU = {};
     var out = past.steps.filter(function (s) {
-      if (!s.approver || s.approver === mine || !canApprove(s.approver)) return false;
+      if (!s.approver || !canApprove(s.approver)) return false;      // 본인 칸도 그대로(2026-10-07 본인 넣기 허용)
       if (APPR_BOXES.indexOf(s.box) < 0 || seenB[s.box]) return false;
       seenB[s.box] = 1; return true;
     }).map(function (s) { return { approver: s.approver, box: s.box }; })
@@ -2192,9 +2202,9 @@
   // 2026-10-07 사용자: 기본은 늘 「전체」 — 메뉴로 다른 관리 화면에 가거나 새로 열면 전체로 돌아간다(같은 묶음의 탭끼리는 유지).
   var ORGF = { div: '', team: '', unit: '' };
   function saveOrgF() { }
-  var ORGP = { n: -1, map: {} };
+  var ORGP = { ref: null, users: null, people: null, map: {} };
   function orgPath(u) {
-    if (ORGP.n !== ORG.length) ORGP = { n: ORG.length, map: {} };
+    if (ORGP.ref !== ORG || ORGP.users !== USERS || ORGP.people !== PEOPLE) ORGP = { ref: ORG, users: USERS, people: PEOPLE, map: {} };
     if (ORGP.map[u]) return ORGP.map[u];
     var o = orgOf(u), p;
     if (o) p = { div: o.division || '', team: o.team || '', unit: o.unit || '' };
@@ -2209,6 +2219,12 @@
       p = hit || { div: '', team: d, unit: '' };
     }
     return (ORGP.map[u] = p);
+  }
+  var KEEP_ORG = false;          // 다음 go() 한 번은 보는 범위를 비우지 않는다(파고드는 이동)
+  /** 지금 보는 범위의 이름(파일 이름·제목용). 전체면 ''. */
+  function orgScopeName() {
+    if (!orgFilterOn()) return '';
+    return [ORGF.div === '-' ? '소속미지정' : ORGF.div, ORGF.team, ORGF.unit].filter(Boolean).slice(-1)[0] || '';
   }
   function orgFilterOn() { return !!(ORGF.div || ORGF.team || ORGF.unit); }
   function orgMatch(u) {
@@ -2267,6 +2283,7 @@
     var teams = cnt(function (p) { return inDiv(p) ? p.team : ''; });
     var units = cnt(function (p) { return inDiv(p) && (!ORGF.team || p.team === ORGF.team) ? p.unit : ''; });
     var opt = function (obj, cur, all) {
+      if (cur && obj[cur] == null) obj[cur] = 0;
       var ks = Object.keys(obj).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
       return '<option value="">' + all + '</option>' + ks.map(function (k) {
         return '<option value="' + esc(k) + '"' + (cur === k ? ' selected' : '') + '>' + esc(k === '-' ? '소속 미지정' : k) + ' (' + obj[k] + '명)</option>';
@@ -2352,7 +2369,7 @@
   /** 조직도에서 고른 자리(사업부 | 팀 | 파트). '' = 전체. 이름을 치면 전체에서 찾는다. */
   var APPR_NODE = '';
   /** 이름·아이디·부서·직급 어디에든 걸리면 후보로 본다.
-   *  2026-10-07: 본인도 넣을 수 있다(팀장이 직접 올릴 때 팀장 칸에 본인 — 서버는 앞쪽 본인 칸을 상신하면서 바로 승인한다). */
+   *  2026-10-07: 본인도 넣을 수 있다(팀장이 직접 올릴 때 팀장 칸에 본인). 본인 칸도 차례가 오면 결재함에서 직접 승인한다(칸마다 한 번씩). */
   function apprCandidates(ignoreNode) {
     var q = APPR_Q.trim().toLowerCase();
     var list = Object.keys(PEOPLE).filter(function (u) { return canApprove(u); });
@@ -2367,7 +2384,7 @@
       var n = APPR_NODE.split('|');
       list = list.filter(function (u) {
         var p = orgPath(u);
-        return p.div === n[0] && (n.length < 2 || p.team === n[1]) && (n.length < 3 || p.unit === n[2]);
+        return (p.div || '(소속 미지정)') === n[0] && (n.length < 2 || p.team === n[1]) && (n.length < 3 || p.unit === n[2]);
       });
     }
     return list.sort(function (a, b) {
@@ -2447,7 +2464,7 @@
   var APPR_BOXES = BOXES.slice(1);       // 팀장 · 실장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
   var APPR_BOX = '';                     // 지금 이름을 넣을 칸
   function draftAt(box) { return DRAFT.filter(function (s) { return s.box === box; })[0] || null; }
-  /** 칸 순서로 정렬하고, 한 칸에 한 명 · 한 사람은 한 칸만 남긴다. */
+  /** 칸 순서로 정렬하고, 한 칸에 한 명만 남긴다(같은 분이 여러 칸에 있어도 된다). */
   function tidyDraft() {
     var seenBox = {}, seenU = {};
     DRAFT = DRAFT.filter(function (s) {
@@ -2475,6 +2492,7 @@
     renderSubmit();
     var q = $('apprQ');
     if (q) q.focus();
+    else { var sb = $('btnSubmitAppr'); if (sb) sb.focus(); }       // 칸이 다 차면 「상신」으로
   }
 
   /** 주기별로 넣다 만 결재선(상신 창을 닫아도 남는다, 상신하면 비운다). */
@@ -3027,7 +3045,8 @@
     }
 
     var h = head(isAll() ? '전체 마감 현황' : cmpCycle(CYC, currentCycle()) === 0 ? '이번 달 마감' : cycleName(CYC.y, CYC.m) + ' 마감',
-      isAll() ? '전체 직원 ' + Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false; }).length + '명' : esc(ME.name || ''));
+      isAll() ? (orgFilterOn() ? esc(orgScopeName()) + ' ' + Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false && orgMatch(u); }).length + '명'
+        : '전체 직원 ' + Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false; }).length + '명') : esc(ME.name || ''));
 
     // 21일이 지나 들어오면 새 주기가 먼저 뜬다. 지난달분을 아직 안 올렸으면 그것부터 알려 준다.
     var pp = prevPending();
@@ -3076,7 +3095,7 @@
     if ((badN || T.unk) && !approved) {
       var list = A.filter(function (f) { return f.n > 0; }).slice(0, 4);
       h += sect('바로 봐야 할 것', null,
-        '<button class="btn sm" data-v="' + (isAll() ? 'a_check' : 'check') + '">전체 점검 ' +
+        '<button class="btn sm" data-keeporg data-v="' + (isAll() ? 'a_check' : 'check') + '">전체 점검 ' +
           ic('chev', 13) + '</button>',
         '<div class="panel">' + list.map(issueRow).join('') + '</div>');
     }
@@ -3219,7 +3238,7 @@
     var btn = '';
     if (!a || a.status === 'rejected' || a.status === 'withdrawn') {
       btn = '<button class="btn sm" data-pdf="">' + ic('dl', 13) + 'PDF 미리보기</button>' +
-        '<button class="btn sm" id="btnOpenSubmit" title="검증 없이 바로 결재선을 골라 상신합니다">' +
+        '<button class="btn sm" id="btnOpenSubmit" title="PDF 미리보기 없이 바로 결재선을 골라 상신합니다(검증은 상신할 때 자동으로 돌립니다)">' +
         (a && a.status === 'rejected' ? '바로 다시 상신' : (isAll() ? '내 것 결재 상신' : '바로 상신')) +
         '</button>';
     } else if (canWithdraw) {
@@ -3284,7 +3303,7 @@
   /** 직원별 금액 표. 관리 화면에서는 소속을 맨 앞에 두고 팀별로 묶어 팀 합계를 붙인다(2026-10-07). */
   function personTable(rows) {
     if (!rows.length) return blank('집계할 운행이 없습니다.', null, 'users');
-    var all = isAll(), cols = all ? 11 : 9;
+    var all = isAll(), cols = all ? 10 : 9;
     var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable"><thead><tr>' +
       (all ? '<th>파트·센터</th>' : '') + '<th>이름</th>' + (all ? '' : '<th>소속</th>') + '<th class="n">운행</th><th class="n">거리(km)</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th>' +
@@ -3504,7 +3523,7 @@
     if (g) {
       rows = sortRows(rows, g, {
         date: function (t) { return Number(t.start_time); },
-        who: function (t) { var p = orgPath(t.username); return p.div + '|' + p.team + '|' + p.unit + '|' + nameOf(t.username); },
+        who: function (t) { var p = orgPath(t.username); return ('0000' + orgRank(p)).slice(-5) + '|' + p.team + '|' + p.unit + '|' + nameOf(t.username); },
         purp: function (t) { return t.purpose || ''; },
         car: function (t) { return t.plate_no || ''; },
         dist: function (t) { return Number(t.distance_km) || 0; },
@@ -3540,11 +3559,12 @@
   }
 
   /** 사람·차량·목적·날짜까지만 건 것(검색어·점검 칩은 뺀 것). 칩 숫자를 이 안에서 센다. */
-  function baseFiltered() {
+  /** ignorePurp: 점검 칩 숫자는 목적과 상관없이 센다(목적 기본값이 일반업무라 출퇴근 칩이 늘 0 이 되던 것). */
+  function baseFiltered(ignorePurp) {
     return TRIPS.filter(function (t) {
       if (FILT.who && t.username !== FILT.who) return false;
       if (FILT.car && t.plate_no !== FILT.car) return false;
-      if (FILT.purp && (FILT.purp === '-' ? !!(t.purpose || '') : t.purpose !== FILT.purp)) return false;
+      if (!ignorePurp && FILT.purp && (FILT.purp === '-' ? !!(t.purpose || '') : t.purpose !== FILT.purp)) return false;
       return inDateFilter(t.start_time);
     });
   }
@@ -3581,7 +3601,7 @@
     if (!LOADED) return head(scopeTitle('운행일지')) + skeleton();
     var A = audit();
     // 칩 숫자는 '지금 걸린 사람·차량·목적·날짜' 안에서 센다(검색어·칩 자신은 빼고).
-    var base = baseFiltered();
+    var base = baseFiltered(true);
     var inBase = {}; base.forEach(function (t) { inBase[t.id] = 1; });
     var c = {};
     A.forEach(function (f) {
@@ -3755,7 +3775,7 @@
     });
     rows = sortRows(rows, "ev", {
       date: function (e) { return Number(e.date_millis); },
-      who: function (e) { var p = orgPath(e.username); return p.div + '|' + p.team + '|' + p.unit + '|' + nameOf(e.username); },
+      who: function (e) { var p = orgPath(e.username); return ('0000' + orgRank(p)).slice(-5) + '|' + p.team + '|' + p.unit + '|' + nameOf(e.username); },
       cat: function (e) { return e.category || ''; },
       amount: function (e) { return Number(e.amount) || 0; }
     }, 'date', -1);
@@ -5091,15 +5111,18 @@
     //   1,800건이 나왔다.
     filtered().slice().sort(function (a, b) { return a.start_time - b.start_time; }).forEach(function (t) {
       var u = USERS[t.username] || {};
-      var row = [ymd(t.start_time), hm(t.start_time), u.name || t.username, u.dept || '',
+      var op = orgPath(t.username);
+      var row = [ymd(t.start_time), hm(t.start_time), u.name || t.username, [orgName(op), op.unit].filter(Boolean).join(' · '),
         t.plate_no || '', t.purpose || '', t.start_address || '', t.end_address || '', t.visit_place || '',
         t.start_odometer, t.end_odometer, t.distance_km,
         Math.round(tripFuel(t)), t.toll_cost == null ? '' : t.toll_cost,
         isUnknownToll(t) ? '미확정' : '확정', t.parking_cost == null ? '' : t.parking_cost,
         t.is_manual ? '수기' : '자동'];
       lines.push(row.map(function (v) {
+        if (typeof v === 'number') return String(v);
         var s = String(v == null ? '' : v);
-        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;            // 엑셀이 수식으로 실행하지 않게(방문처·주소는 직원이 친 글)
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       }).join(','));
     });
     // 엑셀이 UTF-8 을 알아보게 BOM 을 붙인다. 없으면 한글이 깨진다.
@@ -6168,7 +6191,9 @@
   function syncAdm() {
     var list = $('admList'), tog = $('admTog');
     if (!list || !tog) return;
-    var open = ADM_OPEN || (!!list.querySelector('[data-v="' + VIEW + '"]') && ADM_CLICK_VIEW !== VIEW);
+    var inAdm = !!list.querySelector('[data-v="' + VIEW + '"]') ||
+      Array.prototype.some.call(list.querySelectorAll('[data-alt]'), function (a) { return a.dataset.alt.split(',').indexOf(VIEW) >= 0; });
+    var open = ADM_OPEN || (inAdm && ADM_CLICK_VIEW !== VIEW);
     list.classList.toggle('fold', !open);
     tog.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
@@ -6218,7 +6243,8 @@
     // 권한 관리는 관리자 중에서도 마스터 계정만(서버 RPC 가 그렇게 못 박혀 있다).
     if (v === 'perm' && !ACCT.can_manage_admin) return;
     if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = 'inbox';
-    if (v !== VIEW && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
+    if (v !== VIEW && !KEEP_ORG && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
+    KEEP_ORG = false;
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
@@ -6350,7 +6376,7 @@
       render(); return;
     }
     if ((el = e.target.closest('[data-evcat]'))) { EVF.cat = el.dataset.evcat; EVF.touched = true; render(); return; }
-    if (e.target.closest('[data-fclear]')) { clearFilters(); render(); return; }
+    if (e.target.closest('[data-fclear]')) { clearFilters(); FILT.purp = ''; render(); return; }   // 「조건 지우기」는 목적까지 비운다
     if ((el = e.target.closest('[data-inboxf]'))) { INBOX_F = el.dataset.inboxf; render(); return; }
     // PDF 미리보기 — 창에서 고른 목적을 먼저 반영한다. PDF 는 이어서 drv-verify.js 가 만든다.
     if (e.target.closest('[data-pdf]')) {
@@ -6363,8 +6389,9 @@
         PRINT_PURPOSES = [BUSINESS];
       }
     }
-    if ((el = e.target.closest('[data-v]'))) { go(el.dataset.v); return; }
-    if ((el = e.target.closest('[data-chip]'))) { FILT.chip = el.dataset.chip; render(); return; }
+    if ((el = e.target.closest('[data-v]'))) { if (el.hasAttribute('data-keeporg')) KEEP_ORG = true; go(el.dataset.v); return; }
+    // 점검 칩은 목적과 상관없이 보인다(출퇴근·목적 미선택 칩이 일반업무 필터에 가려지지 않게).
+    if ((el = e.target.closest('[data-chip]'))) { FILT.chip = el.dataset.chip; if (FILT.chip !== 'all') FILT.purp = ''; render(); return; }
     if ((el = e.target.closest('[data-issue]'))) {
       // go() 가 필터를 비우므로 반드시 go() **뒤에** 넣어야 한다. 예전에는 앞에 넣어
       // 필터가 날아갔고, 화면도 개인 운행일지로 못 박혀 있어 전체 점검에서 누르면
@@ -6372,6 +6399,7 @@
       var issue = el.dataset.issue;
       // 미확정 통행료는 한 건씩 여는 운행일지가 아니라 구간별로 묶어 채우는 화면으로.
       if (issue === 'unk' && !isAll()) { go('tollfill'); return; }
+      KEEP_ORG = true;                     // 같은 범위를 그대로 들고 간다(팀을 골라 놓고 미확정을 누르면 그 팀 것만)
       go(isAll() ? 'a_trips' : 'trips');
       FILT.chip = issue; FILT.who = ''; FILT.purp = '';   // 점검 항목은 목적과 관계없이 다 보인다
       render(); return;
@@ -6512,6 +6540,10 @@
       APPR_NODE = el.dataset.anode; APPR_Q = '';
       var qn = $('apprQ'); if (qn) qn.value = '';
       var cn = $('apprCand'); if (cn) cn.innerHTML = apprCandHtml();
+      // 다시 그리면 누른 버튼이 사라진다 — 같은 자리 버튼에 초점을 돌려준다.
+      var again = null;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-anode]'), function (b) { if (b.dataset.anode === APPR_NODE) again = b; });
+      if (again) again.focus();
       return;
     }
     // ★ render() 를 부르지 않는다. 표를 다시 그리면 스크롤이 맨 위로 튀어
@@ -7216,7 +7248,10 @@
       // 목적을 고르는 창 없이 문서를 만들 때는 늘 일반업무만 담는다(지난번에 고른 체크박스를 따르지 않는다).
       bizOnly: function () { PRINT_PURPOSES = [BUSINESS]; },
       expectCost: expectCost, sheetSumWarn: sheetSumWarn,
-      setOrg: function (rows) { ORG = rows || []; }
+      setOrg: function (rows) { ORG = rows || []; },
+      orgScopeName: orgScopeName,
+      /** 검증을 돌린 뒤 — 영수증 화면의 사진 판독(evidence_ai)을 다시 받게 한다. */
+      aiReset: function () { AIR = {}; AIR_ASKED = {}; }
     };
     (window.DrvExtQ || []).forEach(function (make) {
       var x;

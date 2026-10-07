@@ -558,6 +558,7 @@ tr.ogrp .od{font-size:11.5px;color:var(--ink-500)}
 tr.ogrp .on{font-size:11.5px;font-weight:700;color:var(--ink-600);background:var(--surface);border:1px solid var(--ink-200);border-radius:999px;padding:0 8px}
 tr.ogrp .or{margin-left:auto;font-size:12.5px;color:var(--ink-600);font-variant-numeric:tabular-nums} tr.ogrp .or b{font-size:12.5px;font-weight:700}
 tr.ogrp .unk{color:var(--red-700);font-weight:600}
+@media (max-width:720px){tr.ogrp td>div{position:sticky;left:12px;max-width:calc(100vw - 64px)} tr.ogrp .or{margin-left:0;width:100%}}
 .admsec{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink-400);padding:12px 12px 4px}
 .vguide{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:18px 0 0;padding:0;font-size:13px;color:var(--ink-500)}
 .vguide li{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 6px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface)}
@@ -1290,6 +1291,14 @@ aside a.step{font-size:15px;height:44px}
 td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--ink-500)}
 .anote,.fhint,.hpnote{font-size:13.5px}
 .cyc .cycle{font-size:15px}
+/* 폰·좁은 화면 — 위 크기 키움이 기존 축소 규칙을 덮지 않게(2026-10-07 검증로봇 6) */
+@media (max-width:1280px){thead th,tbody td{padding-left:12px;padding-right:12px}}
+@media (max-width:900px){
+  .phead h1{font-size:21px} .verdict{font-size:22px} .fact .v{font-size:19px}
+  aside a,aside a.step{height:45px}
+  .scroll table th:first-child{background:#F7F9FA}
+}
+@media (max-width:380px){.cyc .cycle{font-size:14px;padding:0 8px}}
 }
 </style>
 </head>
