@@ -402,6 +402,29 @@
     $('cycNext').disabled = cmpCycle(last, cur) >= 0;
     $('cycleBox').classList.toggle('multi', !!RANGE);
     $('cycleBox').classList.toggle('past', !RANGE && cmpCycle(CYC, cur) < 0);
+    // 기간이 바뀌면 한 번 반짝 — 화면 전체가 다른 기간으로 바뀌었다는 것을 눈에 띄게.
+    var sig = RANGE ? 'r' + RANGE.from.y + RANGE.from.m + '-' + RANGE.to.y + RANGE.to.m : 'c' + CYC.y + '-' + CYC.m;
+    if (CYC_SIG && CYC_SIG !== sig) {
+      var bx = $('cycleBox'); bx.classList.remove('flash'); void bx.offsetWidth; bx.classList.add('flash');
+      setTimeout(function () { bx.classList.remove('flash'); }, 1200);
+    }
+    CYC_SIG = sig;
+  }
+  var CYC_SIG = '';
+  /** 이번 주기가 아닌 기간을 보고 있으면 모든 화면 맨 위에 띠 — 일지·영수증·정산이 모두 그 기간 기준이다. */
+  function cycleBand() {
+    var cur = currentCycle();
+    if (RANGE) {
+      return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(RANGE.from.y + '년 ' + RANGE.from.m + '월분 – ' + RANGE.to.y + '년 ' + RANGE.to.m + '월분</b>') +
+        ' (' + cyclesInView().length + '주기)을 한꺼번에 보고 있습니다 — 조회만 되고 고칠 수 없습니다.</span>' +
+        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">이번 주기로</button></div>';
+    }
+    if (cmpCycle(CYC, cur) < 0) {
+      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + CYC.y + '년 ' + CYC.m + '월분 (' + esc(cycleSpan(CYC.y, CYC.m)) + ') · 지난 주기</b>를 보고 있습니다. ' +
+        '운행일지·영수증·정산이 모두 이 기간 기준입니다.</span>' +
+        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">이번 주기(' + cur.m + '월분)로 →</button></div>';
+    }
+    return '';
   }
   /** 내 결재 상태 한 마디(주기 목록에 붙인다). */
   function myApprTag(key) {
@@ -6134,6 +6157,8 @@
             (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
     // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
+    // 기간과 상관없는 화면(결재함·계정·권한·조직도·차량)에는 띠를 달지 않는다.
+    if (['inbox', 'account', 'perm', 'org', 'cars'].indexOf(VIEW) < 0) html = cycleBand() + html;
     if (STEP_FX) { html = '<div class="stepfx ' + STEP_FX + '">' + html + '</div>'; STEP_FX = ''; }
     return html;
   }
