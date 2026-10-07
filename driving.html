@@ -113,6 +113,8 @@ body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
 body.is-admin .navsec.adm{display:block}
 body.is-admin .navsec.admtog{display:flex}
+/* 결재만 하는 계정(운행일지 안 씀, 2026-10-07) — 메뉴는 결재함만 */
+body.nodrv #nav > a:not([data-v="inbox"]),body.nodrv #nav > .navsec{display:none}
 
 /* ── 로고 ────────────────────────────────────────────────────────────
    CI 원본 아트워크를 그대로 쓴다. 글꼴로 흉내 내지 않는다.

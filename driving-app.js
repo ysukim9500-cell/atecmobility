@@ -603,7 +603,7 @@
 
     var fresh = soft && STATIC_AT && Date.now() - STATIC_AT < CACHE_MS;
     var staticP = fresh ? Promise.resolve(null) : Promise.all([
-      fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status'),
+      fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status,uses_driving'),
       fetchAll('/rest/v1/app_vehicles?select=*'),
       fetchAll('/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path&order=id.asc'),
       fetchAll('/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc'),
@@ -1613,43 +1613,87 @@
     if (!SIGNUPS.length) return '';
     return sect('가입 신청', SIGNUPS.length + '건', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>아이디</th><th>부서 · 직급</th><th>회사 메일</th><th>차량</th><th>신청</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>아이디</th><th>부서 · 직급</th><th>회사 메일</th><th>운행일지</th><th>신청</th><th></th></tr></thead><tbody>' +
       SIGNUPS.map(function (x) {
         var busy = SIGNUP_BUSY === x.username;
         return '<tr><td><span class="lead">' + esc(x.name || '') + '</span></td>' +
           '<td class="mono">' + esc(x.username) + '</td>' +
           '<td class="dim">' + esc([x.dept, x.position].filter(Boolean).join(' · ') || '—') + '</td>' +
           '<td class="dim">' + esc(x.email || '—') + '</td>' +
-          '<td class="dim">' + esc(x.plate_no || '없음(결재만)') + '</td>' +
+          '<td class="dim">' + (x.uses_driving === false ? '안 씀(결재만)' : '씀') + '</td>' +
           '<td class="dim">' + (x.signup_at ? md(Date.parse(x.signup_at)) : '—') + '</td>' +
           '<td class="n" style="white-space:nowrap">' +
           '<button class="btn sm pri" data-signup="' + esc(x.username) + '" data-ok="1"' + (busy ? ' disabled' : '') + '>승인</button> ' +
           '<button class="btn sm" data-signup="' + esc(x.username) + '" data-ok="0"' + (busy ? ' disabled' : '') + '>거절</button></td></tr>';
       }).join('') + '</tbody></table></div></div>' +
       '<div class="anote">업무 결재 포털에서 들어온 신청입니다. 승인하면 그 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다. ' +
-      '적힌 회사 메일은 <b>본인 확인이 안 된 값</b>입니다. 결재자로 고를 수 있게 하려면, 본인이 맞는지 확인한 뒤 ' +
-      '「조직도」에서 그 사람을 열어 앱 계정을 이 아이디로 이어 주세요.</div>');
+      '적힌 회사 메일은 <b>본인 확인이 안 된 값</b>입니다. 승인할 때 <b>조직도의 누구인지</b> 고르면 바로 결재자로 고를 수 있게 됩니다.</div>');
+  }
+  /** 가입 승인 때 이을 조직도 후보 — 아직 계정이 안 이어진 사람. 이름이 같은 사람을 맨 앞에. */
+  function signupOrgOptions(x) {
+    var free = ORG.filter(function (o) { return !o.username; });
+    var nm = String(x.name || '').replace(/\s/g, '');
+    var same = free.filter(function (o) { return String(o.name || '').replace(/\s/g, '') === nm; });
+    var rest = free.filter(function (o) { return same.indexOf(o) < 0; })
+      .sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ko'); });
+    var lab = function (o) { return o.name + ' · ' + [o.team, o.unit].filter(Boolean).join(' › ') + (o.role ? ' · ' + o.role : o.rank ? ' · ' + o.rank : ''); };
+    var opt = function (o) { return '<option value="' + o.id + '">' + esc(lab(o)) + '</option>'; };
+    return {
+      def: same.length === 1 ? String(same[0].id) : same.length ? '' : 'new',
+      html: '<option value="">잇지 않음 — 나중에 「조직도」에서 잇기</option>' +
+        '<option value="new">조직도에 새로 추가</option>' +
+        (same.length ? '<optgroup label="이름이 같은 사람">' + same.map(opt).join('') + '</optgroup>' : '') +
+        (rest.length ? '<optgroup label="계정이 안 이어진 조직도 사람">' + rest.map(opt).join('') + '</optgroup>' : '')
+    };
   }
   /** 승인·거절 확인 창 — 누구를 어떻게 하는지 보여 주고 본인 비밀번호를 받는다. */
   function openSignupConfirm(u, ok) {
     var x = (SIGNUPS || []).filter(function (r) { return r.username === u; })[0] || { username: u };
     $('pTitle').textContent = ok ? '가입 승인' : '가입 거절';
     $('pSub').textContent = (x.name || '') + ' (' + u + ')';
+    var oo = ok ? signupOrgOptions(x) : null;
     $('pBody').innerHTML = '<div class="form"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
       (ok ? '승인' : '거절') + '</b>합니다.' +
-      (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다. 결재자로 쓰려면 「조직도」에서 직접 이어 주세요.'
+      (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다.' +
+          (x.uses_driving === false ? ' <b>운행일지를 안 쓰는 분</b>이라 운행일지에서는 결재함만 보입니다.' : '')
         : ' 거절하면 이 아이디로는 로그인할 수 없고, 적어 낸 차량번호는 비웁니다.') + '</div>' +
+      // ★ 결재자로 고를 수 있게 하려면 조직도에 이어야 한다(결재자 = 조직도에 있고 계정이 이어진 사람, 2026-10-02 결정).
+      //   관리자가 본인 확인 뒤 직접 고른다 — 이름만 같다고 자동으로 잇지 않는다(가로채기 방지, 10/6 검증로봇).
+      (ok ? '<div class="frow"><label class="flab" for="suOrg">조직도</label><div class="fbody">' +
+        '<select class="inp" id="suOrg">' + oo.html + '</select>' +
+        '<div class="fhint">이으면 <b>결재자로 고를 수 있게</b> 됩니다. 본인이 맞는지 확인하고 고르세요.</div>' +
+        '<div id="suOrgNew" class="form" style="margin-top:10px" hidden>' +
+        '<div class="frow"><label class="flab" for="suDiv">본부</label><div class="fbody"><input class="inp" id="suDiv" maxlength="60" placeholder="예) 버스사업본부"></div></div>' +
+        '<div class="frow"><label class="flab" for="suTeam">팀</label><div class="fbody"><input class="inp" id="suTeam" maxlength="60" value="' + esc(x.dept || '') + '"></div></div>' +
+        '<div class="frow"><label class="flab" for="suRole">직책</label><div class="fbody"><input class="inp" id="suRole" maxlength="30" placeholder="예) 팀장 · 센터장 (결재란에 찍힘)"></div></div>' +
+        '<div class="frow"><label class="flab" for="suRank">직급</label><div class="fbody"><input class="inp" id="suRank" maxlength="30" value="' + esc(x.position || '') + '"></div></div>' +
+        '</div></div></div>' : '') +
       '<div class="frow"><label class="flab" for="suMine">본인 비밀번호</label><div class="fbody">' +
       '<input class="inp" type="password" id="suMine" autocomplete="current-password">' +
       '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호입니다.</div></div></div></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnSignupGo" data-u="' + esc(u) + '" data-ok="' + (ok ? '1' : '0') + '">' + (ok ? '승인' : '거절') + '</button>';
     $('panel').classList.add('open');
+    if (ok) {
+      var sel = $('suOrg');
+      var showNew = function () { $('suOrgNew').hidden = sel.value !== 'new'; };
+      sel.value = oo.def; showNew();
+      sel.addEventListener('change', showNew);
+    }
     var f = $('suMine'); if (f) f.focus();
   }
   function decideSignup(u, ok) {
     var mine = ($('suMine') || {}).value || '';
     if (!mine) { toast('본인 비밀번호를 넣어 주세요.', true); return; }
+    // 조직도 잇기(승인일 때만) — 승인 뒤에 쓴다. 새로 추가면 본부는 꼭 받는다(조직도 칸 규칙).
+    var x = (SIGNUPS || []).filter(function (r) { return r.username === u; })[0] || { username: u };
+    var orgPick = ok && $('suOrg') ? $('suOrg').value : '';
+    var newOrg = null;
+    if (orgPick === 'new') {
+      var tv = function (id) { return (($(id) || {}).value || '').trim(); };
+      newOrg = { division: tv('suDiv'), team: tv('suTeam'), role: tv('suRole'), rank: tv('suRank') };
+      if (!newOrg.division) { toast('조직도에 새로 넣으려면 본부를 넣어 주세요.', true); $('suDiv').focus(); return; }
+    }
     var go = $('btnSignupGo'); if (go) go.disabled = true;
     SIGNUP_BUSY = u;
     apiRetry('/functions/v1/driving-account', { method: 'POST', body: JSON.stringify({ action: 'decide_signup', target: u, ok: ok, password: mine }) })
@@ -1658,12 +1702,44 @@
         SIGNUP_BUSY = '';
         if (go) go.disabled = false;
         if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return; }
-        toast(res.j.message || '처리했습니다.');
+        var done = res.j.message || '처리했습니다.';
         closePanel();
         SIGNUPS = null;
-        // 승인한 사람이 직원 목록·조직도에 바로 보이게 다시 받는다.
-        if (res.ok && ok) loadAll(); else render();
+        if (!ok) { toast(done); render(); return; }
+        return linkSignupOrg(u, x, orgPick, newOrg).then(function (msg) {
+          if (msg) toast(done + ' ' + msg, /못했/.test(msg)); else toast(done);
+          loadAll();                     // 승인한 사람이 직원 목록·조직도·결재자 후보에 바로 보이게
+        });
       }).catch(function () { SIGNUP_BUSY = ''; if (go) go.disabled = false; toast('처리하지 못했습니다.', true); });
+  }
+  /** 승인한 계정을 조직도에 잇는다 — 이미 계정이 이어진 줄은 건드리지 않는다(username=is.null 조건). */
+  function linkSignupOrg(u, x, pick, newOrg) {
+    if (!pick) return Promise.resolve('');
+    var now = new Date().toISOString();
+    var mail = String(x.email || '').toLowerCase();
+    var req;
+    if (pick === 'new') {
+      var same = ORG.filter(function (o) { return o.division === newOrg.division && (o.team || '') === newOrg.team && !o.unit; });
+      req = apiRetry('/rest/v1/driving_org', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ name: x.name || u, division: newOrg.division, team: newOrg.team, unit: '',
+          rank: newOrg.rank, role: newOrg.role, duty: '', username: u,
+          // 팀즈 결재 알림은 회사 메일로만 간다 — 다른 도메인이면 비워 둔다
+          email: /@atecmobility\.com$/.test(mail) ? mail : null,
+          sort: same.reduce(function (m, o) { return Math.max(m, o.sort || 0); }, 0) + 1,
+          updated_by: myName(), updated_at: now })
+      });
+    } else {
+      req = apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(pick) + '&username=is.null', {
+        method: 'PATCH', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ username: u, updated_by: myName(), updated_at: now })
+      });
+    }
+    return req.then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rows) {
+        return rows && rows.length ? '조직도에 이었습니다 — 이제 결재자로 고를 수 있습니다.'
+          : '조직도에는 잇지 못했습니다(이미 다른 계정이 이어졌을 수 있습니다). 「조직도」에서 직접 이어 주세요.';
+      }).catch(function () { return '조직도에는 잇지 못했습니다. 「조직도」에서 직접 이어 주세요.'; });
   }
   function viewPerm() {
     if (!LOADED) return head('권한 관리') + skeleton();
@@ -2514,7 +2590,7 @@
     }
 
     var h = head(isAll() ? '전체 마감 현황' : cmpCycle(CYC, currentCycle()) === 0 ? '이번 달 마감' : cycleName(CYC.y, CYC.m) + ' 마감',
-      isAll() ? '전체 직원 ' + Object.keys(USERS).length + '명' : esc(ME.name || ''));
+      isAll() ? '전체 직원 ' + Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false; }).length + '명' : esc(ME.name || ''));
 
     // 21일이 지나 들어오면 새 주기가 먼저 뜬다. 지난달분을 아직 안 올렸으면 그것부터 알려 준다.
     var pp = prevPending();
@@ -4542,7 +4618,9 @@
   /* ══════════════════ 관리 화면 ══════════════════ */
   function viewPeople() {
     if (!LOADED) return head('직원 현황') + skeleton();
+    // 결재만 하는 계정(운행일지 안 씀)은 운행자 현황·미운행 인원에서 뺀다(2026-10-07).
     var list = Object.keys(USERS).map(function (u) { return USERS[u]; })
+      .filter(function (u) { return u.uses_driving !== false; })
       .sort(function (a, b) {
         return (a.dept || '힣').localeCompare(b.dept || '힣', 'ko') ||
           (a.name || '').localeCompare(b.name || '', 'ko');
@@ -5447,7 +5525,19 @@
     list.classList.toggle('fold', !open);
     tog.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
+  /** 운행일지를 안 쓰고 결재만 하는 사람인가(2026-10-07, 포털 가입 때 고름). 관리자는 늘 전부 본다. */
+  function noDriving() {
+    if (!ME || ME.is_admin) return false;
+    var u = USERS[myName()];
+    return ME.uses_driving === false || !!(u && u.uses_driving === false);
+  }
+  var NODRV_VIEWS = ['inbox', 'account'];      // 결재만 하는 사람이 들어갈 수 있는 화면
+
   function render() {
+    // 결재만 하는 사람은 결재함·내 계정만 — 다른 화면 주소로 와도 결재함으로 돌린다.
+    var nd = noDriving();
+    document.body.classList.toggle('nodrv', nd);
+    if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) { VIEW = 'inbox'; applyScope(); writeHash(); }
     // 적재가 실패했으면 스켈레톤 대신 사유와 다시 시도 버튼을 보여 준다.
     $('inner').innerHTML = LOAD_ERR
       ? '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
@@ -5480,6 +5570,7 @@
     if (ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) return;
     // 권한 관리는 관리자 중에서도 마스터 계정만(서버 RPC 가 그렇게 못 박혀 있다).
     if (v === 'perm' && !ACCT.can_manage_admin) return;
+    if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = 'inbox';
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();

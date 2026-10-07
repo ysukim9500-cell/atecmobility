@@ -158,6 +158,13 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .fld > span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
 .fld > span em{font-style:normal;color:var(--red)}
 .fld > span small{font-weight:400;color:var(--grey-2)}
+.fld legend > span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.fld legend > span em{font-style:normal;color:var(--red)}
+.fld legend > span small{font-weight:400;color:var(--grey-2)}
+.pick{display:flex;align-items:center;gap:8px;height:46px;padding:0 14px;border:1px solid var(--line);background:#F7F9FC;font-size:15px;color:var(--ink);cursor:pointer}
+.pick small{color:var(--grey-2);font-size:12px}
+.pick:has(input:checked){border-color:var(--ink);background:#fff;font-weight:700}
+.pick input{accent-color:var(--ink)}
 .inp{width:100%;height:46px;padding:0 14px;border:1px solid var(--line);background:#F7F9FC;font-size:16px;color:var(--ink)}
 .inp:focus{border-color:var(--ink);background:#fff;outline:none}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -358,6 +365,13 @@ a.launch:hover .go svg{transform:translateX(4px)}
       <label class="fld"><span>부서</span><input class="inp" id="suDept" maxlength="60" placeholder="예) 수도권버스지원팀"></label>
       <label class="fld"><span>회사 메일 <small>(팀즈 결재 알림을 받을 주소)</small></span>
         <input class="inp" id="suMail" type="email" autocomplete="email" maxlength="80" placeholder="아이디@atecmobility.com"></label>
+      <fieldset class="fld" style="border:0;padding:0;margin:0">
+        <legend style="padding:0"><span>운행일지 <em>*</em> <small>업무용 차량 운행을 기록하나요?</small></span></legend>
+        <div class="two" role="radiogroup">
+          <label class="pick"><input type="radio" name="suDrv" value="1"> 씀 <small>차량 운행을 기록합니다</small></label>
+          <label class="pick"><input type="radio" name="suDrv" value="0"> 안 씀 <small>결재만 합니다</small></label>
+        </div>
+      </fieldset>
       <p class="hint">차량번호는 받지 않습니다. 운행일지를 쓰실 분은 승인 뒤 <b>운행일지 앱 › 차량 관리</b>에서 차량을 추가하세요.</p>
       <div class="msg" id="suMsg" role="alert" hidden></div>
       <button class="btn pri" type="submit" id="suBtn">가입 신청</button>
@@ -454,9 +468,11 @@ a.launch:hover .go svg{transform:translateX(4px)}
     if (p !== p2) { msg('suMsg', '비밀번호 확인이 다릅니다.'); $('suPw2').focus(); return; }
     if (!n) { msg('suMsg', '이름을 넣어 주세요.'); $('suName').focus(); return; }
     if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { msg('suMsg', '메일 주소 모양이 아닙니다.'); $('suMail').focus(); return; }
+    var drv = document.querySelector('input[name="suDrv"]:checked');
+    if (!drv) { msg('suMsg', '운행일지를 쓰는지 골라 주세요.'); document.querySelector('input[name="suDrv"]').focus(); return; }
     var b = $('suBtn'); b.disabled = true; b.textContent = '보내는 중…'; msg('suMsg', '');
     post('/functions/v1/driving-auth', { action: 'signup', username: u, password: p, name: n,
-      dept: v('suDept'), position: v('suPos'), email: mail }).then(function (res) {
+      dept: v('suDept'), position: v('suPos'), email: mail, uses_driving: drv.value === '1' }).then(function (res) {
       b.disabled = false; b.textContent = '가입 신청';
       if (!res.ok || !res.j || !res.j.ok) { msg('suMsg', (res.j && res.j.error) || '가입 신청을 받지 못했습니다.'); return; }
       $('fSignup').reset();
