@@ -2115,8 +2115,9 @@
      조직도(driving_org)가 정본이다. 조직도에 안 이어진 계정은 가입 때 적은 부서(dept)를 조직도의 팀·파트 이름과
      맞춰 본다. 고른 범위(ORGF)는 관리 화면 전부에 같이 걸린다 — 한 번 「광역교통지원팀」을 고르면 운행일지·영수증·
      정산·검증·결재 완료가 모두 그 팀만 보인다. */
-  var ORGF = (function () { try { var v = JSON.parse(sessionStorage.getItem('drv.orgf') || '{}'); return { div: v.div || '', team: v.team || '', unit: v.unit || '' }; } catch (e) { return { div: '', team: '', unit: '' }; } })();
-  function saveOrgF() { try { sessionStorage.setItem('drv.orgf', JSON.stringify(ORGF)); } catch (e) { } }
+  // 2026-10-07 사용자: 기본은 늘 「전체」 — 메뉴로 다른 관리 화면에 가거나 새로 열면 전체로 돌아간다(같은 묶음의 탭끼리는 유지).
+  var ORGF = { div: '', team: '', unit: '' };
+  function saveOrgF() { }
   var ORGP = { n: -1, map: {} };
   function orgPath(u) {
     if (ORGP.n !== ORG.length) ORGP = { n: ORG.length, map: {} };
@@ -6141,6 +6142,7 @@
     // 권한 관리는 관리자 중에서도 마스터 계정만(서버 RPC 가 그렇게 못 박혀 있다).
     if (v === 'perm' && !ACCT.can_manage_admin) return;
     if (noDriving() && NODRV_VIEWS.indexOf(v) < 0) v = 'inbox';
+    if (v !== VIEW && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
     VIEW = v;
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
@@ -6179,6 +6181,7 @@
     var v = h.view;
     if (VIEWS[v] && !(ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) && !(v === 'perm' && !ACCT.can_manage_admin)) {
       if (VIEW !== v) {
+        if (v !== VIEW && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
         VIEW = v; AUDIT = null; clearFilters();
         // go() 와 같은 이유 — 관리 화면에서 맞춰 둔 남의 대조 결과가 개인 화면에 남으면 안 된다.
         HP = { groups: [], batch: '', busy: false, note: '' };
