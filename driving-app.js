@@ -2274,14 +2274,13 @@
   /** 결재자 찾기 입력에 지금 쳐 놓은 글자. 창을 다시 그려도 남는다. */
   var APPR_Q = '';
 
-  /** 이름·아이디·부서·직급 어디에든 걸리면 후보로 본다. 이미 넣은 사람과 본인은 뺀다. */
-  function apprCandidates() {
+  /** 조직도에서 고른 자리(사업부 | 팀 | 파트). '' = 전체. 이름을 치면 전체에서 찾는다. */
+  var APPR_NODE = '';
+  /** 이름·아이디·부서·직급 어디에든 걸리면 후보로 본다.
+   *  2026-10-07: 본인도 넣을 수 있다(팀장이 직접 올릴 때 팀장 칸에 본인 — 서버는 앞쪽 본인 칸을 상신하면서 바로 승인한다). */
+  function apprCandidates(ignoreNode) {
     var q = APPR_Q.trim().toLowerCase();
-    var used = DRAFT.map(function (s) { return s.approver; }).filter(Boolean);
-    var list = Object.keys(PEOPLE).filter(function (u) {
-      // 이미 다른 칸에 넣은 분도 다시 고를 수 있다(겸직). 후보에 '이미 ○○ 칸'이라고 적어 준다.
-      return u !== myName() && canApprove(u);
-    });
+    var list = Object.keys(PEOPLE).filter(function (u) { return canApprove(u); });
     if (q) {
       list = list.filter(function (u) {
         var p = personOf(u);
@@ -2289,33 +2288,80 @@
         return [nameOf(u), u, p.dept || '', p.position || '', o.division || '', o.team || '', o.unit || '', o.rank || '', o.role || '']
           .join(' ').toLowerCase().indexOf(q) >= 0;
       });
+    } else if (APPR_NODE && !ignoreNode) {
+      var n = APPR_NODE.split('|');
+      list = list.filter(function (u) {
+        var p = orgPath(u);
+        return p.div === n[0] && (n.length < 2 || p.team === n[1]) && (n.length < 3 || p.unit === n[2]);
+      });
     }
-    return list.sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
+    return list.sort(function (a, b) {
+      var pa = orgPath(a), pb = orgPath(b);
+      return (orgRank(pa) - orgRank(pb)) || (pa.unit || '').localeCompare(pb.unit || '', 'ko') || nameOf(a).localeCompare(nameOf(b), 'ko');
+    });
   }
-
+  /** 조직도 나무(결재자가 있는 곳만) — 사업부 › 팀 › 파트·센터, 사람 수와 함께. */
+  function apprTreeHtml() {
+    var all = apprCandidates(true), tree = {}, order = [];
+    if (APPR_Q.trim()) { all = Object.keys(PEOPLE).filter(function (u) { return canApprove(u); }); }
+    all.forEach(function (u) {
+      var p = orgPath(u), d = p.div || '(소속 미지정)';
+      if (!tree[d]) { tree[d] = { n: 0, teams: {}, rank: orgRank(p) }; order.push(d); }
+      tree[d].n++;
+      var t = tree[d].teams;
+      if (p.team) {
+        if (!t[p.team]) t[p.team] = { n: 0, units: {} };
+        t[p.team].n++;
+        if (p.unit) t[p.team].units[p.unit] = (t[p.team].units[p.unit] || 0) + 1;
+      }
+    });
+    order.sort(function (x, y) { return tree[x].rank - tree[y].rank || x.localeCompare(y, 'ko'); });
+    var node = function (key, label, n, lv) {
+      var on = APPR_NODE === key && !APPR_Q.trim();
+      return '<button class="atn lv' + lv + (on ? ' on' : '') + '" data-anode="' + esc(key) + '"' + (on ? ' aria-current="true"' : '') + '>' +
+        '<span class="atl">' + esc(label) + '</span><span class="atc">' + n0(n) + '</span></button>';
+    };
+    var cur = APPR_NODE.split('|');
+    var h = node('', '전체', all.length, 0);
+    order.forEach(function (d) {
+      h += node(d, d, tree[d].n, 1);
+      if (cur[0] !== d) return;                      // 고른 사업부만 펼친다
+      Object.keys(tree[d].teams).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).forEach(function (t) {
+        var T = tree[d].teams[t];
+        h += node(d + '|' + t, t, T.n, 2);
+        if (cur[1] !== t) return;
+        Object.keys(T.units).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).forEach(function (u) {
+          h += node(d + '|' + t + '|' + u, u, T.units[u], 3);
+        });
+      });
+    });
+    return h;
+  }
   function apprCandHtml() {
     var all = apprCandidates();
+    var list;
     if (!all.length) {
-      return '<div class="acnone">' +
-        (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.'
-          : '더 넣을 사람이 없습니다.') +
-        '<br><span style="font-size:11.5px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 찾힙니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
+      list = '<div class="acnone">' +
+        (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.' : '이 자리에는 결재자로 넣을 분이 없습니다.') +
+        '<br><span style="font-size:11.5px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 나옵니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
+    } else {
+      var lastG = null;
+      list = all.map(function (u, i) {
+        var p = orgPath(u), g = orgName(p) + (p.unit ? ' · ' + p.unit : '');
+        var o = orgOf(u) || {};
+        var head = g !== lastG ? '<div class="acg">' + esc(g) + '</div>' : '';
+        lastG = g;
+        var at = DRAFT.filter(function (d) { return d.approver === u; }).map(function (d) { return d.box; });
+        return head + '<button class="acand-i' + (i === 0 && APPR_Q.trim() ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
+          '<b>' + esc(nameOf(u)) + '</b>' +
+          '<span>' + esc([o.role, o.rank].filter(Boolean).join(' · ') || personOf(u).position || '') + '</span>' +
+          (u === myName() ? '<span class="st" style="flex:none;margin-left:6px">본인</span>' : '') +
+          (at.length ? '<span class="st warn" style="flex:none;margin-left:6px">이미 ' + esc(at.join('·')) + ' 칸</span>' : '') +
+          (i === 0 && APPR_Q.trim() ? '<span class="acent">Enter</span>' : '') + '</button>';
+      }).join('');
     }
-    var show = all.slice(0, 8);
-    return show.map(function (u, i) {
-      var p = personOf(u);
-      return '<button class="acand-i' + (i === 0 ? ' top' : '') + '" data-addappr="' + esc(u) + '">' +
-        '<b>' + esc(nameOf(u)) + '</b>' +
-        '<span>' + esc(orgLabel(u) || u) + '</span>' +
-        (function () {
-          var at = DRAFT.filter(function (d) { return d.approver === u; }).map(function (d) { return d.box; });
-          return at.length ? '<span class="st warn" style="margin-left:6px">이미 ' + esc(at.join('·')) + ' 칸</span>' : '';
-        })() +
-        (i === 0 && APPR_Q.trim() ? '<span class="acent">Enter</span>' : '') + '</button>';
-    }).join('') +
-      (all.length > show.length
-        ? '<div class="acnone">그 밖에 ' + n0(all.length - show.length) + '명 — 더 쳐서 좁혀 주세요.</div>'
-        : '');
+    return '<div class="apick"><div class="atree" aria-label="조직도">' + apprTreeHtml() + '</div>' +
+      '<div class="alist">' + list + '</div></div>';
   }
 
   /* ── 결재란 칸 고르기 ──
@@ -2342,7 +2388,7 @@
     return order.filter(function (b) { return !draftAt(b); })[0] || '';
   }
   function addApprover(u) {
-    if (!u || u === myName()) return;
+    if (!u) return;
     var box = APPR_BOX || nextEmptyBox(APPR_BOXES[0]);
     if (!box) { toast('칸이 다 찼습니다. 바꿀 칸의 × 를 눌러 비운 뒤 넣어 주세요.', true); return; }
     // 같은 분이 다른 칸에 있어도 그대로 둔다(한 분이 여러 칸을 맡을 수 있다). 이 칸에 있던 분만 바꾼다.
@@ -2404,7 +2450,7 @@
       //   부서·직급으로도 찾힌다("광역", "팀장").
       h += '<div class="aadd">' +
         '<input id="apprQ" autocomplete="off" aria-label="' + esc(APPR_BOX) + ' 칸에 넣을 분 찾기" placeholder="「' + esc(APPR_BOX) +
-        '」 칸에 넣을 분의 이름을 쓰세요" value="' + esc(APPR_Q) + '">' +
+        '」 칸에 넣을 분 — 이름을 쓰거나 아래 조직도에서 고르세요" value="' + esc(APPR_Q) + '">' +
         '<div class="acand" id="apprCand">' + apprCandHtml() + '</div></div>';
     }
 
@@ -6383,6 +6429,12 @@
     if (e.target.closest('#btnSignCancel')) { SIGN_DRAFT = null; render(); return; }
     if (e.target.closest('#btnSignReset')) { saveSign(null); return; }
     if ((el = e.target.closest('[data-addappr]'))) { addApprover(el.dataset.addappr); return; }
+    if ((el = e.target.closest('[data-anode]'))) {
+      APPR_NODE = el.dataset.anode; APPR_Q = '';
+      var qn = $('apprQ'); if (qn) qn.value = '';
+      var cn = $('apprCand'); if (cn) cn.innerHTML = apprCandHtml();
+      return;
+    }
     // ★ render() 를 부르지 않는다. 표를 다시 그리면 스크롤이 맨 위로 튀어
     //   47줄짜리를 채우려면 매번 다시 내려가야 했다(하이패스 쪽과 같은 이유).
     if ((el = e.target.closest('[data-tffree]'))) {

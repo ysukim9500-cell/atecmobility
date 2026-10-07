@@ -865,8 +865,20 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .aadd input{width:100%;font-size:13.5px;padding:11px 13px;border:1px solid var(--ink-200);
   border-radius:var(--r-sm);background:var(--surface);color:var(--ink-900);outline:0}
 .aadd input:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
-.acand{margin-top:6px;border:1px solid var(--ink-100);border-radius:var(--r-sm);
-  overflow:hidden;max-height:268px;overflow-y:auto}
+.acand{margin-top:8px}
+/* 결재자 고르기 — 왼쪽 조직도 나무, 오른쪽 사람 (2026-10-07) */
+.apick{display:grid;grid-template-columns:minmax(150px,40%) 1fr;border:1px solid var(--ink-200);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
+.atree{max-height:340px;overflow-y:auto;border-right:1px solid var(--ink-100);background:var(--ink-50);padding:6px 0}
+.alist{max-height:340px;overflow-y:auto}
+.atn{display:flex;align-items:center;gap:6px;width:100%;text-align:left;border:0;background:none;font:inherit;cursor:pointer;
+  padding:7px 10px;font-size:12.5px;color:var(--ink-700,#3A4146)}
+.atn.lv1{font-weight:700;color:var(--ink-900)} .atn.lv2{padding-left:22px} .atn.lv3{padding-left:36px;font-size:12px}
+.atn .atl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atn .atc{flex:none;font-size:10.5px;color:var(--ink-400);font-variant-numeric:tabular-nums}
+.atn:hover{background:var(--ink-100)}
+.atn.on{background:var(--red-50);color:var(--red-700);box-shadow:inset 3px 0 0 var(--red)} .atn.on .atc{color:var(--red-700)}
+.acg{position:sticky;top:0;z-index:1;font-size:11px;font-weight:700;color:var(--ink-500);background:var(--ink-50);padding:6px 13px;border-bottom:1px solid var(--ink-100)}
+@media (max-width:560px){.apick{grid-template-columns:1fr}.atree{max-height:150px;border-right:0;border-bottom:1px solid var(--ink-100)}}
 .acand-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 13px;
   border:0;border-bottom:1px solid var(--ink-100);background:var(--surface);cursor:pointer;
   font:inherit;transition:background var(--t)}
