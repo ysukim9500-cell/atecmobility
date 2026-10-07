@@ -17,6 +17,19 @@
 
   var SEL = '';                                 // 고른 부서 키: '' = 전체, 'A' 본부, 'A|B' 팀, 'A|B|C' 센터·파트
   var Q = '';                                   // 사람 찾기
+  var OF = '';                                  // 정리할 것 걸러 보기: '' | 'noacct'(계정 없음) | 'nomail'(메일 없음)
+
+  /** 조직도 어디에도 안 이어진 앱 계정(가입 대기·거절은 뺀다). */
+  function unlinkedAccts(S) {
+    var used = {};
+    S.ORG.forEach(function (x) { if (x.username) used[x.username] = 1; });
+    return Object.keys(S.PEOPLE).filter(function (u) {
+      var pp = S.PEOPLE[u] || {};
+      return !used[u] && (!pp.signup_status || pp.signup_status === 'active');
+    }).sort(function (a, b) { return C.nameOf(a).localeCompare(C.nameOf(b), 'ko'); });
+  }
+  /** 메일이 비었거나 회사 메일이 아닌가(팀즈 알림을 못 받는다). */
+  function noMail(o) { return !/^[^@\s]+@atecmobility\.com$/i.test(String(o.email || '').trim()); }
 
   function nodeKey(o, depth) { return [o.division, o.team, o.unit].slice(0, depth).join('|'); }
   function parts(k) { return k ? k.split('|') : []; }
@@ -75,23 +88,42 @@
       '상신 창에서 결재받을 분의 이름을 넣어 순서대로 고르고, 지난번 결재선을 불러올 수도 있습니다. ' +
       '여기서는 사람의 <b>이름·소속</b>과 <b>앱 계정</b>만 맞춰 두면 됩니다 — 앱 계정이 있어야 결재자로 찾히고 결재를 누를 수 있습니다.</div></div>';
 
+    // ── 정리할 것 — 계정 잇기·메일 채우기 ──
+    var unl = unlinkedAccts(S);
+    var nNoAcct = org.filter(function (o) { return !o.username || !S.PEOPLE[o.username]; }).length;
+    var nNoMail = org.filter(function (o) { return o.username && S.PEOPLE[o.username] && noMail(o); }).length;
+    var tile = function (attr, on, n, t, d, warn) {
+      return '<button class="otile' + (on ? ' on' : '') + (n && warn ? ' warn' : '') + '" ' + attr + '>' +
+        '<b>' + n0(n) + '<small>명</small></b><span class="t">' + t + '</span><span class="d">' + d + '</span></button>';
+    };
+    right += '<div class="otiles">' +
+      tile('data-ounl', false, unl.length, '조직도에 안 이어진 계정', unl.length ? '눌러서 조직도의 누구인지 잇기' : '모두 이어졌습니다', true) +
+      tile('data-of="noacct"', OF === 'noacct', nNoAcct, '앱 계정 없는 사람', '결재자로 못 고릅니다 — 가입하면 이어 주세요', false) +
+      tile('data-of="nomail"', OF === 'nomail', nNoMail, '회사 메일 없는 사람', '팀즈 알림(결재 차례·반려)을 못 받습니다', true) +
+      '</div>';
+
     var q = Q.trim().toLowerCase();
     var people = org.filter(function (o) {
       if (!inNode(o, SEL)) return false;
+      if (OF === 'noacct' && o.username && S.PEOPLE[o.username]) return false;
+      if (OF === 'nomail' && !(o.username && S.PEOPLE[o.username] && noMail(o))) return false;
       if (!q) return true;
       return [o.name, o.rank, o.role, o.duty, o.team, o.unit, o.username || '', o.email || ''].join(' ').toLowerCase().indexOf(q) >= 0;
     });
     right += '<div class="bar" style="margin-top:14px"><label class="field">' + ic('search', 14) +
       '<input id="orgQ" aria-label="사람 찾기" placeholder="이름·직급·업무로 찾기" value="' + esc(Q) + '"></label>' +
+      (OF ? '<button class="btn sm" data-of="">' + ic('close', 12) + (OF === 'noacct' ? '계정 없는 사람만' : '메일 없는 사람만') + ' — 풀기</button>' : '') +
       '<div class="sp" style="flex:1"></div>' +
       '<button class="btn sm pri" data-oadd>＋ 사람 추가</button></div>';
     right += people.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정 · 메일</th><th></th></tr></thead><tbody>' +
       people.map(function (o) {
         var acct = o.username
           ? (S.PEOPLE[o.username] ? '<span class="st ok">' + esc(o.username) + '</span>'
             : '<span class="st bad" title="연결한 계정이 없어졌습니다">' + esc(o.username) + '</span>')
           : '<span class="st dim">없음</span>';
+        acct += o.username && S.PEOPLE[o.username]
+          ? (noMail(o) ? '<div class="omail miss">메일 없음</div>' : '<div class="omail">' + esc(o.email) + '</div>') : '';
         return '<tr><td><span class="lead">' + esc(o.name) + '</span>' + (o.outsourced ? ' <span class="kind">외주</span>' : '') + '</td>' +
           '<td>' + esc(o.rank || '—') + '</td>' +
           '<td>' + (o.role ? '<span class="kind biz">' + esc(o.role) + '</span>' : '<span class="dim">—</span>') + '</td>' +
@@ -237,10 +269,58 @@
       .catch(function (e) { C.toast((e && e.message) || '내리지 못했습니다.', true); });
   }
 
+  /* ══════════════════ 안 이어진 계정 잇기 ══════════════════
+     웹·앱으로 가입했지만 조직도의 어느 사람과도 이어지지 않은 계정. 조직도에서 계정이 비어 있는 사람을 골라 잇는다.
+     같은 이름이 있으면 맨 위에 「같은 이름」으로 먼저 보인다. 조직도에 없는 사람이면 「사람 추가」로 만든다. */
+  function openUnlinked() {
+    var S = C.state(), unl = unlinkedAccts(S);
+    var free = S.ORG.filter(function (o) { return !o.username || !S.PEOPLE[o.username]; });
+    var lab = function (o) { return o.name + ' · ' + ([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + (o.rank ? ' · ' + o.rank : ''); };
+    var rows = unl.map(function (u) {
+      var pp = S.PEOPLE[u] || {}, nm = C.nameOf(u);
+      var same = free.filter(function (o) { return o.name === nm; });
+      var rest = free.filter(function (o) { return o.name !== nm; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+      var opts = '<option value="">— 조직도에서 고르기 —</option>' +
+        (same.length ? '<optgroup label="같은 이름">' + same.map(function (o) { return '<option value="' + o.id + '"' + (same.length === 1 ? ' selected' : '') + '>' + esc(lab(o)) + '</option>'; }).join('') + '</optgroup>' : '') +
+        '<optgroup label="계정 없는 사람 전체">' + rest.map(function (o) { return '<option value="' + o.id + '">' + esc(lab(o)) + '</option>'; }).join('') + '</optgroup>';
+      return '<tr><td><span class="lead">' + esc(nm) + '</span><div class="dim" style="font-size:11px">' + esc(u) + '</div></td>' +
+        '<td class="dim">' + esc([pp.dept, pp.position].filter(Boolean).join(' · ') || '—') + '</td>' +
+        '<td style="min-width:240px"><select class="inp" data-olinksel="' + esc(u) + '" style="height:auto">' + opts + '</select></td>' +
+        '<td class="n"><button class="btn sm pri" data-olink="' + esc(u) + '">잇기</button></td></tr>';
+    }).join('');
+    C.openPanel('조직도에 안 이어진 계정', n0(unl.length) + '명',
+      unl.length
+        ? '<div class="anote" style="margin-top:0">웹·앱으로 가입했지만 조직도의 누구인지 정해지지 않은 계정입니다. ' +
+          '오른쪽에서 <b>조직도의 그 사람</b>을 고르고 「잇기」를 누르세요. 같은 이름이 한 명이면 미리 골라 두었습니다. ' +
+          '조직도에 없는 사람이면 닫고 「＋ 사람 추가」로 만든 뒤 앱 계정을 고르면 됩니다.<br>' +
+          '이으면 <b>결재자로 고를 수 있고</b>, 관리 화면의 <b>소속(사업부·팀·파트)</b>도 바르게 묶입니다.</div>' +
+          '<div class="panel" style="margin-top:12px"><div class="scroll"><table><thead><tr><th>계정</th><th>가입 때 적은 부서</th><th>조직도의 누구?</th><th></th></tr></thead><tbody>' +
+          rows + '</tbody></table></div></div>'
+        : C.blank('모든 계정이 조직도에 이어져 있습니다.', null, 'users'),
+      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>', true);
+  }
+  function linkAcct(u) {
+    var sel = null;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-olinksel]'), function (x) { if (x.dataset.olinksel === u) sel = x; });
+    var id = sel && sel.value;
+    if (!id) { C.toast('조직도에서 누구인지 먼저 골라 주세요.', true); if (sel) sel.focus(); return; }
+    var S = C.state(), o = S.ORG.filter(function (x) { return String(x.id) === String(id); })[0];
+    C.apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ username: u, updated_by: C.myName(), updated_at: new Date().toISOString() })
+    }).then(function (r) { if (!r.ok) return fail(r, '잇기'); })
+      .then(reloadOrg)
+      .then(function () { C.toast(C.nameOf(u) + ' 계정을 ' + (o ? o.name : '조직도') + ' 님에게 이었습니다.'); C.render(); openUnlinked(); })
+      .catch(function (e) { C.toast((e && e.message) || '잇지 못했습니다.', true); });
+  }
+
   /* ══════════════════ 이벤트 ══════════════════ */
   document.addEventListener('click', function (e) {
     var el;
     if ((el = e.target.closest('[data-onode]'))) { SEL = el.dataset.onode; Q = ''; C.render(); return; }
+    if (e.target.closest('[data-ounl]')) { openUnlinked(); return; }
+    if ((el = e.target.closest('[data-olink]'))) { linkAcct(el.dataset.olink); return; }
+    if ((el = e.target.closest('[data-of]'))) { OF = OF === el.dataset.of ? '' : el.dataset.of; C.render(); return; }
     if (e.target.closest('[data-oadd]')) { openPerson(null); return; }
     if ((el = e.target.closest('[data-oedit]'))) { openPerson(el.dataset.oedit); return; }
     if ((el = e.target.closest('#oSave'))) { savePerson(el.dataset.id); return; }
