@@ -922,6 +922,13 @@
     var list = ids.map(apprById).filter(function (a) { return a && a.status === 'approved'; })
       .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     if (!list.length || FINJOB) return;
+    // ★ 한 번에 묶는 인원 상한(2026-10-07 검증로봇 R15) — 사진이 든 PDF 를 모두 메모리에 쌓았다가 합치므로
+    //   전원(66명·사진 약 700장)을 한 번에 묶으면 브라우저 탭이 메모리 부족으로 꺼질 수 있다.
+    var FIN_MAX = 20;
+    if (list.length > FIN_MAX) {
+      C.toast('한 번에 ' + FIN_MAX + '명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true);
+      return;
+    }
     var job = FINJOB = { stop: false };
     var cname = C.cycleName(S.CYC.y, S.CYC.m);
     C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + n0(list.length) + '명',

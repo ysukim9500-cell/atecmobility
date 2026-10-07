@@ -1636,10 +1636,15 @@
     var same = free.filter(function (o) { return String(o.name || '').replace(/\s/g, '') === nm; });
     var rest = free.filter(function (o) { return same.indexOf(o) < 0; })
       .sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ko'); });
-    var lab = function (o) { return o.name + ' · ' + [o.team, o.unit].filter(Boolean).join(' › ') + (o.role ? ' · ' + o.role : o.rank ? ' · ' + o.rank : ''); };
+    // 동명이인을 가릴 수 있게 본부부터 적는다(2026-10-07 검증로봇 R9 — 본부 직속 줄은 이름만 보였다).
+    var lab = function (o) { return o.name + ' · ' + [o.division, o.team, o.unit].filter(Boolean).join(' › ') + (o.role ? ' · ' + o.role : o.rank ? ' · ' + o.rank : ''); };
     var opt = function (o) { return '<option value="' + o.id + '">' + esc(lab(o)) + '</option>'; };
+    // ★ 이름만 같다고 미리 고르지 않는다(검증로봇 R6) — 아직 가입 안 한 결재자 이름으로 가입하면 관리자가
+    //   그대로 승인을 눌러 그 결재자 자리를 넘겨줄 수 있었다. 회사 메일까지 조직도와 같을 때만 미리 고른다.
+    var mail = String(x.email || '').trim().toLowerCase();
+    var byMail = mail ? same.filter(function (o) { return String(o.email || '').trim().toLowerCase() === mail; }) : [];
     return {
-      def: same.length === 1 ? String(same[0].id) : same.length ? '' : 'new',
+      def: byMail.length === 1 ? String(byMail[0].id) : '',
       html: '<option value="">잇지 않음 — 나중에 「조직도」에서 잇기</option>' +
         '<option value="new">조직도에 새로 추가</option>' +
         (same.length ? '<optgroup label="이름이 같은 사람">' + same.map(opt).join('') + '</optgroup>' : '') +
@@ -1667,6 +1672,9 @@
         '<div class="frow"><label class="flab" for="suTeam">팀</label><div class="fbody"><input class="inp" id="suTeam" maxlength="60" value="' + esc(x.dept || '') + '"></div></div>' +
         '<div class="frow"><label class="flab" for="suRole">직책</label><div class="fbody"><input class="inp" id="suRole" maxlength="30" placeholder="예) 팀장 · 센터장 (결재란에 찍힘)"></div></div>' +
         '<div class="frow"><label class="flab" for="suRank">직급</label><div class="fbody"><input class="inp" id="suRank" maxlength="30" value="' + esc(x.position || '') + '"></div></div>' +
+        // 팀즈 결재 알림이 이 주소로 간다 — 신청서의 메일은 본인 확인이 안 된 값이라 관리자가 보고 확정한다(R9).
+        '<div class="frow"><label class="flab" for="suOMail">알림 메일</label><div class="fbody"><input class="inp" id="suOMail" maxlength="80" value="' + esc(x.email || '') + '" placeholder="아이디@atecmobility.com">' +
+        '<div class="fhint">팀즈 결재 알림이 이 주소로 갑니다. <b>본인 회사 메일이 맞는지</b> 확인하세요. 모르면 비워 두세요.</div></div></div>' +
         '</div></div></div>' : '') +
       '<div class="frow"><label class="flab" for="suMine">본인 비밀번호</label><div class="fbody">' +
       '<input class="inp" type="password" id="suMine" autocomplete="current-password">' +
@@ -1691,7 +1699,8 @@
     var newOrg = null;
     if (orgPick === 'new') {
       var tv = function (id) { return (($(id) || {}).value || '').trim(); };
-      newOrg = { division: tv('suDiv'), team: tv('suTeam'), role: tv('suRole'), rank: tv('suRank') };
+      newOrg = { division: tv('suDiv'), team: tv('suTeam'), role: tv('suRole'), rank: tv('suRank'), email: tv('suOMail').toLowerCase() };
+      if (newOrg.email && !/@atecmobility\.com$/.test(newOrg.email)) { toast('알림 메일은 @atecmobility.com 주소만 됩니다. 모르면 비워 두세요.', true); $('suOMail').focus(); return; }
       if (!newOrg.division) { toast('조직도에 새로 넣으려면 본부를 넣어 주세요.', true); $('suDiv').focus(); return; }
     }
     var go = $('btnSignupGo'); if (go) go.disabled = true;
@@ -1715,8 +1724,9 @@
   /** 승인한 계정을 조직도에 잇는다 — 이미 계정이 이어진 줄은 건드리지 않는다(username=is.null 조건). */
   function linkSignupOrg(u, x, pick, newOrg) {
     if (!pick) return Promise.resolve('');
+    // 이미 조직도 어딘가에 이어진 계정이면 또 잇지 않는다(한 사람이 두 줄 — R9).
+    if (ORG.some(function (o) { return o.username === u; })) return Promise.resolve('이 계정은 이미 조직도에 이어져 있어 그대로 두었습니다.');
     var now = new Date().toISOString();
-    var mail = String(x.email || '').toLowerCase();
     var req;
     if (pick === 'new') {
       var same = ORG.filter(function (o) { return o.division === newOrg.division && (o.team || '') === newOrg.team && !o.unit; });
@@ -1725,7 +1735,7 @@
         body: JSON.stringify({ name: x.name || u, division: newOrg.division, team: newOrg.team, unit: '',
           rank: newOrg.rank, role: newOrg.role, duty: '', username: u,
           // 팀즈 결재 알림은 회사 메일로만 간다 — 다른 도메인이면 비워 둔다
-          email: /@atecmobility\.com$/.test(mail) ? mail : null,
+          email: newOrg.email || null,             // 관리자가 승인 창에서 확인한 주소만
           sort: same.reduce(function (m, o) { return Math.max(m, o.sort || 0); }, 0) + 1,
           updated_by: myName(), updated_at: now })
       });
@@ -1738,7 +1748,9 @@
     return req.then(function (r) { return r.ok ? r.json() : null; })
       .then(function (rows) {
         return rows && rows.length ? '조직도에 이었습니다 — 이제 결재자로 고를 수 있습니다.'
-          : '조직도에는 잇지 못했습니다(이미 다른 계정이 이어졌을 수 있습니다). 「조직도」에서 직접 이어 주세요.';
+          : pick === 'new'
+            ? '조직도에 새로 넣지 못했습니다. 「조직도」에서 직접 추가해 주세요.'
+            : '조직도에는 잇지 못했습니다(이미 다른 계정이 이어졌을 수 있습니다). 「조직도」에서 직접 이어 주세요.';
       }).catch(function () { return '조직도에는 잇지 못했습니다. 「조직도」에서 직접 이어 주세요.'; });
   }
   function viewPerm() {
@@ -6155,7 +6167,7 @@
   $('loginBtn').addEventListener('click', doLogin);
   /** 로그인은 업무 결재 포털(work.html)에서 한다(2026-10-06). next = 로그인 뒤 돌아올 운행일지 화면(#/…). */
   function toPortal(next) {
-    var n = /^#\/[A-Za-z0-9_\/-]*$/.test(next || '') ? next : '';
+    var n = /^#\/[A-Za-z0-9_\/~-]*$/.test(next || '') ? next : '';   // ~ = 기간 범위 주소(2026-08~2026-10)
     location.replace('work.html' + (n ? '?next=' + encodeURIComponent(n) : ''));
   }
   function signOut(e) {

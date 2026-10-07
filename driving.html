@@ -19,7 +19,7 @@
     if (/^(127\.0\.0\.1|localhost)$/.test(l.hostname) || /[?&]direct=1/.test(l.search)) return;
     if (!sessionStorage.getItem('drv_at') || !sessionStorage.getItem('drv_me')) {
       var h = l.hash;
-      l.replace('work.html' + (/^#\/[A-Za-z0-9_\/-]*$/.test(h) ? '?next=' + encodeURIComponent(h) : ''));
+      l.replace('work.html' + (/^#\/[A-Za-z0-9_\/~-]*$/.test(h) ? '?next=' + encodeURIComponent(h) : ''));
     }
   } catch (e) { }
 })();

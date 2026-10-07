@@ -253,9 +253,15 @@
       if (unset) {
         e.kind = 'new';                 // 미확정 → 확정. 잃을 게 없다.
         e.diff = null; e.pick = true;
-      } else if (Number(cur) === e.sum) {
-        e.kind = 'same';                // 값이 같다. 굳이 다시 쓸 필요가 없다.
+      } else if (Number(cur) === e.sum && e.trip.toll_source === '하이패스 영수증') {
+        e.kind = 'same';                // 이미 하이패스로 맞춘 값이다. 다시 쓸 필요가 없다.
         e.diff = 0; e.pick = false;
+      } else if (Number(cur) === e.sum) {
+        // ★ 금액은 같지만 아직 '하이패스 영수증'으로 확정되지 않았다(직접 입력·자동 계산).
+        //   확정해 두어야 검증 R06(영수증 없는 직접 입력 통행료)이 풀린다(2026-10-07 검증로봇 R12 —
+        //   "다 확정됐습니다"라고 하는데 R06 은 "0 입력"을 권해 맞는 통행료를 지우게 될 수 있었다).
+        e.kind = 'confirm';
+        e.diff = 0; e.pick = true;
       } else if (who === 'person') {
         // ★ 사람이 직접 정한 값이다. 영수증이 더 정확하더라도 **기본으로 덮지 않는다** —
         //   관리자가 눈으로 보고 직접 고르게 한다.

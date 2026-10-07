@@ -490,7 +490,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
   // 운행일지에서 로그인이 필요해 넘어온 경우(driving.html → work.html?next=#/…): 로그인하면 그 화면으로 돌려보낸다.
   // 운행일지 안의 화면 주소(#/…)만 받는다 — 다른 사이트로 보내는 데 쓰이지 않게.
   var NEXT = (function () {
-    try { var n = new URLSearchParams(location.search).get('next') || ''; return /^#\/[A-Za-z0-9_\/-]*$/.test(n) ? n : ''; }
+    try { var n = new URLSearchParams(location.search).get('next') || ''; return /^#\/[A-Za-z0-9_\/~-]*$/.test(n) ? n : ''; }
     catch (e) { return ''; }
   })();
   function enter() {
