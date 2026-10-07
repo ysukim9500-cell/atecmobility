@@ -1,0 +1,64 @@
+/* ═══ 시안 B — 「업무용 장부」 ═══════════════════════════════════════════
+   엑셀·결재 문서처럼 칸이 분명한 안. 숫자를 많이 보는 관리자에게 맞춘다.
+   · 왼쪽 메뉴를 짙은 남색으로 — 메뉴와 내용이 확실히 갈린다(지금은 흰색끼리 섞인다)
+   · 표: 머리글 짙은 띠, 줄마다 옅은 줄무늬, 칸 사이 세로선 — 긴 표에서 줄을 놓치지 않는다
+   · 글꼴 IBM Plex Sans KR(회사 문서 느낌, 숫자 폭 고정), 기본 14.5px
+   · 빨강은 상신·승인 같은 주 버튼과 경고에만. 바탕은 흰색 */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap");
+:root{
+  --navy:#16222D; --navy-2:#223241; --navy-3:#2E4152;
+  --ink-900:#0F1A22; --ink-800:#1F2B34; --ink-700:#2E3A43; --ink-600:#44515B; --ink-500:#56636D; --ink-400:#86929B;
+  --ink-200:#D5DBE0; --ink-100:#E9EDF0; --canvas:#EEF1F4; --sunken:#F6F8FA;
+  --r:8px; --r-lg:10px; --r-sm:6px;
+}
+body{font-family:"IBM Plex Sans KR","Spoqa Han Sans Neo","Malgun Gothic",sans-serif;font-size:14.5px;line-height:1.55;color:var(--ink-700)}
+header.top{background:#fff;border-bottom:1px solid var(--ink-200)}
+/* 메뉴 — 짙은 남색 */
+aside{background:var(--navy);border-right:0}
+.navsec,.admsec{color:#8FA3B4;font-size:11px}
+aside a{color:#D7E0E7;font-size:14px;height:40px}
+aside a svg{color:#8FA3B4}
+aside a:hover{background:var(--navy-2);color:#fff}
+aside a:hover svg{color:#fff}
+aside a.on{background:var(--navy-3);color:#fff;font-weight:600}
+aside a.on svg{color:#fff}
+aside a.on::before{background:var(--red)}
+aside a.step{color:#E8EEF3}
+aside a.step .stepn{border-color:#5E7486;color:#C9D5DE;background:transparent}
+aside a.step.isnow{color:#fff}
+aside .admtog{color:#8FA3B4}
+aside .pill{background:var(--navy-3);color:#fff}
+/* 제목 */
+.phead h1{font-size:25px;font-weight:700;letter-spacing:-.02em}
+.phead p{font-size:13.5px;color:var(--ink-600)}
+.sect > .hd h2{font-size:15.5px;font-weight:700}
+.hero,.panel{border-radius:var(--r);border-color:var(--ink-200);box-shadow:0 1px 0 rgba(15,26,34,.04)}
+.verdict{font-size:28px;font-weight:700}
+.fact .k{font-size:12.5px;font-weight:600;color:var(--ink-600);text-transform:none}
+.fact .v{font-size:23px;font-weight:700}
+.fact .sub{font-size:12.5px}
+/* 표 — 장부처럼 */
+@media screen{
+  table{font-size:14px}
+  thead th{background:var(--navy-2);color:#E8EEF3;font-size:12.5px;font-weight:600;padding:11px 14px;border-bottom:0;border-right:1px solid var(--navy-3)}
+  thead th:last-child{border-right:0}
+  th.srt button:hover,th.srt.on{color:#fff}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--ink-100);border-right:1px solid var(--ink-100);color:var(--ink-800)}
+  tbody td:last-child{border-right:0}
+  tbody tr:nth-child(even) td{background:#F8FAFB}
+  tbody tr.clk:hover td{background:#EAF1F7}
+  td .lead,td.lead{font-weight:600}
+  td.dim,.dim,td.el{color:var(--ink-600)}
+  td.total{font-weight:700;color:var(--ink-900)}
+  tr.ogrp td{background:#E3E9EE !important}
+}
+.st{font-size:12.5px;font-weight:600}
+.kind{font-size:12px;font-weight:600;border-radius:3px}
+.btn{height:36px;font-size:13.5px;font-weight:600;border-radius:5px}
+.btn.sm{height:30px;font-size:12.5px}
+.field{height:36px;border-radius:5px} .field select,.field input{font-size:13.5px}
+.seg{border-radius:6px} .seg button{font-size:13px;border-radius:4px}
+.issue .t{font-size:14.5px;font-weight:600} .issue .d{font-size:13px;color:var(--ink-600)}
+td.orgc b{font-size:13.5px} td.orgc span,td.whoc .wo{font-size:12px;color:var(--ink-500)}
+.anote,.fhint,.hpnote{font-size:13px}
+.cyc .cycle{font-size:14.5px;border-radius:6px}

@@ -570,7 +570,7 @@ tr.ogrp .unk{color:var(--red-700);font-weight:600}
 .admtog svg{margin-left:6px;vertical-align:-1px;transition:transform var(--t)}
 .admtog[aria-expanded="true"] svg{transform:rotate(180deg)}
 .admtog:hover{color:var(--ink-700)}
-#admList.fold a,body.is-master #admList.fold a.mst{display:none !important}
+#admList.fold a,#admList.fold .admsec,body.is-master #admList.fold a.mst{display:none !important}
 .pill{margin-left:auto;font-size:11px;font-weight:500;min-width:20px;height:20px;padding:0 6px;
   border-radius:999px;display:grid;place-items:center;background:var(--ink-100);color:var(--ink-500)}
 .pill.hot{background:var(--red);color:#fff;font-weight:700}
@@ -1248,6 +1248,18 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
   .logo-mark.tiny{display:block;height:13px}
 }
 </style>
+<script>
+/* 디자인 시안 미리보기(2026-10-07) — 주소 끝에 ?theme=a|b|c 를 붙이면 그 시안으로, ?theme=0 이면 원래대로.
+   고른 것은 이 브라우저에만 남는다. 아무것도 안 붙이면 지금 모양 그대로다. */
+(function () {
+  try {
+    var q = new URLSearchParams(location.search).get('theme');
+    if (q !== null) { if (/^[abc]$/.test(q)) localStorage.setItem('drv.theme', q); else localStorage.removeItem('drv.theme'); }
+    var t = localStorage.getItem('drv.theme');
+    if (t && /^[abc]$/.test(t)) document.write('<link rel="stylesheet" href="theme-' + t + '.css">');
+  } catch (e) { }
+})();
+</script>
 </head>
 <body>
 
