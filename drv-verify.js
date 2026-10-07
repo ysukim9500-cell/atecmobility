@@ -264,8 +264,10 @@
         '<p>' + desc + '</p>' + button + '</li>';
     };
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
-      stepCard(1, '검증하기',
-        busy ? '사진과 기록을 살펴보는 중입니다…' : row ? '고친 게 있으면 다시 눌러 주세요.' : '운행·영수증·계기판이 서로 맞는지 봅니다.',
+      stepCard(1, '검증하기 ' + gemBadge('Gemini'),
+        busy ? 'Gemini 가 영수증·계기판 사진을 읽고 기록과 맞춰 보는 중입니다…'
+          : row ? 'Gemini 가 사진을 읽어 대조했습니다. 고친 게 있으면 다시 눌러 주세요.'
+          : 'Gemini 가 영수증·계기판 사진을 읽어 운행 기록과 서로 맞는지 봅니다.',
         gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
           busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
