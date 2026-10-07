@@ -605,7 +605,7 @@
     var staticP = fresh ? Promise.resolve(null) : Promise.all([
       fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status,uses_driving'),
       fetchAll('/rest/v1/app_vehicles?select=*'),
-      fetchAll('/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path&order=id.asc'),
+      fetchAll('/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path,trip_id&order=id.asc'),
       fetchAll('/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc'),
       fetchAll('/rest/v1/edu_progress?select=*'),
       fetchAll('/rest/v1/edu_targets?select=*'),
@@ -849,9 +849,12 @@
   };
   var EVSUB_FX = '';
   function evSub() { var v = 0; try { v = +sessionStorage.getItem('drv.evsub.' + CYCKEY()) || 0; } catch (e) { } return Math.max(0, Math.min(3, v)); }
+  /** 이 주기에서 영수증 차례를 어디까지 지나왔는가(0~3). 3 이면 계기판까지 왔다 — 3단계로 넘어갈 수 있다. */
+  function evSubMax() { var v = 0; try { v = +localStorage.getItem('drv.evsubmax.' + myName() + '.' + CYCKEY()) || 0; } catch (e) { } return Math.max(evSub(), Math.min(3, v)); }
   function setEvSub(i, fx) {
     i = Math.max(0, Math.min(3, i));
     try { sessionStorage.setItem('drv.evsub.' + CYCKEY(), String(i)); } catch (e) { }
+    try { if (i > evSubMax()) localStorage.setItem('drv.evsubmax.' + myName() + '.' + CYCKEY(), String(i)); } catch (e) { }
     EVSUB_FX = fx || '';
     EVF.cat = EV_SUBS[i]; EVF.touched = false;
   }
@@ -877,12 +880,22 @@
         '<span>' + (unk ? '아직 정해지지 않은 업무 운행 ' + n0(unk) + '건을 구간별로 한 번에 채웁니다.' : '미확정 통행료가 없습니다. 확인만 하시면 됩니다.') + '</span></button>' +
         '</div>';
     }
+    // 주차·통행료: 날짜로 운행에 안 맞는 영수증을 본인이 운행을 골라 직접 잇는다(2026-10-07).
+    var canLink = (name === '주차' || name === '통행료') && !cycleLocked(myName()) && !isMulti();
+    var unm = canLink ? evUnmatched(name).length : 0;
+    if (unm) {
+      body += '<div class="hpnote warn" style="margin-top:12px">' + ic('alert', 15) + '<span><b>' + esc(name) + ' 영수증 ' + n0(unm) +
+        '건</b>이 날짜로 맞는 운행을 찾지 못했습니다(수기 운행 시각이 다르거나 자정을 넘긴 결제 등). 「운행에 직접 맞추기」로 어느 운행의 영수증인지 골라 주세요.</span></div>';
+    }
     body += '<div class="evsact">' +
       (cycleLocked(myName()) || isMulti() ? '' : '<button class="btn" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) + esc(name) + ' 영수증 올리기</button>') +
+      (canLink ? '<button class="btn' + (unm ? ' pri' : '') + '" data-evlink="' + esc(name) + '">' + ic('scan', 13) + '운행에 직접 맞추기' + (unm ? ' (' + n0(unm) + ')' : '') + '</button>' : '') +
       '<span style="flex:1"></span>' +
       (cur > 0 ? '<button class="btn" data-evsubmove="-1">← ' + esc(EV_SUBS[cur - 1]) + '</button>' : '') +
       (cur < 3 ? '<button class="btn pri cta" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
-        : '<span class="dim" style="font-size:12.5px">마지막 차례입니다 — 맨 아래 「3 검증·상신 →」으로 넘어가세요.</span>') +
+        : (stepNow() === 2 && !cycleLocked(myName()) && !isMulti()
+          ? '<button class="btn pri cta" data-stepmove="1" data-from="2">다음: 3 검증·상신 →</button>'
+          : '<span class="dim" style="font-size:12.5px">마지막 차례입니다.</span>')) +
       '</div></div>';
     EVSUB_FX = '';
     return '<section class="sect">' + steps + body + '</section>';
@@ -4227,7 +4240,7 @@
       if (e.username !== mine || !(d >= r.lo && d < r.hi)) return;
       if (!pick || !pick[e.id]) return;
       if (!(Number(e.amount) > 0)) return;
-      var k = ymd(d);
+      var k = evDay(e, r);                               // 운행에 이은 영수증은 그 운행의 날로
       if (e.category === '주차') evPark[k] = (evPark[k] || 0) + Number(e.amount);
       if (e.category === '통행료') evToll[k] = (evToll[k] || 0) + Number(e.amount);
     });
@@ -4382,7 +4395,7 @@
       if (e.username !== mine || !(d >= r.lo && d < r.hi)) return;
       if (!pick || !pick[e.id]) return;
       if (!(Number(e.amount) > 0)) return;
-      var k = ymd(d);
+      var k = evDay(e, r);                               // 운행에 이은 영수증은 그 운행의 날로
       if (e.category === '주차') evPark[k] = (evPark[k] || 0) + Number(e.amount);
       if (e.category === '통행료') evToll[k] = (evToll[k] || 0) + Number(e.amount);
     });
@@ -5551,8 +5564,12 @@
         // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만.
         (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + ' ' + esc(STEP_NAMES[p - 1]) + '(지금 단계)로 →</button>' : '') +
         (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
-        (sn < 3 && sn <= p ? '<button class="btn pri' + (sn === 2 && evSub() < 3 ? '' : sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
-          (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
+        // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
+        //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
+        (sn === 2 && sn === p && evSubMax() < 3
+          ? '<span class="dim" style="font-size:12.5px">주차 → 통행료 → 주유 → 계기판을 차례로 마치면 3 검증·상신으로 넘어갈 수 있습니다.</span>'
+          : sn < 3 && sn <= p ? '<button class="btn pri' + (sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
+            (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
     // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
     if (STEP_FX) { html = '<div class="stepfx ' + STEP_FX + '">' + html + '</div>'; STEP_FX = ''; }
@@ -5798,6 +5815,8 @@
 
     if (e.target.closest('#btnCreateTrip')) { createTrip(false); return; }
     if (e.target.closest('[data-odoshot]')) { setEvSub(3); go('evid'); return; }   // 영수증 › 계기판 차례로 바로
+    if ((el = e.target.closest('[data-evlink]'))) { openEvLink(el.dataset.evlink); return; }
+    if (e.target.closest('#btnEvLinkSave')) { saveEvLink(); return; }
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
     // ★ 인쇄 버튼은 직원 행(data-person) 안에 들어 있다. 같은 핸들러 안에서
     //   행 검사가 먼저 돌면 인쇄 대신 화면 이동이 일어난다(stopPropagation 은
@@ -6322,6 +6341,84 @@
    * 번호판이 비었으면) 빈 번호판 영수증이 모든 장에 실려 두 번 더해질 수 있었다(2026-10-02 재검증:
    * 등록 1대 · 운행 번호판 2개 · 빈 영수증 7,000원 → 화면 14,640 / 문서 21,640).
    */
+  /**
+   * 영수증이 직접 이어진 운행(2026-10-07 — 「주차비·통행료 직접 맞추기」). 이어진 운행이 같은 사람·같은 마감주기에
+   * 살아 있을 때만 쓴다. 없으면 null(영수증 날짜로 맞춘다). 서버 검증(driving-verify.ts dayOf)과 같은 규칙.
+   */
+  function linkedTrip(e, r) {
+    if (!e || e.trip_id == null || (e.category !== '주차' && e.category !== '통행료')) return null;
+    var id = String(e.trip_id), t = null;
+    for (var i = 0; i < TRIPS.length; i++) { if (String(TRIPS[i].id) === id) { t = TRIPS[i]; break; } }
+    if (!t || t.username !== e.username || t.deleted_at) return null;
+    var ts = Number(t.start_time);
+    if (r && !(ts >= r.lo && ts < r.hi)) return null;
+    return t;
+  }
+  /** 영수증이 엑셀에서 붙는 날 — 이어진 운행이 있으면 그 운행의 날, 아니면 영수증 날짜. */
+  function evDay(e, r) { var t = linkedTrip(e, r); return ymd(t ? t.start_time : Number(e.date_millis)); }
+  /** 이번 주기 내 영수증(구분 cat) 중 붙는 날에 업무 운행이 없는 것 — 날짜로 운행을 못 찾은 영수증. */
+  function evUnmatched(cat) {
+    var me = myName(), r = cycleRange(CYC.y, CYC.m), days = {};
+    TRIPS.forEach(function (t) { if (t.username === me && t.purpose === BUSINESS && !t.deleted_at) days[ymd(t.start_time)] = 1; });
+    return EVID.filter(function (e) {
+      var d = Number(e.date_millis);
+      return e.username === me && e.category === cat && Number(e.amount) > 0 && d >= r.lo && d < r.hi && !days[evDay(e, r)];
+    });
+  }
+  /** 「운행에 직접 맞추기」 창 — 이번 주기 내 영수증(주차·통행료)마다 어느 운행 것인지 고른다. */
+  function openEvLink(cat) {
+    var me = myName(), r = cycleRange(CYC.y, CYC.m);
+    var evs = EVID.filter(function (e) {
+      var d = Number(e.date_millis);
+      return e.username === me && e.category === cat && Number(e.amount) > 0 && d >= r.lo && d < r.hi;
+    }).sort(function (a, b) { return a.date_millis - b.date_millis; });
+    var trips = TRIPS.filter(function (t) { return t.username === me && !t.deleted_at && t.start_time >= r.lo && t.start_time < r.hi; })
+      .sort(function (a, b) { return a.start_time - b.start_time; });
+    if (!evs.length) { toast('이번 주기에 올린 ' + cat + ' 영수증이 없습니다.'); return; }
+    var bad = {}; evUnmatched(cat).forEach(function (e) { bad[e.id] = 1; });
+    var tripLabel = function (t) {
+      return md(t.start_time) + ' ' + hm(t.start_time) + ' · ' + (t.start_address || '').split(' ').slice(-1)[0] + ' → ' +
+        (t.end_address || '').split(' ').slice(-1)[0] + (t.purpose && t.purpose !== BUSINESS ? ' (' + t.purpose + ')' : '');
+    };
+    var rows = evs.map(function (e) {
+      var opts = '<option value="">날짜로 자동 맞춤 (' + esc(md(e.date_millis)) + ')</option>' + trips.map(function (t) {
+        return '<option value="' + t.id + '"' + (String(e.trip_id || '') === String(t.id) ? ' selected' : '') + '>' + esc(tripLabel(t)) + '</option>';
+      }).join('');
+      return '<tr' + (bad[e.id] ? ' class="flagged"' : '') + '><td><span class="lead">' + esc(md(e.date_millis)) + '</span> <span class="dim">' +
+        esc(hm(e.date_millis)) + '</span>' + (bad[e.id] ? ' <span class="st warn">맞는 운행 없음</span>' : '') + '</td>' +
+        '<td class="n">' + n0(e.amount) + '</td>' +
+        '<td><select class="inp" data-evlinksel="' + e.id + '" data-was="' + esc(String(e.trip_id || '')) + '" style="height:34px;min-width:220px">' + opts + '</select></td></tr>';
+    }).join('');
+    openPanel(cat + ' 영수증을 운행에 맞추기', cycleName(CYC.y, CYC.m) + ' · ' + n0(evs.length) + '건',
+      '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 자동으로 붙습니다. 수기 운행의 시각이 다르거나 ' +
+      '자정을 넘겨 결제해 날짜가 안 맞으면, 여기서 <b>어느 운행의 영수증인지</b> 골라 주세요. 엑셀·검증이 고른 운행의 날로 맞춥니다. ' +
+      '영수증 날짜는 바뀌지 않습니다.</div>' +
+      '<div class="panel" style="margin-top:12px"><div class="scroll"><table><thead><tr><th>영수증 날짜</th><th class="n">금액</th><th>운행</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnEvLinkSave">저장</button>', true);
+  }
+  function saveEvLink() {
+    var sels = [].slice.call(document.querySelectorAll('[data-evlinksel]')).filter(function (s) { return s.value !== s.dataset.was; });
+    if (!sels.length) { toast('바뀐 내용이 없습니다.'); closePanel(); return; }
+    var btn = $('btnEvLinkSave'); if (btn) { btn.disabled = true; btn.textContent = '저장하는 중…'; }
+    var fail = 0;
+    var one = function (i) {
+      if (i >= sels.length) return Promise.resolve();
+      var s = sels[i];
+      return apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(s.dataset.evlinksel), {
+        method: 'PATCH', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ trip_id: s.value ? Number(s.value) : null })
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) { if (!rows || !rows.length) fail++; }, function () { fail++; })
+        .then(function () { return one(i + 1); });
+    };
+    one(0).then(function () {
+      closePanel();
+      toast(fail ? (sels.length - fail) + '건 저장, ' + fail + '건은 저장하지 못했습니다(결재 중이거나 다른 주기 운행일 수 있습니다).'
+        : sels.length + '건을 맞췄습니다.', !!fail);
+      loadAll();
+    });
+  }
   function evidBySheet(mine, plates, r) {
     var out = plates.map(function () { return {}; });
     if (!plates.length) return out;
@@ -6329,7 +6426,8 @@
       var d = Number(e.date_millis);
       if (e.username !== mine || !(d >= r.lo && d < r.hi) || !(Number(e.amount) > 0)) return;
       if (e.category !== '주차' && e.category !== '통행료') return;
-      var i = plates.indexOf(e.vehicle_plate || '');
+      var lt = linkedTrip(e, r);                          // 운행에 이었으면 그 운행의 차량 장에 싣는다
+      var i = plates.indexOf(lt ? (lt.plate_no || '') : (e.vehicle_plate || ''));
       out[i < 0 ? 0 : i][e.id] = 1;
     });
     return out;
