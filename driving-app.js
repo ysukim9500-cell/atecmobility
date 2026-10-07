@@ -240,7 +240,8 @@
    *  마스터 계정 이름을 웹에 적어 두지 않으려고 서버에 물어본다. */
   var ACCT = { can_manage_admin: false };
   var LOAD_ERR = '';     // 적재 실패 사유(스켈레톤에 갇히지 않게 화면에 남긴다)
-  var FILT = { chip: 'all', who: '', car: '', q: '', purp: '' };
+  // 목적은 처음부터 「일반업무」로 좁혀 둔다(2026-10-07 사용자 — 정산·결재 대상이 업무 운행이다). 「목적 전체」로 바꿀 수 있다.
+  var FILT = { chip: 'all', who: '', car: '', q: '', purp: '일반업무' };
   /**
    * 조회 범위 — 여러 주기를 한꺼번에 볼 때만 값이 있다({from:{y,m}, to:{y,m}}). 평소에는 null(= CYC 한 주기).
    * ★ 조회 전용이다. 상신·결재 문서·통행료 채우기·증빙 올리기는 언제나 CYC 한 주기만 다룬다.
@@ -573,7 +574,7 @@
     //   (필터는 남는데 셀렉트는 '전체'로 보여 "왜 표가 비었는지" 알 수 없었다.
     //    하이패스는 옛 주기 운행 객체를 가리킨 채 남아 반영 결과가 안 보였다.)
     //   저장·올리기 뒤의 다시 받기(soft 아님)는 같은 기간이므로 좁혀 둔 것을 지킨다.
-    if (soft) { FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; FILT.purp = ''; }
+    if (soft) { FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; FILT.purp = BUSINESS; }
     HP = { groups: [], batch: '', busy: false, note: '' };
     // FILLS 는 여기서 안 버린다. loadAll 은 저장·증빙 올리기 뒤에도 돌기 때문에,
     // 여기서 비우면 증빙 한 장 올리고 온 사이에 30칸이 사라진다. 기간을 바꿀 때(setPeriod)만 비운다.
@@ -6114,7 +6115,7 @@
   }
   /** 좁혀 둔 것을 전부 푼다(사람·차량·목적·검색·점검 칩·날짜·증빙 구분·나눠 보기). */
   function clearFilters() {
-    FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; FILT.purp = '';
+    FILT.who = ''; FILT.car = ''; FILT.q = ''; FILT.chip = 'all'; FILT.purp = BUSINESS;
     DATEF = { from: '', to: '' }; EVF.cat = 'all'; PAGES = {};
   }
   /** 주소(#)에 적힌 화면·기간으로 맞춘다. 기간이 바뀌었으면 true. */
@@ -6247,7 +6248,7 @@
       // 미확정 통행료는 한 건씩 여는 운행일지가 아니라 구간별로 묶어 채우는 화면으로.
       if (issue === 'unk' && !isAll()) { go('tollfill'); return; }
       go(isAll() ? 'a_trips' : 'trips');
-      FILT.chip = issue; FILT.who = '';
+      FILT.chip = issue; FILT.who = ''; FILT.purp = '';   // 점검 항목은 목적과 관계없이 다 보인다
       render(); return;
     }
     if ((el = e.target.closest('[data-edit]'))) { openEdit(el.dataset.edit); return; }
