@@ -1952,15 +1952,34 @@
       '<b style="color:var(--ink-2)">권한 주는 관리자</b>는 마스터 계정이 지정합니다. 이 화면에서 다른 직원을 관리자로 ' +
       '지정·해제하고 비밀번호를 초기화할 수 있습니다(마스터 계정과 다른 권한 주는 관리자는 바꿀 수 없습니다).</div></section>';
     h += signupSect();
-    h += sect('직원', list.length + '명', '',
-      '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+    // 찾기·거르기(2026-10-07) — 치는 즉시 표가 좁혀진다(다시 그리지 않고 줄만 감춤 → 한글 조합이 안 끊긴다).
+    var roleOf = function (u) {
+      return u === ACCT.master ? 'mst' : MGRS.indexOf(u) >= 0 ? 'mgr' : USERS[u].is_admin ? 'adm' : 'usr';
+    };
+    var cntR = function (r) { return list.filter(function (u) { var k = roleOf(u); return r === 'adm' ? k !== 'usr' : k === r; }).length; };
+    var bar = '<div class="permbar">' +
+      '<label class="field permq">' + ic('search', 15) +
+      '<input id="permQ" autocomplete="off" placeholder="이름 · 아이디 · 소속(팀·센터·사업부)으로 찾기" value="' + esc(PERMQ) + '" aria-label="직원 찾기">' +
+      '<button class="permx" id="permX" aria-label="찾기 지우기"' + (PERMQ ? '' : ' hidden') + '>' + ic('close', 12) + '</button></label>' +
+      '<div class="seg">' + [['', '전체', list.length], ['adm', '관리자', cntR('adm')], ['usr', '일반', cntR('usr')]].map(function (c) {
+        return '<button class="' + (PERMF === c[0] ? 'on' : '') + '" data-permf="' + c[0] + '" aria-pressed="' + (PERMF === c[0]) + '">' +
+          c[1] + ' <span class="c">' + n0(c[2]) + '</span></button>';
+      }).join('') + '</div>' +
+      '<span class="permcnt" id="permCnt"></span></div>';
+    h += sect('직원', '<span id="permN">' + list.length + '명</span>', '', bar +
+      '<div class="panel"><div class="scroll tall" data-rows><table id="permT"><thead><tr>' +
       '<th>이름</th><th>아이디</th><th>소속</th><th>권한</th><th></th></tr></thead><tbody>' +
       list.map(function (u) {
-        var x = USERS[u];
-        return '<tr>' +
-          '<td><span class="lead">' + esc(x.name || u) + '</span></td>' +
-          '<td class="dim">' + esc(u) + '</td>' +
-          '<td class="dim">' + esc(x.dept || '—') + '</td>' +
+        var x = USERS[u], op = orgPath(u), oo = orgOf(u) || {};
+        var hay = [x.name || '', u, x.dept || '', op.div, op.team, op.unit, oo.rank || '', oo.role || '', x.position || ''].join(' ').toLowerCase();
+        return '<tr data-pq="' + esc(hay) + '" data-pr="' + roleOf(u) + '">' +
+          '<td><span class="lead" data-pt="' + esc(x.name || u) + '">' + esc(x.name || u) + '</span></td>' +
+          '<td class="dim" data-pt="' + esc(u) + '">' + esc(u) + '</td>' +
+          (function () {
+            // 소속 칸도 찾은 글자에 형광펜이 들어가게 data-pt 를 단다(orgCell 과 같은 모양).
+            var a = orgName(op), b = [op.team ? op.div : '', op.unit].filter(Boolean).join(' · ');
+            return '<td class="orgc"><b data-pt="' + esc(a) + '">' + esc(a) + '</b>' + (b ? '<span data-pt="' + esc(b) + '">' + esc(b) + '</span>' : '') + '</td>';
+          })() +
           '<td>' + (u === ACCT.master ? '<span class="st bad">마스터</span>'
             : MGRS.indexOf(u) >= 0 ? '<span class="st bad">권한 주는 관리자</span>'
             : x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
@@ -1974,8 +1993,40 @@
                 (MGRS.indexOf(u) >= 0 ? '권한 주기 해제' : '권한 주기 허용') + '</button> ' : '') +
               '<button class="btn sm" data-pwreset="' + esc(u) + '">비밀번호 초기화</button>') +
           '</td></tr>';
-      }).join('') + '</tbody></table></div></div>');
+      }).join('') + '<tr class="permnone" hidden><td colspan="5"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없습니다.</div>' +
+        '<div class="d">이름 두 글자, 아이디 일부, 「대전센터」 같은 소속으로도 찾을 수 있습니다.</div></div></td></tr>' +
+      '</tbody></table></div></div>');
+    setTimeout(permFilter, 0);              // 그린 뒤 지금 찾기·거르기를 적용
     return h;
+  }
+  /** 권한 관리 찾기어·거르기(다시 그려도 남는다). */
+  var PERMQ = '', PERMF = '';
+  /** 표 줄을 감추고 보이며, 맞은 글자에 형광펜. 표를 다시 그리지 않는다. */
+  function permFilter() {
+    var t = $('permT'); if (!t) return;
+    var q = PERMQ.trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), n = 0;
+    var mark = function (s) {
+      var low = s.toLowerCase(), out = '', i = 0;
+      if (!words.length) return esc(s);
+      while (i < s.length) {
+        var hit = 0;
+        words.forEach(function (w) { if (!hit && low.substr(i, w.length) === w) hit = w.length; });
+        if (hit) { out += '<mark>' + esc(s.substr(i, hit)) + '</mark>'; i += hit; }
+        else { out += esc(s.charAt(i)); i++; }
+      }
+      return out;
+    };
+    Array.prototype.forEach.call(t.querySelectorAll('tbody tr[data-pq]'), function (tr) {
+      var r = tr.dataset.pr;
+      var okF = !PERMF || (PERMF === 'adm' ? r !== 'usr' : r === PERMF);
+      var okQ = words.every(function (w) { return tr.dataset.pq.indexOf(w) >= 0; });
+      tr.hidden = !(okF && okQ);
+      if (!tr.hidden) n++;
+      Array.prototype.forEach.call(tr.querySelectorAll('[data-pt]'), function (c) { c.innerHTML = mark(c.dataset.pt); });
+    });
+    var none = t.querySelector('.permnone'); if (none) none.hidden = n > 0;
+    var c = $('permN'); if (c) c.textContent = (q || PERMF ? n0(n) + ' / ' : '') + n0(t.querySelectorAll('tbody tr[data-pq]').length) + '명';
+    var x = $('permX'); if (x) x.hidden = !PERMQ;
   }
 
   /** 권한·비밀번호를 바꾸기 전에 본인 비밀번호를 확인받는 창. */
@@ -6496,6 +6547,14 @@
       PAGES = {}; AUDIT = null; applyScope(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
     }
     if ((el = e.target.closest('[data-orgunit]'))) { ORGF.unit = el.dataset.orgunit; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
+    if ((el = e.target.closest('[data-permf]'))) {
+      PERMF = el.dataset.permf;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-permf]'), function (b) {
+        var on = b.dataset.permf === PERMF; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      permFilter(); return;
+    }
+    if (e.target.closest('#permX')) { PERMQ = ''; var pq = $('permQ'); if (pq) { pq.value = ''; pq.focus(); } permFilter(); return; }
     if (e.target.closest('#ofClear')) { ORGF = { div: '', team: '', unit: '' }; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
     if (e.target.closest('#btnPrevLine')) {
       var pv = previousSteps();
@@ -6667,6 +6726,7 @@
     queueSearch(e.target);
   });
   document.addEventListener('input', function (e) {
+    if (e.target.id === 'permQ') { PERMQ = e.target.value; permFilter(); return; }
     if (e.target.id === 'apprQ') {
       // 창 전체를 다시 그리면 커서가 튀고 한글 조합이 끊긴다 — 후보 목록만 바꾼다.
       APPR_Q = e.target.value;
@@ -6729,6 +6789,7 @@
     if (e.key === 'Enter' && (e.target.id === 'u' || e.target.id === 'p')) doLogin();
     if (e.key === 'Enter' && /^pw(Cur|New|New2)$/.test(e.target.id)) { e.preventDefault(); savePassword(); return; }
     // 결재자 찾기 — Enter 로 맨 위 후보를 넣는다.
+    if (e.key === 'Escape' && e.target.id === 'permQ' && PERMQ) { e.preventDefault(); e.stopPropagation(); PERMQ = ''; e.target.value = ''; permFilter(); return; }
     if (e.key === 'Enter' && e.target.id === 'apprQ') {
       e.preventDefault();
       // ★ 한글 조합을 끝내는 Enter(맥은 신호가 두 번 온다)와 빈 검색어 Enter 는 무시한다 —

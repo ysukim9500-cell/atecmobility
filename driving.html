@@ -380,6 +380,14 @@ table.evup tbody tr:first-child td{border-top:0}
 .onotes div{display:flex;gap:6px;align-items:flex-start;line-height:1.55}
 .onotes svg{flex:none;margin-top:2px}
 .omain{min-width:0}
+/* 권한 관리 — 찾기·거르기 */
+.permbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.permbar .permq{flex:1 1 320px;position:relative;height:42px;border-radius:var(--r-sm);border-color:var(--ink-200);background:var(--surface)}
+.permbar .permq:focus-within{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
+.permbar .permq input{font-size:14px;flex:1;width:auto;min-width:0}
+.permx{border:0;background:var(--ink-100);border-radius:999px;width:22px;height:22px;display:grid;place-items:center;cursor:pointer;color:var(--ink-600);flex:none}
+.permx[hidden]{display:none}
+#permT mark{background:#FFE58A;color:inherit;border-radius:2px;padding:0 1px}
 /* 조직도 — 정리할 것(안 이어진 계정·계정 없음·메일 없음) */
 .otiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
 .otile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px;border:1px solid var(--ink-200);
