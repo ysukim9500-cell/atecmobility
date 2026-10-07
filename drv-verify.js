@@ -674,9 +674,23 @@
         '<div class="anote">' + (o.note || MARK_NOTE[mk] || MARK_NOTE['']) + '</div></div>';
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(o.file) + '">' + ic('dl', 14) + '내려받기</a>' +
-        '<a class="btn' + (o.okKey ? '' : ' pri') + '" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>' +
+        '<a class="btn pri' + (o.okKey ? ' cta' : '') + '" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">' +
+          (o.okKey ? '① 열어서 보기' : '열기 · 인쇄') + '</a>' +
         // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
-        (o.okKey ? '<button class="btn pri cta" data-pdfok="' + esc(o.okKey) + '">확인 완료 → 결재 상신</button>' : '');
+        // 2026-10-07: 문서를 먼저 열어 봐야 「확인 완료」가 눌린다(열기·내려받기 중 하나).
+        (o.okKey ? '<button class="btn" id="pdfOkBtn" data-pdfok="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">② 확인 완료 → 결재 상신</button>' : '');
+      if (o.okKey) {
+        $('pBody').insertAdjacentHTML('beforeend', '<div class="hpnote" id="pdfStepNote" style="margin-top:14px">' + ic('alert', 15) +
+          '<span><b>① 열어서 보기</b>로 문서를 끝까지 확인한 뒤 <b>② 확인 완료 → 결재 상신</b>을 눌러 주세요.</span></div>');
+        var unlock = function () {
+          var b = $('pdfOkBtn'); if (!b || !b.disabled) return;
+          b.disabled = false; b.removeAttribute('title'); b.classList.add('pri', 'cta');
+          var a = $('pdfOpen'); if (a) a.classList.remove('pri', 'cta');
+          var nt = $('pdfStepNote');
+          if (nt) { nt.classList.add('ok'); nt.innerHTML = ic('check', 15) + '<span>문서를 열었습니다. 확인했으면 <b>② 확인 완료 → 결재 상신</b>을 눌러 주세요.</span>'; }
+        };
+        Array.prototype.forEach.call($('pFoot').querySelectorAll('a[href="' + url + '"]'), function (a) { a.addEventListener('click', unlock); });
+      }
       var op = $('pdfOpen'); if (op) { try { op.focus(); } catch (e) { } }
       return res;
     }).catch(function (e) {
