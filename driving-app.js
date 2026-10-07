@@ -1296,7 +1296,7 @@
 
     h += sect('직원별', rows.length + '명', '',
       '<div class="panel"><div class="scroll tall" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>소속</th><th class="n">점수</th><th>등급</th>' +
+      '<th>소속</th><th>이름</th><th class="n">점수</th><th>등급</th>' +
       '<th class="n">운행</th><th class="n">거리</th><th class="n">과속</th>' +
       '<th class="n">급가속</th><th class="n">급감속</th><th class="n">100km당</th>' +
       '</tr></thead><tbody>' +
@@ -1304,8 +1304,7 @@
         var u = USERS[x.u] || {}, g3 = safeGrade(x.score);
         return '<tr class="clk' + (x.score < 80 ? ' flagged' : '') +
           '" tabindex="0" data-person="' + esc(x.u) + '">' +
-          '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
-          '<td class="dim">' + esc(u.dept || '—') + '</td>' +
+          orgCell(x.u) + '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
           '<td class="n total">' + n0(x.score) + '</td>' +
           '<td><span class="st ' + g3[2] + '">' + g3[1] + '</span></td>' +
           '<td class="n">' + n0(x.n) + '</td>' +
@@ -2095,6 +2094,112 @@
     return !!PEOPLE[u] && ORG.some(function (o) { return o.username === u && o.active !== false; });
   }
 
+  /* ══════════════════ 관리 화면 공통 — 소속(사업부 › 팀 › 파트·센터)으로 좁히고 묶기 (2026-10-07) ══════════════════
+     조직도(driving_org)가 정본이다. 조직도에 안 이어진 계정은 가입 때 적은 부서(dept)를 조직도의 팀·파트 이름과
+     맞춰 본다. 고른 범위(ORGF)는 관리 화면 전부에 같이 걸린다 — 한 번 「광역교통지원팀」을 고르면 운행일지·영수증·
+     정산·검증·결재 완료가 모두 그 팀만 보인다. */
+  var ORGF = (function () { try { var v = JSON.parse(sessionStorage.getItem('drv.orgf') || '{}'); return { div: v.div || '', team: v.team || '', unit: v.unit || '' }; } catch (e) { return { div: '', team: '', unit: '' }; } })();
+  function saveOrgF() { try { sessionStorage.setItem('drv.orgf', JSON.stringify(ORGF)); } catch (e) { } }
+  var ORGP = { n: -1, map: {} };
+  function orgPath(u) {
+    if (ORGP.n !== ORG.length) ORGP = { n: ORG.length, map: {} };
+    if (ORGP.map[u]) return ORGP.map[u];
+    var o = orgOf(u), p;
+    if (o) p = { div: o.division || '', team: o.team || '', unit: o.unit || '' };
+    else {
+      var d = String(personOf(u).dept || '').trim(), hit = null;
+      for (var i = 0; d && i < ORG.length && !hit; i++) {
+        var x = ORG[i];
+        if (x.unit && x.unit === d) hit = { div: x.division || '', team: x.team || '', unit: x.unit };
+        else if (x.team && x.team === d) hit = { div: x.division || '', team: x.team, unit: '' };
+        else if (!x.team && x.division === d) hit = { div: x.division, team: '', unit: '' };
+      }
+      p = hit || { div: '', team: d, unit: '' };
+    }
+    return (ORGP.map[u] = p);
+  }
+  function orgFilterOn() { return !!(ORGF.div || ORGF.team || ORGF.unit); }
+  function orgMatch(u) {
+    if (!orgFilterOn()) return true;
+    var p = orgPath(u);
+    return (!ORGF.div || (ORGF.div === '-' ? !p.div : p.div === ORGF.div)) && (!ORGF.team || p.team === ORGF.team) && (!ORGF.unit || p.unit === ORGF.unit);
+  }
+  /** 조직도 순서(사업부·팀이 처음 나오는 줄). 조직도에 없는 소속은 뒤로. */
+  function orgRank(p) {
+    for (var i = 0; i < ORG.length; i++) if ((ORG[i].division || '') === p.div && (ORG[i].team || '') === p.team) return i;
+    for (var j = 0; j < ORG.length; j++) if ((ORG[j].division || '') === p.div) return 5000 + j;
+    return 9999;
+  }
+  function orgName(p) { return p.team || p.div || '소속 미지정'; }
+  /** 긴 목록(운행·영수증)의 사람 칸 — 소속을 앞에, 이름을 굵게. */
+  function whoCell(u) {
+    var p = orgPath(u), o = [orgName(p), p.unit].filter(Boolean).join(' · ');
+    return '<td class="whoc"><span class="wo">' + esc(o) + '</span><b>' + esc(nameOf(u)) + '</b></td>';
+  }
+  /** 표의 첫 칸 — 팀(굵게) 아래 사업부·파트. */
+  function orgCell(u, inGroup) {
+    // 팀 묶음 안에서는 팀 이름이 묶음 줄에 있으니 파트·센터만 보인다.
+    if (inGroup) { var q = orgPath(u); return '<td class="orgc">' + (q.unit ? '<b>' + esc(q.unit) + '</b>' : '<span>팀 직속</span>') + '</td>'; }
+    var p = orgPath(u), sub = [p.team ? p.div : '', p.unit].filter(Boolean).join(' · ');
+    return '<td class="orgc"><b>' + esc(orgName(p)) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</td>';
+  }
+  /** items 를 팀(사업부+팀)으로 묶는다. getU(item) = 계정. 묶음 안의 순서는 들어온 순서 그대로. */
+  function orgGroups(items, getU, byUnit) {
+    var by = {}, out = [];
+    items.forEach(function (it) {
+      var p = orgPath(getU(it)), k = p.div + '|' + p.team;
+      if (!by[k]) { by[k] = { k: k, p: p, rank: orgRank(p), list: [] }; out.push(by[k]); }
+      by[k].list.push(it);
+    });
+    // byUnit: 묶음 안을 파트·센터 이름순으로(같은 파트끼리 붙게). 아니면 들어온 순서(예: 금액 큰 순) 그대로.
+    if (byUnit) out.forEach(function (g) {
+      g.list = g.list.map(function (it, i) { return { it: it, i: i, k: orgPath(getU(it)).unit || '￿' }; })
+        .sort(function (a, b) { return a.k.localeCompare(b.k, 'ko') || a.i - b.i; }).map(function (x) { return x.it; });
+    });
+    return out.sort(function (a, b) { return a.rank - b.rank || orgName(a.p).localeCompare(orgName(b.p), 'ko'); });
+  }
+  /** 묶음 제목 줄. right = 오른쪽에 붙일 합계 등. */
+  function orgGroupRow(g, cols, right) {
+    return '<tr class="ogrp"><td colspan="' + cols + '"><div><b>' + esc(orgName(g.p)) + '</b>' +
+      (g.p.team && g.p.div ? '<span class="od">' + esc(g.p.div) + '</span>' : '') +
+      '<span class="on">' + n0(g.list.length) + '명</span>' + (right ? '<span class="or">' + right + '</span>' : '') + '</div></td></tr>';
+  }
+  /** 관리 화면 위 「보는 범위」 줄 — 사업부 › 팀 › 파트·센터. 고를 수 있는 값은 지금 자료에 있는 사람 기준. */
+  function orgBarHtml() {
+    var r = viewRange(), seen = {};
+    ALL_TRIPS.forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi) seen[t.username] = 1; });
+    var us = Object.keys(seen);
+    var cnt = function (f) { var c = {}; us.forEach(function (u) { var p = orgPath(u); if (f(p)) { var v = f(p); c[v] = (c[v] || 0) + 1; } }); return c; };
+    var divs = cnt(function (p) { return p.div || '-'; });
+    var inDiv = function (p) { return !ORGF.div || (ORGF.div === '-' ? !p.div : p.div === ORGF.div); };
+    var teams = cnt(function (p) { return inDiv(p) ? p.team : ''; });
+    var units = cnt(function (p) { return inDiv(p) && (!ORGF.team || p.team === ORGF.team) ? p.unit : ''; });
+    var opt = function (obj, cur, all) {
+      var ks = Object.keys(obj).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+      return '<option value="">' + all + '</option>' + ks.map(function (k) {
+        return '<option value="' + esc(k) + '"' + (cur === k ? ' selected' : '') + '>' + esc(k === '-' ? '소속 미지정' : k) + ' (' + obj[k] + '명)</option>';
+      }).join('');
+    };
+    var shown = us.filter(orgMatch).length;
+    return '<div class="orgbar' + (orgFilterOn() ? ' on' : '') + '" role="group" aria-label="보는 범위">' +
+      '<span class="obl">' + ic('users', 14) + '보는 범위</span>' +
+      '<label class="osel"><span>사업부</span><select id="ofDiv">' + opt(divs, ORGF.div, '전체') + '</select></label>' +
+      '<span class="oarr" aria-hidden="true">›</span>' +
+      '<label class="osel"><span>팀</span><select id="ofTeam"' + (Object.keys(teams).length ? '' : ' disabled') + '>' + opt(teams, ORGF.team, '전체') + '</select></label>' +
+      '<span class="oarr" aria-hidden="true">›</span>' +
+      '<label class="osel"><span>파트·센터</span><select id="ofUnit"' + (Object.keys(units).length ? '' : ' disabled') + '>' + opt(units, ORGF.unit, '전체') + '</select></label>' +
+      '<span class="ocnt">운행한 사람 <b>' + n0(shown) + '</b>' + (orgFilterOn() ? ' / ' + n0(us.length) : '') + '명</span>' +
+      (orgFilterOn() ? '<button class="btn sm" id="ofClear">' + ic('close', 12) + '범위 지우기</button>' : '') +
+      '</div>';
+  }
+  /** 사업부 값 '-' = 사업부가 비어 있는 사람(소속 미지정). */
+  function setOrgF(which, v) {
+    if (which === 'div') ORGF = { div: v, team: '', unit: '' };
+    else if (which === 'team') { ORGF.team = v; ORGF.unit = ''; }
+    else ORGF.unit = v;
+    saveOrgF();
+  }
+
   function apprStatusText(a) {
     if (!a) return { t: '아직 상신하지 않았습니다', cls: '' };
     if (a.status === 'approved') return { t: '결재 완료', cls: 'ok' };
@@ -2840,6 +2945,7 @@
 
     if (isAll()) {
       var rows = perPersonTotals();
+      h += sect(ORGF.team ? '파트·센터별' : '팀별', null, '', teamCards(rows));
       h += sect('직원별 요약', rows.length + '명', '', personTable(rows));
     } else {
       h += sect('최근 운행', null,
@@ -3016,30 +3122,69 @@
       .sort(function (a, b) { return b.cost - a.cost; });
   }
 
+  /** 팀별 합계 카드(관리) — 누르면 그 팀으로 좁힌다. 팀을 이미 골랐으면 파트·센터별로. */
+  function teamCards(rows) {
+    if (!isAll() || !rows.length) return '';
+    var byUnit = !!ORGF.team, by = {}, out = [];
+    rows.forEach(function (x) {
+      var p = orgPath(x.u), k = byUnit ? (p.unit || '(파트 없음)') : p.div + '|' + p.team;
+      if (!by[k]) { by[k] = { k: k, p: p, label: byUnit ? (p.unit || '팀 직속') : orgName(p), sub: byUnit ? orgName(p) : p.div, rank: orgRank(p), n: 0, cost: 0, unk: 0, trips: 0 }; out.push(by[k]); }
+      var g = by[k]; g.n++; g.cost += x.cost || 0; g.unk += x.unk || 0; g.trips += x.n || 0;
+    });
+    if (out.length < 2 && !byUnit) return '';
+    var max = out.reduce(function (a, g) { return Math.max(a, g.cost); }, 1);
+    out.sort(function (a, b) { return b.cost - a.cost; });
+    return '<div class="tcards">' + out.map(function (g) {
+      var attr = byUnit ? (g.p.unit ? ' data-orgunit="' + esc(g.p.unit) + '"' : '') : ' data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"';
+      return '<button class="tcard"' + attr + (attr ? '' : ' disabled') + '><span class="tl">' + esc(g.label) + '</span>' +
+        '<span class="ts">' + esc(g.sub || '') + '</span>' +
+        '<span class="tv">' + won(g.cost) + '</span>' +
+        '<span class="tbar"><i style="width:' + Math.max(3, Math.round(g.cost / max * 100)) + '%"></i></span>' +
+        '<span class="tm">' + n0(g.n) + '명 · 운행 ' + n0(g.trips) + '건' + (g.unk ? ' · <em>미확정 ' + n0(g.unk) + '</em>' : '') + '</span></button>';
+    }).join('') + '</div>';
+  }
+  /** 직원별 금액 표. 관리 화면에서는 소속을 맨 앞에 두고 팀별로 묶어 팀 합계를 붙인다(2026-10-07). */
   function personTable(rows) {
     if (!rows.length) return blank('집계할 운행이 없습니다.', null, 'users');
-    var h = '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>소속</th><th class="n">운행</th><th class="n">거리</th>' +
+    var all = isAll(), cols = all ? 11 : 9;
+    var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable"><thead><tr>' +
+      (all ? '<th>파트·센터</th>' : '') + '<th>이름</th>' + (all ? '' : '<th>소속</th>') + '<th class="n">운행</th><th class="n">거리(km)</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th>' +
-      '<th class="n">합계</th><th class="n">미확정</th>' +
-      (isAll() ? '<th></th>' : '') + '</tr></thead><tbody>';
-    rows.forEach(function (x) {
+      '<th class="n">합계</th><th class="n">통행료 미확정</th>' +
+      (all ? '<th></th>' : '') + '</tr></thead><tbody>';
+    var row = function (x) {
       var u = USERS[x.u] || {};
-      h += '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '">' +
+      return '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '">' +
+        (all ? orgCell(x.u, true) : '') +
         '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
-        '<td class="dim">' + esc(u.dept || '—') + '</td>' +
+        (all ? '' : '<td class="dim">' + esc(u.dept || '—') + '</td>') +
         '<td class="n">' + n0(x.n) + '</td>' +
         '<td class="n">' + km(x.km) + '</td>' +
         '<td class="n">' + n0(x.fuel) + '</td>' +
         '<td class="n">' + n0(x.toll) + '</td>' +
         '<td class="n">' + (x.park ? n0(x.park) : '—') + '</td>' +
         '<td class="n total">' + n0(x.cost) + '</td>' +
-        '<td class="n ' + (x.unk ? 'unk' : 'dim') + '">' + (x.unk ? n0(x.unk) : '—') + '</td>' +
-        (isAll()
+        '<td class="n ' + (x.unk ? 'unk' : 'dim') + '">' + (x.unk ? n0(x.unk) + '건' : '—') + '</td>' +
+        (all
           ? '<td class="n"><button class="btn sm" data-print="' + esc(x.u) + '" ' +
             'title="' + esc(u.name || x.u) + ' 님 운행기록부 인쇄">' + ic('receipt', 13) + '인쇄</button></td>'
           : '') + '</tr>';
-    });
+    };
+    var sum = function (list, k) { return list.reduce(function (a, x) { return a + (Number(x[k]) || 0); }, 0); };
+    if (all) {
+      orgGroups(rows, function (x) { return x.u; }).forEach(function (g) {
+        h += orgGroupRow(g, cols, '운행 ' + n0(sum(g.list, 'n')) + '건 · 합계 <b>' + won(sum(g.list, 'cost')) + '</b>' +
+          (sum(g.list, 'unk') ? ' · <span class="unk">미확정 ' + n0(sum(g.list, 'unk')) + '건</span>' : ''));
+        g.list.forEach(function (x) { h += row(x); });
+      });
+      h += '</tbody><tfoot><tr><td colspan="2">' + n0(rows.length) + '명 합계</td>' +
+        '<td class="n">' + n0(sum(rows, 'n')) + '</td><td class="n">' + km(sum(rows, 'km')) + '</td>' +
+        '<td class="n">' + n0(sum(rows, 'fuel')) + '</td><td class="n">' + n0(sum(rows, 'toll')) + '</td>' +
+        '<td class="n">' + n0(sum(rows, 'park')) + '</td><td class="n total">' + n0(sum(rows, 'cost')) + '</td>' +
+        '<td class="n">' + (sum(rows, 'unk') ? n0(sum(rows, 'unk')) + '건' : '—') + '</td><td></td></tr></tfoot>';
+      return h + '</table></div></div>';
+    }
+    rows.forEach(function (x) { h += row(x); });
     return h + '</tbody></table></div></div>';
   }
 
@@ -3140,11 +3285,19 @@
     var seen = {};
     usernames.forEach(function (u) { seen[u] = 1; });
     if (FILT.who) seen[FILT.who] = 1;
-    var us = Object.keys(seen).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
+    var key = function (u) { var p = orgPath(u); return orgRank(p) + '|' + orgName(p) + '|' + nameOf(u); };
+    var us = Object.keys(seen).filter(function (u) { return u === FILT.who || orgMatch(u); })
+      .sort(function (a, b) { var ka = key(a), kb = key(b); return (orgRank(orgPath(a)) - orgRank(orgPath(b))) || ka.localeCompare(kb, 'ko'); });
+    // 팀별로 묶어 고른다(같은 이름도 소속으로 가린다).
+    var html = '', cur = null;
+    us.forEach(function (u) {
+      var g = orgName(orgPath(u));
+      if (g !== cur) { html += (cur !== null ? '</optgroup>' : '') + '<optgroup label="' + esc(g) + '">'; cur = g; }
+      html += '<option value="' + esc(u) + '"' + (FILT.who === u ? ' selected' : '') + '>' + esc(nameOf(u)) + '</option>';
+    });
+    if (cur !== null) html += '</optgroup>';
     return '<label class="field">' + ic('users', 14) + '<select id="selWho" aria-label="사람"><option value="">사람 전체</option>' +
-      us.map(function (u) {
-        return '<option value="' + esc(u) + '"' + (FILT.who === u ? ' selected' : '') + '>' + esc(nameOf(u)) + '</option>';
-      }).join('') + '</select></label>';
+      html + '</select></label>';
   }
   /**
    * 표 정렬. getters = { 열이름: 행 → 값 }. 상태(SORTS[group])가 비어 있으면 기본(defKey, defDir).
@@ -3213,7 +3366,7 @@
     if (g) {
       rows = sortRows(rows, g, {
         date: function (t) { return Number(t.start_time); },
-        who: function (t) { return nameOf(t.username); },
+        who: function (t) { var p = orgPath(t.username); return p.div + '|' + p.team + '|' + p.unit + '|' + nameOf(t.username); },
         purp: function (t) { return t.purpose || ''; },
         car: function (t) { return t.plate_no || ''; },
         dist: function (t) { return Number(t.distance_km) || 0; },
@@ -3225,7 +3378,7 @@
     }
     var pg = g ? pageOf(g, rows.length) : { n: rows.length, more: '' };
     var h = '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      th('날짜', 'date', -1) + (showWho ? th('이름', 'who', 1) : '') + th('목적', 'purp', 1) + th('차량', 'car', 1) +
+      th('날짜', 'date', -1) + (showWho ? th('소속 · 이름', 'who', 1) : '') + th('목적', 'purp', 1) + th('차량', 'car', 1) +
       th('거리', 'dist', -1, true) + (opt.compact ? '' : th('계기판', 'odo', -1, true)) +
       th('통행료', 'toll', -1, true) + (opt.compact ? '' : th('주차', 'park', -1, true)) +
       th('방문처', 'place', 1) + '</tr></thead><tbody>';
@@ -3236,7 +3389,7 @@
         '<td><span class="lead">' + (isMulti() ? ymd(t.start_time).slice(2).replace(/-/g, '.') : md(t.start_time)) +
         '</span> <span class="dim">' + hm(t.start_time) + '</span>' +
         (t.is_manual ? ' <span class="kind">수기</span>' : '') + '</td>' +
-        (showWho ? '<td>' + esc(nameOf(t.username)) + '</td>' : '') +
+        (showWho ? whoCell(t.username) : '') +
         '<td>' + purposeCell(t.purpose) + '</td>' +
         '<td>' + esc(t.plate_no || '—') + '</td>' +
         '<td class="n">' + km(t.distance_km) + '</td>' +
@@ -3464,7 +3617,7 @@
     });
     rows = sortRows(rows, "ev", {
       date: function (e) { return Number(e.date_millis); },
-      who: function (e) { return nameOf(e.username); },
+      who: function (e) { var p = orgPath(e.username); return p.div + '|' + p.team + '|' + p.unit + '|' + nameOf(e.username); },
       cat: function (e) { return e.category || ''; },
       amount: function (e) { return Number(e.amount) || 0; }
     }, 'date', -1);
@@ -3481,13 +3634,13 @@
     // 날짜 칸을 치는 동안 입력 칸을 갈아 끼우지 않게, 날짜에 따라 바뀌는 곳(건수 · 표)만 따로 표시해 둔다(paintBelow).
     h += sect('내역', '<span data-live="evcnt">' + (rows.length === all.length ? rows.length + '건' : rows.length + ' / ' + all.length + '건') + '</span>', upBtn,
       bar + '<div id="belowF">' + (rows.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      thSort('날짜', 'date', 'ev', -1) + (isAll() ? thSort('이름', 'who', 'ev', 1) : '') +
+      thSort('날짜', 'date', 'ev', -1) + (isAll() ? thSort('소속 · 이름', 'who', 'ev', 1) : '') +
       thSort('구분', 'cat', 'ev', 1) + '<th>차량</th>' +
       thSort('금액', 'amount', 'ev', -1, true) + '<th>메모</th><th></th></tr></thead><tbody>' +
       rows.map(function (e) {
         var canDel = e.username === mine && !evLocked(e);
         return '<tr><td><span class="lead">' + md(e.date_millis) + '</span></td>' +
-          (isAll() ? '<td>' + esc(nameOf(e.username)) + '</td>' : '') +
+          (isAll() ? whoCell(e.username) : '') +
           '<td><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
           '<td class="dim">' + esc(e.vehicle_plate || '—') + '</td>' +
           '<td class="n total">' + n0(e.amount) + '</td>' +
@@ -4206,6 +4359,7 @@
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
+    if (isAll()) { var tc = teamCards(rows); if (tc) h += sect(ORGF.team ? '파트·센터별' : '팀별', null, '', tc); }
     // 개인 범위에서 rows 는 사람 목록(늘 1명)이다. 건수는 운행 수로 적는다.
     h += sect(isAll() ? '직원별' : '내 정산',
       isAll() ? rows.length + '명' : '운행 ' + n0(T.n) + '건',
@@ -4845,21 +4999,27 @@
       '</div></div>';
 
     h += sect('명단', list.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>소속</th><th>직급</th><th>차량</th><th class="n">운행</th>' +
+      '<th>파트·센터</th><th>이름</th><th>직급</th><th>차량</th><th class="n">운행</th>' +
       '<th class="n">거리</th><th class="n">비용</th><th></th></tr></thead><tbody>' +
-      list.map(function (u) {
+      orgGroups(list, function (u) { return u.username; }, true).map(function (g) {
+        var gi = g.list.filter(function (u) { return !(byU[u.username] || []).length; }).length;
+        return orgGroupRow(g, 8, gi ? '<span class="unk">기록 없음 ' + n0(gi) + '명</span>' : '전원 기록') + g.list.map(peopleRow).join('');
+      }).join('') + '</tbody></table></div></div>');
+    return h;
+    function peopleRow(u) {
+      return (function () {
         var x = totals(byU[u.username] || [], { who: u.username });   // 영수증만 있는 사람도 금액이 나온다(다른 화면과 같은 기준)
-        return '<tr class="clk" tabindex="0" data-person="' + esc(u.username) + '">' +
+        return '<tr class="clk" tabindex="0" data-person="' + esc(u.username) + '">' + orgCell(u.username, true) +
           '<td><span class="lead">' + esc(u.name || u.username) + '</span>' +
           '<div class="dim" style="font-size:11px">' + esc(u.username) + '</div></td>' +
-          '<td>' + esc(u.dept || '—') + '</td><td class="dim">' + esc(u.position || '—') + '</td>' +
+          '<td class="dim">' + esc(u.position || '—') + '</td>' +
           '<td class="dim">' + esc(u.plate_no || '—') + '</td>' +
           '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td>' +
           '<td class="n">' + (x.km ? km(x.km) : '—') + '</td>' +
           '<td class="n total">' + (x.cost ? n0(x.cost) : '—') + '</td>' +
           '<td>' + (u.is_admin ? '<span class="st bad">관리자</span>' : '') + '</td></tr>';
-      }).join('') + '</tbody></table></div></div>');
-    return h;
+      })();
+    }
   }
 
   function viewCars() {
@@ -4947,14 +5107,13 @@
     if (!tg.length) return h + blank('대상자 명단이 없습니다.', '앱 교육 관리에서 회차를 시작하면 만들어집니다.', 'cap');
 
     h += sect('대상자', tg.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>소속</th><th class="n">안전점수</th><th class="n">운행</th><th>이수</th></tr></thead><tbody>' +
+      '<th>소속</th><th>이름</th><th class="n">안전점수</th><th class="n">운행</th><th>이수</th></tr></thead><tbody>' +
       tg.slice().sort(function (a, b) { return (doneBy[a.username] || 0) - (doneBy[b.username] || 0); })
         .map(function (t) {
           var u = USERS[t.username] || {}, d = doneBy[t.username] || 0;
           var ok = vids.length > 0 && d >= vids.length;
           return '<tr' + (ok ? '' : ' class="flagged"') + '>' +
-            '<td><span class="lead">' + esc(u.name || t.username) + '</span></td>' +
-            '<td class="dim">' + esc(u.dept || '—') + '</td>' +
+            orgCell(t.username) + '<td><span class="lead">' + esc(u.name || t.username) + '</span></td>' +
             '<td class="n">' + (t.avg_score == null ? '—' : n0(t.avg_score)) + '</td>' +
             '<td class="n">' + n0(t.trip_count) + '</td>' +
             '<td>' + (ok ? '<span class="st ok">완료</span>'
@@ -5798,16 +5957,25 @@
   function scopeTitle(t) { return isAll() ? '전체 ' + t : t; }
   /** 지금 화면 범위에 맞게 TRIPS·EVID 를 채운다. */
   function applyScope() {
-    if (isAll()) { TRIPS = ALL_TRIPS; EVID = ALL_EVID; return; }
+    if (isAll()) {
+      // 관리 화면은 「보는 범위」(사업부·팀·파트)로 좁힌다 — 합계·점검·표가 모두 그 범위로 나온다.
+      if (orgFilterOn() && ORGBAR_VIEWS.indexOf(VIEW) >= 0) {
+        TRIPS = ALL_TRIPS.filter(function (t) { return orgMatch(t.username); });
+        EVID = ALL_EVID.filter(function (e) { return orgMatch(e.username); });
+      } else { TRIPS = ALL_TRIPS; EVID = ALL_EVID; }
+      return;
+    }
     var me = myName();
     TRIPS = ALL_TRIPS.filter(function (t) { return t.username === me; });
     EVID = ALL_EVID.filter(function (e) { return e.username === me; });
   }
+  /** 「보는 범위」 줄을 얹는 관리 화면. */
+  var ORGBAR_VIEWS = ['a_close', 'a_trips', 'a_check', 'a_evid', 'a_settle', 'a_safety', 'a_verify', 'a_final'];
   /* ── A안: 한 단계로 묶인 화면 사이의 탭, 단계 화면 맨 아래 '다음 단계' ── */
-  var TAB_OF = { trips: 'rec', check: 'rec', a_trips: 'arec', a_check: 'arec', hipass: 'toll', tollfill: 'toll' };
+  var TAB_OF = { trips: 'rec', check: 'rec', a_trips: 'arec', a_check: 'arec', a_evid: 'arec', hipass: 'toll', tollfill: 'toll' };
   var TAB_SET = {
     rec: [['trips', '운행일지'], ['check', '기록 점검']],
-    arec: [['a_trips', '전체 운행일지'], ['a_check', '전체 기록 점검']],
+    arec: [['a_trips', '운행일지'], ['a_check', '기록 점검'], ['a_evid', '영수증']],
     toll: [['evid', '← 영수증 차례로'], ['tollfill', '통행료 직접 채우기'], ['hipass', '하이패스 PDF 대조']]
   };
   var NEXT_OF = {
@@ -5824,6 +5992,12 @@
       }).join('') + '</nav>';
       var i = html.indexOf('<div class="phead">'), j = i >= 0 ? html.indexOf('</div>', i) : -1;
       html = j >= 0 ? html.slice(0, j + 6) + tabs + html.slice(j + 6) : tabs + html;
+    }
+    if (ORGBAR_VIEWS.indexOf(VIEW) >= 0) {
+      var oi = html.indexOf('<div class="phead">'), oj = oi >= 0 ? html.indexOf('</div>', oi) : -1;
+      var at = oj >= 0 ? oj + 6 : 0;
+      if (html.indexOf('<nav class="vtabs"', at) === at) at = html.indexOf('</nav>', at) + 6;   // 탭 줄 바로 아래
+      html = html.slice(0, at) + orgBarHtml() + html.slice(at);
     }
     var sn = STEP_OF[VIEW];
     if (sn && sn <= 3 && !isAll() && !isMulti() && !cycleLocked(myName())) {
@@ -6245,6 +6419,12 @@
 
     /* ── 결재 ── */
     if (e.target.closest('#btnOpenSubmit')) { openSubmit(); return; }
+    if ((el = e.target.closest('[data-orgteam]'))) {
+      var tp = el.dataset.orgteam.split('|'); ORGF = { div: tp[0] || '-', team: tp[1] || '', unit: '' }; saveOrgF();
+      PAGES = {}; AUDIT = null; applyScope(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+    }
+    if ((el = e.target.closest('[data-orgunit]'))) { ORGF.unit = el.dataset.orgunit; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
+    if (e.target.closest('#ofClear')) { ORGF = { div: '', team: '', unit: '' }; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
     if (e.target.closest('#btnPrevLine')) {
       var pv = previousSteps();
       if (pv) { DRAFT = pv.slice(); APPR_Q = ''; APPR_BOX = ''; renderSubmit(); }
@@ -6359,6 +6539,10 @@
       fileToSign(f).then(function (png) { SIGN_DRAFT = png; render(); },
         function (err) { toast((err && err.message) || '서명을 읽지 못했습니다.', true); });
       return;
+    }
+    if (e.target.id === 'ofDiv' || e.target.id === 'ofTeam' || e.target.id === 'ofUnit') {
+      setOrgF(e.target.id === 'ofDiv' ? 'div' : e.target.id === 'ofTeam' ? 'team' : 'unit', e.target.value);
+      FILT.who = ''; PAGES = {}; AUDIT = null; applyScope(); renderKeepFocus(e.target.id); return;
     }
     if (e.target.id === 'selWho') { FILT.who = e.target.value; PAGES = {}; renderKeepFocus('selWho'); return; }
     if (e.target.id === 'selPurp') { FILT.purp = e.target.value; PAGES = {}; renderKeepFocus('selPurp'); return; }
@@ -6858,7 +7042,8 @@
       $: $, SB: SB, esc: esc, ic: ic, n0: n0, won: won, km: km, pad: pad, md: md, hm: hm, ymd: ymd,
       toast: toast, toastOk: toastOk, apiRetry: apiRetry, fetchAll: fetchAll,
       head: head, sect: sect, blank: blank, skeleton: skeleton,
-      nameOf: nameOf, personOf: personOf, myName: myName, myAppr: myAppr, apprOf: apprOf,
+      nameOf: nameOf, personOf: personOf, myName: myName,
+      orgCell: orgCell, orgGroups: orgGroups, orgGroupRow: orgGroupRow, orgMatch: orgMatch, orgPath: orgPath, orgName: orgName, myAppr: myAppr, apprOf: apprOf,
       cycleRange: cycleRange, cycleName: cycleName, cycleSpan: cycleSpan,
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
       pdfDocFor: pdfDocFor, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,

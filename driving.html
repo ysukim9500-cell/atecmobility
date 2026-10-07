@@ -456,6 +456,44 @@ aside a.step.isnow .stepn{animation:ringnow 1.8s ease-out infinite}
 .vstep .btn[disabled]{cursor:not-allowed}
 @media (max-width:720px){.vsteps{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.vstep.now .vsh i{animation:none}}
+/* 관리 화면 「보는 범위」 — 사업부 › 팀 › 파트·센터 */
+.orgbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:4px 0 18px;padding:10px 14px;
+  border:1px solid var(--ink-200);border-radius:var(--r);background:var(--surface)}
+.orgbar.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
+.orgbar .obl{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-600);margin-right:4px}
+.orgbar .osel{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-500)}
+.orgbar .osel select{font:inherit;font-size:13px;font-weight:600;color:var(--ink-900);padding:6px 26px 6px 10px;border:1px solid var(--ink-200);
+  border-radius:var(--r-xs);background-color:var(--surface);max-width:220px}
+.orgbar .osel select:disabled{opacity:.5}
+.orgbar.on .osel select:not([value=""]){border-color:var(--ink-300)}
+.orgbar .oarr{color:var(--ink-300);font-size:15px}
+.orgbar .ocnt{margin-left:auto;font-size:12.5px;color:var(--ink-500)} .orgbar .ocnt b{color:var(--ink-900);font-variant-numeric:tabular-nums}
+@media (max-width:720px){.orgbar .oarr{display:none}.orgbar .ocnt{margin-left:0;width:100%}}
+/* 팀별 합계 카드 — 누르면 그 팀으로 좁힌다 */
+.tcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tcard{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:14px 16px;border:1px solid var(--ink-200);
+  border-radius:var(--r);background:var(--surface);cursor:pointer;font:inherit;color:inherit;transition:border-color var(--t),box-shadow var(--t),transform var(--t)}
+.tcard:not([disabled]):hover{border-color:var(--red);box-shadow:0 4px 14px rgba(20,24,28,.06);transform:translateY(-1px)}
+.tcard:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.tcard .tl{font-size:14px;font-weight:800;color:var(--ink-900)}
+.tcard .ts{font-size:11px;color:var(--ink-400);min-height:14px}
+.tcard .tv{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:6px;color:var(--ink-900)}
+.tcard .tbar{width:100%;height:4px;border-radius:2px;background:var(--ink-100);overflow:hidden;margin:4px 0 2px}
+.tcard .tbar i{display:block;height:100%;background:var(--red);border-radius:2px}
+.tcard .tm{font-size:11.5px;color:var(--ink-500)} .tcard .tm em{font-style:normal;color:var(--red-700);font-weight:600}
+@media (prefers-reduced-motion:reduce){.tcard{transition:none}.tcard:hover{transform:none}}
+/* 표의 소속 칸·묶음 줄 */
+td.orgc{white-space:nowrap} td.orgc b{display:block;font-weight:600;font-size:13px;color:var(--ink-900)}
+td.orgc span{display:block;font-size:11.5px;color:var(--ink-400);margin-top:1px}
+td.whoc{white-space:nowrap} td.whoc .wo{display:block;font-size:11px;color:var(--ink-400)} td.whoc b{font-weight:600}
+tr.ogrp td{background:var(--ink-50,#F4F6F7);padding:9px 14px !important;border-top:1px solid var(--ink-200)}
+tr.ogrp td>div{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+tr.ogrp b{font-size:13.5px;font-weight:800;color:var(--ink-900)}
+tr.ogrp .od{font-size:11.5px;color:var(--ink-500)}
+tr.ogrp .on{font-size:11.5px;font-weight:700;color:var(--ink-600);background:var(--surface);border:1px solid var(--ink-200);border-radius:999px;padding:0 8px}
+tr.ogrp .or{margin-left:auto;font-size:12.5px;color:var(--ink-600);font-variant-numeric:tabular-nums} tr.ogrp .or b{font-size:12.5px;font-weight:700}
+tr.ogrp .unk{color:var(--red-700);font-weight:600}
+.admsec{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink-400);padding:12px 12px 4px}
 .vguide{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:18px 0 0;padding:0;font-size:13px;color:var(--ink-500)}
 .vguide li{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 6px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface)}
 .vguide li i{width:22px;height:22px;border-radius:999px;display:grid;place-items:center;font-style:normal;font-size:11.5px;font-weight:700;
@@ -1235,18 +1273,18 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
       <a tabindex="0" role="button" data-v="edu"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
+      <div class="admsec">결재·마감</div>
+      <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
+      <a tabindex="0" role="button" data-v="a_verify" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증 현황</a>
       <a tabindex="0" role="button" data-v="a_final" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
-      <a tabindex="0" role="button" data-v="a_close" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 마감 현황</a>
-      <a tabindex="0" role="button" data-v="a_trips" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 운행일지</a>
-      <a tabindex="0" role="button" data-v="a_check" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-scan"/></svg>전체 기록 점검</a>
-      <a tabindex="0" role="button" data-v="a_evid" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-receipt"/></svg>전체 영수증</a>
-      <a tabindex="0" role="button" data-v="a_verify" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>전체 검증</a>
-      <a tabindex="0" role="button" data-v="a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-ticket"/></svg>하이패스 대조 (전체)</a>
-      <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>전체 정산</a>
+      <a tabindex="0" role="button" data-v="a_settle" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산</a>
+      <div class="admsec">기록</div>
+      <a tabindex="0" role="button" data-v="a_trips" data-alt="a_check,a_evid,a_hipass" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행·영수증 기록</a>
+      <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
+      <div class="admsec">사람·설정</div>
       <a tabindex="0" role="button" data-v="people" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>조직도</a>
       <a tabindex="0" role="button" data-v="cars" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-car"/></svg>차량</a>
-      <a tabindex="0" role="button" data-v="a_safety" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>전체 안전운전</a>
       <a tabindex="0" role="button" data-v="eduadm" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cap"/></svg>교육 관리</a>
       <a tabindex="0" role="button" data-v="perm" class="adm mst"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>권한 관리</a>
       </div>

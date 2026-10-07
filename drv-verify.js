@@ -366,10 +366,9 @@
     }
     var by = {};
     ALLROWS.list.forEach(function (r) { by[r.username] = r; });
-    // 이번 주기에 운행이나 검증 기록이 있는 사람
-    var users = {};
-    S.ALL_TRIPS.forEach(function (t) { users[t.username] = 1; });
-    Object.keys(by).forEach(function (u) { users[u] = 1; });
+    // 이번 주기에 운행이 있는 사람만(2026-10-07 사용자) — 「보는 범위」(사업부·팀·파트) 안에서.
+    var users = {}, rr = C.cycleRange(S.CYC.y, S.CYC.m);
+    S.ALL_TRIPS.forEach(function (t) { if (t.start_time >= rr.lo && t.start_time < rr.hi && C.orgMatch(t.username)) users[t.username] = 1; });
     var list = Object.keys(users).map(function (u) {
       var r = by[u], s = r && r.summary;
       var a = S.APPR.filter(function (x) { return x.username === u && x.cycle === cyc; })[0];
@@ -377,22 +376,37 @@
     }).sort(function (x, y) { return x.rank - y.rank || C.nameOf(x.u).localeCompare(C.nameOf(y.u), 'ko'); });
     var nBad = list.filter(function (x) { return x.s && x.s.bad; }).length;
     var nNone = list.filter(function (x) { return !x.r; }).length;
+    var nOk = list.filter(function (x) { return x.r && !x.s.bad && !x.s.warn; }).length;
+    var nWarn = list.filter(function (x) { return x.r && !x.s.bad && x.s.warn; }).length;
 
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (nBad ? '' : ' ok') + '"></span>' + n0(list.length) + '명</div>' +
-      '<p class="verdict' + (nBad ? '' : ' clean') + '">' +
-      (nBad ? '불일치가 있는 사람이 <em>' + n0(nBad) + '명</em> 있습니다' : '<em>불일치가 없습니다</em>') + '</p>' +
-      '<div class="facts"><div class="fact"><div class="k">검증 안 한 사람</div><div class="v">' +
-      n0(nNone) + '<small>명</small></div><div class="sub">각자 「검증」에서 실행하거나 아래에서 대신 실행</div></div></div></div>';
+    var allNone = list.length > 0 && nNone === list.length;
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (nBad || nNone ? '' : ' ok') + '"></span>이번 기간 운행한 ' + n0(list.length) + '명</div>' +
+      '<p class="verdict' + (nBad || nNone ? '' : ' clean') + '">' +
+      (nBad ? '불일치가 있는 사람이 <em>' + n0(nBad) + '명</em> 있습니다'
+        : allNone ? '아직 아무도 <em>검증하지 않았습니다</em>'
+        : nNone ? '불일치는 없고, 검증 안 한 사람이 <em>' + n0(nNone) + '명</em>입니다'
+        : '<em>모두 검증했고 불일치가 없습니다</em>') + '</p>' +
+      '<div class="facts">' +
+      '<div class="fact"><div class="k">불일치</div><div class="v' + (nBad ? ' alert' : '') + '">' + n0(nBad) + '<small>명</small></div><div class="sub">고쳐야 할 것이 있음</div></div>' +
+      '<div class="fact"><div class="k">확인 필요</div><div class="v">' + n0(nWarn) + '<small>명</small></div><div class="sub">사람이 한 번 봐야 함</div></div>' +
+      '<div class="fact"><div class="k">이상 없음</div><div class="v">' + n0(nOk) + '<small>명</small></div><div class="sub">검증 통과</div></div>' +
+      '<div class="fact"><div class="k">검증 안 함</div><div class="v">' + n0(nNone) + '<small>명</small></div><div class="sub">각자 실행하거나 아래에서 대신 실행</div></div>' +
+      '</div></div>';
 
     h += C.sect('직원별', list.length + '명', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>소속</th><th>결과</th><th>사진 판독</th><th>검증 시각</th><th>결재</th><th></th></tr></thead><tbody>' +
-      list.map(function (x) {
+      '<th>파트·센터</th><th>이름</th><th>결과</th><th>사진 판독</th><th>검증 시각</th><th>결재</th><th></th></tr></thead><tbody>' +
+      C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
+        var gb = g.list.filter(function (x) { return x.s && x.s.bad; }).length, gn = g.list.filter(function (x) { return !x.r; }).length;
+        return C.orgGroupRow(g, 7, (gb ? '<span class="unk">불일치 ' + n0(gb) + '명</span> · ' : '') + '검증 안 함 ' + n0(gn) + '명') +
+          g.list.map(vrow).join('');
+      }).join('') + '</tbody></table></div></div>');
+    function vrow(x) {
+      return (function () {
         var p = C.personOf(x.u);
         var busy = RUN.busy && RUN.who === keyOf(x.u, cyc);
         var stuck = x.a && x.a.status === 'submitted';
-        return '<tr><td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td>' +
-          '<td class="dim">' + esc(p.dept || '') + '</td>' +
+        return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td>' +
           '<td>' + (x.r ? sumChip(x.s) : '<span class="dim">검증 전</span>') + '</td>' +
           '<td class="dim">' + (x.r && x.r.ai ? n0(x.s.read) + ' / ' + n0(x.s.receipts) : '—') + '</td>' +
           '<td class="dim">' + (x.r ? esc(whenText(x.r.created_at)) : '') + '</td>' +
@@ -406,7 +420,8 @@
           // 결재가 끝난 건의 정정 — 잠금을 풀어 다시 상신하게 한다(완료본은 이력에 남는다).
           (x.a && x.a.status === 'approved' ? ' <button class="btn sm" data-appr="reopen" data-id="' + x.a.id + '" title="결재 완료 건을 정정하도록 다시 엽니다">정정 열기</button>' : '') +
           '</td></tr>';
-      }).join('') + '</tbody></table></div></div>');
+      })();
+    }
     h += '<div class="anote"><b>관리자 반려</b>는 결재자가 자리에 없어 결재가 멈췄을 때만 씁니다. 반려하면 그 직원의 잠금이 풀려 고쳐서 다시 올릴 수 있고, ' +
       '누가 왜 반려했는지 기록에 남습니다. 승인을 대신할 수는 없습니다.<br>' +
       '<b>정정 열기</b>는 결재가 끝난 뒤 고칠 것이 생겼을 때 씁니다. 잠금이 풀려 직원이 고쳐 다시 상신하고 결재선을 처음부터 다시 탑니다. ' +
@@ -844,14 +859,17 @@
     if (!S.LOADED) return C.head('결재 완료 출력') + C.skeleton();
     if (C.isMulti()) return C.singleOnly('결재 완료 출력', '출력');
     var cyc = S.CYCKEY, cname = C.cycleName(S.CYC.y, S.CYC.m);
-    var list = S.APPR.filter(function (a) { return a.cycle === cyc; });
+    // 「보는 범위」(사업부·팀·파트) 안의 사람만.
+    var list = S.APPR.filter(function (a) { return a.cycle === cyc && C.orgMatch(a.username); });
     var done = list.filter(function (a) { return a.status === 'approved'; })
       .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     var going = list.filter(function (a) { return a.status === 'submitted'; });
     var back = list.filter(function (a) { return a.status === 'rejected' || a.status === 'withdrawn'; });
+    // 챙겨야 할 사람 = 이 결재 기간에 **운행이 있는** 사람만(2026-10-07 사용자 — 영수증만 있는 사람·운행 없는 사람은 뺀다).
     var r = C.cycleRange(S.CYC.y, S.CYC.m), has = {};
-    (S.ALL_TRIPS || []).forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi && S.USERS[t.username]) has[t.username] = 1; });
-    (S.ALL_EVID || []).forEach(function (e) { var d = Number(e.date_millis); if (d >= r.lo && d < r.hi && S.USERS[e.username]) has[e.username] = 1; });
+    (S.ALL_TRIPS || []).forEach(function (t) {
+      if (t.start_time >= r.lo && t.start_time < r.hi && S.USERS[t.username] && C.orgMatch(t.username)) has[t.username] = (has[t.username] || 0) + 1;
+    });
     // 결재 건이 있는 사람(완료·결재 중·반려·회수)은 위 목록에 이미 있다 — 「상신 전」에 또 넣지 않는다
     // (예전에는 반려된 사람이 「반려」와 「상신 전」 두 곳에 나와 숫자가 두 번 셌다, 2026-10-06 검증로봇 5).
     var sent = {}; list.forEach(function (a) { sent[a.username] = 1; });
@@ -875,7 +893,7 @@
       fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') +
       fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) +
-      fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '운행·영수증이 있는데 상신 전', notYet.length > 0) +
+      fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 운행이 있는데 상신 전', notYet.length > 0) +
       '</div></div>';
 
     // ── 결재 완료 — 출력 ──
@@ -886,39 +904,52 @@
         '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>'
       : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length
-      ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>이름</th><th>소속</th>' +
+      ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
         '<th>결재 완료</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
-        done.map(function (a) {
+        C.orgGroups(done, function (a) { return a.username; }, true).map(function (g) {
+          return C.orgGroupRow(g, 7, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') +
+            g.list.map(doneRow).join('');
+        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="3">결재 완료 ' + n0(done.length) + '명 합계</td>' +
+        '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
+      : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
+    function doneRow(a) {
           var p = S.USERS[a.username] || {};
           var line = (a.steps || []).map(function (s) { return (s.name || C.nameOf(s.approver)) + '(' + (s.box || '') + ')'; }).join(' → ');
           return '<tr><td><input type="checkbox" data-finsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') +
             ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
-            '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
-            '<td class="dim">' + esc(p.dept || '—') + '</td>' +
+            C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td class="dim">' + (a.closed_at ? esc(whenText(a.closed_at)) : '—') + '</td>' +
             '<td class="n total">' + n0((a.snapshot || {}).cost) + '</td>' +
             '<td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
             '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button></td></tr>';
-        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="3">결재 완료 ' + n0(done.length) + '명 합계</td>' +
-        '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
-      : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
+    }
 
     if (going.length) {
       h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-        '<th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th></tr></thead><tbody>' +
+        '<th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th></tr></thead><tbody>' +
         going.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
-          return '<tr><td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
+          return '<tr>' + C.orgCell(a.username) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td class="dim">' + (a.submitted_at ? esc(whenText(a.submitted_at)) : '') + '</td>' +
             '<td class="n">' + n0((a.snapshot || {}).cost) + '</td>' +
             '<td>' + esc((cur.name || C.nameOf(cur.approver || '')) + (cur.box ? ' (' + cur.box + ')' : '')) + '</td></tr>';
         }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
-      h += C.sect('챙겨야 할 사람', n0(back.length + notYet.length) + '명', '', '<div class="panel" style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:8px">' +
-        back.map(function (a) { return '<span class="st bad">' + esc(C.nameOf(a.username)) + ' · ' + (a.status === 'rejected' ? '반려' : '회수') + '</span>'; }).join('') +
-        notYet.map(function (u) { return '<span class="st warn">' + esc(C.nameOf(u)) + ' · 상신 전</span>'; }).join('') + '</div>');
+      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '회수', cls: 'bad' }; })
+        .concat(notYet.map(function (u) { return { u: u, st: '상신 전', cls: 'warn' }; }));
+      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '',
+        '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
+        C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
+          return C.orgGroupRow(g, 5, '') + g.list.map(function (x) {
+            var vr = ROWS[keyOf(x.u, cyc)], vs = vr && vr.summary;
+            return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td>' +
+              '<td><span class="st ' + x.cls + '">' + esc(x.st) + '</span></td>' +
+              '<td class="n">' + n0(has[x.u] || 0) + '건</td>' +
+              '<td>' + (vs ? sumChip(vs) : '<span class="dim">검증 전</span>') + '</td></tr>';
+          }).join('');
+        }).join('') + '</tbody></table></div></div>');
     }
     return h;
   }
