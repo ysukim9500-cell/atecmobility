@@ -22,3 +22,13 @@
 
 driving.html 은 `vendor/pdf.min.mjs` 를 필요할 때만 `import()` 한다. 배포 저장소
 (atecmobility)에도 `vendor/` 를 통째로 올려야 한다.
+
+## SheetJS CE 0.20.3 (SheetJS LLC · Apache-2.0)
+
+- `xlsx.full.min.js` (UMD — 브라우저는 `window.XLSX`, Node 는 `require`) · 라이선스 원문 `LICENSE-SheetJS.txt`
+- 받은 곳: https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js
+- 받은 날: 2026-10-08 · sha256 `cc015130aa8521e7f088f88898eba949ccdcbfb38df0bd129b44b7273c3a6f41`
+- 쓰는 곳: 법인카드 지출결의 「ERP 엑셀 올리기」(drv-card.js 가 창을 열 때만 싣는다 — 약 1MB) · 웹 시험(web/test).
+- 왜 cdnjs 판(0.18.5)이 아닌가: 0.18.5 에는 엑셀 파일을 읽을 때의 프로토타입 오염(CVE-2023-30533)과
+  ReDoS(CVE-2024-22363)가 남아 있다. 직원이 올리는 파일을 읽는 데 쓰므로 고친 판을 둔다.
+- 우리 `xlsx.js`(`window.Xlsx`, 소문자 lsx)와 이름이 다르다 — 둘이 함께 있어도 부딪히지 않는다.

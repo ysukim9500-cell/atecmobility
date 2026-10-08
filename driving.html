@@ -2,7 +2,8 @@
   ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
   같이 올라가야 하는 것: driving-app.js · drv-verify.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
-                         vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF)
+                         card-rules.js · card-erp.js · card-sheet.js · drv-card.js (법인카드)
+                         vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF / xlsx.full.min.js · LICENSE-SheetJS.txt — 카드 엑셀)
                          brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
 -->
 <!doctype html>
@@ -120,16 +121,58 @@ body.is-admin .navsec.admtog{display:flex}
 #nav .navsys a.navback:hover{color:var(--red);background:var(--red-50)}
 .navname{display:flex;align-items:center;gap:8px;padding:2px 10px 0;font-size:16px;color:var(--ink-900,#1F2328)}
 .navname svg{color:var(--red);flex:none}
-body.mode-d #nav .xnav,body.mode-d #nav .xadm{display:none !important}
-body.mode-x #nav .dnav,body.mode-x #nav .dadm,body.mode-x #nav .xhead{display:none !important}
+body.mode-d #nav .xnav,body.mode-d #nav .xadm,body.mode-d #nav .cnav,body.mode-d #nav .cadm{display:none !important}
+body.mode-x #nav .dnav,body.mode-x #nav .dadm,body.mode-x #nav .xhead,body.mode-x #nav .cnav,body.mode-x #nav .cadm{display:none !important}
+body.mode-c #nav .dnav,body.mode-c #nav .dadm,body.mode-c #nav .xnav,body.mode-c #nav .xadm,body.mode-c #nav .chead{display:none !important}
+/* 법인카드 모듈(drv-card.js)이 안 실렸으면 그 메뉴는 없다(paintNavMode 가 no-c 를 붙인다) */
+body.no-c #nav .cnav,body.no-c #nav .cadm{display:none !important}
 
 /* 결재만 하는 계정(운행일지 안 씀, 2026-10-07) — 메뉴는 결재함만 */
-body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav),body.nodrv #nav > .navsec:not(.xnav){display:none}
+body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav > .navsec:not(.xnav):not(.cnav){display:none}
 
 /* ── 개인경비 지출결의(2026-10-07) ── */
 .akind{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;
   background:var(--ink-100);color:var(--ink-600);flex:none}
 .akind.x{background:#EEF4FF;color:#2F5BB7;border:1px solid #CFDDF7}
+.akind.c{background:#FFF5E6;color:#8A5300;border:1px solid #F2D7AA}
+/* ── 법인카드 지출결의(2026-10-09) — 이번 달 카드 내역 표: 칸에서 바로 고치기 · 빈 칸 빨간 테두리 · 추천 칩 · 휴대폰은 카드 모양 ── */
+.ctab .cin{width:100%;min-width:92px;height:32px;font-size:13px}
+.ctab .cin.wide{min-width:220px}
+.ctab .cin.need{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+.ctab .cin::placeholder{color:var(--ink-400)}
+.csug{display:flex;width:max-content;align-items:center;margin-top:4px;height:24px;padding:0 9px;border-radius:999px;border:1px dashed var(--ink-300);
+  background:transparent;color:var(--ink-500);font:inherit;font-size:12px;cursor:pointer}
+.csug:hover,.csug:focus-visible{border-color:var(--red);color:var(--red)}
+.csave{font-size:11.5px;color:var(--ink-500);margin-right:6px;white-space:nowrap}
+.csave.bad{color:var(--red)}
+.ctab tr.cmiss td{background:var(--warn-50)}
+.ctab tr.flash td{background:var(--red-50)}
+.cdrop tr.cbad td{background:var(--red-50)}
+.cfacts{margin:0 0 12px}
+/* 휴대폰: 한 줄 = 카드 한 장. 위 두 줄은 순번·승인일·시간·금액 / 가맹점·업종, 그 아래 손으로 적는 칸 셋(이름표와 함께) */
+@media (max-width:720px){
+  .scroll.cscroll{max-height:none;overflow:visible}
+  .scroll table.ctab{min-width:0;width:100%}
+  .ctab thead{display:none}
+  .ctab,.ctab tbody,.ctab tfoot{display:block;width:100%}
+  .ctab tr{display:grid;grid-template-columns:auto auto 1fr auto;gap:2px 10px;align-items:baseline;box-sizing:border-box;width:100%;
+    border:1px solid var(--line);border-radius:var(--r-sm);margin:0 0 10px;padding:10px 12px;background:var(--surface)}
+  .ctab td{display:block;min-width:0;border:0 !important;padding:2px 0 !important;text-align:left !important;white-space:normal;max-width:none;
+    position:static !important;background:none !important}
+  .ctab td:nth-child(1){grid-row:1;grid-column:1;color:var(--ink-500)}
+  .ctab td:nth-child(2){grid-row:1;grid-column:2;font-weight:700}
+  .ctab td:nth-child(3){grid-row:1;grid-column:3}
+  .ctab td:nth-child(6){grid-row:1;grid-column:4;text-align:right !important}
+  .ctab td:nth-child(4){grid-row:2;grid-column:1/4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ctab td:nth-child(5){grid-row:2;grid-column:4;text-align:right !important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw}
+  .ctab td:nth-child(n+7){grid-column:1/-1;padding-top:6px !important}
+  .ctab td:nth-child(10){display:flex;justify-content:flex-end;align-items:center}
+  .ctab tbody td[data-l]:nth-child(n+7):not([data-l=""])::before{content:attr(data-l);display:block;font-size:12px;color:var(--ink-500);margin-bottom:3px}
+  .ctab tfoot tr{display:flex;justify-content:space-between;border:0;background:none;padding:6px 4px}
+  .ctab tfoot td:empty{display:none}
+  .ctab .cin,.ctab .cin.wide{min-width:0;width:100%;box-sizing:border-box;height:40px}
+  .ctab .csug{height:34px;padding:0 12px;font-size:13px}
+}
 .xcalp{padding:12px}
 .xcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .xcal .xw{font-size:11.5px;font-weight:600;color:var(--ink-500);text-align:center;padding:2px 0 4px}
@@ -908,6 +951,7 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 .acard:last-child{border-bottom:0}
 .ahd{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:4px}
 .ahd b{font-size:14px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
+.ahd > .st{white-space:normal;flex:0 1 auto;min-width:0;overflow-wrap:anywhere}
 .acyc{font-size:12px;color:var(--ink-500)}
 .asum{font-size:12px;color:var(--ink-400);font-variant-numeric:tabular-nums}
 
@@ -1579,17 +1623,19 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <body>
 <script>
 /* 메뉴 갈래를 첫 그림 전에 정한다(2026-10-08) — 안 하면 driving-app.js 가 돌 때까지 두 갈래 메뉴가 한꺼번에 비친다.
-   규칙은 driving-app.js navModeOf 와 같다: 개인경비 화면(x_·xa_)이면 x, 함께 쓰는 화면이면 앞 갈래, 그 밖은 d.
-   운행일지를 안 쓰는 사람(uses_driving=false, 관리자 아님)은 늘 x. 틀려도 paintNavMode 가 곧 바로잡는다. */
+   규칙은 driving-app.js navModeOf 와 같다: 개인경비 화면(x_·xa_)이면 x, 법인카드 화면(c_·ca_)이면 c(2026-10-09),
+   함께 쓰는 화면이면 앞 갈래, 그 밖은 d. 운행일지를 안 쓰는 사람(uses_driving=false, 관리자 아님)은 d 대신 x.
+   틀려도 paintNavMode 가 곧 바로잡는다. */
 (function () {
   var m = 'd';
   try {
     var v = (/^#\/([a-z_]+)/.exec(location.hash || '') || [])[1] || '';
-    var prev = sessionStorage.getItem('drv_navmode') === 'x' ? 'x' : 'd';
+    var pv = sessionStorage.getItem('drv_navmode'), prev = pv === 'x' || pv === 'c' ? pv : 'd';
     if (/^xa?_/.test(v)) m = 'x';
+    else if (/^ca?_/.test(v)) m = 'c';
     else if (['inbox', 'account', 'people', 'org', 'perm'].indexOf(v) >= 0) m = prev;
     var me = JSON.parse(sessionStorage.getItem('drv_me') || 'null');
-    if (me && me.uses_driving === false && !me.is_admin) m = 'x';
+    if (me && me.uses_driving === false && !me.is_admin && m === 'd') m = 'x';
   } catch (e) { }
   document.body.classList.add('mode-' + m);
 })();
@@ -1604,6 +1650,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <g id="i-play" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M10.4 9.3l4.4 2.7-4.4 2.7z"/></g>
 <g id="i-ticket" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3.8 8.6V6.8h16.4v1.8a2.2 2.2 0 000 6.8v1.8H3.8v-1.8a2.2 2.2 0 000-6.8z"/><path d="M13 8.2v7.6"/></g>
 <g id="i-won" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5l3 9 4.5-9 4.5 9 3-9M4 11.5h16M4 14.5h16"/></g>
+<g id="i-card" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 9.5h18M7 15h4"/></g>
 <g id="i-users" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8.5" r="3"/><path d="M3.8 19.2c.6-3 2.9-4.7 5.7-4.7s5.1 1.7 5.7 4.7"/><path d="M16.2 6.2a2.9 2.9 0 010 5.4M17.6 14.9c2 .5 3.3 1.9 3.8 4.3"/></g>
 <g id="i-left" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></g>
 <g id="i-car" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5v2.2h2.6v-2.2M17.4 16.5v2.2H20v-2.2"/><path d="M3.6 16.5v-4l1.9-4.6A1.6 1.6 0 017 6.9h10a1.6 1.6 0 011.5 1L20.4 12.5v4z"/><path d="M4 12.6h16"/><circle cx="7.4" cy="14.5" r=".9" fill="currentColor" stroke="none"/><circle cx="16.6" cy="14.5" r=".9" fill="currentColor" stroke="none"/></g>
@@ -1715,6 +1762,10 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <div class="navsec xnav xhead">개인경비</div>
       <a tabindex="0" role="button" data-v="x_month" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>이번 달 경비</a>
       <a tabindex="0" role="button" data-v="x_verify" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증·상신</a>
+      <!-- 법인카드 지출결의(2026-10-09) — 모든 직원(cnav). 기간은 1일~말일. -->
+      <div class="navsec cnav chead">법인카드</div>
+      <a tabindex="0" role="button" data-v="c_month" class="cnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-card"/></svg>이번 달 카드 내역</a>
+      <a tabindex="0" role="button" data-v="c_verify" class="cnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증·상신</a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
       <div class="admsec adm dadm">결재·마감</div>
@@ -1730,6 +1781,11 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <a tabindex="0" role="button" data-v="xa_list" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 내역</a>
       <a tabindex="0" role="button" data-v="xa_final" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
       <a tabindex="0" role="button" data-v="xa_people" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
+      <div class="admsec adm cadm">법인카드</div>
+      <a tabindex="0" role="button" data-v="ca_close" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-card"/></svg>법인카드 현황</a>
+      <a tabindex="0" role="button" data-v="ca_list" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 내역</a>
+      <a tabindex="0" role="button" data-v="ca_final" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
+      <a tabindex="0" role="button" data-v="ca_people" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <div class="admsec adm">사람·설정</div>
       <a tabindex="0" role="button" data-v="people" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <a tabindex="0" role="button" data-v="org" class="adm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>조직도</a>
@@ -1769,6 +1825,11 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <script src="drv-verify.js"></script>
 <script src="drv-org.js"></script>
 <script src="drv-expense.js"></script>
+<!-- 법인카드 지출결의(2026-10-09) — 순수 모듈 셋을 먼저, 확장 모듈은 본체 앞에. SheetJS(vendor/xlsx.full.min.js)는 올리기 창을 열 때만 싣는다. -->
+<script src="card-rules.js"></script>
+<script src="card-erp.js"></script>
+<script src="card-sheet.js"></script>
+<script src="drv-card.js"></script>
 <script src="driving-app.js"></script>
 </body>
 </html>

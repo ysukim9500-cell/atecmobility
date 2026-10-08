@@ -61,6 +61,7 @@
   function Ctx(pdf, lib, fR, fB, doc) {
     this.pdf = pdf; this.lib = lib; this.fR = fR; this.fB = fB; this.doc = doc;
     this.page = null; this.y = MT; this.issues = [];
+    this.pw = PW; this.ph = PH; this.limit = LIMIT;          // 쪽 크기 — 가로 문서(법인카드)는 geo() 로 바꾼다(2026-10-09)
     this.stats = { cells: 0, shrunk: 0, wrapped: 0, minSize: 99, images: 0 };
     this.black = lib.rgb(0, 0, 0);
     this.cs = null;
@@ -75,8 +76,10 @@
     if (this.issues.length < 200) this.issues.push({ kind: kind, page: this.pdf.getPageCount(), msg: msg });
   };
   Ctx.prototype.gray = function (v) { return this.lib.rgb(v, v, v); };
+  /** 쪽 크기를 바꾼다(가로 A4 = 841.89 × 595.28). 다음 newPage 부터, 그리고 좌표 뒤집기(ph)·쪽 끝(limit)에 바로 쓴다. */
+  Ctx.prototype.geo = function (pw, ph, limit) { this.pw = pw; this.ph = ph; this.limit = limit; };
   Ctx.prototype.newPage = function () {
-    this.page = this.pdf.addPage([PW, PH]);
+    this.page = this.pdf.addPage([this.pw, this.ph]);
     this.y = MT;
     return this.page;
   };
@@ -209,7 +212,7 @@
     lay = lay || this.layout(o, w);
     if (o.fill != null || o.border !== false) {
       pg.drawRectangle({
-        x: x, y: PH - yTop - h, width: w, height: h,
+        x: x, y: this.ph - yTop - h, width: w, height: h,
         // fill: 회색 값(0~1) 또는 [r, g, b](0~1) — 개인경비 명세는 양식의 파랑·노랑 칠을 쓴다.
         color: o.fill == null ? undefined : Array.isArray(o.fill) ? lib.rgb(o.fill[0], o.fill[1], o.fill[2]) : this.gray(o.fill),
         borderColor: o.border === false ? undefined : this.black,
@@ -217,7 +220,7 @@
       });
     }
     if (o.slash) {
-      pg.drawLine({ start: { x: x, y: PH - yTop - h }, end: { x: x + w, y: PH - yTop }, thickness: BW, color: this.black });
+      pg.drawLine({ start: { x: x, y: this.ph - yTop - h }, end: { x: x + w, y: this.ph - yTop }, thickness: BW, color: this.black });
       return;
     }
     var size = lay.size, bold = !!o.bold, f = this.font(bold), lh = size * LH;
@@ -234,7 +237,7 @@
         : o.align === 'center' ? x + (w - tw) / 2
           : x + lay.padX;
       var base = top + i * lh + lh / 2 + size * 0.35;      // 한글 글리프의 눈높이 중심
-      pg.drawText(ln, { x: tx, y: PH - base, size: size, font: f, color: color });
+      pg.drawText(ln, { x: tx, y: this.ph - base, size: size, font: f, color: color });
     }
   };
 
@@ -247,14 +250,14 @@
     var tw = f.widthOfTextAtSize(s, size);
     var tx = o.align === 'right' ? x - tw : o.align === 'center' ? x - tw / 2 : x;
     this.page.drawText(s, {
-      x: tx, y: PH - (yTop + size * 0.85), size: size, font: f,
+      x: tx, y: this.ph - (yTop + size * 0.85), size: size, font: f,
       color: o.color != null ? this.gray(o.color) : this.black
     });
     return tw;
   };
   Ctx.prototype.rule = function (yTop, thick, gray) {
     this.page.drawLine({
-      start: { x: MX, y: PH - yTop }, end: { x: MX + CW, y: PH - yTop },
+      start: { x: MX, y: this.ph - yTop }, end: { x: this.pw - MX, y: this.ph - yTop },
       thickness: thick || 0.6, color: gray != null ? this.gray(gray) : this.black
     });
   };
@@ -267,7 +270,7 @@
     o = o || {};
     var self = this, lays = cells.map(function (c) { return c.slash ? null : self.layout(c, c.w); });
     var h = Math.max(o.minH || 0, lays.reduce(function (m, l) { return l ? Math.max(m, l.h) : m; }, 0));
-    if (this.y + h > LIMIT + 0.01) {
+    if (this.y + h > this.limit + 0.01) {
       if (o.onBreak) o.onBreak(); else this.newPage();
     }
     var x = o.x == null ? MX : o.x;
@@ -387,20 +390,20 @@
         var mw = boxW - 2 * MM, mh = sgH - (v.date ? 4.2 * MM : 1.6 * MM);
         var k = Math.min(mw / sgi.width, mh / sgi.height), iw = sgi.width * k, ih = sgi.height * k;
         var iy0 = top + hdH + 0.8 * MM + (mh - ih) / 2;
-        c.page.drawImage(sgi, { x: bx + (boxW - iw) / 2, y: PH - iy0 - ih, width: iw, height: ih });
+        c.page.drawImage(sgi, { x: bx + (boxW - iw) / 2, y: c.ph - iy0 - ih, width: iw, height: ih });
         if (v.date) {
           var ds0 = c.clean(v.date), dw0 = c.fR.widthOfTextAtSize(ds0, 6.5);
-          c.page.drawText(ds0, { x: bx + (boxW - dw0) / 2, y: PH - (top + hdH + sgH - 1.3 * MM), size: 6.5, font: c.fR, color: c.gray(0.33) });
+          c.page.drawText(ds0, { x: bx + (boxW - dw0) / 2, y: c.ph - (top + hdH + sgH - 1.3 * MM), size: 6.5, font: c.fR, color: c.gray(0.33) });
         }
       } else if (v.name) {
         var lay = c.layout({ t: v.name, size: 8.5, padX: 0.8 * MM }, boxW);
         var f = c.fR, nm = lay.lines[0], tw = f.widthOfTextAtSize(nm, lay.size);
         var mid = top + hdH + sgH / 2;
         var by = v.date ? mid - 0.6 : mid + lay.size * 0.35;
-        c.page.drawText(nm, { x: bx + (boxW - tw) / 2, y: PH - by, size: lay.size, font: f, color: c.black });
+        c.page.drawText(nm, { x: bx + (boxW - tw) / 2, y: c.ph - by, size: lay.size, font: f, color: c.black });
         if (v.date) {
           var ds = c.clean(v.date), dw = f.widthOfTextAtSize(ds, 6.5);
-          c.page.drawText(ds, { x: bx + (boxW - dw) / 2, y: PH - (mid + 9), size: 6.5, font: f, color: c.gray(0.33) });
+          c.page.drawText(ds, { x: bx + (boxW - dw) / 2, y: c.ph - (mid + 9), size: 6.5, font: f, color: c.gray(0.33) });
         }
       }
     });
@@ -491,7 +494,7 @@
     var s = v.summary || {};
     var line1 = [
       v.ranAt ? '검증 시각 ' + v.ranAt : '',
-      v.ai ? 'AI 사진 판독 ' + n0(s.read || 0) + ' / ' + n0(s.receipts || 0) + '장' : 'AI 사진 판독 없음(규칙 검증만)'
+      v.ai ? 'AI 사진 판독 ' + n0(s.read || 0) + ' / ' + n0(s.receipts || 0) + '장' : (v.noAiText || 'AI 사진 판독 없음(규칙 검증만)')
     ].filter(Boolean).join('   ·   ');
     c.text(line1, MX, c.y, { size: 8.5, color: 0.2, maxW: CW });
     c.y += 8.5 * LH + 2.5 * MM;
@@ -529,12 +532,13 @@
       c.y += 3 * MM;
     }
     if (c.y + 12 * MM > LIMIT) head(true);
-    c.text('· 금액 계산은 정해진 규칙으로만 합니다. AI 는 사진을 읽어 입력값과 다른 곳을 표시할 뿐, 값을 바꾸지 않습니다.',
-      MX, c.y, { size: 7.6, color: 0.3, maxW: CW });
-    c.y += 7.6 * LH + 0.8 * MM;
-    c.text('· 불일치·확인 항목이 있어도 상신할 수 있습니다. 결재자는 이 표를 보고 판단합니다.',
-      MX, c.y, { size: 7.6, color: 0.3, maxW: CW });
-    c.y += 7.6 * LH;
+    // 맺음 문구 — 문서마다 다르면 v.notes 로 받는다(법인카드: AI 없음, 빈칸만 막음 — 2026-10-09). 없으면 예전 두 줄.
+    var notes = v.notes || ['· 금액 계산은 정해진 규칙으로만 합니다. AI 는 사진을 읽어 입력값과 다른 곳을 표시할 뿐, 값을 바꾸지 않습니다.',
+      '· 불일치·확인 항목이 있어도 상신할 수 있습니다. 결재자는 이 표를 보고 판단합니다.'];
+    notes.forEach(function (t, k) {
+      c.text(t, MX, c.y, { size: 7.6, color: 0.3, maxW: CW });
+      c.y += 7.6 * LH + (k < notes.length - 1 ? 0.8 * MM : 0);
+    });
   }
 
   // ─────────────────────────── 영수증 ───────────────────────────
@@ -691,23 +695,26 @@
     var mk = MARKS[meta.mark] || (meta.draft ? MARKS.preview : null);
     pages.forEach(function (pg, i) {
       c.page = pg;
-      var fy = PH - 10.5 * MM;
-      pg.drawLine({ start: { x: MX, y: PH - fy }, end: { x: MX + CW, y: PH - fy }, thickness: 0.3, color: c.gray(0.6) });
+      // 쪽마다 크기가 다를 수 있다(법인카드 = 가로 + 검증 쪽은 세로, 2026-10-09). 세로 쪽은 예전과 같은 값이 나온다.
+      var sz = pg.getSize(), pw = sz.width, ph = sz.height, cw = pw - 2 * MX;
+      c.geo(pw, ph, ph - MB);
+      var fy = ph - 10.5 * MM;
+      pg.drawLine({ start: { x: MX, y: ph - fy }, end: { x: MX + cw, y: ph - fy }, thickness: 0.3, color: c.gray(0.6) });
       var ty = fy + 1.2 * MM;
-      c.text([meta.name, meta.cycleName].filter(Boolean).join(' · '), MX, ty, { size: 8, color: 0.3, maxW: CW * 0.3 });
-      c.text(meta.docNo || '', MX + CW / 2, ty, { size: 8, color: 0.3, align: 'center', maxW: CW * 0.5 });
-      c.text((i + 1) + ' / ' + n, MX + CW, ty, { size: 8, color: 0.3, align: 'right' });
+      c.text([meta.name, meta.cycleName].filter(Boolean).join(' · '), MX, ty, { size: 8, color: 0.3, maxW: cw * 0.3 });
+      c.text(meta.docNo || '', MX + cw / 2, ty, { size: 8, color: 0.3, align: 'center', maxW: cw * 0.5 });
+      c.text((i + 1) + ' / ' + n, MX + cw, ty, { size: 8, color: 0.3, align: 'right' });
       if (mk) {
         var s = mk[0], size = Array.from(s).length >= 4 ? 104 : 120, f = c.fB;
         var tw = f.widthOfTextAtSize(s, size), th = size * 0.72, a = 32 * Math.PI / 180;
-        var cx = PW / 2, cy = PH / 2;
+        var cx = pw / 2, cy = ph / 2;
         // 0.07 은 영수증 사진 위에서 거의 안 보였다 — 사진 쪽에서도 읽히게 조금 진하게.
         pg.drawText(s, {
           x: cx - (tw / 2 * Math.cos(a) - th / 2 * Math.sin(a)),
           y: cy - (tw / 2 * Math.sin(a) + th / 2 * Math.cos(a)),
           size: size, font: f, color: c.gray(0), opacity: 0.12, rotate: deg(32)
         });
-        c.text(mk[1], MX + CW / 2, 4.2 * MM, { size: 7.5, align: 'center', color: 0.3 });
+        c.text(mk[1], MX + cw / 2, 4.2 * MM, { size: 7.5, align: 'center', color: 0.3 });
       }
     });
     return n;
@@ -1040,9 +1047,131 @@
     });
   }
 
+  // ─────────────────────────── 법인카드 지출결의서 (2026-10-09, 가로 A4) ───────────────────────────
+  /* 양식(docs/card/법인카드 지출결의서_양식.xlsx)과 같은 짜임:
+       제목 「지 출 결 의 서」(굵게, 밑줄 두 줄) · 오른쪽 위 결재란 5칸(운행일지·개인경비와 같은 drawBoxes)
+       왼쪽 파란 띠 「신용카드 전표 정보」(순번~사용자) + 오른쪽 파란 띠(구분~비고)
+       노란 머리글(굵게): 순번 · 카드번호 · 승인일 · 승인번호 · 가맹점명 · 승인금액 · 사용자 · 구분 · 사용목적 · 비고(사용목적 칸 글자는 굵게)
+       합계 줄(순번~가맹점명을 합쳐 「합계」, 승인금액 합). 표 바깥은 굵은 선.
+     쪽이 넘치면 「(계속)」 줄 + 띠 + 머리글을 되풀이하고, 마지막 줄 없이 합계만 다음 쪽에 가지 않게 마지막 줄을 데리고 넘어간다.
+     doc = { meta, person:{dept,name}, periodLabel, boxes, verify,
+             items:[{ no, card_no, date, appr_no, merchant, amount, user, category, purpose, note }] }   ← 이미 승인일 순 */
+  var CPW = 841.89, CPH = 595.28, CMX = 30, CMB = MB;
+  var CCW = CPW - 2 * CMX, CLIMIT = CPH - CMB;
+  var CCOLS_W = [5.13, 24, 11.88, 10.13, 27, 10.88, 10.13, 8.38, 57, 28.63];   // 양식 열 폭(엑셀 B~K)
+  var CCOLS = (function () { var s = CCOLS_W.reduce(function (a, b) { return a + b; }, 0); return CCOLS_W.map(function (w) { return w / s * CCW; }); })();
+  var CHEAD = ['순번', '카드번호', '승인일', '승인번호', '가맹점명', '승인금액', '사용자', '구분', '사용목적', '비고'];
+  function drawCard(c, d) {
+    var items = d.items || [], p = d.person || {};
+    var total = items.reduce(function (s, it) { return s + Math.round(Number(it.amount) || 0); }, 0);
+    var X0 = CMX, rowH = 22, bandH = 20, headH = 24, FS = 8.6;
+    var sum = function (a, b) { var s = 0; for (var i = a; i <= b; i++) s += CCOLS[i]; return s; };
+    c.geo(CPW, CPH, CLIMIT);
+    c.newPage();
+    c.bw = 0.6;
+    // ── 결재란(오른쪽 위) ──
+    var bg = { labW: 16, boxW: 50, hdH: 16, sgH: 48, fill: null, size: 8.5, hpadX: 0.4 * MM, label: ['결', '', '재'] };
+    var bw5 = bg.labW + 5 * bg.boxW, bx = X0 + CCW - bw5, btop = 20;
+    drawBoxes(c, bx, btop, d.boxes, bg);
+    c.page.drawRectangle({ x: bx, y: c.ph - btop - bg.hdH - bg.sgH, width: bw5, height: bg.hdH + bg.sgH, borderColor: c.black, borderWidth: 1.2 });
+    // ── 제목 — 굵게, 밑줄 두 줄. 결재란에 닿으면 왼쪽으로 민다 ──
+    var TS = 24, title = '지 출 결 의 서', tw = c.w(title, TS, true);
+    var tcx = Math.min(X0 + CCW / 2, bx - 8 * MM - tw / 2), tTop = btop + 12;
+    c.text(title, tcx, tTop, { size: TS, bold: true, align: 'center' });
+    [tTop + TS * 1.12, tTop + TS * 1.12 + 2.6].forEach(function (uy) {
+      c.page.drawLine({ start: { x: tcx - tw / 2 - 4, y: c.ph - uy }, end: { x: tcx + tw / 2 + 4, y: c.ph - uy }, thickness: 0.9, color: c.black });
+    });
+    // ── 기간 · 소속 이름(양식에는 없는 줄 — 어느 기간 누구의 문서인지) ──
+    var lineTop = btop + bg.hdH + bg.sgH + 7;
+    c.text([d.periodLabel, [p.dept, p.name].filter(Boolean).join(' ')].filter(Boolean).join(' · '), X0, lineTop, { size: 8, color: 0.25, maxW: CCW });
+    c.y = lineTop + 8 * LH + 3;
+    var pageTop = c.y;
+    var band = function () {
+      c.row([{ w: sum(0, 6), t: '신용카드 전표 정보', size: 9.5, bold: true, align: 'center', fill: XBLUE },
+        { w: sum(7, 9), t: '', fill: XBLUE }], { x: X0, minH: bandH });
+      c.row(CHEAD.map(function (h, i) { return { w: CCOLS[i], t: h, size: 9.5, bold: true, align: 'center', fill: XYELLOW }; }), { x: X0, minH: headH });
+    };
+    var closeBox = function () {
+      c.page.drawRectangle({ x: X0, y: c.ph - c.y, width: CCW, height: c.y - pageTop, borderColor: c.black, borderWidth: 1.2 });
+    };
+    var brk = function () {
+      closeBox();
+      c.newPage();
+      c.text('지출결의서 (계속)  ·  ' + [p.name, d.periodLabel].filter(Boolean).join('  ·  '), X0, c.y, { size: 7.6, color: 0.3, maxW: CCW });
+      c.y += 7.6 * LH + 1.2 * MM;
+      pageTop = c.y;
+      band();
+    };
+    var cells = function (it) {
+      if (!it) return CCOLS.map(function (w) { return { w: w, t: '' }; });
+      return [
+        { w: CCOLS[0], t: String(it.no == null ? '' : it.no), size: FS, align: 'center' },
+        { w: CCOLS[1], t: it.card_no || '', size: FS, align: 'center', padX: 0.8 * MM },
+        { w: CCOLS[2], t: it.date || '', size: FS, align: 'center', padX: 0.6 * MM },
+        { w: CCOLS[3], t: it.appr_no || '', size: FS, align: 'center', padX: 0.6 * MM },
+        { w: CCOLS[4], t: it.merchant || '', size: FS, align: 'center', wrap: true, maxLines: 2 },
+        { w: CCOLS[5], t: n0(it.amount), size: FS, align: 'right', padX: 1.6 * MM },
+        { w: CCOLS[6], t: it.user || '', size: FS, align: 'center', padX: 0.6 * MM },
+        { w: CCOLS[7], t: it.category || '', size: FS, align: 'center', padX: 0.6 * MM },
+        { w: CCOLS[8], t: it.purpose || '', size: FS, bold: true, align: 'center', wrap: true, maxLines: 3 },
+        { w: CCOLS[9], t: it.note || '', size: FS, align: 'center', wrap: true, maxLines: 2 }
+      ];
+    };
+    band();
+    var rows = items.length ? items : [null];
+    rows.forEach(function (it, k) {
+      var cs = cells(it);
+      // 마지막 줄은 합계와 같은 쪽에 — 합계만 다음 쪽에 덩그러니 남지 않게 데리고 넘어간다.
+      if (k === rows.length - 1 && c.y + c.rowHeight(cs, rowH) + rowH > c.limit + 0.01) brk();
+      c.row(cs, { x: X0, onBreak: brk, minH: rowH });
+    });
+    if (c.y + rowH > c.limit + 0.01) brk();
+    c.row([{ w: sum(0, 4), t: '합계', size: 9.5, bold: true, align: 'center' },
+      { w: CCOLS[5], t: n0(total), size: 9, bold: true, align: 'right', padX: 1.6 * MM },
+      { w: CCOLS[6], t: '' }, { w: CCOLS[7], t: '' }, { w: CCOLS[8], t: '' }, { w: CCOLS[9], t: '' }], { x: X0, minH: rowH });
+    closeBox();
+    c.bw = null;
+    return { all: total, n: items.length };
+  }
+  /** 법인카드 지출결의서 PDF 한 권. deps 는 build 와 같다(loadImage 없음 — 사진이 없다).
+   *  totals[0] = { all: 표 합계, n: 줄 수, pages: 지출결의서가 차지한 쪽 수 }. 검증 쪽(doc.verify)은 세로로 뒤에 붙인다. */
+  function buildCard(doc, deps) {
+    var lib = deps.PDFLib, c, meta = doc.meta || {};
+    return lib.PDFDocument.create().then(function (pdf) {
+      pdf.registerFontkit(deps.fontkit);
+      pdf.setTitle('지출결의서(법인카드) ' + (meta.name || '') + ' ' + (meta.cycleName || ''));
+      pdf.setAuthor('ATEC Driving');
+      pdf.setProducer('ATEC Driving sheetpdf');
+      return Promise.all([   // ★ subset:false — build() 와 같은 까닭(한글 합성 글리프)
+        pdf.embedFont(deps.fontRegular, { subset: false }),
+        pdf.embedFont(deps.fontBold, { subset: false })
+      ]).then(function (f) { c = new Ctx(pdf, lib, f[0], f[1], doc); return pdf; });
+    }).then(function (pdf) {
+      c.signs = {};
+      var urls = [];
+      Object.keys(doc.boxes || {}).forEach(function (k) { var v = doc.boxes[k]; if (v && v.sign && urls.indexOf(v.sign) < 0) urls.push(v.sign); });
+      return Promise.all(urls.map(function (u) {
+        var m = /^data:image\/png;base64,(.+)$/.exec(u);
+        if (!m) return null;
+        var bin = atob(m[1]), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return pdf.embedPng(bytes).then(function (img) { c.signs[u] = img; }, function () { c.issue('image', '서명 그림을 넣지 못함'); });
+      })).then(function () { return pdf; });
+    }).then(function (pdf) {
+      var t = drawCard(c, doc);
+      t.pages = pdf.getPageCount();
+      if (doc.verify) { c.geo(PW, PH, LIMIT); drawVerify(c, doc.verify, meta); }
+      var n = finishPages(c, meta);
+      return pdf.save().then(function (bytes) {
+        return { bytes: bytes, pages: n, issues: c.issues, stats: c.stats, totals: [t] };
+      });
+    });
+  }
+
   return {
     build: build, basePay: basePay, sheetTotals: sheetTotals, exifOrientation: exifOrientation,
     buildExpense: buildExpense, expenseGroups: expenseGroups, EXPENSE_CATS: X_CATS,
-    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.3.0'
+    buildCard: buildCard, CARD_COLS_W: CCOLS_W,
+    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.4.0'
   };
 });

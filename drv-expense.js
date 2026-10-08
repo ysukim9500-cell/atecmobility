@@ -1767,7 +1767,7 @@
   // 칸을 고칠 때 식비 초과 표시를 바로 바꾸려고 줄을 다시 그리지는 않는다(커서가 튄다) — 올리기 전 검사에서 다시 본다.
 
   var S0 = {
-    tag: '개인경비',
+    tag: '개인경비', mode: 'x',
     rows: function () { return XAPPR || []; },
     mine: function (cyc) { return myX(cyc); },
     reload: function () { var S = C.state(); dropItems(S.CYCKEY); return Promise.all([loadAppr(), loadItems(S.CYCKEY, false, true)]); },
@@ -1796,7 +1796,7 @@
     orgbar: ADMIN_X,
     orgUsers: orgUsers,
     kinds: { expense: S0 },
-    period: { views: XVIEWS, current: xCurrent, span: xSpan, band: band, tag: tag },
+    period: { mode: 'x', views: XVIEWS, current: xCurrent, span: xSpan, band: band, tag: tag },
     load: loadWith,
     onGo: function (v, prev) {
       if (v === 'x_verify') FRESH = {};

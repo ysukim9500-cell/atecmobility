@@ -234,17 +234,33 @@
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
   var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [], onGo: [],
-    // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(period)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
-    kinds: {}, period: null, load: [], orgUsers: null };
-  /** 지금 화면이 다른 기간 규칙(개인경비 20~19일)을 쓰는가 — 그 규칙, 아니면 null. */
-  function pv() { return EXT.period && EXT.period.views.indexOf(VIEW) >= 0 ? EXT.period : null; }
-  /** 지금 화면 기준 '이번 주기'. 개인경비 화면은 20일에 넘어간다. */
+    // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
+    // 2026-10-09 법인카드 — 기간 규칙이 둘이 되어 목록으로(개인경비 20~19일 'x' · 법인카드 1일~말일 'c'). 규칙마다 mode.
+    kinds: {}, periods: [], load: [], orgUsers: null };
+  /** 그 화면의 기간 규칙(확장 모듈) — 없으면 null(운행일지 21~20일). */
+  function periodOf(v) {
+    for (var i = 0; i < EXT.periods.length; i++) if (EXT.periods[i].views.indexOf(v) >= 0) return EXT.periods[i];
+    return null;
+  }
+  /** 갈래('x'·'c')의 기간 규칙 — 운행일지 갈래('d')나 모르는 갈래는 null. */
+  function periodOfMode(m) {
+    for (var i = 0; i < EXT.periods.length; i++) if (EXT.periods[i].mode === m) return EXT.periods[i];
+    return null;
+  }
+  /** 지금 화면이 다른 기간 규칙을 쓰는가 — 그 규칙, 아니면 null. */
+  function pv() { return periodOf(VIEW); }
+  /** 지금 화면 기준 '이번 주기'. 개인경비 화면은 20일에, 법인카드 화면은 1일에 넘어간다. */
   function curCyc(view) {
-    var p = EXT.period && EXT.period.views.indexOf(view || VIEW) >= 0 ? EXT.period : null;
+    var p = periodOf(view || VIEW);
     return p ? p.current() : currentCycle();
   }
-  /** 그 화면이 다른 기간 규칙(개인경비 20~19일)을 쓰는가(2026-10-08). */
-  function usesXPeriod(v) { return !!(EXT.period && EXT.period.views.indexOf(v) >= 0); }
+  /** 그 화면이 다른 기간 규칙(개인경비·법인카드)을 쓰는가(2026-10-08). */
+  function usesXPeriod(v) { return !!periodOf(v); }
+  /** v 로 옮겨 갈 때 지금과 같은 기간 규칙인가 — 함께 쓰는 화면(결재함 등)에 있으면 지금 갈래의 규칙으로 본다(2026-10-09). */
+  function samePeriod(v) {
+    var from = SHARED_VIEWS.indexOf(VIEW) >= 0 ? periodOfMode(NAV_MODE) : periodOf(VIEW);
+    return from === periodOf(v);
+  }
   /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
   function notifyGo(v, prev) { EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } }); }
   var LOADED = false, LOADING = false, AUDIT = null;
@@ -495,7 +511,7 @@
       '</select><span class="dim">까지</span><button class="btn sm pri" id="cpGo">보기</button></div>' +
       // 개인경비 화면에는 「통행료 채우기」가 없다 — 그 갈래에서는 그 말을 빼고 안내한다(2026-10-08).
       '<div class="cp-note">여러 기간을 볼 때는 조회만 됩니다. ' +
-      (P1 || NAV_MODE === 'x' ? '상신·결재 문서·영수증 올리기는 한 기간을 골라서 합니다. '
+      (P1 || NAV_MODE !== 'd' ? '상신·결재 문서·영수증 올리기는 한 기간을 골라서 합니다. '
         : '상신·결재 문서·통행료 채우기·영수증 올리기는 한 기간을 골라서 합니다. ') +
       '<span class="kbdhint"><span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 기간으로 넘깁니다.</span></div>';
     $('cycPop').innerHTML = h;
@@ -2685,7 +2701,8 @@
       h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(warn.join(' · ')) + '</span></div>';
     }
     h += '<div class="anote">상신하면 <b>지금 자료가 그대로 저장</b>되고, 결재자는 그 자료를 봅니다. ' +
-      (KD ? '상신 뒤에는 이 기간의 경비를 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. '
+      // 종류마다 무엇이 잠기는지(lockNoun, 조사까지) — 없으면 예전 그대로 「경비를」(개인경비 글자 그대로). 법인카드 「카드 내역을」.
+      (KD ? '상신 뒤에는 이 기간의 ' + esc(KD.lockNoun || '경비를') + ' <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. '
         : '상신 뒤에는 이 기간의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ') +
       '상신을 누르면 먼저 검증을 돌리고, 맞지 않는 곳이 있으면 올리기 전에 한 번 보여 드립니다.</div>';
 
@@ -2751,7 +2768,7 @@
     var body = '';
     if (act === 'withdraw') {
       body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>' +
-        (kd ? '이 기간의 경비를 다시 고칠 수 있게' : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
+        (kd ? (kd.withdrawText || '이 기간의 경비를 다시 고칠 수 있게') : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
         '고친 뒤 다시 상신하면 그때의 자료로 새로 고정됩니다.</div>' + apprTrack(a);
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
@@ -2808,16 +2825,16 @@
     });
 
     var nTurn = mine.length + SP.ndMine.length;
-    var h = head(SP.split ? (SP.mode === 'x' ? '개인경비 결재함' : '운행일지 결재함') : '결재함',
+    var h = head(SP.split ? MODE_NAME[SP.mode] + ' 결재함' : '결재함',
       nTurn ? '내 차례 ' + nTurn + '건' : '내 차례인 건이 없습니다');
-    // 다른 갈래로 가는 한 줄 — 그쪽에 내 차례가 있으면 건수를, 없으면 문서가 있다는 것만.
-    if (SP.otherTurn || SP.otherAny) {
-      var oName = SP.mode === 'x' ? '운행일지' : '개인경비';
-      h += '<button type="button" class="ibswitch' + (SP.otherTurn ? ' hot' : '') + '" data-inboxmode="' + (SP.mode === 'x' ? 'd' : 'x') + '">' +
-        ic(SP.mode === 'x' ? 'car' : 'won', 15) + '<span>' + (SP.otherTurn
-          ? oName + ' 결재 <b>' + n0(SP.otherTurn) + '건</b>은 ' + oName + ' 결재함에서'
+    // 다른 갈래로 가는 줄 — 갈래마다 한 줄(2026-10-09 세 갈래). 그쪽에 내 차례가 있으면 건수를, 없으면 문서가 있다는 것만.
+    SP.other.forEach(function (o) {
+      var oName = MODE_NAME[o.mode];
+      h += '<button type="button" class="ibswitch' + (o.turn ? ' hot' : '') + '" data-inboxmode="' + o.mode + '">' +
+        ic(MODE_ICO[o.mode], 15) + '<span>' + (o.turn
+          ? oName + ' 결재 <b>' + n0(o.turn) + '건</b>은 ' + oName + ' 결재함에서'
           : oName + ' 결재 문서는 ' + oName + ' 결재함에서') + '</span>' + ic('chev', 14) + '</button>';
-    }
+    });
     if (mine.length) {
       h += sect('내 차례', mine.length + '건', '', '<div class="panel">' + mine.map(apprCard).join('') + '</div>');
     } else if (!SP.ndMine.length) {
@@ -2851,11 +2868,13 @@
     }
     return h;
   }
-  /* ── 결재함 갈래 나누기(2026-10-08) ──
-     'd' 운행일지 갈래 = 운행일지 결재 건(종류 없음), 'x' 개인경비 갈래 = 확장 종류(개인경비) 결재 건.
-     확장 모듈이 없으면(개인경비 미탑재) 나누지 않는다. */
-  function inboxMode() { return noDriving() ? 'x' : navModeOf(VIEW); }
-  function inMode(a, mode) { return mode === 'x' ? !!kindOf(a) : !kindOf(a); }
+  /* ── 결재함 갈래 나누기(2026-10-08 · 2026-10-09 세 갈래) ──
+     'd' 운행일지 = 운행일지 결재 건(종류 없음) · 확장 종류는 그 모듈이 정한 갈래(개인경비 'x' · 법인카드 'c').
+     확장 모듈이 없으면 나누지 않는다. 운전 안 하는 사람은 'd' 갈래가 없다(운행일지 건은 아래 따로 모은다). */
+  var MODE_NAME = { d: '운행일지', x: '개인경비', c: '법인카드' }, MODE_ICO = { d: 'car', x: 'won', c: 'card' };
+  function modeOfAppr(a) { var kd = kindDef(kindOf(a)); return kd ? (kd.mode || 'x') : 'd'; }
+  function inboxMode() { var m = navModeOf(VIEW); return noDriving() && m === 'd' ? 'x' : m; }
+  function inMode(a, mode) { return modeOfAppr(a) === mode; }
   function involvesMe(a) {
     var me = myName();
     return a.username === me || (a.steps || []).some(function (s) { return s && s.approver === me; });
@@ -2864,16 +2883,19 @@
   function inboxSplit() {
     var all = inbox(), split = Object.keys(EXT.kinds).length > 0, mode = split ? inboxMode() : 'd', nd = split && noDriving();
     var rel = allAppr().filter(function (a) { return all.indexOf(a) < 0 && involvesMe(a); });
-    if (!split) return { split: false, mode: mode, mine: all, others: rel, ndMine: [], ndOthers: [], otherTurn: 0, otherAny: 0 };
-    var om = mode === 'x' ? 'd' : 'x';
+    if (!split) return { split: false, mode: mode, mine: all, others: rel, ndMine: [], ndOthers: [], other: [] };
+    var modes = ['d'];
+    Object.keys(EXT.kinds).forEach(function (k) { var m = EXT.kinds[k].mode || 'x'; if (modes.indexOf(m) < 0) modes.push(m); });
     return {
       split: true, mode: mode,
       mine: all.filter(function (a) { return inMode(a, mode); }),
       others: rel.filter(function (a) { return inMode(a, mode); }),
       ndMine: nd ? all.filter(function (a) { return inMode(a, 'd'); }) : [],
       ndOthers: nd ? rel.filter(function (a) { return inMode(a, 'd'); }) : [],
-      otherTurn: nd ? 0 : all.filter(function (a) { return inMode(a, om); }).length,
-      otherAny: nd ? 0 : rel.filter(function (a) { return inMode(a, om); }).length
+      // 다른 갈래(운전 안 하는 사람은 운행일지 갈래를 빼고 — 그 건은 ndMine·ndOthers 로 이 화면에 있다). 건이 있는 갈래만.
+      other: modes.filter(function (m) { return m !== mode && !(nd && m === 'd'); }).map(function (m) {
+        return { mode: m, turn: all.filter(function (a) { return inMode(a, m); }).length, any: rel.filter(function (a) { return inMode(a, m); }).length };
+      }).filter(function (o) { return o.turn || o.any; })
     };
   }
   /** 메뉴 결재함 숫자 — 지금 갈래에서 내가 처리할 것만(운전 안 하는 사람은 아래 운행일지 칸까지). */
@@ -2948,7 +2970,7 @@
   }
   function noteDoc(a) {
     var kd = kindDef(kindOf(a)), p = String(a.cycle || '').split('-');
-    return { sys: kd ? 'x' : 'd', tag: kd ? kd.tag : '운행일지', month: p.length === 2 ? (+p[1]) + '월분' : String(a.cycle || '') };
+    return { sys: kd ? (kd.mode || 'x') : 'd', tag: kd ? kd.tag : '운행일지', month: p.length === 2 ? (+p[1]) + '월분' : String(a.cycle || '') };
   }
   function noteWho(s) { return (s.box ? s.box + ' ' : '') + (s.name || nameOf(s.approver)) + ' 님'; }
   /** 알림 목록(최근 순). 키는 사건마다 고유하다 — 다시 상신하면 단계 시각이 바뀌어 새 알림이 된다. */
@@ -3026,7 +3048,7 @@
             var u = noteUnread(e);
             return '<button type="button" class="ni' + (u ? ' un' : '') + (e.turn ? ' turn' : '') + '" data-note="' + esc(e.k) + '">' +
               '<span class="nd" aria-hidden="true"></span>' +
-              '<span class="nb"><span class="nt"><span class="akind' + (e.sys === 'x' ? ' x' : '') + '">' + esc(e.tag) + '</span>' +
+              '<span class="nb"><span class="nt"><span class="akind' + (e.sys !== 'd' ? ' ' + e.sys : '') + '">' + esc(e.tag) + '</span>' +
                 '<span class="ndoc">' + esc(e.doc) + '</span><time>' + noteTime(e.ms) + '</time></span>' +
               '<span class="nx">' + esc(e.txt) + (u ? '<span class="sr"> (안 읽음)</span>' : '') + '</span>' +
               (e.why ? '<span class="nw">' + esc(e.why) + '</span>' : '') + '</span></button>';
@@ -3061,7 +3083,7 @@
     if (NOTE.ids.indexOf(k) < 0) NOTE.ids.push(k);
     notePersist();
     openNotePop(false);
-    if (!noDriving()) NAV_MODE = e.sys;
+    if (!noDriving() || e.sys !== 'd') NAV_MODE = e.sys;          // 운전 안 하는 사람도 개인경비·법인카드 갈래는 오간다
     INBOX_F = 'all';
     NOTE.focus = (e.kind || 'd') + ':' + e.id;
     if (VIEW === 'inbox') render(); else go('inbox');
@@ -3095,7 +3117,7 @@
     var kd = kindDef(kindOf(a)), anyKind = Object.keys(EXT.kinds).length > 0;
     var kattr = kd ? ' data-kind="' + esc(kindOf(a)) + '"' : '';
     return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc((kindOf(a) || 'd') + ':' + a.id) + '">' +
-      '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' x' : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
+      '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' ' + (kd.mode || 'x') : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
       // 개인경비는 기간이 20일~19일이라 달 이름만으로는 헷갈린다 — 범위를 같이 적는다(kd.cycLabel).
@@ -6593,39 +6615,52 @@
     return ME.uses_driving === false || !!(u && u.uses_driving === false);
   }
   // 운전 안 하는 사람이 들어갈 수 있는 화면 — 결재함 · 내 계정 · 개인경비(2026-10-07)
-  var NODRV_VIEWS = ['inbox', 'account', 'x_month', 'x_verify'];
+  var NODRV_VIEWS = ['inbox', 'account', 'x_month', 'x_verify', 'c_month', 'c_verify'];   // 법인카드도 모든 직원(2026-10-09)
   /** 운전 안 하는 사람의 첫 화면 — 결재할 것이 있으면 결재함, 아니면 개인경비. */
   function ndLanding() {
     if (inbox().length) return 'inbox';
     return VIEWS.x_month ? 'x_month' : 'inbox';
   }
-  // 메뉴 갈래(2026-10-08): 'd' 운행일지 · 'x' 개인경비. 함께 쓰는 화면에서는 앞 갈래를 그대로 둔다.
-  var NAV_MODE = (function () { try { return sessionStorage.getItem('drv_navmode') === 'x' ? 'x' : 'd'; } catch (e) { return 'd'; } })();
+  // 메뉴 갈래(2026-10-08): 'd' 운행일지 · 'x' 개인경비 · 'c' 법인카드(2026-10-09). 함께 쓰는 화면에서는 앞 갈래를 그대로 둔다.
+  var NAV_MODE = (function () { try { var v = sessionStorage.getItem('drv_navmode'); return v === 'x' || v === 'c' ? v : 'd'; } catch (e) { return 'd'; } })();
   var SHARED_VIEWS = ['inbox', 'account', 'org', 'perm'];   // 직원 현황은 갈래마다 따로(people / xa_people, 2026-10-08)
+  /** 갈래마다 머리 이름·아이콘·첫 화면·기간 이름표(2026-10-09). */
+  var MODE_SYS = {
+    d: { name: '운행일지', ico: '#i-car', home: 'close', homeLabel: '마감 현황으로', cyc: '마감 기간' },
+    x: { name: '개인경비 지출결의', ico: '#i-won', home: 'x_month', homeLabel: '개인경비 지출결의 첫 화면으로', cyc: '경비 기간' },
+    c: { name: '법인카드 지출결의', ico: '#i-card', home: 'c_month', homeLabel: '법인카드 지출결의 첫 화면으로', cyc: '카드 기간' }
+  };
+  /** 그 갈래의 모듈이 실려 있는가 — 첫 화면이 있어야 한다(drv-card.js 가 없으면 'c' 는 없다. 운행일지 'd' 는 늘 있다). */
+  function modeOk(m) { return m === 'd' || !!(MODE_SYS[m] && VIEWS[MODE_SYS[m].home]); }
   function navModeOf(v) {
     if (/^xa?_/.test(v)) return 'x';
-    if (SHARED_VIEWS.indexOf(v) >= 0) return NAV_MODE;
+    if (/^ca?_/.test(v)) return 'c';                 // 법인카드(2026-10-09) — c_month·ca_close …('cars' 는 밑줄이 없어 걸리지 않는다)
+    // 함께 쓰는 화면은 앞 갈래 그대로 — 단 그 갈래 모듈이 없으면(세션에 남은 'c' 인데 drv-card.js 가 안 실림) 운행일지로.
+    if (SHARED_VIEWS.indexOf(v) >= 0) return modeOk(NAV_MODE) ? NAV_MODE : 'd';
     return 'd';
   }
   function paintNavMode() {
-    NAV_MODE = noDriving() ? 'x' : navModeOf(VIEW);
+    var m0 = navModeOf(VIEW);
+    NAV_MODE = noDriving() && m0 === 'd' ? 'x' : m0;   // 운전 안 하는 사람은 운행일지 갈래가 없다
     try { sessionStorage.setItem('drv_navmode', NAV_MODE); } catch (e) { }
-    document.body.classList.toggle('mode-x', NAV_MODE === 'x');
-    document.body.classList.toggle('mode-d', NAV_MODE === 'd');
+    ['d', 'x', 'c'].forEach(function (m) { document.body.classList.toggle('mode-' + m, NAV_MODE === m); });
+    // 법인카드 모듈(drv-card.js)이 없으면 그 메뉴는 숨긴다(누를 곳이 없는 메뉴를 남기지 않게).
+    document.body.classList.toggle('no-c', !modeOk('c'));
+    var M = MODE_SYS[NAV_MODE] || MODE_SYS.d;
     var nm = $('navSysName'), ni = $('navSysIco');
-    if (nm) nm.textContent = NAV_MODE === 'x' ? '개인경비 지출결의' : '운행일지';
-    if (ni) ni.setAttribute('href', NAV_MODE === 'x' ? '#i-won' : '#i-car');
+    if (nm) nm.textContent = M.name;
+    if (ni) ni.setAttribute('href', M.ico);
     // 머리띠 로고 — 지금 갈래의 첫 화면으로(2026-10-08). 개인경비 갈래에서 누르면 운행일지 마감 현황으로 튀지 않게.
     var lg = $('appLogo');
     if (lg) {
-      var lx = NAV_MODE === 'x' && VIEWS.x_month;
-      lg.setAttribute('data-v', lx ? 'x_month' : 'close');
-      lg.setAttribute('aria-label', lx ? '개인경비 지출결의 첫 화면으로' : '마감 현황으로');
+      var LM = MODE_SYS[NAV_MODE] || MODE_SYS.d, lx = LM.home !== 'close' && VIEWS[LM.home];
+      lg.setAttribute('data-v', lx ? LM.home : 'close');
+      lg.setAttribute('aria-label', lx ? LM.homeLabel : MODE_SYS.d.homeLabel);
     }
-    // 기간 이름표 — 개인경비는 「마감」이 아니라 20~19일 「경비 기간」이다.
+    // 기간 이름표 — 개인경비는 「마감」이 아니라 20~19일 「경비 기간」, 법인카드는 1일~말일 「카드 기간」이다.
     var cl = $('cycLab');
     //   결재함 같은 공용 화면은 운행일지 기간 규칙으로 그려지므로 그냥 「기간」이라 부른다(이름표와 날짜가 어긋나지 않게).
-    if (cl) cl.textContent = SHARED_VIEWS.indexOf(VIEW) >= 0 ? '기간' : NAV_MODE === 'x' ? '경비 기간' : '마감 기간';
+    if (cl) cl.textContent = SHARED_VIEWS.indexOf(VIEW) >= 0 ? '기간' : (MODE_SYS[NAV_MODE] || MODE_SYS.d).cyc;
     // 결재함 숫자는 갈래마다 다르다 — 갈래가 바뀌면 다시 센다.
     paintInboxPill();
   }
@@ -6695,8 +6730,9 @@
     //   20일에는 운행일지 주기는 아직 이번 달인데 개인경비는 이미 다음 달분으로 넘어가 있다 —
     //   그대로 두면 지난 기간에 떨어진다. 개인경비 갈래 안에서 옮겨 다닐 때(결재함 등 함께 쓰는 화면을 거쳐도)는
     //   사용자가 고른 기간을 그대로 둔다.
-    var fromX = usesXPeriod(VIEW) || (SHARED_VIEWS.indexOf(VIEW) >= 0 && NAV_MODE === 'x');
-    var enterX = !RANGE && usesXPeriod(v) && !fromX && cmpCycle(CYC, curCyc(v)) !== 0;
+    // 2026-10-09: 기간 규칙이 셋(운행일지 21~20 · 개인경비 20~19 · 법인카드 1~말일). 규칙이 바뀌는 이동이면(함께 쓰는 화면으로 가는 것은 빼고)
+    //   그 화면의 이번 기간으로 — 25일에 법인카드(10월분)에서 운행일지로 오면 운행일지 11월분, 반대면 법인카드 10월분.
+    var enterX = !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0;
     // ★ 함께 쓰는 화면(결재함·내 계정·사람·조직도·권한)은 기간과 무관하다 — 개인경비 갈래에서 들어가도
     //   운행일지 규칙으로 기간을 당기지 않는다(돌아왔을 때 기간이 말없이 바뀌어 있지 않게, 2026-10-08).
     var clampCyc = enterX || (!RANGE && SHARED_VIEWS.indexOf(v) < 0 && cmpCycle(CYC, curCyc(v)) > 0);
@@ -6744,8 +6780,7 @@
     // ★ 주소에 기간 없이 개인경비 화면만 적혀 왔으면(포털 카드 driving.html#/x_month, 첫 진입) 개인경비의 이번 기간으로.
     //   운행일지 주기를 그대로 쓰면 20일에는 지난 기간에 떨어진다(2026-10-08). go() 와 같은 규칙 —
     //   개인경비 갈래 안에서 옮겨 다니는 중이면 고른 기간을 그대로 둔다. 주소에 기간이 적혀 있으면 그것을 따른다(위).
-    if (!h.a && okView && !RANGE && usesXPeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0 &&
-        !(usesXPeriod(VIEW) || (SHARED_VIEWS.indexOf(VIEW) >= 0 && NAV_MODE === 'x'))) {
+    if (!h.a && okView && !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0) {
       setPeriod({ cyc: curCyc(v) }, { silent: true });
       changed = true;
     }
@@ -6802,7 +6837,7 @@
     if (e.target.closest('[data-noteacct]')) { openNotePop(false); go('account'); return; }
     if (NOTE.open && !e.target.closest('#noteBox')) openNotePop(false);
     if ((el = e.target.closest('[data-inboxmode]'))) {
-      NAV_MODE = el.dataset.inboxmode === 'x' ? 'x' : 'd'; INBOX_F = 'all';
+      NAV_MODE = MODE_NAME[el.dataset.inboxmode] ? el.dataset.inboxmode : 'd'; INBOX_F = 'all';
       if (VIEW === 'inbox') render(); else go('inbox');
       window.scrollTo({ top: 0 }); return;
     }
@@ -7132,7 +7167,7 @@
         var endD = md(rEnd - 1);
         // 개인경비는 「뒤의 경비가 빠진다」가 아니다 — 상신하면 그 기간이 잠겨 회수 전에는 영수증을 더 올리거나 고칠 수 없다(2026-10-08).
         $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">' + (subKD
-          ? '아직 기간 중입니다. 상신하면 회수하기 전에는 이 기간(~' + esc(endD) + ')의 영수증을 더 올리거나 고칠 수 없습니다. 그래도 상신할까요?'
+          ? '아직 기간 중입니다. 상신하면 회수하기 전에는 이 기간(~' + esc(endD) + ')의 ' + (subKD.earlyNoun || '영수증을 더 올리거나') + ' 고칠 수 없습니다. 그래도 상신할까요?'
           : '아직 기간 중입니다(' + esc(endD) + '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?') + '</span>' +
           '<button class="btn" data-close>취소</button>' +
           '<button class="btn pri" id="btnSubmitAppr" data-early="1">그래도 상신</button>';
@@ -7775,9 +7810,10 @@
       if (x.onGo) EXT.onGo.push(x.onGo);
       // 개인경비(2026-10-07): 결재 문서 종류 · 기간 규칙 · 같이 받을 자료 · 「보는 범위」를 얹을 관리 화면
       Object.keys(x.kinds || {}).forEach(function (k) { EXT.kinds[k] = x.kinds[k]; });
-      if (x.period) EXT.period = x.period;
+      if (x.period) EXT.periods.push(x.period);            // 기간 규칙은 모듈마다(개인경비 'x' · 법인카드 'c')
       if (x.load) EXT.load.push(x.load);
-      if (x.orgUsers) EXT.orgUsers = x.orgUsers;
+      // 「보는 범위」 사람 — 모듈마다 자기 관리 화면에서만 값을 낸다(아니면 null). 앞의 것이 null 이면 다음 것.
+      if (x.orgUsers) (function (prev, next) { EXT.orgUsers = prev ? function (v) { return prev(v) || next(v); } : next; })(EXT.orgUsers, x.orgUsers);
       (x.orgbar || []).forEach(function (k) { if (ORGBAR_VIEWS.indexOf(k) < 0) ORGBAR_VIEWS.push(k); });
     });
   })();
