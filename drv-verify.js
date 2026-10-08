@@ -769,7 +769,8 @@
       }
       // 문서 총계(장별 총계의 합)가 상신 때 서버가 집계한 금액과 같은가 — 다르면 결재 카드와 문서가 다른 숫자를 말한다.
       var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
-      if (o.expect != null && isFinite(Number(o.expect)) && Math.abs(Math.round(sum) - Math.round(Number(o.expect))) > 1) {
+      // 1원 차이도 알린다(2026-10-08, 예전 > 1 은 1원 차이를 숨겼다).
+      if (o.expect != null && isFinite(Number(o.expect)) && Math.round(sum) - Math.round(Number(o.expect)) !== 0) {
         chk += '<div class="awarn">' + ic('alert', 15) + '<span>문서 총계 <b>' + C.won(sum) + '</b> 가 ' + (o.expectName || '상신 때 집계한 금액') + ' <b>' +
           C.won(o.expect) + '</b> 과 ' + n0(Math.abs(Math.round(sum) - Math.round(Number(o.expect)))) +
           '원 다릅니다. 관리자에게 알려 주세요.</span></div>';
@@ -1123,7 +1124,7 @@
           parts.push(res.bytes);
           var snap = a.snapshot || {}, why = [];
           var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
-          if (snap.version >= 2 && isFinite(Number(snap.cost)) && Math.abs(Math.round(sum) - Math.round(Number(snap.cost))) > 1) {
+          if (snap.version >= 2 && isFinite(Number(snap.cost)) && Math.round(sum) - Math.round(Number(snap.cost)) !== 0) {   // 1원 차이도(2026-10-08)
             why.push('문서 총계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(snap.cost) + '원');
           }
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;

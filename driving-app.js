@@ -243,6 +243,8 @@
     var p = EXT.period && EXT.period.views.indexOf(view || VIEW) >= 0 ? EXT.period : null;
     return p ? p.current() : currentCycle();
   }
+  /** 그 화면이 다른 기간 규칙(개인경비 20~19일)을 쓰는가(2026-10-08). */
+  function usesXPeriod(v) { return !!(EXT.period && EXT.period.views.indexOf(v) >= 0); }
   /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
   function notifyGo(v, prev) { EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } }); }
   var LOADED = false, LOADING = false, AUDIT = null;
@@ -490,7 +492,10 @@
       '</select><span class="dim">부터</span><select id="cpTo" aria-label="끝 주기">' +
       opts.replace('value="' + t0 + '"', 'value="' + t0 + '" selected') +
       '</select><span class="dim">까지</span><button class="btn sm pri" id="cpGo">보기</button></div>' +
-      '<div class="cp-note">여러 주기를 볼 때는 조회만 됩니다. 상신·결재 문서·통행료 채우기·영수증 올리기는 한 주기를 골라서 합니다. ' +
+      // 개인경비 화면에는 「통행료 채우기」가 없다 — 그 갈래에서는 그 말을 빼고 안내한다(2026-10-08).
+      '<div class="cp-note">여러 주기를 볼 때는 조회만 됩니다. ' +
+      (P1 || NAV_MODE === 'x' ? '상신·결재 문서·영수증 올리기는 한 기간을 골라서 합니다. '
+        : '상신·결재 문서·통행료 채우기·영수증 올리기는 한 주기를 골라서 합니다. ') +
       '<span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 주기로 넘깁니다.</div>';
     $('cycPop').innerHTML = h;
   }
@@ -5072,7 +5077,8 @@
     if (expect == null || !isFinite(Number(expect))) return '';
     var sum = 0, known = true;
     files.forEach(function (f) { if (f.sum == null) known = false; else sum += f.sum; });
-    if (!known || Math.abs(Math.round(sum) - Math.round(Number(expect))) <= 1) return '';
+    // 1원도 봐주지 않는다(2026-10-08) — 정산 금액은 원 단위로 정확히 맞아야 한다(±1원 허용이 실제 차이를 숨겼다).
+    if (!known || Math.round(sum) - Math.round(Number(expect)) === 0) return '';
     return '문서 총계 ' + won(sum) + ' 가 집계 금액 ' + won(expect) + ' 과 ' +
       n0(Math.abs(Math.round(sum) - Math.round(Number(expect)))) + '원 다릅니다. 관리자에게 알려 주세요.';
   }
@@ -6356,6 +6362,17 @@
     var nm = $('navSysName'), ni = $('navSysIco');
     if (nm) nm.textContent = NAV_MODE === 'x' ? '개인경비 지출결의' : '운행일지';
     if (ni) ni.setAttribute('href', NAV_MODE === 'x' ? '#i-won' : '#i-car');
+    // 머리띠 로고 — 지금 갈래의 첫 화면으로(2026-10-08). 개인경비 갈래에서 누르면 운행일지 마감 현황으로 튀지 않게.
+    var lg = $('appLogo');
+    if (lg) {
+      var lx = NAV_MODE === 'x' && VIEWS.x_month;
+      lg.setAttribute('data-v', lx ? 'x_month' : 'close');
+      lg.setAttribute('aria-label', lx ? '개인경비 지출결의 첫 화면으로' : '마감 현황으로');
+    }
+    // 기간 이름표 — 개인경비는 「마감」이 아니라 20~19일 「경비 기간」이다.
+    var cl = $('cycLab');
+    //   결재함 같은 공용 화면은 운행일지 기간 규칙으로 그려지므로 그냥 「기간」이라 부른다(이름표와 날짜가 어긋나지 않게).
+    if (cl) cl.textContent = SHARED_VIEWS.indexOf(VIEW) >= 0 ? '기간' : NAV_MODE === 'x' ? '경비 기간' : '마감 기간';
   }
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
@@ -6363,7 +6380,16 @@
     // 운전 안 하는 사람은 결재함·개인경비·내 계정만 — 다른 화면 주소로 와도 그리로 돌린다.
     var nd = noDriving();
     document.body.classList.toggle('nodrv', nd);
-    if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) { VIEW = ndLanding(); ND_AUTO = !LOADED; applyScope(); writeHash(); }
+    if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) {
+      VIEW = ndLanding(); ND_AUTO = !LOADED;
+      // 운행일지 화면에서 개인경비로 돌린 것이다 — 기간도 개인경비의 이번 기간으로(20일에 지난 기간에 떨어지지 않게, 2026-10-08).
+      if (!RANGE && usesXPeriod(VIEW) && cmpCycle(CYC, curCyc(VIEW)) !== 0) {
+        setPeriod({ cyc: curCyc(VIEW) }, { silent: true });
+        applyScope(); writeHash();
+        // 받은(받는 중인) 자료는 옛 기간 것이다 — 새 기간으로 다시 받는다(loadAll 이 다시 그린다. 늦게 온 옛 응답은 LOAD_SEQ 가 버린다).
+        if (LOADED || LOADING) { loadAll({ soft: true }); return; }
+      } else { applyScope(); writeHash(); }
+    }
     else if (nd && ND_AUTO && LOADED) {
       ND_AUTO = false;
       if (VIEW !== 'inbox' && inbox().length) { VIEW = 'inbox'; applyScope(); writeHash(); }
@@ -6409,7 +6435,15 @@
     // ★ 개인경비(20~19일) 화면에서 20일에 넘어간 「다음 달분」을 보다가 운행일지(21~20일) 화면으로 오면
     //   운행일지에는 아직 없는 앞날의 주기가 된다 — 그 화면의 이번 주기로 맞춘다(applyHash 와 같은 규칙).
     //   조용히 바꾼다(silent: 주소 쓰기·다시 받기는 아래에서 한 번만).
-    var clampCyc = !RANGE && cmpCycle(CYC, curCyc(v)) > 0;
+    // ★ 2026-10-08: 운행일지 갈래에서 개인경비 화면으로 들어가면(기간을 따로 고른 적 없음) 개인경비의 이번 기간으로 맞춘다.
+    //   20일에는 운행일지 주기는 아직 이번 달인데 개인경비는 이미 다음 달분으로 넘어가 있다 —
+    //   그대로 두면 지난 기간에 떨어진다. 개인경비 갈래 안에서 옮겨 다닐 때(결재함 등 함께 쓰는 화면을 거쳐도)는
+    //   사용자가 고른 기간을 그대로 둔다.
+    var fromX = usesXPeriod(VIEW) || (SHARED_VIEWS.indexOf(VIEW) >= 0 && NAV_MODE === 'x');
+    var enterX = !RANGE && usesXPeriod(v) && !fromX && cmpCycle(CYC, curCyc(v)) !== 0;
+    // ★ 함께 쓰는 화면(결재함·내 계정·사람·조직도·권한)은 기간과 무관하다 — 개인경비 갈래에서 들어가도
+    //   운행일지 규칙으로 기간을 당기지 않는다(돌아왔을 때 기간이 말없이 바뀌어 있지 않게, 2026-10-08).
+    var clampCyc = enterX || (!RANGE && SHARED_VIEWS.indexOf(v) < 0 && cmpCycle(CYC, curCyc(v)) > 0);
     VIEW = v;
     if (clampCyc) setPeriod({ cyc: curCyc(v) }, { silent: true });
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
@@ -6445,11 +6479,21 @@
       if (h.b) setPeriod({ range: { from: h.a, to: h.b } }, { silent: true });
       else setPeriod({ cyc: h.a }, { silent: true });
       // 앞날의 주기를 주소에 적어 와도 이번 주기까지만 간다.
-      if (!RANGE && cmpCycle(CYC, curCyc(h.view)) > 0) setPeriod({ cyc: curCyc(h.view) }, { silent: true });
+      // (함께 쓰는 화면은 기간과 무관하다 — 당기지 않는다, 2026-10-08)
+      if (!RANGE && SHARED_VIEWS.indexOf(h.view) < 0 && cmpCycle(CYC, curCyc(h.view)) > 0) setPeriod({ cyc: curCyc(h.view) }, { silent: true });
       changed = hashOf().split('/')[2] !== before;
     }
     var v = h.view;
-    if (VIEWS[v] && !(ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) && !(v === 'perm' && !ACCT.can_manage_admin)) {
+    var okView = VIEWS[v] && !(ADMIN_VIEWS.indexOf(v) >= 0 && !(ME && ME.is_admin)) && !(v === 'perm' && !ACCT.can_manage_admin);
+    // ★ 주소에 기간 없이 개인경비 화면만 적혀 왔으면(포털 카드 driving.html#/x_month, 첫 진입) 개인경비의 이번 기간으로.
+    //   운행일지 주기를 그대로 쓰면 20일에는 지난 기간에 떨어진다(2026-10-08). go() 와 같은 규칙 —
+    //   개인경비 갈래 안에서 옮겨 다니는 중이면 고른 기간을 그대로 둔다. 주소에 기간이 적혀 있으면 그것을 따른다(위).
+    if (!h.a && okView && !RANGE && usesXPeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0 &&
+        !(usesXPeriod(VIEW) || (SHARED_VIEWS.indexOf(VIEW) >= 0 && NAV_MODE === 'x'))) {
+      setPeriod({ cyc: curCyc(v) }, { silent: true });
+      changed = true;
+    }
+    if (okView) {
       if (VIEW !== v) {
         if (v !== VIEW && !(TAB_OF[v] && TAB_OF[v] === TAB_OF[VIEW])) ORGF = { div: '', team: '', unit: '' };
         notifyGo(v, VIEW);
@@ -6815,8 +6859,10 @@
       var rEnd = subKD ? subKD.rangeHi() : cycleRange(CYC.y, CYC.m).hi;
       if (Date.now() < rEnd && !sb.dataset.early) {
         var endD = md(rEnd - 1);
-        $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">아직 ' + (subKD ? '기간' : '주기') + ' 중입니다(' + esc(endD) +
-          '까지). 지금 상신하면 이후 ' + (subKD ? '경비는' : '운행·영수증은') + ' 결재 문서에 들어가지 않습니다. 그래도 상신할까요?</span>' +
+        // 개인경비는 「뒤의 경비가 빠진다」가 아니다 — 상신하면 그 기간이 잠겨 회수 전에는 영수증을 더 올리거나 고칠 수 없다(2026-10-08).
+        $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">' + (subKD
+          ? '아직 기간 중입니다. 상신하면 회수하기 전에는 이 기간(~' + esc(endD) + ')의 영수증을 더 올리거나 고칠 수 없습니다. 그래도 상신할까요?'
+          : '아직 주기 중입니다(' + esc(endD) + '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?') + '</span>' +
           '<button class="btn" data-close>취소</button>' +
           '<button class="btn pri" id="btnSubmitAppr" data-early="1">그래도 상신</button>';
         return;
@@ -6857,6 +6903,8 @@
       (bfs
         ? bfs(function (t) { if (alive() && document.contains(sb)) sb.textContent = t + '…'; })
         : Promise.resolve(null)).then(function (sum) {
+        // 확장 모듈이 상신을 멈췄다(개인경비: PDF 미리보기 뒤에 경비가 바뀜, 2026-10-08) — 창 닫기·안내는 모듈이 했다.
+        if (sum && sum.blocked) return;
         if (!alive()) { gone(); return; }
         if (sum && sum.bad > 0) {
           $('pFoot').innerHTML = '<span class="st bad" style="flex:1;white-space:normal">검증에서 맞지 않는 곳이 ' +
@@ -7052,6 +7100,8 @@
     var at = ss(K_AT);
     if (at) { try { fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at }, keepalive: true }).catch(function () { }); } catch (e) { } }
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
+    // 메뉴 갈래도 지운다(2026-10-08) — 같은 탭에서 다른 사람이 로그인하면 앞사람의 갈래(개인경비)로 열리지 않게.
+    try { sessionStorage.removeItem('drv_navmode'); } catch (e2) { }
     // 직접 로그아웃이면 포털 첫 화면, 로그인이 만료된 것이면 다시 로그인한 뒤 보던 화면으로 돌아오게.
     toPortal(e && e.type === 'click' ? '' : location.hash);
   }

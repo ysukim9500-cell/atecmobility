@@ -7,7 +7,7 @@
    ★ 기간은 운행일지와 다르다: 전월 20일 00:00 ~ 당월 19일 24:00(KST), 끝나는 달 이름.
      2026-09-20 ~ 2026-10-19 = '2026-10' = 「2026년 10월분」. 헷갈리지 않게 모든 화면에 범위를 함께 적는다.
    ★ 금액 계산은 단순 합이다(소계 = 구분별 합, 합계 = 소계의 합). 서버 approval-act 가 상신 때 같은 합을 굳힌다.
-   ★ 식비 기준(1인 1끼 13,000원)은 **알리기만** 한다. 인원은 사용내역의 「N명」(N), 「외 N명」(N+1), 없으면 1명 —
+   ★ 식비 기준(1인 1끼 13,000원)은 **알리기만** 한다. 인원은 사용내역의 「N명/인」(N, 붙여 쓴 것만), 「외 N명/인」(N+1), 없으면 1명(2026-10-08 규칙 — mealPeople 주석) —
      서버 _shared/expense-verify.ts X07 과 같은 규칙(mealPeople·mealOver).
 
    화면: x_month(이번 달 경비) · x_verify(검증·상신) · 관리 xa_close(현황) · xa_list(전체 내역) · xa_final(결재 완료 출력)
@@ -44,19 +44,26 @@
   /* ══════════════════ 식비 기준 ══════════════════ */
   /** 사용내역에서 인원 — 「외 N명」 = N+1, 「N명」 = N, 없으면 1. (서버 X07 과 같은 규칙) */
   function mealPeople(usage) {
-    // 서버 mealPersons 와 글자 하나까지 같게 — 숫자는 1~2자리, 「외 N명」이 먼저(찾았는데 0 이면 1명).
-    var s = String(usage || ''), m = /외\s*(\d{1,2})\s*명/.exec(s);
-    if (m) return +m[1] >= 1 ? +m[1] + 1 : 1;
-    m = /(\d{1,2})\s*명/.exec(s);
-    if (m) return +m[1] >= 1 ? +m[1] : 1;
-    return 1;
+    // ★ 2026-10-08 규칙 교체 — 서버·앱과 글자 하나까지 같게 바꾼다.
+    //   A 「외 N명/인」(띄어 써도 됨) = N+1 (N ≥ 1 일 때만).
+    //   B (A 가 없을 때만) 숫자 바로 뒤에 「명/인」이 붙고(띄우지 않음), 숫자 앞이 숫자·. , / : - 가 아닌 것 = N.
+    //     예전 규칙은 「123명」→23명, 「10.3 명동 점심」→3명으로 잘못 읽었다.
+    //   그 밖은 1명. 결과는 1~99.
+    var text = String(usage || ''), n = 1;
+    var a = /외\s*(\d{1,2})\s*(?:명|인)/.exec(text);
+    if (a) { if (+a[1] >= 1) n = +a[1] + 1; }
+    else {
+      var b = /(?:^|[^\d.,\/:\-])(\d{1,2})(?:명|인)/.exec(text);
+      if (b && +b[1] >= 1) n = +b[1];
+    }
+    return Math.max(1, Math.min(99, n));
   }
   /** 식비 줄이 1인 1끼 13,000원을 넘는가 — { n, per } 또는 null.
-   *  ★ 판정은 나눈 값 그대로(반올림 없이, 서버 a / p > 13000 과 같게). per 는 보여 줄 값(원 아래 버림). */
+   *  ★ 판정은 금액 > 13,000 × 인원(나누지 않고 — 서버와 같게). per 는 보여 줄 1인 금액(원 아래 올림, 2026-10-08 서버·앱과 같게). */
   function mealOver(it) {
     if (!it || it.category !== '식비') return null;
-    var n = mealPeople(it.usage), raw = (Number(it.amount) || 0) / n;
-    return raw > MEAL_LIMIT ? { n: n, per: Math.floor(raw) } : null;
+    var n = mealPeople(it.usage), amt = Number(it.amount) || 0;
+    return amt > MEAL_LIMIT * n ? { n: n, per: Math.ceil(amt / n) } : null;
   }
   function mealTag(it) {
     var o = mealOver(it);
@@ -431,7 +438,9 @@
                   it.cat = CATS.indexOf(x.category) >= 0 ? x.category : '';
                   if (x.merchant) it.merchant = String(x.merchant).slice(0, 60);
                   if (x.usage) it.usage = String(x.usage).slice(0, 200);
-                  if (x.amount != null && isFinite(Number(x.amount))) it.amt = String(Math.round(Number(x.amount)));
+                  // ★ 음수(환불)는 칸을 비우고 알린다(2026-10-08) — 그대로 두면 칸이 숫자만 남겨 「-5,000」이 5,000원(양수)이 된다.
+                  if (x.amount != null && isFinite(Number(x.amount)) && Number(x.amount) < 0) hint.push('금액이 음수(환불)로 읽혔습니다 — 확인해 주세요');
+                  else if (x.amount != null && isFinite(Number(x.amount))) it.amt = String(Math.round(Number(x.amount)));
                   else hint.push('금액을 읽지 못했습니다');
                   if (x.date) {
                     var ms = dayMs(x.date);
@@ -548,14 +557,24 @@
       return C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob })
         .then(function (up) { if (!up.ok) return up.text().then(function (t) { throw new Error(t || ('HTTP ' + up.status)); }); });
     };
+    // 줄이 서버에 들어가 있는가 — { id, photo_path } 또는 null. 묻지도 못했으면 reject(그때는 아무것도 지우지 않는다).
+    var existing = function (key) {
+      return rest('/rest/v1/expense_items?username=eq.' + encodeURIComponent(mine) + '&client_key=eq.' + encodeURIComponent(key) + '&select=id,photo_path')
+        .then(function (a) { return (Array.isArray(a) && a[0]) || null; });
+    };
     session.items.reduce(function (chain, it, i) {
       return chain.then(function () {
         xNote((done + 1) + ' / ' + total + '건 올리는 중…');
-        var pg = session.pages[it.page], key = base + i;
-        var path = mine + '/exp/' + key + '.jpg';
+        // ★ 2026-10-08: client_key 는 줄마다 한 번만 정하고 다시 올릴 때도 그대로 쓴다 — 응답만 잃고 실제로는
+        //   들어간 줄이 있으면 다시 올려도 같은 줄로 알아본다(username+client_key 가 유일). 사진 이름은
+        //   두 번째 시도부터 뒤에 -N 을 붙인다(먼저 올라간 사진이 남아 있으면 같은 이름으로는 못 올린다).
+        if (it.key == null) it.key = base + i;
+        var att = it.tries = (it.tries || 0) + 1;
+        var pg = session.pages[it.page], key = it.key, sfx = att > 1 ? '-' + att : '';
+        var path = mine + '/exp/' + key + sfx + '.jpg';
         var scanP = Promise.resolve();
         if (pg.multi && !pg.scanPath) {
-          var sp = mine + '/exp/scan/' + key + '.jpg';
+          var sp = mine + '/exp/scan/' + key + sfx + '.jpg';
           scanP = upload(sp, pg.blob).then(function () { pg.scanPath = sp; });
         }
         return scanP.then(function () { return upload(path, (it.crop && it.crop.blob) || pg.blob); }).then(function () {
@@ -569,9 +588,19 @@
               ai: it.ai || null, captured_at: Date.now()
             })
           }).catch(function (e) {
-            // 기록이 안 들어갔으면 사진만 남기지 않는다.
-            return C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { })
-              .then(function () { throw e; });
+            // ★ 실패로 보여도 줄은 들어갔을 수 있다(응답만 잃음 · 앞 시도에서 이미 들어가 409). 사진을 지우기 전에
+            //   서버에 그 줄이 있는지 먼저 묻는다(2026-10-08). 예전에는 바로 지워, 들어간 줄의 사진이 비었다.
+            //   · 줄이 있다 → 올라간 것으로 친다. 그 줄이 이번 사진을 안 가리키면(앞 시도 사진) 이번 사진만 지운다.
+            //   · 줄이 없다 → 사진만 남기지 않게 지우고 실패로.
+            //   · 묻지도 못했다 → 아무것도 지우지 않고 실패로(남는 사진 한 장이 빈 증빙보다 낫다).
+            return existing(key).then(function (row) {
+              if (row) {
+                if (row.photo_path !== path) C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { });
+                return;
+              }
+              return C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { })
+                .then(function () { throw e; });
+            }, function () { throw e; });
           }).then(function () { done++; });
         });
       });
@@ -644,16 +673,30 @@
       return C.apiRetry('/storage/v1/object/evidence/' + newPath, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: ph.blob })
         .then(function (r2) { if (!r2.ok) return r2.text().then(function (t) { throw new Error(t || ('HTTP ' + r2.status)); }); body.photo_path = newPath; body.scan_path = ''; });
     })() : Promise.resolve();
+    var saved = function () {
+      XEDIT = null; dropItems(S.CYCKEY); C.closePanel(); C.toast('고쳤습니다.');
+      loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
+    };
+    var failed = function (e) {
+      if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+      C.toast('저장하지 못했습니다 — ' + why(e), true);
+    };
     up.then(function () {
       return rest('/rest/v1/expense_items?id=eq.' + encodeURIComponent(it.id), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
     }).then(function (rows) {
       if (!Array.isArray(rows) || !rows.length) throw new Error('EXPENSE_LOCKED');
-      XEDIT = null; dropItems(S.CYCKEY); C.closePanel(); C.toast('고쳤습니다.');
-      loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
+      saved();
     }).catch(function (e) {
-      if (newPath) C.apiRetry('/storage/v1/object/evidence/' + newPath, { method: 'DELETE' }).catch(function () { });
-      if (btn) { btn.disabled = false; btn.textContent = '저장'; }
-      C.toast('저장하지 못했습니다 — ' + why(e), true);
+      if (!newPath) { failed(e); return; }
+      // ★ 2026-10-08: 새 사진을 바로 지우지 않는다 — 응답만 잃고 실제로는 고쳐졌으면 그 줄이 새 사진을 가리킨다
+      //   (지우면 증빙이 빈다). 줄을 다시 읽어 보고: 새 사진을 가리키면 저장된 것, 아니면 새 사진만 지운다.
+      //   다시 읽지도 못했으면 지우지 않는다(남는 사진 한 장이 빈 증빙보다 낫다).
+      rest('/rest/v1/expense_items?id=eq.' + encodeURIComponent(it.id) + '&select=id,photo_path').then(function (a) {
+        var row = Array.isArray(a) && a[0];
+        if (row && row.photo_path === newPath) { saved(); return; }
+        C.apiRetry('/storage/v1/object/evidence/' + newPath, { method: 'DELETE' }).catch(function () { });
+        failed(e);
+      }, function () { failed(e); });
     });
   }
   function openDel(id) {
@@ -851,8 +894,23 @@
   function beforeSubmit(onNote) {
     var u = me(), cyc = C.state().CYCKEY, k = vkey(u, cyc);
     var say = function (t) { if (onNote) onNote(String(t).replace(/…\s*/g, ' ').trim()); };
-    if (VRUN.busy && VRUN.who === k && VRUN.p) { say('검증이 끝나기를 기다리는 중'); return VRUN.p.then(function (r) { return (r && r.summary) || null; }, function () { return null; }); }
-    return runVerify(u, cyc, say, true).then(function (row) { VROWS[k] = row || null; return (row && row.summary) || null; }).catch(function () { return null; });
+    // ★ 2026-10-08: PDF 미리보기 뒤에 경비가 바뀌었으면(다른 탭·앱에서 올리기·고치기·지우기) 상신을 멈춘다 —
+    //   결재자에게 가는 것(서버가 상신 순간의 줄을 굳힌다)이 사용자가 눈으로 본 PDF 와 달라진다.
+    //   이 기간 내 경비를 서버에서 다시 받아 미리보기 때의 서명(건수·id·금액·내용)과 맞춰 본다.
+    //   다시 받지 못했으면 막지 않는다(검증 실패와 같이 — 상신은 서버가 지킨다).
+    var seen = PREV[k] ? PREV[k].sig : null;
+    say('경비를 다시 확인하는 중');
+    return loadItems(cyc, false, true).then(function (rows) {
+      if (rows && seen != null && sig(u, cyc) !== seen) {
+        setPreviewed(k, false);
+        C.closePanel();
+        if (C.state().VIEW !== 'x_verify') C.go('x_verify'); else C.render();
+        C.toast('미리보기 뒤에 경비가 바뀌었습니다. PDF를 다시 확인해 주세요.', true);
+        return { blocked: true };          // driving-app 상신 흐름이 보내지 않고 멈춘다
+      }
+      if (VRUN.busy && VRUN.who === k && VRUN.p) { say('검증이 끝나기를 기다리는 중'); return VRUN.p.then(function (r) { return (r && r.summary) || null; }, function () { return null; }); }
+      return runVerify(u, cyc, say, true).then(function (row) { VROWS[k] = row || null; return (row && row.summary) || null; }).catch(function () { return null; });
+    });
   }
 
   /* ══════════════════ 문서(PDF · 엑셀) ══════════════════ */
@@ -1335,7 +1393,7 @@
     rows.slice().sort(function (a, b) { return a.date_millis - b.date_millis; }).forEach(function (it) {
       var op = C.orgPath(it.username), mo = mealOver(it);
       out.push([C.ymd(it.date_millis), C.nameOf(it.username), it.username, [C.orgName(op), op.unit].filter(Boolean).join(' · '), it.category, it.merchant || '',
-        Number(it.amount) || 0, it.usage || '', it.note || '', it.category === '식비' ? Math.floor((Number(it.amount) || 0) / mealPeople(it.usage)) : '', mo ? '초과' : '']);
+        Number(it.amount) || 0, it.usage || '', it.note || '', it.category === '식비' ? Math.ceil((Number(it.amount) || 0) / mealPeople(it.usage)) : '', mo ? '초과' : '']);   // 1인 금액은 올림(2026-10-08 서버·앱과 같게)
     });
     out.push(['합계', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '', '']);
     C.saveBlob(new TextEncoder().encode(csvText(out)), '개인경비_내역_' + S.CYCKEY + scopeSuffix() + '.csv');
@@ -1443,7 +1501,8 @@
         }).then(function (res) {
           parts.push(res.bytes);
           var sum = (res.totals[0] || {}).all || 0, exp = (a.snapshot || {}).cost, w = [];
-          if (exp != null && Math.abs(Math.round(sum) - Math.round(Number(exp))) > 1) w.push('문서 합계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(exp) + '원');
+          // 1원 차이도 알린다(2026-10-08, 예전 > 1 은 1원 차이를 숨겼다).
+          if (exp != null && Math.round(sum) - Math.round(Number(exp)) !== 0) w.push('문서 합계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(exp) + '원');
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
           if (img) w.push('불러오지 못한 사진 ' + img + '장');
           var cut = (res.issues || []).filter(function (x) { return x.kind === 'cut'; }).length;

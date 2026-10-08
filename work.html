@@ -571,6 +571,7 @@ footer .wrap{font-size:13px}
     var at = ss(K_AT);
     if (at) fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).catch(function () { });
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
+    ss('drv_navmode', null);            // 운행일지 메뉴 갈래(2026-10-08) — 다음 사람이 앞사람 갈래로 열리지 않게
     document.body.classList.remove('in');
     $('signupNote').hidden = true;
   }

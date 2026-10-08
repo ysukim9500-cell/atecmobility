@@ -1359,6 +1359,23 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 </style>
 </head>
 <body>
+<script>
+/* 메뉴 갈래를 첫 그림 전에 정한다(2026-10-08) — 안 하면 driving-app.js 가 돌 때까지 두 갈래 메뉴가 한꺼번에 비친다.
+   규칙은 driving-app.js navModeOf 와 같다: 개인경비 화면(x_·xa_)이면 x, 함께 쓰는 화면이면 앞 갈래, 그 밖은 d.
+   운행일지를 안 쓰는 사람(uses_driving=false, 관리자 아님)은 늘 x. 틀려도 paintNavMode 가 곧 바로잡는다. */
+(function () {
+  var m = 'd';
+  try {
+    var v = (/^#\/([a-z_]+)/.exec(location.hash || '') || [])[1] || '';
+    var prev = sessionStorage.getItem('drv_navmode') === 'x' ? 'x' : 'd';
+    if (/^xa?_/.test(v)) m = 'x';
+    else if (['inbox', 'account', 'people', 'org', 'perm'].indexOf(v) >= 0) m = prev;
+    var me = JSON.parse(sessionStorage.getItem('drv_me') || 'null');
+    if (me && me.uses_driving === false && !me.is_admin) m = 'x';
+  } catch (e) { }
+  document.body.classList.add('mode-' + m);
+})();
+</script>
 
 <!-- 아이콘 — 24px 격자, stroke 1.7, currentColor -->
 <svg class="sr" aria-hidden="true"><defs>
@@ -1413,14 +1430,14 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   <header class="top">
     <button class="iconbtn" id="burger" aria-label="메뉴 열기">
       <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button>
-    <button class="appname" data-v="close" aria-label="마감 현황으로">
+    <button class="appname" id="appLogo" data-v="close" aria-label="마감 현황으로">
       <img class="logo-mark" src="brand/atec-driving.png" alt="ATEC Driving">
       <img class="logo-mark tiny" src="brand/atec-mark.png" alt="ATEC">
     </button>
     <div class="sp"></div>
     <!-- 기간: ◀ ▶ 로 한 주기씩, 가운데를 누르면 주기 목록·여러 주기 조회. 키보드 [ ] 도 된다. -->
     <div class="cyc" id="cycleBox">
-      <span class="cyclab" aria-hidden="true">마감 기간</span>
+      <span class="cyclab" id="cycLab" aria-hidden="true">마감 기간</span>
       <button class="cycnav prev" id="cycPrev" aria-label="앞 주기" title="앞 주기  [">
         <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
       <button class="cycle" id="cycBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cycPop" title="기간 고르기">
