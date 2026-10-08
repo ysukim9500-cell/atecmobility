@@ -6353,11 +6353,9 @@
     try { sessionStorage.setItem('drv_navmode', NAV_MODE); } catch (e) { }
     document.body.classList.toggle('mode-x', NAV_MODE === 'x');
     document.body.classList.toggle('mode-d', NAV_MODE === 'd');
-    Array.prototype.forEach.call(document.querySelectorAll('#navMode [data-mode]'), function (a) {
-      var cur = a.dataset.mode === NAV_MODE;
-      a.classList.toggle('cur', cur);
-      a.setAttribute('aria-selected', cur ? 'true' : 'false');
-    });
+    var nm = $('navSysName'), ni = $('navSysIco');
+    if (nm) nm.textContent = NAV_MODE === 'x' ? '개인경비 지출결의' : '운행일지';
+    if (ni) ni.setAttribute('href', NAV_MODE === 'x' ? '#i-won' : '#i-car');
   }
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
@@ -6380,7 +6378,6 @@
       : (LOADED ? stepChrome((VIEWS[VIEW] || viewClose)()) : (VIEWS[VIEW] || viewClose)());
     paintNavMode();
     Array.prototype.forEach.call($('nav').querySelectorAll('[data-v]'), function (a) {
-      if (a.closest('#navMode')) return;     // 갈래 단추는 paintNavMode 가 칠한다
       // 같은 단계로 묶인 화면(data-alt)에 있어도 그 단계 메뉴에 불이 들어온다.
       var on = a.dataset.v === VIEW || (a.dataset.alt || '').split(',').indexOf(VIEW) >= 0;
       a.classList.toggle('on', on);

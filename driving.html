@@ -114,15 +114,15 @@ body.is-master a.mst{display:flex !important}
 body.is-admin a.adm{display:flex}
 body.is-admin .navsec.adm,body.is-admin .admsec.adm{display:block}
 body.is-admin .navsec.admtog{display:flex}
-/* 메뉴 갈래(2026-10-08) — 운행일지 / 개인경비 */
-.navmode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:2px 0 10px;border-radius:10px;background:var(--ink-100)}
-.navmode a{display:flex;align-items:center;justify-content:center;gap:6px;height:36px;border-radius:7px;font-size:14px;font-weight:600;color:var(--ink-600);cursor:pointer;padding:0 6px}
-.navmode a svg{flex:none}
-.navmode a.cur{background:#fff;color:var(--red);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.navmode a:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+/* 지금 시스템(2026-10-08) — 운행일지 / 개인경비 지출결의. 바꾸려면 「시스템 선택」(포털)로 */
+.navsys{margin:0 0 10px;padding:0 0 10px;border-bottom:1px solid var(--ink-100)}
+#nav .navsys a.navback{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 6px;margin:0 0 4px -2px;border-radius:6px;font-size:13px;font-weight:500;color:var(--ink-600);background:none}
+#nav .navsys a.navback:hover{color:var(--red);background:var(--red-50)}
+.navname{display:flex;align-items:center;gap:8px;padding:2px 10px 0;font-size:16px;color:var(--ink-900,#1F2328)}
+.navname svg{color:var(--red);flex:none}
 body.mode-d #nav .xnav,body.mode-d #nav .xadm{display:none !important}
 body.mode-x #nav .dnav,body.mode-x #nav .dadm,body.mode-x #nav .xhead{display:none !important}
-body.nodrv #navMode{display:none}
+
 /* 결재만 하는 계정(운행일지 안 씀, 2026-10-07) — 메뉴는 결재함만 */
 body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav),body.nodrv #nav > .navsec:not(.xnav){display:none}
 
@@ -1370,6 +1370,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <g id="i-ticket" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3.8 8.6V6.8h16.4v1.8a2.2 2.2 0 000 6.8v1.8H3.8v-1.8a2.2 2.2 0 000-6.8z"/><path d="M13 8.2v7.6"/></g>
 <g id="i-won" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5l3 9 4.5-9 4.5 9 3-9M4 11.5h16M4 14.5h16"/></g>
 <g id="i-users" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8.5" r="3"/><path d="M3.8 19.2c.6-3 2.9-4.7 5.7-4.7s5.1 1.7 5.7 4.7"/><path d="M16.2 6.2a2.9 2.9 0 010 5.4M17.6 14.9c2 .5 3.3 1.9 3.8 4.3"/></g>
+<g id="i-left" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></g>
 <g id="i-car" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5v2.2h2.6v-2.2M17.4 16.5v2.2H20v-2.2"/><path d="M3.6 16.5v-4l1.9-4.6A1.6 1.6 0 017 6.9h10a1.6 1.6 0 011.5 1L20.4 12.5v4z"/><path d="M4 12.6h16"/><circle cx="7.4" cy="14.5" r=".9" fill="currentColor" stroke="none"/><circle cx="16.6" cy="14.5" r=".9" fill="currentColor" stroke="none"/></g>
 <g id="i-cap" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.6L21 9l-9 4.4L3 9z"/><path d="M6.6 11v4.6c0 1.5 2.4 2.7 5.4 2.7s5.4-1.2 5.4-2.7V11"/></g>
 <g id="i-gauge" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 17.4a8.6 8.6 0 1114.8 0"/><path d="M12 13.2l3.4-3"/><circle cx="12" cy="14.3" r="1.2" fill="currentColor" stroke="none"/></g>
@@ -1452,10 +1453,11 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <!-- A안(2026-10-02): 홈 · 결재함을 맨 위에, 마감은 실제 순서대로 1~5 단계. 단계 동그라미는 paintPills 가 칠한다
            (완료 = 초록 ✓, 지금 할 단계 = 빨강, 남은 단계 = 테두리). data-alt 는 같은 단계로 묶인 화면(탭).
            「내 계정」은 오른쪽 위 이름을 누르면 열린다. -->
-      <!-- 2026-10-08: 운행일지·개인경비는 서로 다른 일이다 — 맨 위에서 갈래를 고르면 그 갈래 메뉴만 보인다(결재함·사람·설정은 함께). -->
-      <div class="navmode" id="navMode" role="tablist" aria-label="업무 고르기">
-        <a tabindex="0" role="tab" data-v="close" data-mode="d"><svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-car"/></svg>운행일지</a>
-        <a tabindex="0" role="tab" data-v="x_month" data-mode="x"><svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-won"/></svg>개인경비</a>
+      <!-- 2026-10-08: 시스템은 포털(work.html)에서 고른다 — 여기서는 지금 시스템 이름과 「시스템 선택」으로 돌아가는 길만.
+           운행일지·개인경비 메뉴는 들어온 시스템 것만 보인다(결재함·사람·설정은 함께). -->
+      <div class="navsys" id="navSys">
+        <a class="navback" href="work.html"><svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-left"/></svg>시스템 선택</a>
+        <div class="navname"><svg width="17" height="17" viewBox="0 0 24 24"><use id="navSysIco" href="#i-car"/></svg><b id="navSysName">운행일지</b></div>
       </div>
       <a tabindex="0" role="button" data-v="close" class="on dnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>이번 달 마감</a>
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
