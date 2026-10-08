@@ -382,6 +382,7 @@
       // 경로·질의를 함께 적는다 — '#…' 만 넘기면 <base> 가 있는 쪽에서는 그 기준으로 풀려 경로가 바뀐다.
       try { history.replaceState(null, '', location.pathname + location.search + hashOf()); } catch (e) { }
       loadAll();
+      noteLoad();                  // 알림 읽음 상태(서버 notice_seen — 없으면 브라우저 저장소)
     });
   }
 
@@ -1216,7 +1217,8 @@
       if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('isnow', stt === 'now');
     });
     set('pEdu', eduTodo(), eduTodo() > 0);
-    set('pInbox', inbox().length, inbox().length > 0);
+    paintInboxPill();
+    paintBell();
     function set(id, v, hot) {
       var el = $(id); if (!el) return;
       el.hidden = !v;
@@ -2780,16 +2782,15 @@
   /* ── 결재함 ── */
   function viewInbox() {
     if (!LOADED) return head('결재함') + skeleton();
-    var mine = inbox();
+    // ★ 결재함은 갈래마다 따로(2026-10-08 사용자 결정) — 개인경비 갈래에서는 개인경비 문서만, 운행일지 갈래에서는
+    //   운행일지 문서만. 다른 갈래에 문서가 있으면 한 줄로 그리 가는 길만 둔다(inboxSplit).
+    //   운전 안 하는 사람(개인경비 갈래 고정)은 결재선에 든 운행일지 문서를 아래 따로 모아 보여 준다 — 숨기면 결재가 멈춘다.
+    var SP = inboxSplit();
+    var mine = SP.mine;
     // ★ 결재함은 개인 화면이다. 관리자는 APPR 에 전 직원 결재건이 들어 있어,
     //   거르지 않으면 남의 결재 진행상황과 금액이 '그 밖의 건' 으로 나열됐다.
     //   내가 올린 것과 내가 결재선에 든 것만 남긴다.
-    var meNow = myName();
-    var others = allAppr().filter(function (a) {
-      if (mine.indexOf(a) >= 0) return false;
-      if (a.username === meNow) return true;
-      return (a.steps || []).some(function (s) { return s && s.approver === meNow; });
-    });
+    var others = SP.others;
 
     // 예전에는 40건에서 말없이 잘랐다(건수는 전체로 적어 놓고). 이제는 상태로 좁히고, 넘치면 넘친다고 말한다.
     var st = INBOX_F;
@@ -2797,7 +2798,7 @@
     var CAP = 80;
     // 카드에 붙는 검증 요약·결재 문서 버튼은 고정본에서 온다 — 보이는 건만 한 번에 물어본다.
     // 번호는 종류마다 따로 매긴다 — 운행일지 것은 운행일지 모듈에, 개인경비 것은 개인경비 모듈에 묻는다.
-    var vis = mine.concat(shown.slice(0, CAP));
+    var vis = mine.concat(shown.slice(0, CAP), SP.ndMine, SP.ndOthers.slice(0, 20));
     if (EXT.wantSummaries) {
       EXT.wantSummaries(vis.filter(function (a) { return !kindOf(a); }).map(function (a) { return a.id; }));
     }
@@ -2806,11 +2807,26 @@
       if (kd.wantSummaries) kd.wantSummaries(vis.filter(function (a) { return kindOf(a) === k; }).map(function (a) { return a.id; }));
     });
 
-    var h = head('결재함', mine.length ? '내 차례 ' + mine.length + '건' : '내 차례인 건이 없습니다');
+    var nTurn = mine.length + SP.ndMine.length;
+    var h = head(SP.split ? (SP.mode === 'x' ? '개인경비 결재함' : '운행일지 결재함') : '결재함',
+      nTurn ? '내 차례 ' + nTurn + '건' : '내 차례인 건이 없습니다');
+    // 다른 갈래로 가는 한 줄 — 그쪽에 내 차례가 있으면 건수를, 없으면 문서가 있다는 것만.
+    if (SP.otherTurn || SP.otherAny) {
+      var oName = SP.mode === 'x' ? '운행일지' : '개인경비';
+      h += '<button type="button" class="ibswitch' + (SP.otherTurn ? ' hot' : '') + '" data-inboxmode="' + (SP.mode === 'x' ? 'd' : 'x') + '">' +
+        ic(SP.mode === 'x' ? 'car' : 'won', 15) + '<span>' + (SP.otherTurn
+          ? oName + ' 결재 <b>' + n0(SP.otherTurn) + '건</b>은 ' + oName + ' 결재함에서'
+          : oName + ' 결재 문서는 ' + oName + ' 결재함에서') + '</span>' + ic('chev', 14) + '</button>';
+    }
     if (mine.length) {
       h += sect('내 차례', mine.length + '건', '', '<div class="panel">' + mine.map(apprCard).join('') + '</div>');
-    } else {
+    } else if (!SP.ndMine.length) {
       h += blank('결재할 것이 없습니다.', '다른 분 차례이거나 아직 상신되지 않았습니다.', 'check');
+    }
+    if (SP.ndMine.length) {
+      h += sect('운행일지 결재 — 내 차례', SP.ndMine.length + '건', '',
+        '<div class="fhint" style="margin:-4px 0 10px">운행일지를 쓰지 않으셔도 결재선에 들어 있는 운행일지는 여기서 결재합니다.</div>' +
+        '<div class="panel">' + SP.ndMine.map(apprCard).join('') + '</div>');
     }
     if (others.length) {
       var cnt = function (k) { return others.filter(function (a) { return a.status === k; }).length; };
@@ -2828,7 +2844,237 @@
         (shown.length > CAP ? '<div class="fhint" style="margin-top:8px">최근 ' + CAP + '건만 보입니다. 위에서 상태로 좁혀 보세요(전체 ' +
           n0(shown.length) + '건).</div>' : ''));
     }
+    if (SP.ndOthers.length) {
+      h += sect('운행일지 결재 기록', SP.ndOthers.length + '건', '',
+        '<div class="panel">' + SP.ndOthers.slice(0, 20).map(apprCard).join('') + '</div>' +
+        (SP.ndOthers.length > 20 ? '<div class="fhint" style="margin-top:8px">최근 20건만 보입니다.</div>' : ''));
+    }
     return h;
+  }
+  /* ── 결재함 갈래 나누기(2026-10-08) ──
+     'd' 운행일지 갈래 = 운행일지 결재 건(종류 없음), 'x' 개인경비 갈래 = 확장 종류(개인경비) 결재 건.
+     확장 모듈이 없으면(개인경비 미탑재) 나누지 않는다. */
+  function inboxMode() { return noDriving() ? 'x' : navModeOf(VIEW); }
+  function inMode(a, mode) { return mode === 'x' ? !!kindOf(a) : !kindOf(a); }
+  function involvesMe(a) {
+    var me = myName();
+    return a.username === me || (a.steps || []).some(function (s) { return s && s.approver === me; });
+  }
+  /** 결재함이 그릴 것 — 지금 갈래의 내 차례·그 밖의 건, 다른 갈래 건수, 운전 안 하는 사람의 운행일지 건. */
+  function inboxSplit() {
+    var all = inbox(), split = Object.keys(EXT.kinds).length > 0, mode = split ? inboxMode() : 'd', nd = split && noDriving();
+    var rel = allAppr().filter(function (a) { return all.indexOf(a) < 0 && involvesMe(a); });
+    if (!split) return { split: false, mode: mode, mine: all, others: rel, ndMine: [], ndOthers: [], otherTurn: 0, otherAny: 0 };
+    var om = mode === 'x' ? 'd' : 'x';
+    return {
+      split: true, mode: mode,
+      mine: all.filter(function (a) { return inMode(a, mode); }),
+      others: rel.filter(function (a) { return inMode(a, mode); }),
+      ndMine: nd ? all.filter(function (a) { return inMode(a, 'd'); }) : [],
+      ndOthers: nd ? rel.filter(function (a) { return inMode(a, 'd'); }) : [],
+      otherTurn: nd ? 0 : all.filter(function (a) { return inMode(a, om); }).length,
+      otherAny: nd ? 0 : rel.filter(function (a) { return inMode(a, om); }).length
+    };
+  }
+  /** 메뉴 결재함 숫자 — 지금 갈래에서 내가 처리할 것만(운전 안 하는 사람은 아래 운행일지 칸까지). */
+  function inboxCount() {
+    var SP = inboxSplit();
+    return SP.mine.length + SP.ndMine.length;
+  }
+  function paintInboxPill() {
+    var el = $('pInbox'); if (!el) return;
+    var v = inboxCount();
+    el.hidden = !v;
+    el.textContent = v > 999 ? '999+' : n0(v);
+    el.className = 'pill' + (v > 0 ? ' hot' : '');
+  }
+
+  /* ══════════════════ 알림(종) — 2026-10-08 ══════════════════
+     결재 건(APPR + 확장 종류)에서 화면이 직접 만든다. 서버에 새 사건은 없다.
+       · 내가 올린 문서: 결재자 승인 · 결재 완료 · 반려(누가·사유) · 관리자 반려 · 정정 열기
+       · 내 차례가 된 문서: 「○○ 님 개인경비 10월분 결재 차례」
+     읽음 상태는 서버 notice_seen(사람마다 한 줄: seen_at 까지 모두 읽음 + 그 뒤 하나씩 읽은 키)에 둔다.
+     표가 아직 없거나(마이그레이션 적용 전) 실패하면 브라우저 저장소만 쓴다 — 오류를 띄우지 않는다. */
+  var NOTE = { at: null, ids: [], srv: '', loaded: false, open: false, saveT: 0, focus: '' };
+  var NOTE_MAX_IDS = 200, NOTE_DAYS = 90, NOTE_BASE_DAYS = 30;
+  function noteLsKey() { return 'drv.notice.' + myName(); }
+  function noteMs(t) { var v = t ? Date.parse(t) : NaN; return isNaN(v) ? 0 : v; }
+  function noteLocal() {
+    try { var j = JSON.parse(localStorage.getItem(noteLsKey()) || 'null'); return j && typeof j === 'object' ? j : null; } catch (e) { return null; }
+  }
+  function noteMerge(x) {
+    if (!x) return;
+    var at = noteMs(x.seen_at || x.at);
+    if (at && (NOTE.at == null || at > NOTE.at)) NOTE.at = at;
+    (Array.isArray(x.read_ids) ? x.read_ids : Array.isArray(x.ids) ? x.ids : []).forEach(function (k) {
+      if (typeof k === 'string' && NOTE.ids.indexOf(k) < 0) NOTE.ids.push(k);
+    });
+  }
+  /** 로그인 뒤 한 번 — 브라우저 것과 서버 것을 합친다(더 늦은 seen_at · 읽은 키 합집합). */
+  function noteLoad() {
+    if (NOTE.loaded || !myName()) return;
+    NOTE.loaded = true;
+    noteMerge(noteLocal());
+    apiRetry('/rest/v1/notice_seen?select=seen_at,read_ids&username=eq.' + encodeURIComponent(myName()))
+      .then(function (r) {
+        if (!r.ok) { NOTE.srv = 'off'; return null; }     // 표 없음(404)·권한 없음 — 브라우저 저장소만
+        NOTE.srv = 'on';
+        return r.json();
+      })
+      .then(function (rows) { if (Array.isArray(rows) && rows[0]) noteMerge(rows[0]); paintBell(); })
+      .catch(function () { NOTE.srv = 'off'; });
+  }
+  function notePersist() {
+    var me = myName(); if (!me) return;
+    // 읽은 키는 seen_at 이전 것이면 필요 없다 — 지금 목록에 없는 키부터 버리고 개수를 묶는다.
+    if (LOADED) {
+      var live = {}; noteEvents().forEach(function (e) { live[e.k] = 1; });
+      NOTE.ids = NOTE.ids.filter(function (k) { return live[k]; });
+    }
+    NOTE.ids = NOTE.ids.slice(-NOTE_MAX_IDS);
+    var row = { username: me, seen_at: new Date(NOTE.at || Date.now()).toISOString(), read_ids: NOTE.ids, updated_at: new Date().toISOString() };
+    try { localStorage.setItem(noteLsKey(), JSON.stringify(row)); } catch (e) { }
+    if (NOTE.srv !== 'on') return;
+    clearTimeout(NOTE.saveT);
+    NOTE.saveT = setTimeout(function () {
+      apiRetry('/rest/v1/notice_seen?on_conflict=username', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row)
+      }).then(function (r) { if (!r.ok) NOTE.srv = 'off'; }).catch(function () { NOTE.srv = 'off'; });
+    }, 500);
+  }
+  function noteTime(ms) {
+    var d = new Date(ms + 9 * 3600e3);
+    return pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
+  }
+  function noteDoc(a) {
+    var kd = kindDef(kindOf(a)), p = String(a.cycle || '').split('-');
+    return { sys: kd ? 'x' : 'd', tag: kd ? kd.tag : '운행일지', month: p.length === 2 ? (+p[1]) + '월분' : String(a.cycle || '') };
+  }
+  function noteWho(s) { return (s.box ? s.box + ' ' : '') + (s.name || nameOf(s.approver)) + ' 님'; }
+  /** 알림 목록(최근 순). 키는 사건마다 고유하다 — 다시 상신하면 단계 시각이 바뀌어 새 알림이 된다. */
+  function noteEvents() {
+    var me = myName(), out = [], lo = Date.now() - NOTE_DAYS * 864e5;
+    if (!me || !LOADED) return out;
+    allAppr().forEach(function (a) {
+      var D = noteDoc(a), base = (kindOf(a) || 'd') + ':' + a.id;
+      var steps = (a.steps || []).slice().sort(function (x, y) { return x.seq - y.seq; });
+      var push = function (k, ms, txt, why, turn) {
+        if (!ms || (!turn && ms < lo)) return;
+        // 윗줄(문서) — 내 차례 알림은 본문이 이미 「누구 님 무슨 문서」라 윗줄에는 내 칸만 적는다.
+        out.push({ k: base + ':' + k, ms: ms, sys: D.sys, tag: D.tag,
+          doc: turn ? (turn.box ? turn.box + ' 칸 결재 요청' : '결재 요청') : (a.username === me ? '내 ' : nameOf(a.username) + ' 님 ') + D.tag + ' ' + D.month,
+          txt: txt, why: why || '', turn: !!turn, id: a.id, kind: kindOf(a) });
+      };
+      if (a.username === me) {
+        var allOk = steps.length > 0 && steps.every(function (s) { return s.result === 'approved'; });
+        var reo = steps.filter(function (s) { return s.reopened_by; })[0];
+        steps.forEach(function (s, i) {
+          if (!s.acted_at || !s.result) return;
+          var ms = noteMs(s.acted_at);
+          if (s.result === 'approved') {
+            if (allOk && i === steps.length - 1) {
+              push('done:' + s.acted_at, ms, '결재 완료 — ' + noteWho(s) + '이 마지막으로 승인', s.comment);
+            } else push('a' + s.seq + ':' + s.acted_at, ms, noteWho(s) + '이 승인', s.comment);
+          } else if (s.result === 'rejected') {
+            push('r' + s.seq + ':' + s.acted_at, ms, s.forced_by
+              ? '관리자 ' + nameOf(s.forced_by) + ' 님이 반려(결재자 대신)'
+              : noteWho(s) + '이 반려', s.comment || '');
+          }
+        });
+        if (reo) {
+          var rms = noteMs(reo.reopened_at) || noteMs(a.closed_at);
+          push('reopen:' + (reo.reopened_at || a.closed_at), rms, nameOf(reo.reopened_by) + ' 님이 정정으로 다시 열었습니다', reo.reopen_reason);
+        }
+      }
+      if (a.status === 'submitted') {
+        var cur = steps.filter(function (s) { return s.seq === a.cur_seq; })[0];
+        if (cur && cur.approver === me) {
+          var prev = steps.filter(function (s) { return s.seq < a.cur_seq && s.acted_at; }).pop();
+          var tms = noteMs(prev && prev.acted_at) || noteMs(a.submitted_at);
+          push('turn' + a.cur_seq + ':' + (a.submitted_at || ''), tms,
+            nameOf(a.username) + ' 님 ' + D.tag + ' ' + D.month + ' 결재 차례', '', cur);
+        }
+      }
+    });
+    return out.sort(function (x, y) { return y.ms - x.ms; }).slice(0, 60);
+  }
+  function noteBase() { return NOTE.at != null ? NOTE.at : Date.now() - NOTE_BASE_DAYS * 864e5; }
+  function noteUnread(e) { return e.ms > noteBase() && NOTE.ids.indexOf(e.k) < 0; }
+  function paintBell() {
+    var n = noteEvents().filter(noteUnread).length;
+    var t = n > 99 ? '99+' : String(n);
+    [['bellN', 'bellBtn'], ['uBadge', 'uBtn']].forEach(function (p) {
+      var b = $(p[0]); if (b) { b.hidden = !n; b.textContent = t; }
+    });
+    var bb = $('bellBtn');
+    if (bb) bb.setAttribute('aria-label', n ? '알림 — 읽지 않은 ' + n + '건' : '알림');
+    var ub = $('uBtn');
+    if (ub) ub.setAttribute('aria-label', '내 정보' + (n ? ' · 읽지 않은 알림 ' + n + '건' : ''));
+    if (NOTE.open) paintNotePop();
+  }
+  /** 좁은 폰(≤460px)에서는 종을 따로 두지 않는다 — 머리줄이 넘친다. 이름 단추가 알림 창을 연다(창 안에 「내 계정」). */
+  function bellNarrow() { try { return window.matchMedia('(max-width:460px)').matches; } catch (e) { return false; } }
+  function paintNotePop() {
+    var pop = $('notePop'); if (!pop) return;
+    var ev = noteEvents(), un = ev.filter(noteUnread).length;
+    pop.innerHTML =
+      '<div class="nh"><b>알림</b>' + (un ? '<span class="nc">' + n0(un) + '</span>' : '') + '<span class="sp"></span>' +
+        '<button type="button" class="nlink" data-noteacct>' + ic('users', 14) + '내 계정</button>' +
+        (un ? '<button type="button" class="nall" data-noteall>모두 읽음</button>' : '') + '</div>' +
+      (ev.length
+        ? '<div class="nlist">' + ev.map(function (e) {
+            var u = noteUnread(e);
+            return '<button type="button" class="ni' + (u ? ' un' : '') + (e.turn ? ' turn' : '') + '" data-note="' + esc(e.k) + '">' +
+              '<span class="nd" aria-hidden="true"></span>' +
+              '<span class="nb"><span class="nt"><span class="akind' + (e.sys === 'x' ? ' x' : '') + '">' + esc(e.tag) + '</span>' +
+                '<span class="ndoc">' + esc(e.doc) + '</span><time>' + noteTime(e.ms) + '</time></span>' +
+              '<span class="nx">' + esc(e.txt) + (u ? '<span class="sr"> (안 읽음)</span>' : '') + '</span>' +
+              (e.why ? '<span class="nw">' + esc(e.why) + '</span>' : '') + '</span></button>';
+          }).join('') + '</div>'
+        : '<div class="nempty">' + ic('check', 20) + '<b>새 알림이 없습니다</b><span>결재가 진행되거나 내 차례가 되면 여기에 뜹니다.</span></div>');
+  }
+  function openNotePop(on) {
+    var pop = $('notePop'); if (!pop) return;
+    if (on === undefined) on = pop.hidden;
+    if (on) { noteLoad(); openCyclePop(false); }
+    NOTE.open = !!on;
+    pop.hidden = !on;
+    var bb = $('bellBtn'), ub = $('uBtn');
+    if (bb) bb.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (ub && bellNarrow()) ub.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (on) {
+      paintNotePop();
+      var f = pop.querySelector('.ni.un') || pop.querySelector('.ni') || pop.querySelector('button');
+      if (f) { try { f.focus({ preventScroll: true }); } catch (e) { } }
+    }
+  }
+  function noteReadAll() {
+    var mx = Date.now();
+    noteEvents().forEach(function (e) { if (e.ms > mx) mx = e.ms; });
+    NOTE.at = mx; NOTE.ids = [];
+    notePersist(); paintBell();
+  }
+  /** 알림을 눌렀다 — 읽음으로 하고 그 문서가 있는 갈래의 결재함을 열어 그 카드로 간다. */
+  function noteOpen(k) {
+    var e = noteEvents().filter(function (x) { return x.k === k; })[0];
+    if (!e) return;
+    if (NOTE.ids.indexOf(k) < 0) NOTE.ids.push(k);
+    notePersist();
+    openNotePop(false);
+    if (!noDriving()) NAV_MODE = e.sys;
+    INBOX_F = 'all';
+    NOTE.focus = (e.kind || 'd') + ':' + e.id;
+    if (VIEW === 'inbox') render(); else go('inbox');
+    paintBell();
+    noteFocusCard();
+  }
+  function noteFocusCard() {
+    if (!NOTE.focus) return;
+    var c = document.querySelector('.acard[data-akey="' + NOTE.focus + '"]');
+    if (!c) return;
+    NOTE.focus = '';
+    c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
+    try { c.scrollIntoView({ block: 'center' }); } catch (e) { c.scrollIntoView(); }
   }
   /** 결재 완료 건을 정정으로 다시 열 수 있는가 — 운행일지 관리자만(서버 approval-act 'reopen' 도 같은 판정). */
   function canReopen(a) { return !!(ME && ME.is_admin && a && a.status === 'approved'); }
@@ -2848,7 +3094,7 @@
     // 결재 문서 종류(개인경비 등)가 붙어 있으면 한 결재함에서 어느 문서인지 딱지로 가른다.
     var kd = kindDef(kindOf(a)), anyKind = Object.keys(EXT.kinds).length > 0;
     var kattr = kd ? ' data-kind="' + esc(kindOf(a)) + '"' : '';
-    return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '">' +
+    return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc((kindOf(a) || 'd') + ':' + a.id) + '">' +
       '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' x' : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
@@ -3309,7 +3555,8 @@
       '<p class="verdict' + clean + '">' + verdict + '</p>' + (desc ? '<div class="nd">' + esc(desc) + '</div>' : '') + '</div>' +
       (btns ? '<div class="nowbtns">' + btns + '</div>' : '') + '</div></div>';
 
-    var ib = inbox();
+    // 운행일지 첫 화면 — 결재함 갈래 나누기(2026-10-08)에 맞춰 운행일지 결재 건만 센다(「결재함 열기」가 여는 것과 같게).
+    var ib = inbox().filter(function (a) { return !kindOf(a); });
     var monthOf = function (c) { var p = String(c || '').split('-'); return p.length === 2 ? (+p[1]) + '월분' : String(c || ''); };
     h += '<div class="cards3">' +
       '<div class="cardx"><div class="k">' + (closed ? '업무용 비용' : '업무용 비용 (지금까지)') + '</div><div class="v">' + won(T.cost) + '</div><div class="rows">' +
@@ -6379,6 +6626,8 @@
     var cl = $('cycLab');
     //   결재함 같은 공용 화면은 운행일지 기간 규칙으로 그려지므로 그냥 「기간」이라 부른다(이름표와 날짜가 어긋나지 않게).
     if (cl) cl.textContent = SHARED_VIEWS.indexOf(VIEW) >= 0 ? '기간' : NAV_MODE === 'x' ? '경비 기간' : '마감 기간';
+    // 결재함 숫자는 갈래마다 다르다 — 갈래가 바뀌면 다시 센다.
+    paintInboxPill();
   }
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
@@ -6421,6 +6670,7 @@
     // 드롭존은 화면을 다시 그릴 때마다 새로 생기므로 그때마다 연결한다.
     bindDrop($('hpDrop'), hpFiles);
     afterPaint();
+    noteFocusCard();
     // 정렬 머리를 눌러 다시 그렸으면 그 머리로 포커스를 돌려준다(키보드로 누르던 자리를 잃지 않게).
     if (SORT_FOCUS) {
       var sf = $('inner').querySelector('[data-sort="' + SORT_FOCUS + '"]');
@@ -6540,6 +6790,21 @@
     // 패널이 닫혀 있을 때 누른 것이 곧 '연 버튼' 이다(닫을 때 포커스를 돌려준다).
     if (!$('panel').classList.contains('open')) {
       PANEL_FROM = e.target.closest('button,a,[tabindex],tr.clk') || null;
+    }
+    /* ── 알림(종) ── 좁은 폰에서는 이름 단추가 알림 창을 연다(창 안에 「내 계정」). */
+    if (e.target.closest('#bellBtn') || (e.target.closest('#uBtn') && bellNarrow())) { openNotePop(); return; }
+    if ((el = e.target.closest('[data-note]'))) { noteOpen(el.dataset.note); return; }
+    if (e.target.closest('[data-noteall]')) {
+      noteReadAll();
+      var nf = $('notePop') && $('notePop').querySelector('.ni,button'); if (nf) { try { nf.focus({ preventScroll: true }); } catch (er) { } }
+      return;
+    }
+    if (e.target.closest('[data-noteacct]')) { openNotePop(false); go('account'); return; }
+    if (NOTE.open && !e.target.closest('#noteBox')) openNotePop(false);
+    if ((el = e.target.closest('[data-inboxmode]'))) {
+      NAV_MODE = el.dataset.inboxmode === 'x' ? 'x' : 'd'; INBOX_F = 'all';
+      if (VIEW === 'inbox') render(); else go('inbox');
+      window.scrollTo({ top: 0 }); return;
     }
     if (e.target.closest('#btnKeep')) {
       if (CLOSE_ASK != null) { $('pFoot').innerHTML = CLOSE_ASK; CLOSE_ASK = null; }
@@ -7068,6 +7333,11 @@
     }
     if (e.key === 'Escape') {
       if (!$('cycPop').hidden) { openCyclePop(false); return; }
+      if (NOTE.open) {
+        openNotePop(false);
+        var nb = bellNarrow() ? $('uBtn') : $('bellBtn'); if (nb) { try { nb.focus(); } catch (er) { } }
+        return;
+      }
       askClose(); document.body.classList.remove('nav-open');
     }
     // [ ] 로 앞뒤 주기 — 글자를 치는 중이거나 창이 열려 있으면 건드리지 않는다.

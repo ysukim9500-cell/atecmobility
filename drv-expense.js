@@ -161,7 +161,14 @@
     var S = C.state(), k = itemKey(all, S.CYCKEY), x = ITEMS[k];
     if (x && x.rows) return x.rows;
     if (x && x.err) return { err: x.err };
-    if (!x) loadItems(S.CYCKEY, all).then(function () { if (XVIEWS.indexOf(C.state().VIEW) >= 0) C.render(); });
+    // 이미 받으러 간 중이어도(화면 이동 훅·새로고침이 먼저 출발) 끝나면 다시 그린다 — 예전엔 !x 일 때만 다시 그려서
+    // 관리 화면(개인경비 현황 등)이 뼈대(로딩)에 멈춰 있곤 했다(2026-10-08).
+    var p = x ? x.wait : loadItems(S.CYCKEY, all);
+    if (p && !(x && x.hooked)) {
+      if (x) x.hooked = true; else if (ITEMS[k]) ITEMS[k].hooked = true;
+      var want = S.CYCKEY;
+      p.then(function () { var T = C.state(); if (XVIEWS.indexOf(T.VIEW) >= 0 && T.CYCKEY === want) C.render(); });
+    }
     return null;
   }
   function xApprOf(u, cyc) {

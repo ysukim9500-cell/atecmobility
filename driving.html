@@ -1300,8 +1300,10 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--red);cursor:point
 }
 
 /* 작은 폰(≤430px)에서는 ATEC DRIVING 이 헤더를 밀어낸다(360px 에서 27px 넘침).
-   그 폭에서는 예전처럼 ATEC 단독 마크만 둔다. */
-@media (max-width:430px){
+   그 폭에서는 예전처럼 ATEC 단독 마크만 둔다.
+   ★ 2026-10-08 실측: 431~490px(큰 폰 가로·작은 태블릿)에서도 머리줄이 최대 33px 넘쳐 화면 전체가 옆으로 밀렸다
+     (종을 넣기 전부터). 종까지 들어가면 540px 까지 모자란다 — 540px 까지 단독 마크로. */
+@media (max-width:540px){
   .logo-mark{display:none}
   .logo-mark.tiny{display:block;height:13px}
 }
@@ -1500,6 +1502,78 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   /* 폴드 등 아주 좁은 폭 — 앞뒤 단추는 접고 가운데(기간 고르기) 창으로 넘긴다 */
   .cyc .cycnav{display:none}
 }
+
+/* ═══ 알림(종) · 결재함 갈래 (2026-10-08) ═══
+   머리줄 이름 단추 왼쪽의 종. 460px 이하에서는 머리줄이 넘치므로 종을 감추고, 빨간 숫자는 이름 단추에 붙이고
+   이름 단추가 알림 창을 연다(창 안에 「내 계정」). */
+.notew{position:relative;display:flex;align-items:center}
+.bellbtn{position:relative}
+.uchip{position:relative}
+.nbadge{position:absolute;top:-7px;right:-8px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:12px;font-weight:700;line-height:18px;text-align:center;
+  box-shadow:0 0 0 2px #fff;pointer-events:none;font-variant-numeric:tabular-nums}
+.nbadge[hidden]{display:none}
+#uBadge{display:none}
+#notePop{position:absolute;top:calc(100% + 10px);right:-4px;z-index:60;width:392px;max-width:calc(100vw - 24px);
+  max-height:min(72vh,600px);overflow:auto;overscroll-behavior:contain;background:var(--surface);
+  border:1px solid var(--ink-200);border-radius:var(--r);
+  box-shadow:0 18px 44px -18px rgba(29,37,43,.34),0 2px 6px rgba(29,37,43,.06)}
+#notePop[hidden]{display:none}
+#notePop .nh{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;padding:12px 14px 10px;
+  background:var(--surface);border-bottom:1px solid var(--ink-100)}
+#notePop .nh b{font-size:15px;font-weight:800;color:var(--ink-900)}
+#notePop .nh .nc{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;
+  font-size:12px;font-weight:700;line-height:20px;text-align:center}
+#notePop .nh .sp{flex:1}
+#notePop .nall,#notePop .nlink{height:32px;padding:0 10px;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);
+  font:inherit;font-size:13px;color:var(--ink-700);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+#notePop .nall:hover,#notePop .nlink:hover{border-color:var(--ink-400);background:var(--sunken)}
+#notePop .nlink{display:none}
+#notePop .ni{display:flex;gap:10px;width:100%;padding:12px 14px;border:0;border-bottom:1px solid var(--ink-100);
+  background:none;font:inherit;text-align:left;cursor:pointer;color:var(--ink-700)}
+#notePop .ni:last-child{border-bottom:0}
+#notePop .ni:hover{background:var(--sunken)}
+#notePop .ni.un{background:#FFF7F9}
+#notePop .ni.un:hover{background:var(--red-50)}
+#notePop .ni:focus-visible,#notePop .nall:focus-visible,#notePop .nlink:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+#notePop .nd{flex:none;width:8px;height:8px;margin-top:7px;border-radius:50%;background:transparent}
+#notePop .ni.un .nd{background:var(--red)}
+#notePop .nb{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+#notePop .nt{display:flex;align-items:center;gap:6px;min-width:0;font-size:12.5px;color:var(--ink-500)}
+#notePop .nt .ndoc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#notePop .nt time{flex:none;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-500)}
+#notePop .nx{font-size:14px;color:var(--ink-900);line-height:1.45}
+#notePop .ni.un .nx{font-weight:700}
+#notePop .ni.turn .nx{color:var(--red-700,#B00040)}
+#notePop .nw{font-size:13px;color:var(--ink-600);line-height:1.45;padding:6px 9px;border-radius:var(--r-xs);background:var(--ink-50,#F5F7F8);
+  border-left:3px solid var(--ink-300);word-break:keep-all;overflow-wrap:anywhere}
+#notePop .nempty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 18px 38px;text-align:center;color:var(--ink-500);font-size:13px}
+#notePop .nempty svg{color:var(--ink-400)}
+#notePop .nempty b{font-size:14px;color:var(--ink-800,#2A3136)}
+/* 결재함 — 다른 갈래로 가는 한 줄 · 알림에서 연 카드 */
+.ibswitch{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;margin:0 0 16px;padding:9px 14px;
+  border:1px solid var(--ink-200);border-radius:var(--r-sm);background:var(--surface);font:inherit;font-size:13.5px;
+  color:var(--ink-700);text-align:left;cursor:pointer;transition:border-color var(--t),background var(--t)}
+.ibswitch span{flex:1;min-width:0}
+.ibswitch svg{flex:none;color:var(--ink-500)}
+.ibswitch:hover{border-color:var(--ink-400);background:var(--sunken)}
+.ibswitch.hot{border-color:#F3C2D0;background:#FFF7F9}
+.ibswitch.hot b{color:var(--red)}
+.ibswitch:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.acard.flash{animation:acflash 1.8s ease-out}
+@keyframes acflash{0%,35%{background:var(--red-50);box-shadow:inset 3px 0 0 var(--red)}100%{background:transparent;box-shadow:none}}
+@media (prefers-reduced-motion:reduce){.acard.flash{animation:none;background:var(--red-50)}}
+@media screen and (max-width:900px){
+  #notePop{position:fixed;top:calc(var(--head) + 6px);left:12px;right:12px;width:auto;max-width:none;max-height:calc(100dvh - var(--head) - 24px)}
+}
+/* 종이 따로 들어갈 자리는 머리줄 실측(2026-10-08)으로 461px 부터 있다 — 412px 폰에서 종을 넣으면 27px 넘쳤다. */
+@media screen and (max-width:460px){
+  .notew{display:contents}          /* 빈 칸이 머리줄 간격(6px)을 먹지 않게 */
+  .notew .bellbtn{display:none}
+  #uBadge{display:block;top:-8px;right:-7px}
+  #uBadge[hidden]{display:none}
+  #notePop .nlink{display:inline-flex}
+}
 </style>
 </head>
 <body>
@@ -1545,6 +1619,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <g id="i-out" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 8V5.8a1.6 1.6 0 00-1.6-1.6H5.6A1.6 1.6 0 004 5.8v12.4a1.6 1.6 0 001.6 1.6h7.3a1.6 1.6 0 001.6-1.6V16"/><path d="M9 12h11M16.8 8.6L20.2 12l-3.4 3.4"/></g>
 <g id="i-stamp" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 19.2h15.6"/><path d="M5.6 16.4h12.8v-1.6a1.6 1.6 0 00-1.6-1.6H7.2a1.6 1.6 0 00-1.6 1.6z"/><path d="M9.6 13.2V9.8a2.4 2.4 0 114.8 0v3.4"/></g>
 <g id="i-menu" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g>
+<g id="i-bell" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 16.6V11a5.8 5.8 0 0111.6 0v5.6l1.6 1.8H4.6z"/><path d="M10 20.2a2.1 2.1 0 004 0"/></g>
 </defs></svg>
 
 <!-- ═══ 로그인 ═══ -->
@@ -1593,8 +1668,14 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
         <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
       <div id="cycPop" role="dialog" aria-label="기간 고르기" hidden></div>
     </div>
+    <!-- 알림(2026-10-08) — 결재 진행·내 차례. 460px 이하에서는 종을 감추고 이름 단추가 이 창을 연다(빨간 숫자도 이름 단추에). -->
+    <div class="notew" id="noteBox">
+      <button class="iconbtn bellbtn" id="bellBtn" aria-label="알림" title="알림" aria-haspopup="dialog" aria-expanded="false" aria-controls="notePop">
+        <svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-bell"/></svg><span class="nbadge" id="bellN" hidden></span></button>
+      <div id="notePop" role="dialog" aria-label="알림" hidden></div>
+    </div>
     <button class="uchip" id="uBtn" title="내 정보">
-      <span class="uav" id="uAv">—</span>
+      <span class="uav" id="uAv">—</span><span class="nbadge" id="uBadge" hidden></span>
       <span class="utxt"><b id="uName">—</b><span id="uMeta"></span></span>
     </button>
     <button class="iconbtn" id="logoutBtn" aria-label="로그아웃" title="로그아웃">
