@@ -6340,6 +6340,24 @@
     if (inbox().length) return 'inbox';
     return VIEWS.x_month ? 'x_month' : 'inbox';
   }
+  // 메뉴 갈래(2026-10-08): 'd' 운행일지 · 'x' 개인경비. 함께 쓰는 화면에서는 앞 갈래를 그대로 둔다.
+  var NAV_MODE = 'd';
+  var SHARED_VIEWS = ['inbox', 'account', 'people', 'org', 'perm'];
+  function navModeOf(v) {
+    if (/^xa?_/.test(v)) return 'x';
+    if (SHARED_VIEWS.indexOf(v) >= 0) return NAV_MODE;
+    return 'd';
+  }
+  function paintNavMode() {
+    NAV_MODE = noDriving() ? 'x' : navModeOf(VIEW);
+    document.body.classList.toggle('mode-x', NAV_MODE === 'x');
+    document.body.classList.toggle('mode-d', NAV_MODE === 'd');
+    Array.prototype.forEach.call(document.querySelectorAll('#navMode [data-mode]'), function (a) {
+      var cur = a.dataset.mode === NAV_MODE;
+      a.classList.toggle('cur', cur);
+      a.setAttribute('aria-selected', cur ? 'true' : 'false');
+    });
+  }
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
   function render() {
@@ -6359,7 +6377,9 @@
         '<div class="dim" style="margin-bottom:16px">잠시 뒤 다시 시도해 주세요.</div>' +
         '<button class="btn pri" id="btnRetryLoad">다시 불러오기</button></div></section>'
       : (LOADED ? stepChrome((VIEWS[VIEW] || viewClose)()) : (VIEWS[VIEW] || viewClose)());
+    paintNavMode();
     Array.prototype.forEach.call($('nav').querySelectorAll('[data-v]'), function (a) {
+      if (a.closest('#navMode')) return;     // 갈래 단추는 paintNavMode 가 칠한다
       // 같은 단계로 묶인 화면(data-alt)에 있어도 그 단계 메뉴에 불이 들어온다.
       var on = a.dataset.v === VIEW || (a.dataset.alt || '').split(',').indexOf(VIEW) >= 0;
       a.classList.toggle('on', on);
