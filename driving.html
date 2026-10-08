@@ -242,7 +242,7 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cyc .cycle:focus-visible,.cycnav:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .cyc.multi .cycle{border-color:var(--ink-600);background:var(--ink-50)}
 .cyc.multi .cycle .tag{color:var(--ink-900);font-weight:500}
-.cyc.past .cycle .tag::after{content:" · 지난 주기";color:var(--warn)}
+.cyc.past .cycle .tag::after{content:" · 지난 기간";color:var(--warn)}
 .cycnav{width:30px;height:34px;display:grid;place-items:center;border:1px solid var(--ink-200);border-radius:var(--r-xs);
   background:var(--surface);color:var(--ink-600);cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t)}
 .cycnav:hover:not(:disabled){background:var(--sunken);border-color:var(--ink-400);color:var(--ink-900)}
@@ -254,7 +254,7 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cyc .cycle svg{color:var(--red)}
 .cyc .cycle:hover{background:var(--red-100,#FBDDE4);border-color:var(--red)}
 .cyc .cycle .tag{font-size:12px;font-weight:500;color:var(--ink-600)}
-.cyc:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 주기";color:var(--red-700);font-weight:700}
+.cyc:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 기간";color:var(--red-700);font-weight:700}
 .cyc.xper:not(.past):not(.multi) .cycle .tag::after{content:" · 이번 기간"}
 .cyc.xper.past:not(.multi) .cycle .tag::after{content:" · 지난 기간"}
 .cyc.past .cycle{border-color:var(--warn);background:var(--warn-50)}
@@ -1356,6 +1356,150 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 }
 @media (max-width:380px){.cyc .cycle{font-size:14px;padding:0 8px}}
 }
+
+/* ═══ 폰·태블릿 정리 (2026-10-08 모바일 점검 로봇 4대) ═══
+   PC(901px 이상) 모양은 그대로 두고, 좁은 화면에서만 원인별로 한 번에 고친다. 화면 전용(인쇄·PDF 양식 무관). */
+/* 결재 진행 막대 — 번호·이름을 한 덩어리로(줄이 바뀌어도 번호만 윗줄에 남지 않게). PC 간격(2px)은 그대로. */
+.astep{display:inline-flex;align-items:center;gap:0 2px;white-space:nowrap}
+@media screen and (max-width:900px){
+  /* ① 한글이 글자 단위로 끊기던 것 — 어절로 접고, 넘치는 긴 낱말(주소·영문)만 어디서든 끊는다 */
+  body{word-break:keep-all;overflow-wrap:anywhere}
+  .phead h1,.verdict,.ahd b,#panel .ph .t{text-wrap:balance}
+  .anote,.hpnote,.fhint,.nextstep .t,.vd,.issue .d,.phead p,.cycband span,.awarn{text-wrap:pretty}
+  /* ② 머리줄 — 본문과 같은 16px 여백 */
+  header.top{padding:0 16px}
+  /* 머리줄 단추는 넓히면 다시 넘친다 — 누르는 자리만 겉으로 넓힌다 */
+  header.top .iconbtn,header.top .cycnav,header.top .uchip{position:relative}
+  #appLogo{min-height:40px}
+  header.top .iconbtn::after,header.top .cycnav::after,header.top .uchip::after{content:"";position:absolute;inset:-4px -3px}
+  /* ③ 입력칸 16px 미만이면 iOS 가 화면을 확대한다 — 칸마다 따로 지정된 크기(12~14px)를 한 번에 덮는다 */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),select,textarea{font-size:16px !important}
+  /* ④ 표 모양 「이름–값」(내 계정·안전운전) — .kv(flex) 규칙이 표에도 걸려 머리칸이 한 글자씩 세로로 섰다 */
+  table.kv{display:table;padding:0;border-bottom:0;gap:0}
+  table.kv th{width:1%;white-space:nowrap;word-break:keep-all;vertical-align:top;padding-right:12px}
+  table.kv td{white-space:normal;overflow-wrap:anywhere}
+  /* ⑤ 알림(토스트) — 왼쪽 50% 기준이라 폭이 화면 절반으로 눌렸다 */
+  #toast{left:16px;right:16px;margin:0 auto;width:max-content;max-width:min(560px,calc(100vw - 32px));transform:translateY(16px)}
+  #toast.show{transform:none}
+  /* ⑥ 결재 요약 숫자 「(+363%)」가 옆 칸으로 넘치던 것 */
+  .abf b{white-space:normal}
+  .abf b small{display:inline-block;white-space:nowrap}
+  /* ⑦ 정렬 */
+  .vtabs button{white-space:nowrap;flex:none}
+  .qd{white-space:nowrap}
+  .steps .stp{display:grid;grid-template-columns:6px 8.5em minmax(0,1fr);align-items:center;gap:10px;min-height:40px}
+  .facts > .fact:last-child:nth-child(odd){grid-column:1 / -1}
+  .dfil{height:38px}
+  .xcal .xw{padding:2px 0 4px;text-align:center;width:100%}
+  #xeCat,#xeDate{max-width:none !important}
+  .form input.inp:not([type=checkbox]):not([type=radio]),.form select.inp{height:44px}
+  /* 표가 옆으로 더 있다는 표시 — 표를 감싼 상자 오른쪽 끝 그림자(끝까지 밀면 사라진다, .scrollmore 는 afterPaint 가 단다).
+     표 배경에 그리면 색이 있는 줄(소계·묶음)만 가려져 줄무늬가 됐다 — 상자 위에 겹쳐 그린다. */
+  .panel.scrollmore{position:relative}
+  .panel.scrollmore::after{content:"";position:absolute;top:0;right:0;bottom:0;width:16px;pointer-events:none;z-index:3;
+    background:linear-gradient(to left,rgba(29,37,43,.14),rgba(29,37,43,0))}
+  /* 소속 칸(파트·센터 이름)은 낱말 중간에서 끊지 않는다 */
+  td.orgc b,td.orgc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 개인경비 내역 표 — 옆으로 밀지 않고 줄마다 카드로(901px 이상 PC 표는 그대로).
+     왼쪽 칸(날짜·사용처·내역)이 주인공 — 오른쪽 칸에는 금액만 두고, 식비 초과 표시·고치기 단추는 한 줄 전체로 내린다. */
+  .scroll table.xtab{min-width:0;width:100%}
+  table.xtab,table.xtab tbody,table.xtab tfoot{display:block}
+  table.xtab thead{display:none}
+  table.xtab tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:12px 14px;border-top:1px solid var(--ink-100)}
+  table.xtab tbody tr:first-child{border-top:0}
+  table.xtab td{display:block;padding:0 !important;border:0 !important;position:static !important;white-space:normal !important;background:none !important;max-width:none;min-width:0}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td{grid-column:1 / -1}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td:first-child{grid-column:1;grid-row:1}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td .lead{white-space:nowrap}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td.n.total{display:contents}
+  table.xtab .xamt{grid-column:2;grid-row:1;max-width:9em;text-align:right;white-space:nowrap;font-weight:700;color:var(--ink-900)}
+  table.xtab .xmealw{grid-column:1 / -1;text-align:left}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td:empty{display:none}
+  /* 사진 단추(왼쪽)와 고치기·지우기(오른쪽)는 같은 줄 — 날짜 줄 말고는 모두 한 줄 전체를 쓰므로 오른쪽 칸이 넓어져도 글이 눌리지 않는다 */
+  table.xtab tbody tr:not(.xsec):not(.xsub) td.xph{grid-column:1}
+  table.xtab tbody tr:not(.xsec):not(.xsub) td.xact{grid-column:2;text-align:right;align-self:end}
+  table.xtab td.xnote:not(:empty)::before{content:"비고: ";color:var(--ink-500)}
+  table.xtab tr.xsec,table.xtab tr.xsub{background:var(--sunken)}
+  table.xtab tr.xsec td,table.xtab tr.ogrp td{grid-column:1 / -1}
+  table.xtab tr.xsub td,table.xtab tfoot td{grid-column:1;grid-row:1}
+  table.xtab tr.xsub td.n,table.xtab tfoot td.n{grid-column:2;grid-row:1;white-space:nowrap !important}
+  table.xtab tr.xsub td[colspan="4"],table.xtab tfoot td[colspan="4"],table.xtab tfoot td:empty{display:none}
+  .xmeal{white-space:normal}
+  /* ⑧ 누르는 자리 40px 안팎 */
+  .btn,.btn.sm{min-height:38px}
+  .btn.sm{height:38px}
+  .aact .btn{height:40px}
+  .ag-x{width:28px;height:28px}
+  #nav .navsys a.navback{height:40px}
+  .cpq{height:36px}
+  .cycnav{min-width:24px}
+  th.srt button{padding:8px 0;margin:-8px 0}
+  input[type=checkbox]{width:20px;height:20px}
+  .atn{min-height:40px}
+  .hpnote .iconbtn{width:36px;height:36px}
+  /* ⑨ 12px 미만 글자 → 12px 이상 */
+  .gem,.akind,.ag-b small,.ag-pick,.cp-sec small,.kbd,.omail,.uav,.navsec,.admsec,.abf .k,.abf .sub,.abf b small,
+  .orgbar .osel,.xcal .xw,.onode .c,.atn .atc,.acg,.ostep em,td.whoc .wo,.alabel em,.seg button .c,.pill,
+  .anode,.tcard .ts,.tcard .tm,tr.ogrp .od,tr.ogrp .on,.nowrow .nk,.otile .d,.otile b small,td.mono,.mtable th{font-size:12px}
+  /* 표 안 보조 줄은 글자 크기가 인라인(11~11.5px)으로 박혀 있다 */
+  td .dim[style*="font-size:11"]{font-size:12px !important}
+  .xcal .xc,.xcal .xas{font-size:12px}
+  /* ⑩ 키보드 안내는 터치 기기에서 뜻이 없다 */
+}
+@media (hover:none){.kbdhint{display:none}}
+@media screen and (max-width:600px){
+  /* 글 + 오른쪽 단추 덩어리 — 글 칸이 70~110px 로 눌리던 것. 단추를 글 아래 줄로 */
+  .nextstep{flex-wrap:wrap}
+  .nextstep .t{flex:1 1 calc(100% - 40px)}
+  .nextstep .btn{flex:1 1 auto;justify-content:center}
+  .hpnote{flex-wrap:wrap}
+  .hpnote > span{flex:1 1 calc(100% - 30px)}
+  .hpnote > .btn{margin-left:26px}
+  .vitem{flex-wrap:wrap}
+  .vitem .vgo{margin-left:66px}
+  .cycband > span{flex:1 1 100%;min-width:0}
+  .cycband .btn{margin-left:0}
+  /* 필터 줄 — 높이를 38 하나로, 두 칸 격자로 맞춘다 */
+  .bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .bar > .sp{display:none}
+  .bar > .dfil,.bar > .seg,.bar > .fbar,.bar > .permq,.bar > div:not(.sp):not(.field){grid-column:1 / -1}
+  /* :has 는 따로 둔다 — 목록에 섞으면 :has 를 모르는 브라우저(iOS 15.0~15.3 등)가 위 규칙까지 통째로 버린다 */
+  .bar > label.field:has(input){grid-column:1 / -1}
+  .bar > .field,.bar > .btn,.bar > .dfil{width:100%;min-width:0;height:38px}
+  .bar > .btn{justify-content:center}
+  .bar .field select{flex:1;min-width:0;width:100%}
+  .bar .field input{flex:1;min-width:0;width:auto}
+  .dfil{flex-wrap:wrap;height:auto !important;min-height:38px;padding:3px 6px 3px 11px;row-gap:4px}
+  .dfil input{flex:1 1 0;min-width:0;width:auto}
+  .dfil .qd{height:30px}
+  /* 보는 범위(관리 화면) — 라벨 칸을 맞춘 격자 */
+  .orgbar{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  .orgbar .osel{display:grid;grid-template-columns:5.5em minmax(0,1fr);align-items:center}
+  .orgbar .osel select{max-width:none;width:100%}
+  .orgbar .ocnt{margin-left:0}
+  .orgbar #ofClear{justify-self:start}
+  /* 영수증 차례 · 단추 반반 */
+  .evsubs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .evs{min-width:0}
+  .evsact > .btn{flex:1 1 calc(50% - 4px);justify-content:center}
+  .evsact > span[style*="flex:1"]{display:none}
+  /* 영수증 올리기 창 — 창 안에 또 스크롤(52vh)이 있어 두 번 밀어야 했다. 파일을 고른 뒤엔 끌어 놓기 상자를 줄인다 */
+  #xList .scroll[data-rows]{max-height:none !important}
+  #xDrop:has(+ #xList > .panel){padding:14px 16px}
+  #xDrop:has(+ #xList > .panel) .gemorb,#xDrop:has(+ #xList > .panel) .dd,#xDrop:has(+ #xList > .panel) .gemchip{display:none}
+}
+@media screen and (max-width:400px){
+  /* 머리줄이 360px 에서 6~14px 넘쳐 로그아웃이 잘리고 모든 화면이 옆으로 밀렸다 */
+  header.top{gap:6px}
+  .cyc{gap:2px}
+  .cyc .cycnav{width:24px}
+  .cyc .cycle > svg:first-child{display:none}
+  .uchip{padding:3px}
+}
+@media screen and (max-width:344px){
+  /* 폴드 등 아주 좁은 폭 — 앞뒤 단추는 접고 가운데(기간 고르기) 창으로 넘긴다 */
+  .cyc .cycnav{display:none}
+}
 </style>
 </head>
 <body>
@@ -1438,14 +1582,14 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
     <!-- 기간: ◀ ▶ 로 한 주기씩, 가운데를 누르면 주기 목록·여러 주기 조회. 키보드 [ ] 도 된다. -->
     <div class="cyc" id="cycleBox">
       <span class="cyclab" id="cycLab" aria-hidden="true">마감 기간</span>
-      <button class="cycnav prev" id="cycPrev" aria-label="앞 주기" title="앞 주기  [">
+      <button class="cycnav prev" id="cycPrev" aria-label="앞 기간" title="앞 기간  [">
         <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
       <button class="cycle" id="cycBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cycPop" title="기간 고르기">
         <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-cal"/></svg>
         <span id="cycleTxt">—</span><span class="tag" id="cycleTag"></span>
         <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-down"/></svg>
       </button>
-      <button class="cycnav" id="cycNext" aria-label="다음 주기" title="다음 주기  ]">
+      <button class="cycnav" id="cycNext" aria-label="다음 기간" title="다음 기간  ]">
         <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chev"/></svg></button>
       <div id="cycPop" role="dialog" aria-label="기간 고르기" hidden></div>
     </div>

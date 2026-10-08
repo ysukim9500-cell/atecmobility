@@ -231,6 +231,16 @@ footer .wrap{font-size:13px}
 .notice{font-size:14.5px}
 .launch .go{font-size:14.5px}
 }
+/* 폰 정리(2026-10-08 모바일 점검 로봇) — 입력칸 16px(iOS 확대 막기), 창 로고가 × 를 덮지 않게, 버튼 글자 한 줄 */
+@media (max-width:900px){
+  .pwhelp .inp{font-size:16px;min-width:0}
+  .notice .btn{white-space:nowrap;flex:none}
+}
+@media (max-width:480px){
+  .modal .mhead img{display:block;width:min(265px,calc(100% - 96px));height:auto;margin:0 auto}
+  .modal .x{right:4px;top:4px;width:44px;height:44px}
+  .notice{flex-wrap:wrap}
+}
 </style>
 </head>
 <body>
@@ -260,10 +270,9 @@ footer .wrap{font-size:13px}
       <div class="demo" aria-label="예시 화면">
         <div class="dh">이번 달 마감<span class="sp"></span><span class="ex">예시 화면</span></div>
         <div class="row"><span class="n done">✓</span><span class="t">운행 기록</span><span class="s">완료</span></div>
-        <div class="row"><span class="n now">2</span><span class="t">통행료</span><span class="s">지금 할 일</span></div>
-        <div class="row"><span class="n">3</span><span class="t">영수증</span><span class="s">남음</span></div>
-        <div class="row"><span class="n">4</span><span class="t">검증 · 상신</span><span class="s">남음</span></div>
-        <div class="row"><span class="n">5</span><span class="t">정산 · 엑셀</span><span class="s">결재 후</span></div>
+        <div class="row"><span class="n now">2</span><span class="t">영수증·통행료</span><span class="s">지금 할 일</span></div>
+        <div class="row"><span class="n">3</span><span class="t">검증·상신</span><span class="s">남음</span></div>
+        <div class="row"><span class="n">4</span><span class="t">정산·엑셀</span><span class="s">결재 후</span></div>
         <div class="alert">결재 차례가 되면 팀즈 개인 채팅으로 알려 드립니다.</div>
       </div>
     </div>
@@ -278,12 +287,12 @@ footer .wrap{font-size:13px}
         <article class="card">
           <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
           <h3>운행일지 (ATEC DRIVING)</h3>
-          <p>앱으로 기록한 업무 운행을 주기마다 마감합니다. 통행료·영수증을 정리하고 AI 검증을 거쳐 결재를 올립니다.</p>
+          <p>앱으로 기록한 업무 운행을 기간마다 마감합니다. 영수증·통행료를 정리하고 Gemini 검증을 거쳐 결재를 올립니다.</p>
         </article>
         <article class="card">
           <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
           <h3>개인경비 지출결의</h3>
-          <p>소모품비·식비·기타비용 영수증을 올리면 AI 가 금액·사용처를 읽어 채웁니다. 20일~19일 기간마다 검증을 거쳐 같은 결재함으로 올립니다.</p>
+          <p>소모품비·식비·기타비용 영수증을 올리면 Gemini 가 금액·사용처를 읽어 채웁니다. 20일~19일 기간마다 검증을 거쳐 같은 결재함으로 올립니다.</p>
         </article>
         <article class="card dim">
           <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
@@ -335,13 +344,13 @@ footer .wrap{font-size:13px}
       <a class="launch" href="driving.html">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
         <h2>운행일지 (ATEC DRIVING)</h2>
-        <p>이번 달 마감 · 통행료 · 영수증 · AI 검증 · 결재 상신과 결재함</p>
+        <p>이번 달 마감 · 영수증·통행료 · Gemini 검증 · 결재 상신과 결재함</p>
         <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
       <a class="launch" href="driving.html#/x_month">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
         <h2>개인경비 지출결의</h2>
-        <p>이번 달 경비 · 영수증 올리기(AI 판독) · 검증 · 결재 상신과 결재함</p>
+        <p>이번 달 경비 · 영수증 올리기(Gemini 읽기) · 검증 · 결재 상신과 결재함</p>
         <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
       <div class="launch off" aria-disabled="true">
@@ -370,15 +379,15 @@ footer .wrap{font-size:13px}
       <button class="btn pri" type="submit" id="liBtn">로그인</button>
     </form>
     <div class="links">
-      <button type="button" id="btnForgot">비밀번호를 잊으셨나요?</button>
+      <button type="button" id="btnForgot">비밀번호 찾기</button>
       <span>계정이 없으신가요? <button type="button" class="em" data-open="signup">회원가입</button></span>
     </div>
     <form class="hint pwhelp" id="forgotT" hidden novalidate>
-      <div>아이디와 이름을 넣고 <b>요청</b>을 누르면 운행일지 관리자에게 팀즈로 <b>비밀번호 초기화 요청</b>이 갑니다. 관리자가 본인인지 확인한 뒤 임시 비밀번호를 알려 드립니다.</div>
+      <div>아이디와 이름을 넣고 <b>초기화 요청</b>을 누르면 운행일지 관리자에게 팀즈로 <b>비밀번호 초기화 요청</b>이 갑니다. 관리자가 본인인지 확인한 뒤 임시 비밀번호를 알려 드립니다.</div>
       <div class="pwrow">
         <input class="inp" id="pwUser" autocomplete="username" placeholder="아이디" aria-label="아이디">
         <input class="inp" id="pwName" autocomplete="name" placeholder="이름" aria-label="이름">
-        <button class="btn pri" type="submit" id="pwBtn">요청</button>
+        <button class="btn pri" type="submit" id="pwBtn">초기화 요청</button>
       </div>
       <div class="msg" id="pwMsg" role="alert" hidden></div>
     </form>
@@ -481,11 +490,11 @@ footer .wrap{font-size:13px}
     if (!n) { msg('pwMsg', '이름을 넣어 주세요.'); $('pwName').focus(); return; }
     b.disabled = true; b.textContent = '보내는 중…'; msg('pwMsg', '');
     post('/functions/v1/driving-auth', { action: 'pw_help', username: u, name: n }).then(function (res) {
-      b.disabled = false; b.textContent = '요청';
+      b.disabled = false; b.textContent = '초기화 요청';
       if (!res.ok || !res.j || !res.j.ok) { msg('pwMsg', (res.j && res.j.error) || '요청을 보내지 못했습니다.'); return; }
       msg('pwMsg', res.j.message || '관리자에게 요청을 보냈습니다.', true);
     }).catch(function () {
-      b.disabled = false; b.textContent = '요청';
+      b.disabled = false; b.textContent = '초기화 요청';
       msg('pwMsg', '서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
     });
   });

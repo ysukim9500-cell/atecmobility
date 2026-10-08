@@ -405,7 +405,7 @@
       var a = RANGE.from, b = RANGE.to;
       $('cycleTxt').innerHTML = '<span class="yr">' + a.y + '년 </span>' + a.m + '월분 – ' +
         (a.y === b.y ? '' : '<span class="yr">' + b.y + '년 </span>') + b.m + '월분';
-      $('cycleTag').textContent = cyclesInView().length + '주기 · 조회 전용';
+      $('cycleTag').textContent = cyclesInView().length + '개 기간 · 조회 전용';
     } else {
       $('cycleTxt').innerHTML = '<span class="yr">' + CYC.y + '년 </span>' + CYC.m + '월분';
       // 개인경비 화면은 20일~19일 — 같은 달 이름에 그 범위를 보인다(「09.20 – 10.19 · 이번 기간」).
@@ -433,13 +433,13 @@
     if (pv() && !RANGE) return pv().band ? pv().band() : '';
     if (RANGE) {
       return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(RANGE.from.y + '년 ' + RANGE.from.m + '월분 – ' + RANGE.to.y + '년 ' + RANGE.to.m + '월분</b>') +
-        ' (' + cyclesInView().length + '주기)을 한꺼번에 보고 있습니다 — 조회만 되고 고칠 수 없습니다.</span>' +
-        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">이번 주기로</button></div>';
+        ' (' + cyclesInView().length + '개 기간)을 한꺼번에 보고 있습니다 — 조회만 되고 고칠 수 없습니다.</span>' +
+        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">' + cur.m + '월분으로 →</button></div>';
     }
     if (cmpCycle(CYC, cur) < 0) {
-      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + CYC.y + '년 ' + CYC.m + '월분 (' + esc(cycleSpan(CYC.y, CYC.m)) + ') · 지난 주기</b>를 보고 있습니다. ' +
+      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + CYC.y + '년 ' + CYC.m + '월분 (' + esc(cycleSpan(CYC.y, CYC.m)) + ') · 지난 기간</b>을 보고 있습니다. ' +
         '운행일지·영수증·정산이 모두 이 기간 기준입니다.</span>' +
-        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">이번 주기(' + cur.m + '월분)로 →</button></div>';
+        '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">' + cur.m + '월분으로 →</button></div>';
     }
     return '';
   }
@@ -462,10 +462,10 @@
     };
     var prev = addCycle(cur, -1), y1 = { y: cur.y, m: 1 };
     h += '<div class="cp-sec">빠른 선택</div><div class="cp-quick">' +
-      q('이번 주기', 'data-cyc="' + cur.y + '-' + cur.m + '"', !RANGE && cmpCycle(CYC, cur) === 0) +
-      q('지난 주기', 'data-cyc="' + prev.y + '-' + prev.m + '"', !RANGE && cmpCycle(CYC, prev) === 0) +
-      q('최근 3주기', 'data-range="' + cycKey(addCycle(cur, -2)) + '~' + cycKey(cur) + '"', isR(addCycle(cur, -2), cur)) +
-      q('최근 6주기', 'data-range="' + cycKey(addCycle(cur, -5)) + '~' + cycKey(cur) + '"', isR(addCycle(cur, -5), cur)) +
+      q('이번 기간', 'data-cyc="' + cur.y + '-' + cur.m + '"', !RANGE && cmpCycle(CYC, cur) === 0) +
+      q('지난 기간', 'data-cyc="' + prev.y + '-' + prev.m + '"', !RANGE && cmpCycle(CYC, prev) === 0) +
+      q('최근 3개 기간','data-range="' + cycKey(addCycle(cur, -2)) + '~' + cycKey(cur) + '"', isR(addCycle(cur, -2), cur)) +
+      q('최근 6개 기간','data-range="' + cycKey(addCycle(cur, -5)) + '~' + cycKey(cur) + '"', isR(addCycle(cur, -5), cur)) +
       (cur.m > 1 ? q(cur.y + '년 전체', 'data-range="' + cycKey(y1) + '~' + cycKey(cur) + '"', isR(y1, cur)) : '') +
       q((cur.y - 1) + '년 전체', 'data-range="' + (cur.y - 1) + '-01~' + (cur.y - 1) + '-12"',
         isR({ y: cur.y - 1, m: 1 }, { y: cur.y - 1, m: 12 })) +
@@ -473,7 +473,7 @@
     // 주기 목록 — 최근 24개. 오래된 것은 '직접 지정'으로 간다.
     // 목록은 그냥 버튼들이다. listbox/option 역할을 주면 화살표 키로 움직여야 하는데 그렇게 만들지 않았다 —
     // 역할만 붙이면 화면낭독기 사용자가 쓸 수 없는 목록이 된다. 지금 고른 것은 aria-current 로 알린다.
-    h += '<div class="cp-sec" id="cpListLab">주기 고르기</div><div class="cp-list" role="group" aria-labelledby="cpListLab">';
+    h += '<div class="cp-sec" id="cpListLab">기간 고르기</div><div class="cp-list" role="group" aria-labelledby="cpListLab">';
     var opts = '';
     for (var i = 0; i < 24; i++) {
       var c = addCycle(cur, -i), on = !RANGE && cmpCycle(CYC, c) === 0;
@@ -487,16 +487,16 @@
       opts += '<option value="' + cycKey(c2) + '">' + c2.y + '년 ' + c2.m + '월분</option>';
     }
     var f0 = RANGE ? cycKey(RANGE.from) : cycKey(addCycle(CYC, -2)), t0 = RANGE ? cycKey(RANGE.to) : cycKey(CYC);
-    h += '<div class="cp-sec">여러 주기 직접 지정 <small>조회 전용</small></div>' +
-      '<div class="cp-range"><select id="cpFrom" aria-label="시작 주기">' + opts.replace('value="' + f0 + '"', 'value="' + f0 + '" selected') +
-      '</select><span class="dim">부터</span><select id="cpTo" aria-label="끝 주기">' +
+    h += '<div class="cp-sec">여러 기간 직접 지정<small>조회 전용</small></div>' +
+      '<div class="cp-range"><select id="cpFrom" aria-label="시작 기간">' + opts.replace('value="' + f0 + '"', 'value="' + f0 + '" selected') +
+      '</select><span class="dim">부터</span><select id="cpTo" aria-label="끝 기간">' +
       opts.replace('value="' + t0 + '"', 'value="' + t0 + '" selected') +
       '</select><span class="dim">까지</span><button class="btn sm pri" id="cpGo">보기</button></div>' +
       // 개인경비 화면에는 「통행료 채우기」가 없다 — 그 갈래에서는 그 말을 빼고 안내한다(2026-10-08).
-      '<div class="cp-note">여러 주기를 볼 때는 조회만 됩니다. ' +
+      '<div class="cp-note">여러 기간을 볼 때는 조회만 됩니다. ' +
       (P1 || NAV_MODE === 'x' ? '상신·결재 문서·영수증 올리기는 한 기간을 골라서 합니다. '
-        : '상신·결재 문서·통행료 채우기·영수증 올리기는 한 주기를 골라서 합니다. ') +
-      '<span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 주기로 넘깁니다.</div>';
+        : '상신·결재 문서·통행료 채우기·영수증 올리기는 한 기간을 골라서 합니다. ') +
+      '<span class="kbdhint"><span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 기간으로 넘깁니다.</span></div>';
     $('cycPop').innerHTML = h;
   }
   function openCyclePop(open) {
@@ -805,7 +805,7 @@
       { k: 'rate', sev: 'bad', ico: 'won', t: '유류단가 미등록', rows: [], n: missKeys.length,
         d: missKeys.length ? missKeys.join(' · ') + ' 단가가 없어 기본 단가 159원/km 로 계산됩니다. 실제 단가와 다를 수 있으니 등록해 주세요.' : '없습니다.' },
       { k: 'unk', sev: 'warn', ico: 'ticket', t: '통행료 미확정', rows: unk, n: unk.length,
-        d: '정산에서 0원으로 잡혀 회사가 덜 내주게 됩니다. 「통행료 채우기」에서 구간별로 한 번에 정리하실 수 있습니다.' },
+        d: '채우지 않으면 0원으로 정산되어 회사가 덜 내주게 됩니다. 「통행료 채우기」에서 한 번에 정리하세요.' },
       { k: 'overlap', sev: 'warn', ico: 'list', t: '시간이 겹치는 운행', rows: overlap, n: overlap.length,
         d: '같은 사람이 같은 시간에 두 건을 기록했습니다.' },
       { k: 'zero', sev: 'warn', ico: 'list', t: '0km 운행', rows: zero, n: zero.length,
@@ -1002,7 +1002,7 @@
       return e.username === me && e.category === cat && d >= r.lo && d < r.hi;
     });
     var DOW = ['일', '월', '화', '수', '목', '금', '토'];
-    var dn = function (k) { var p = k.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return (+p[1]) + '/' + (+p[2]) + '(' + DOW[d.getUTCDay()] + ')'; };
+    var dn = function (k) { var p = k.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return p[1] + '.' + p[2] + '(' + DOW[d.getUTCDay()] + ')'; };
     var ok = function (t) { return '<span class="mres ok">' + ic('check', 12) + esc(t) + '</span>'; };
     var bad = function (t) { return '<span class="mres bad">' + esc(t) + '</span>'; };
     var box = function (good, headline, sub, table) {
@@ -1092,7 +1092,7 @@
     if (cat === '계기판') {
       var plates = [];
       biz.forEach(function (t) { if (t.end_odometer != null) { var p = t.plate_no || ''; if (plates.indexOf(p) < 0) plates.push(p); } });
-      if (!plates.length) return box(true, '이번 주기에 업무 운행이 없습니다', '', '');
+      if (!plates.length) return box(true, '이번 기간에 업무 운행이 없습니다', '', '');
       var shots = evs.filter(function (e) { return (e.photo_path || '') !== ''; });
       var plateOf = function (e) { return e.vehicle_plate || (plates.length === 1 ? plates[0] : null); };
       var anyBad = 0, needRun = 0;
@@ -1123,7 +1123,7 @@
       return box(!anyBad && !needRun,
         anyBad ? '맞지 않는 차가 <em>' + n0(anyBad) + '건</em> 있습니다' : needRun ? '사진 숫자를 아직 읽지 않았습니다' : '계기판 사진이 운행일지 최종 km 와 같거나 큽니다 — 정상',
         '계기판 사진 숫자가 운행일지 마지막 km 와 <b>같거나 커야</b> 합니다(사진 찍고 조금 더 달린 것은 정상).' +
-          (needRun ? ' 사진의 숫자는 3단계 「검증하기」를 누르면 AI 가 읽어 여기에도 나옵니다.' : ''),
+          (needRun ? ' 사진의 숫자는 3단계 「검증하기」를 누르면 Gemini 가 읽어 여기에도 나옵니다.' : ''),
         tblO);
     }
     return '';
@@ -1709,7 +1709,7 @@
       kv('차 종', esc(u.vehicle_type || '—')) +
       kv('운행일지 관리자', ME.is_admin ? '예' : '아니오') +
       // 2026-10-07 — 업무용 차량을 운전하는가(운행일지 씀/안 씀). 바꾸는 것은 관리자가 「권한 관리」에서 한다.
-      kv('업무용 차량 운전', (usesDriving(myName())
+      kv('차량 운전', (usesDriving(myName())
         ? '<b>운전합니다</b> <span class="dim">— 운행일지와 개인경비를 모두 씁니다</span>'
         : '<b>운전하지 않습니다</b> <span class="dim">— 개인경비 지출결의와 결재만 씁니다</span>') +
         '<div class="fhint">나중에 바뀌면 관리자에게 말씀하시면 바꿔 드립니다.</div>') +
@@ -2438,19 +2438,21 @@
   /** 진행 막대 — 상신자부터 마지막 결재자까지. */
   function apprTrack(a) {
     if (!a || !(a.steps || []).length) return '';
-    var h = '<div class="aprog"><span class="anode done">' + ic('check', 12) + '</span>' +
+    // 번호·이름을 한 덩어리(.astep)로 묶고, 다음 단계로 가는 선은 앞 덩어리 끝에 붙인다 —
+    // 폰에서 줄이 바뀌어도 번호만 윗줄에 남거나 아랫줄이 선부터 시작하지 않게(2026-10-08)
+    var h = '<div class="aprog"><span class="astep"><span class="anode done">' + ic('check', 12) + '</span>' +
       '<span class="alabel">' + esc(nameOf(a.username)) + '</span>';
     a.steps.forEach(function (s) {
       var st = s.result === 'approved' ? 'done'
         : s.result === 'rejected' ? 'bad'
           : (a.status === 'submitted' && s.seq === a.cur_seq) ? 'now' : 'wait';
-      h += '<span class="aline ' + (st === 'done' ? 'done' : '') + '"></span>' +
-        '<span class="anode ' + st + '">' +
+      h += '<span class="aline ' + (st === 'done' ? 'done' : '') + '"></span></span>' +
+        '<span class="astep"><span class="anode ' + st + '">' +
         (st === 'done' ? ic('check', 12) : st === 'bad' ? '!' : s.seq) + '</span>' +
         '<span class="alabel' + (st === 'wait' ? ' wait' : '') + '">' + esc(s.name || s.approver) +
         (s.box ? '<em>' + esc(s.box) + '</em>' : '') + '</span>';
     });
-    return h + '</div>';
+    return h + '</span></div>';
   }
 
   /* ── 상신 창 ── */
@@ -2459,7 +2461,7 @@
   function draftKey() { return (SUB_KIND ? SUB_KIND + ':' : '') + CYCKEY(); }
   function openSubmit(kind) {
     SUB_KIND = kindDef(kind) ? kind : '';
-    if (isMulti()) { toast('상신은 한 주기씩 합니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
+    if (isMulti()) { toast('상신은 한 기간씩 합니다. 위에서 기간을 하나 골라 주세요.', true); return; }
     var a = SUB_KIND ? kindDef(SUB_KIND).mine(CYCKEY()) : myAppr();
     if (a && (a.status === 'submitted' || a.status === 'approved')) {
       toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
@@ -2682,7 +2684,7 @@
     }
     h += '<div class="anote">상신하면 <b>지금 자료가 그대로 저장</b>되고, 결재자는 그 자료를 봅니다. ' +
       (KD ? '상신 뒤에는 이 기간의 경비를 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. '
-        : '상신 뒤에는 이 주기의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ') +
+        : '상신 뒤에는 이 기간의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ') +
       '상신을 누르면 먼저 검증을 돌리고, 맞지 않는 곳이 있으면 올리기 전에 한 번 보여 드립니다.</div>';
 
     $('pBody').innerHTML = h;
@@ -2747,7 +2749,7 @@
     var body = '';
     if (act === 'withdraw') {
       body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>' +
-        (kd ? '이 기간의 경비를 다시 고칠 수 있게' : '이 주기의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
+        (kd ? '이 기간의 경비를 다시 고칠 수 있게' : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
         '고친 뒤 다시 상신하면 그때의 자료로 새로 고정됩니다.</div>' + apprTrack(a);
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
@@ -2764,7 +2766,7 @@
               '지금의 결재 완료본(결재선·금액·문서)은 <b>이력에 그대로 남습니다</b>. 누가 왜 열었는지도 기록됩니다.'
           : act === 'force_reject'
             ? '결재자가 자리에 없어 결재가 멈췄을 때 쓰는 <b>관리자 권한 반려</b>입니다. 승인을 대신할 수는 없습니다. ' +
-              '반려하면 이 주기의 잠금이 풀려 상신자가 고쳐서 다시 올릴 수 있고, 누가 반려했는지 기록에 남습니다.'
+              '반려하면 이 기간의 잠금이 풀려 상신자가 고쳐서 다시 올릴 수 있고, 누가 반려했는지 기록에 남습니다.'
             : '반려하면 상신자가 자료를 고쳐 다시 올릴 수 있습니다.') + '</div>';
     }
     openPanel(nameOf(a.username) + ' · ' + (kd ? kd.tag + ' ' : '') + title, cname,
@@ -2956,6 +2958,10 @@
     Array.prototype.forEach.call($('inner').querySelectorAll('.scroll[data-rows]'), function (w) {
       var n = w.querySelectorAll('tbody tr').length;
       w.classList.toggle('tall', n > 22);
+      // 표가 오른쪽으로 더 있으면 감싼 상자(.panel)에 「더 있음」 그림자(좁은 화면 CSS 만 그린다, 2026-10-08)
+      var box = w.parentNode, more = function () { box.classList.toggle('scrollmore', w.scrollWidth - w.clientWidth - w.scrollLeft > 2); };
+      if (!w.dataset.moreOn) { w.dataset.moreOn = '1'; w.addEventListener('scroll', more, { passive: true }); }
+      more();
     });
   }
   /** 하이패스 대조 — 고른 건수·합계와 확정 버튼만 제자리에서 고쳐 쓴다. */
@@ -3081,18 +3087,18 @@
 
     var h = head(all ? '전체 기간 요약' : '기간 요약',
       esc(viewName()) + ' · ' + esc(viewSpan()) + ' · <b>조회 전용</b>');
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>' + n0(rows.length) + '주기 합계' +
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>' + n0(rows.length) + '개 기간 합계' +
       (all ? ' · 전 직원' : '') + '</div>' +
       '<p class="verdict">업무용 비용 <em>' + won(sum.cost) + '</em></p><div class="facts">' +
       fact('운행', n0(sum.n) + '<small>건</small>', km(sum.km) + ' km') +
       fact('유류비', won(sum.fuel), '거리 × 분기·지역 단가') +
-      fact('통행료 · 주차', won(sum.toll + sum.park), '통행 ' + won(sum.toll) + ' · 주차 ' + won(sum.park)) +
-      fact('주기 평균', won(withData ? sum.cost / withData : 0), '운행이 있는 ' + n0(withData) + '주기 기준') +
+      fact('통행료 · 주차', won(sum.toll + sum.park), '통행료 ' + won(sum.toll) + ' · 주차비 ' + won(sum.park)) +
+      fact('기간 평균', won(withData ? sum.cost / withData : 0), '운행이 있는 ' + n0(withData) + '개 기간 기준') +
       '</div></div>';
 
-    h += sect('주기별', rows.length + '주기', '',
+    h += sect('기간별', rows.length + '개 기간', '',
       '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>주기</th><th>기간</th><th class="n">운행</th><th class="n">거리</th><th class="n">유류비</th>' +
+      '<th>월분</th><th>기간</th><th class="n">운행</th><th class="n">거리</th><th class="n">유류비</th>' +
       '<th class="n">통행료</th><th class="n">주차</th><th class="n">합계</th><th style="width:16%"></th>' +
       '<th class="n">미확정</th><th>결재</th></tr></thead><tbody>' +
       rows.map(function (x) {
@@ -3120,7 +3126,7 @@
       (sum.park ? n0(sum.park) : '—') + '</td><td class="n total">' + n0(sum.cost) + '</td><td></td><td class="n">' +
       (sum.unk ? n0(sum.unk) : '—') + '</td><td></td></tr></tfoot></table></div></div>');
 
-    h += '<div class="anote">합계는 <b>주기별 합계를 그대로 더한 값</b>입니다. 주기를 누르면 그 주기로 가서 ' +
+    h += '<div class="anote">합계는 <b>기간별 합계를 그대로 더한 값</b>입니다. 줄을 누르면 그 기간으로 가서 ' +
       '상신·결재 문서·통행료 채우기를 할 수 있습니다. 통행료 미확정은 0원으로 잡혀 있습니다.</div>';
     return h;
 
@@ -3199,9 +3205,9 @@
     if (!isAll() && !cycleLocked(myName())) {
       var miss = odoPhotoMissing();
       if (miss.length) {
-        h += '<div class="hpnote warn">' + ic('gauge', 16) + '<span><b>계기판 사진</b>이 아직 없습니다' +
+        h += '<div class="hpnote warn">' + ic('gauge', 16) + '<span title="검증에서 운행일지 최종 km 와 대조합니다. 앱이나 웹 「영수증 › 계기판」에서 올립니다."><b>계기판 사진</b>이 없습니다' +
           (miss.length > 1 || miss[0] ? ' (' + esc(miss.map(function (p) { return p || '차량 미지정'; }).join(', ')) + ')' : '') +
-          '. 이번 주기 <b>마지막 운행을 마친 뒤</b> 계기판을 찍어 앱이나 웹 「영수증 › 계기판」에 올려 주세요 — 검증에서 운행일지 최종 km 와 대조합니다.</span>' +
+          '. <b>마지막 운행 뒤</b> 계기판을 찍어 올려 주세요 — 검증에서 최종 km 와 대조합니다.</span>' +
           '<button class="btn sm" data-odoshot="1">계기판 사진 올리기</button></div>';
       }
     }
@@ -3216,10 +3222,10 @@
       fact('마감', closed ? '종료' : (days <= 0 ? '오늘' : days + '<small>일 남음</small>'),
         closed ? esc(cycleSpan(CYC.y, CYC.m)) + ' 종료' : pct + '% 지남') +
       fact('운행', n0(T.n) + '<small>건</small>', km(T.km) + ' km' + (T.manual ? ' · 수기 ' + n0(T.manual) : '')) +
-      fact('업무용 비용', won(T.cost), '유류 ' + won(T.fuel) + ' · 통행 ' + won(T.toll)) +
+      fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll)) +
       // 잠긴 뒤에는 채울 수 없다 — 빨갛게 '여기를 보라'고 하지 않고, 어떻게 올라갔는지만 적는다.
       fact('통행료 미확정', n0(T.unk) + '<small>건</small>',
-        T.unk ? (approved ? '0원으로 상신됨' : '정산에서 0원으로 잡힙니다') : '전부 확정', T.unk > 0 && !approved) +
+        T.unk ? (approved ? '0원으로 상신됨' : '0원으로 정산됩니다') : '전부 확정', T.unk > 0 && !approved) +
       '</div></div>';
 
     // 결재 — 히어로 바로 아래. 이 주기가 지금 어디까지 갔는지가 제일 궁금하다.
@@ -3268,15 +3274,15 @@
       desc = '「정산·엑셀」에서 운행기록부를 받을 수 있습니다.'; btns = big('settle', '정산·엑셀 받기');
     } else if (st === 'submitted') {
       verdict = '<em>결재 중입니다</em>'; clean = ' wait';
-      desc = '결재 차례가 된 분께 팀즈로 알림이 갑니다. 결재 중에는 이 주기의 기록을 고칠 수 없습니다.';
+      desc = '결재 차례가 된 분께 팀즈로 알림이 갑니다. 결재 중에는 이 기간의 기록을 고칠 수 없습니다.';
     } else if (cur === 0 && !S.trips.length && !S.ev.length) {
       verdict = '아직 기록된 운행이 없습니다'; clean = ' clean';
       desc = '앱에서 운행을 기록하면 여기에 모입니다.';
     } else if (cur === 0) {
       verdict = S.fixBad ? '운행 기록 <em>' + n0(S.fixBad) + '건</em>을 먼저 손보세요' : '<em>① 운행 기록</em>을 확인하세요';
-      desc = S.fixBad ? '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 고친 뒤 「다음 단계」를 누르세요.'
-        : '운행 ' + n0(S.trips.length) + '건이 맞는지 보고, 맨 아래 「다음 단계」를 누르세요.';
-      btns = S.fixBad ? big('check', '기록 ' + n0(S.fixBad) + '건 고치기') + sub('trips', '운행일지 보기') : big('trips', '운행 기록 확인하기');
+      desc = S.fixBad ? '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 고친 뒤 맨 아래 「2 영수증·통행료 →」를 누르세요.'
+        : '운행 ' + n0(S.trips.length) + '건이 맞는지 보고, 맨 아래 「2 영수증·통행료 →」를 누르세요.';
+      btns = S.fixBad ? big('check', '기록 ' + n0(S.fixBad) + '건 고치기') + sub('trips', '운행 기록 보기') : big('trips', '운행 기록 확인하기');
     } else if (cur === 1) {
       verdict = '<em>② 영수증·통행료</em>를 차례대로 정리하세요';
       desc = '주차 → 통행료 → 주유 → 계기판 순서로 하나씩 확인합니다.' +
@@ -3285,8 +3291,8 @@
       btns = big('evid', '영수증·통행료 정리하기');
     } else {
       verdict = st === 'rejected' ? '반려됐습니다 — 고쳐서 <em>다시 상신</em>하세요' : '<em>기록이 정리됐습니다</em> — 검증하고 상신하세요';
-      desc = closed ? 'AI 가 영수증 사진과 입력값을 맞춰 본 뒤 결재선을 골라 상신합니다.'
-        : '주기 중에도 상신할 수 있습니다. 상신하면 이 주기의 기록은 고칠 수 없습니다.';
+      desc = closed ? 'Gemini 가 영수증 사진과 입력값을 맞춰 본 뒤 결재선을 골라 상신합니다.'
+        : '기간 중에도 상신할 수 있습니다. 상신하면 이 기간의 기록은 고칠 수 없습니다.';
       if (S.noPhoto) desc += ' 사진이 없는 영수증 ' + n0(S.noPhoto) + '건은 결재 문서에 빈 칸으로 나갑니다(앱에서 사진을 붙일 수 있습니다).';
       btns = big('verify', '검증하고 상신하기');
     }
@@ -3307,9 +3313,9 @@
     var monthOf = function (c) { var p = String(c || '').split('-'); return p.length === 2 ? (+p[1]) + '월분' : String(c || ''); };
     h += '<div class="cards3">' +
       '<div class="cardx"><div class="k">' + (closed ? '업무용 비용' : '업무용 비용 (지금까지)') + '</div><div class="v">' + won(T.cost) + '</div><div class="rows">' +
-        '<div><span>유류</span><b>' + won(T.fuel) + '</b></div>' +
+        '<div><span>유류비</span><b>' + won(T.fuel) + '</b></div>' +
         '<div><span>통행료' + (T.evToll ? ' (영수증 포함)' : '') + '</span><b>' + won(T.toll) + '</b></div>' +
-        '<div><span>주차' + (T.evPark ? ' (영수증 포함)' : '') + '</span><b>' + won(T.park) + '</b></div></div></div>' +
+        '<div><span>주차비' + (T.evPark ? ' (영수증 포함)' : '') + '</span><b>' + won(T.park) + '</b></div></div></div>' +
       '<div class="cardx"><div class="k">운행</div><div class="v">' + n0(T.n) + '<small>건</small></div><div class="rows">' +
         '<div><span>거리</span><b>' + km(T.km) + ' km</b></div><div><span>업무용</span><b>' + km(T.bizKm) + ' km</b></div>' +
         (T.manual ? '<div><span>수기 입력</span><b>' + n0(T.manual) + '건</b></div>' : '') + '</div></div>' +
@@ -3374,7 +3380,7 @@
     if (!a || a.status === 'rejected' || a.status === 'withdrawn') {
       btn = '<button class="btn sm" data-pdf="">' + ic('dl', 13) + 'PDF 미리보기</button>' +
         '<button class="btn sm" id="btnOpenSubmit" title="PDF 미리보기 없이 바로 결재선을 골라 상신합니다(검증은 상신할 때 자동으로 돌립니다)">' +
-        (a && a.status === 'rejected' ? '바로 다시 상신' : (isAll() ? '내 것 결재 상신' : '바로 상신')) +
+        (a && a.status === 'rejected' ? '바로 다시 상신' : (isAll() ? '내 것 상신' : '바로 상신')) +
         '</button>';
     } else if (canWithdraw) {
       btn = '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '">회수</button>';
@@ -3387,7 +3393,7 @@
       (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' +
         '결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 지난번 결재선을 불러올 수도 있습니다.</div>') +
       (locked && EXT.apprExtra ? EXT.apprExtra(a) : '') +
-      (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 주기의 운행·영수증을 고칠 수 없습니다. ' +
+      (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
         withdrawHow(a) + '</div>' : '') +
       '</div></section>';
   }
@@ -3522,9 +3528,9 @@
     var cs = cyclesInView().slice().reverse().slice(0, 6);
     return head(title, esc(viewName())) +
       '<div class="panel" style="padding:30px 26px;text-align:center">' +
-      '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(what) + '은 한 주기씩 합니다</div>' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(what) + '은 한 기간씩 합니다</div>' +
       '<div class="dim" style="font-size:13px;line-height:1.8;max-width:460px;margin:0 auto 16px">' +
-      '지금은 여러 주기를 함께 보고 있습니다(조회 전용). 어느 주기를 다룰지 골라 주세요.</div>' +
+      '지금은 여러 기간을 함께 보고 있습니다(조회 전용). 어느 기간을 다룰지 골라 주세요.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
       cs.map(function (c) {
         return '<button class="btn sm" data-cyc="' + c.y + '-' + c.m + '">' + esc(cycleName(c.y, c.m)) + '</button>';
@@ -3557,7 +3563,7 @@
         var f = ymd(Math.max(a, r.lo)), t = ymd(Math.min(b, r.hi - 1));
         return f <= t ? [f, t] : null;
       };
-      var q = [['이번 주', clip(mon, mon + 6 * 86400e3)], ['지난 주', clip(mon - 7 * 86400e3, mon - 86400e3)]];
+      var q = [['이번주', clip(mon, mon + 6 * 86400e3)], ['지난주', clip(mon - 7 * 86400e3, mon - 86400e3)]];
       quick = q.filter(function (x) { return x[1]; }).map(function (x) {
         var on = DATEF.from === x[1][0] && DATEF.to === x[1][1];
         return '<button class="qd' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') +
@@ -3733,7 +3739,7 @@
   }
 
   function viewTrips() {
-    if (!LOADED) return head(scopeTitle('운행일지')) + skeleton();
+    if (!LOADED) return head(scopeTitle('운행 기록')) + skeleton();
     var A = audit();
     // 칩 숫자는 '지금 걸린 사람·차량·목적·날짜' 안에서 센다(검색어·칩 자신은 빼고).
     var base = baseFiltered(true);
@@ -3746,7 +3752,7 @@
 
     // 무엇으로 좁혀 놓았는지 제목에 드러낸다. 그 상태로 CSV 를 누르는 실수를 줄인다.
     var narrowed = filterWords();
-    var h = head(scopeTitle('운행일지') + (narrowed.length ? ' — ' + narrowed.join(' · ') : ''),
+    var h = head(scopeTitle('운행 기록') + (narrowed.length ? ' — ' + narrowed.join(' · ') : ''),
       esc(viewName()) + ' · ' + esc(viewSpan()) + (isMulti() ? ' · <b>조회 전용</b>' : ''));
 
     h += '<div class="bar">';
@@ -3772,7 +3778,7 @@
       }).join('') + '</select></label>';
     h += dateFilterHtml();
     h += '<label class="field">' + ic('search', 14) +
-      '<input id="qBox" aria-label="운행 찾기" placeholder="방문처·주소·이름  ( / )" value="' + esc(FILT.q) + '"></label>';
+      '<input id="qBox" aria-label="운행 찾기" placeholder="방문처·주소·이름" title="단축키 /" value="' + esc(FILT.q) + '"></label>';
     h += '<div class="sp" style="flex:1"></div>';
     if (!isMulti()) h += '<button class="btn sm" id="btnAddTrip">＋ 운행 추가</button>';
     // 예전 이름은 「엑셀」이었는데 받는 것은 CSV 목록이다. 양식 엑셀(운행기록부)은 정산 화면에 있다.
@@ -3814,7 +3820,7 @@
 
     if (!found.length) {
       h += '<div class="hero fade"><div class="eyebrow"><span class="dot" style="background:var(--ok)"></span>점검 완료</div>' +
-        '<p class="verdict clean"><em>이번 주기는 손볼 것이 없습니다</em></p>' +
+        '<p class="verdict clean"><em>이번 기간은 손볼 것이 없습니다</em></p>' +
         '<div class="facts"><div class="fact"><div class="k">검사 항목</div><div class="v">' +
         A.length + '<small>가지</small></div><div class="sub">전부 이상 없음</div></div></div></div>';
     } else {
@@ -3999,8 +4005,8 @@
   }
   function gemTag(t) { return '<span class="gem">' + gemSvg(12) + esc(t || 'Gemini') + '</span>'; }
   function openEvUpload(defCat) {
-    if (isMulti()) { toast('영수증은 한 주기씩 올립니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
-    if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 주기에는 올릴 수 없습니다.', true); return; }
+    if (isMulti()) { toast('영수증은 한 기간씩 올립니다. 위에서 기간을 하나 골라 주세요.', true); return; }
+    if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 기간에는 올릴 수 없습니다.', true); return; }
     // 올리는 중에 뒤로가기로 창이 닫혔을 수 있다. 그 사이 새 창을 열면 돌고 있는 올리기가 새 목록을 건드린다.
     if (EV_SENDING) { toast('앞서 누른 영수증을 아직 올리는 중입니다. 끝난 뒤 다시 열어 주세요.'); return; }
     evFreeUrls();
@@ -4013,7 +4019,7 @@
     $('pBody').innerHTML =
       '<div class="drop gemdrop" id="evDrop" style="margin:0 0 14px">' +
       '<div class="gemorb">' + gemSvg(28) + '</div>' +
-      '<div class="gemchip">' + gemSvg(12) + 'Gemini AI 판독</div>' +
+      '<div class="gemchip">' + gemSvg(12) + 'Gemini 가 읽어 줍니다</div>' +
       '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 구분·날짜·금액을 읽어 드립니다</div>' +
       '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
       '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>' +
@@ -4042,8 +4048,8 @@
     askAi().then(function (on) {
       var el = $('evAiNote');
       if (el) el.innerHTML = on
-        ? gemTag('Gemini AI') + ' 가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드립니다. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
-        : 'AI 판독이 꺼져 있어 구분·날짜·금액을 직접 넣습니다. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b> 로 줄을 늘리세요.';
+        ? gemTag('Gemini') + ' 가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드립니다. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
+        : 'Gemini 읽기가 꺼져 있어 구분·날짜·금액을 직접 넣습니다. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b> 로 줄을 늘리세요.';
     });
   }
 
@@ -4194,7 +4200,8 @@
         m === 'pdfjs' ? 'PDF 를 읽는 도구를 불러오지 못했습니다. 사진으로 올려 주세요.'
           : m === 'toomany' ? 'PDF 가 30장을 넘습니다. 나눠서 올려 주세요.'
             : m === 'image' ? '이미지를 읽지 못했습니다. 다른 파일로 해 보세요.'
-              : '읽지 못했습니다: ' + m) + '</b>');
+              : '파일을 읽지 못했습니다. 다른 파일로 다시 올려 주세요.') + '</b>');
+      if (m && m !== 'pdfjs' && m !== 'toomany' && m !== 'image') console.warn('영수증 읽기 실패', m);
     });
   }
   /** 빈 줄 하나. 날짜는 오늘(보는 주기 밖이면 주기 안으로 당긴다 — 미래 주기를 보며 올리면 전부 튕겼다).
@@ -4306,8 +4313,7 @@
           if (EVUP !== session) return;
           pg.ai = 'fail';
           console.error('AI 판독 실패:', e && e.message);
-          evNote('<span class="dim">AI 가 읽지 못한 장이 있습니다(' + esc(String((e && e.message) || '').slice(0, 60)) +
-            '). 그 줄은 직접 넣어 주세요.</span>');
+          evNote('<span class="dim">Gemini 가 읽지 못한 장이 있습니다. 그 줄은 직접 넣어 주세요.</span>');
         }).then(function () {
           if (EVUP !== session) return;
           // ★ 줄을 갈아 끼웠으면 evRead 를 부르지 않는다 — 화면은 아직 옛 줄 번호라, 뒤 줄의 값이
@@ -4404,7 +4410,7 @@
 
   function runEvUpload() {
     if (EVUP.busy) { toast('아직 파일을 읽는 중입니다. 잠시만 기다려 주세요.'); return; }
-    if (EVUP.pages.some(function (p) { return p.ai === 'run'; })) { toast('AI 가 아직 읽는 중입니다. 기다리거나 「직접 입력」을 눌러 주세요.'); return; }
+    if (EVUP.pages.some(function (p) { return p.ai === 'run'; })) { toast('Gemini 가 아직 읽는 중입니다. 기다리거나 「직접 입력」을 눌러 주세요.'); return; }
     if (!EVUP.items.length) { toast('올릴 파일을 골라 주세요.', true); return; }
     evRead();
     var car = String(($('evCar') || {}).value || '').trim();
@@ -4542,7 +4548,7 @@
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
         return r.json().then(function (rows) {
           if (!Array.isArray(rows) || !rows.length) {
-            throw new Error('지워지지 않았습니다. 이 주기가 상신됐거나 권한이 없을 수 있습니다 — 새로 고침 후 다시 확인해 주세요');
+            throw new Error('지워지지 않았습니다. 이 기간이 상신됐거나 권한이 없을 수 있습니다 — 새로 고침 후 다시 확인해 주세요');
           }
         });
       })
@@ -4664,7 +4670,7 @@
     h += sect('산정 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
       '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
-      '유류비 = 분기 기준단가 × (반올림한 도착계기 − 반올림한 출발계기)<br>' +
+      '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
       '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '-' + pad(b[1]); }).join(' · ')) + '<br>' +
       '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산합니다. 리포트와 다르면 알려 주세요.</div>');
     return h;
@@ -5159,7 +5165,7 @@
   /** 인쇄 전에 담을 운행목적을 고르게 한다. 앱 내보내기 창과 같은 자리다. */
   function doPrint(who) {
     if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
-    if (isMulti()) { toast('운행기록부는 한 주기씩 만듭니다. 위 기간에서 주기를 하나 골라 주세요.', true); return; }
+    if (isMulti()) { toast('운행기록부는 한 기간씩 만듭니다. 위에서 기간을 하나 골라 주세요.', true); return; }
     // 개인 화면에서는 본인 것만 뽑는다. 남의 이름으로 부르면 운행은 없어도
     // 머리 정보(이름·부서·차량)가 찍히므로 여기서 막는다.
     if (who && who !== myName() && !isAll()) {
@@ -5287,7 +5293,7 @@
     var idle = list.filter(function (u) { return !(byU[u.username] || []).length; }).length;
 
     var h = head('직원 현황', list.length + '명 · ' + esc(viewName()));
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 주기</div>' +
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 기간</div>' +
       '<p class="verdict">' + (idle ? '<em>' + idle + '명</em>이 한 건도 기록하지 않았습니다' : '<em>전원 기록</em>했습니다') + '</p>' +
       '<div class="facts">' +
       '<div class="fact"><div class="k">등록 인원</div><div class="v">' + list.length + '<small>명</small></div></div>' +
@@ -5342,7 +5348,7 @@
       '<div class="fact"><div class="k">등록된 차량</div><div class="v">' + VEHICLES.length + '<small>대</small></div></div>' +
       '</div></div>';
 
-    h += sect('이번 주기에 운행된 차량', plates.length + '대', '',
+    h += sect('이번 기간에 운행된 차량', plates.length + '대', '',
       plates.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
         '<th>번호판</th><th>사용자</th><th class="n">운행</th><th class="n">거리</th>' +
         '<th class="n">계기판</th><th>비고</th></tr></thead><tbody>' +
@@ -5436,13 +5442,13 @@
     //   (전체 화면은 사람마다 다르므로 묶음 줄에서 따로 표시한다.)
     if (!isAll() && cycleLocked(myName())) {
       return h + lockedNote(lockTitle(myName()),
-        '이 주기의 통행료는 바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다. ' + lockHow(myName()));
+        '이 기간의 통행료는 바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다. ' + lockHow(myName()));
     }
 
     var T = totals(TRIPS);
     if (LOADED && T.unk) {
       h += '<div class="hpnote">' + ic('ticket', 16) +
-        '<span>이번 주기에 <b>통행료 미확정 ' + n0(T.unk) + '건</b>이 있습니다. ' +
+        '<span>이번 기간에 <b>통행료 미확정 ' + n0(T.unk) + '건</b>이 있습니다. ' +
         '채우지 않으면 정산에서 0원으로 잡힙니다.</span></div>';
     }
 
@@ -5705,7 +5711,7 @@
       ? '<span class="dim" style="font-size:12px;flex:1">결재 중이거나 끝난 기간이라 고칠 수 없습니다</span>' +
         '<button class="btn" data-close>닫기</button>'
       : isMulti()
-        ? '<span class="dim" style="font-size:12px;flex:1">여러 주기를 함께 볼 때는 조회만 됩니다</span>' +
+        ? '<span class="dim" style="font-size:12px;flex:1">여러 기간을 함께 볼 때는 조회만 됩니다</span>' +
           '<button class="btn" data-close>닫기</button>' +
           '<button class="btn pri" data-cyc="' + tc.y + '-' + tc.m + '">' + tc.m + '월분 열어 고치기</button>'
         : '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
@@ -5950,7 +5956,7 @@
     var lk = isFinite(ms) && lockedAt(CF.who, ms);
     if (hint) {
       if (!isFinite(ms)) hint.textContent = '날짜를 골라 주세요';
-      else { var c = cycleOfMs(ms); hint.innerHTML = '<b>' + esc(cycleName(c.y, c.m)) + '</b>(' + esc(cycleSpan(c.y, c.m)) + ')에 들어갑니다' + (lk ? ' — <b style="color:var(--red)">결재 중이거나 끝난 주기라 넣을 수 없습니다</b>' : ''); }
+      else { var c = cycleOfMs(ms); hint.innerHTML = '<b>' + esc(cycleName(c.y, c.m)) + '</b>(' + esc(cycleSpan(c.y, c.m)) + ')에 들어갑니다' + (lk ? ' — <b style="color:var(--red)">결재 중이거나 끝난 기간이라 넣을 수 없습니다</b>' : ''); }
     }
     var btn = $('btnCreateTrip'); if (btn) btn.disabled = !!lk;
     var day = cfDayTrips();
@@ -6271,9 +6277,9 @@
   /* ── A안: 한 단계로 묶인 화면 사이의 탭, 단계 화면 맨 아래 '다음 단계' ── */
   var TAB_OF = { trips: 'rec', check: 'rec', a_trips: 'arec', a_check: 'arec', a_evid: 'arec', hipass: 'toll', tollfill: 'toll' };
   var TAB_SET = {
-    rec: [['trips', '운행일지'], ['check', '기록 점검']],
-    arec: [['a_trips', '운행일지'], ['a_check', '기록 점검'], ['a_evid', '영수증']],
-    toll: [['evid', '← 영수증 차례로'], ['tollfill', '통행료 직접 채우기'], ['hipass', '하이패스 PDF 대조']]
+    rec: [['trips', '운행 기록'], ['check', '기록 점검']],
+    arec: [['a_trips', '운행 기록'], ['a_check', '기록 점검'], ['a_evid', '영수증']],
+    toll: [['evid', '← 영수증'], ['tollfill', '직접 채우기'], ['hipass', '하이패스 PDF']]
   };
   var NEXT_OF = {
     trips: ['tollfill', '2 통행료로'], check: ['tollfill', '2 통행료로'],
@@ -6301,12 +6307,12 @@
       var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
       var note = sn < p ? '<b>이미 지난 단계</b>입니다. 고친 뒤 「다음 단계」로 다시 넘어가세요.'
-        : sn > p ? '앞 단계부터 진행해 주세요 — 지금은 <b>' + p + ' ' + esc(STEP_NAMES[p - 1]) + '</b> 단계입니다.'
+        : sn > p ? '지금은 <b>' + p + '단계(' + esc(STEP_NAMES[p - 1]) + ')</b> 차례입니다.'
         : here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 다음 단계로 갈 수 있습니다.'
-        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요. 잘못 넘어갔으면 「이전 단계」로 돌아오면 됩니다.';
+        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.' + (sn > 1 ? ' 잘못 넘어갔으면 「← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '」로 돌아오면 됩니다.' : '');
       html += '<div class="nextstep"><span class="stepbadge">' + sn + '</span><span class="t">' + note + '</span>' +
         // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만.
-        (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + ' ' + esc(STEP_NAMES[p - 1]) + '(지금 단계)로 →</button>' : '') +
+        (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + '단계로 가기 →</button>' : '') +
         (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
         // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
         //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
@@ -6862,7 +6868,7 @@
         // 개인경비는 「뒤의 경비가 빠진다」가 아니다 — 상신하면 그 기간이 잠겨 회수 전에는 영수증을 더 올리거나 고칠 수 없다(2026-10-08).
         $('pFoot').innerHTML = '<span class="st warn" style="flex:1;white-space:normal">' + (subKD
           ? '아직 기간 중입니다. 상신하면 회수하기 전에는 이 기간(~' + esc(endD) + ')의 영수증을 더 올리거나 고칠 수 없습니다. 그래도 상신할까요?'
-          : '아직 주기 중입니다(' + esc(endD) + '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?') + '</span>' +
+          : '아직 기간 중입니다(' + esc(endD) + '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다. 그래도 상신할까요?') + '</span>' +
           '<button class="btn" data-close>취소</button>' +
           '<button class="btn pri" id="btnSubmitAppr" data-early="1">그래도 상신</button>';
         return;
@@ -6874,7 +6880,7 @@
       var token = SUBMIT.token = {};
       var alive = function () { return SUBMIT.token === token && $('panel').classList.contains('open'); };
       // 창이 닫혔을 때만 '취소했다'고 말한다. 결재선을 고쳐 다시 그린 것이면 화면에 「상신」 버튼이 돌아와 있다.
-      var gone = function () { if (!$('panel').classList.contains('open')) toast('상신을 취소했습니다.'); };
+      var gone = function () { if (!$('panel').classList.contains('open')) toast('상신하지 않고 닫았습니다.'); };
       var send = function () {
         if (!alive()) { gone(); return; }
         // ★ 결재선은 보내는 순간의 화면에서 읽는다. 누른 순간에 만들어 두면, '그대로 상신할까요?' 가 떠 있는 동안
@@ -7250,7 +7256,7 @@
     }).sort(function (a, b) { return a.date_millis - b.date_millis; });
     var trips = TRIPS.filter(function (t) { return t.username === me && !t.deleted_at && t.start_time >= r.lo && t.start_time < r.hi; })
       .sort(function (a, b) { return a.start_time - b.start_time; });
-    if (!evs.length) { toast('이번 주기에 올린 ' + cat + ' 영수증이 없습니다.'); return; }
+    if (!evs.length) { toast('이번 기간에 올린 ' + cat + ' 영수증이 없습니다.'); return; }
     var bad = {}; evUnmatched(cat).forEach(function (e) { bad[e.id] = 1; });
     // 주소 끝 번지(488-3)만으로는 어디인지 모른다 — 동·읍·면·리 이름(없으면 도로명)을 쓴다. 「서울 강남구 역삼동 488-3」 → 역삼동
     var area = function (a) {
@@ -7314,7 +7320,7 @@
     };
     one(0).then(function () {
       closePanel();
-      toast(fail ? (sels.length - fail) + '건 저장, ' + fail + '건은 저장하지 못했습니다(결재 중이거나 다른 주기 운행일 수 있습니다).'
+      toast(fail ? (sels.length - fail) + '건 저장, ' + fail + '건은 저장하지 못했습니다(결재 중이거나 다른 기간 운행일 수 있습니다).'
         : sels.length + '건을 맞췄습니다.', !!fail);
       loadAll();
     });

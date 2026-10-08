@@ -104,6 +104,12 @@
     console.error('개인경비:', m);
     return '잠시 뒤 다시 해 주세요.';
   }
+  /** 「~하지 못했습니다」 알림 — 서버가 준 한국어 설명은 그대로 붙이고, HTTP 500·주소 같은 원문은 콘솔로만(2026-10-08 문구 점검). */
+  function failMsg(head, e, tail) {
+    var m = String((e && e.message) || '');
+    if (m) console.warn(head, m);
+    return /[가-힣]/.test(m) && !/https?:\/\/|HTTP \d/.test(m) ? head + ': ' + m : head + '. ' + tail;
+  }
 
   /* ══════════════════ 자료 ══════════════════ */
   var ITEMS = {};          // 'me|2026-10' · 'all|2026-10' → { rows } | { err } (받는 중이면 { wait })
@@ -253,7 +259,7 @@
       esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · ' + esc(xSpan(S.CYC.y, S.CYC.m)) + ' · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.all) + '</p><div class="facts">' +
       CATS.map(function (c) { return fact(c, won(T.by[c].sum), n0(T.by[c].n) + '건'); }).join('') +
-      fact('식비 기준 초과', n0(T.meal) + '<small>건</small>', '1인 1끼 13,000원 — 알리기만 합니다', false) +
+      fact('식비 기준 초과', n0(T.meal) + '<small>건</small>', '1인 1끼 13,000원 — 알리기만', false) +
       '</div>' +
       (locked ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-xup="">' + ic('receipt', 14) + '영수증 올리기</button>' +
         (rows.length ? '<button class="btn" data-v="x_verify">검증·상신으로 ' + ic('chev', 13) + '</button>' : '') + '</div>') +
@@ -270,8 +276,8 @@
         : '<div class="panel"><div class="blank"><div class="ico">' + ic('receipt', 21) + '</div><div class="t">이 기간에 올린 경비가 없습니다.</div>' +
           '<div class="d">영수증 사진이나 스캔 PDF 를 올리면 ' + C.gemTag('Gemini') + ' 가 금액·사용처를 읽고 구분·사용내역을 추천합니다.<br>앱(「개인경비」)에서 올린 것도 여기에 모입니다.</div>' +
           (locked ? '' : '<div style="margin-top:16px"><button class="btn pri" data-xup="">' + ic('receipt', 14) + '영수증 올리기</button></div>') + '</div></div>');
-    h += '<div class="anote">구분은 <b>소모품비 · 식비 · 기타비용</b> 세 가지입니다. 식비는 1인 1끼 <b>13,000원</b>이 기준이며, 넘으면 표시만 합니다 ' +
-      '(사용내역에 「3명」·「외 2명」처럼 인원을 적으면 1인당 금액으로 봅니다). 영수증 사진이 없는 줄은 만들 수 없습니다.</div>';
+    h += '<div class="anote">구분은 <b>소모품비 · 식비 · 기타비용</b>입니다. 식비는 1인 1끼 <b>13,000원</b> 기준 — 넘으면 표시만 합니다 ' +
+      '(사용내역에 「3명」·「외 2명」을 적으면 1인당으로 봅니다). 사진 없는 줄은 만들 수 없습니다.</div>';
     return h;
   }
 
@@ -323,11 +329,12 @@
         h += '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td><span class="lead">' + C.md(it.date_millis) + '</span></td>' +
           (opt.who ? C.orgCell(it.username) : '') +
           '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
-          '<td class="n total">' + n0(it.amount) + (mealOver(it) ? '<div>' + mealTag(it) + '</div>' : '') + '</td>' +
-          '<td class="el" title="' + esc(it.usage || '') + '">' + (it.usage ? esc(it.usage) : '<span class="st warn">비어 있음</span>') + '</td>' +
-          '<td class="el dim" title="' + esc(it.note || '') + '">' + esc(it.note || '') + '</td>' +
-          '<td style="white-space:nowrap">' + photoLink(it) + '</td>' +
-          '<td class="n" style="white-space:nowrap">' + (can ? '<button class="btn sm" data-xedit="' + it.id + '">고치기</button> <button class="btn sm" data-xdel="' + it.id + '">지우기</button>' : '') + '</td></tr>';
+          // 폰 카드에서는 금액(.xamt)과 식비 초과 표시(.xmealw)를 따로 놓는다(초과 표시가 금액 칸을 넓혀 왼쪽이 눌리던 것, 2026-10-08)
+          '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span>' + (mealOver(it) ? '<div class="xmealw">' + mealTag(it) + '</div>' : '') + '</td>' +
+          '<td class="el xuse" title="' + esc(it.usage || '') + '">' + (it.usage ? esc(it.usage) : '<span class="st warn">비어 있음</span>') + '</td>' +
+          '<td class="el dim xnote" title="' + esc(it.note || '') + '">' + esc(it.note || '') + '</td>' +
+          '<td class="xph" style="white-space:nowrap">' + photoLink(it) + '</td>' +
+          '<td class="n xact" style="white-space:nowrap">' + (can ? '<button class="btn sm" data-xedit="' + it.id + '">고치기</button> <button class="btn sm" data-xdel="' + it.id + '">지우기</button>' : '') + '</td></tr>';
       });
       h += '<tr class="xsub"><td colspan="' + (opt.who ? 3 : 2) + '">' + esc(cat) + ' 소계</td><td class="n total">' + n0(sum) + '</td><td colspan="4"></td></tr>';
     });
@@ -356,13 +363,13 @@
     C.openPanel('영수증 올리기 — 개인경비', C.cycleName(S.CYC.y, S.CYC.m) + ' · ' + xSpan(S.CYC.y, S.CYC.m),
       '<div class="drop gemdrop" id="xDrop" style="margin:0 0 14px">' +
       '<div class="gemorb">' + C.gemSvg(28) + '</div>' +
-      '<div class="gemchip">' + C.gemSvg(12) + 'Gemini AI 판독</div>' +
+      '<div class="gemchip">' + C.gemSvg(12) + 'Gemini 가 읽어 줍니다</div>' +
       '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 금액·사용처를 읽고 구분·사용내역을 추천합니다</div>' +
       '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
       '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기<input type="file" id="xFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div><div id="xList"></div><div id="xNote" class="fhint" style="margin-top:10px"></div>' +
-      '<div class="fhint">' + C.gemTag('Gemini AI') + ' 가 채운 값은 틀릴 수 있습니다. <b>올리기 전에 사진과 꼭 맞춰 보세요.</b> 처음부터 손으로 써도 됩니다. ' +
+      '<div class="fhint">' + C.gemTag('Gemini') + ' 가 채운 값은 틀릴 수 있습니다. <b>올리기 전에 사진과 꼭 맞춰 보세요.</b> 처음부터 손으로 써도 됩니다. ' +
       '날짜는 ' + esc(xSpan(S.CYC.y, S.CYC.m)) + ' 안이어야 합니다.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXUpGo" disabled>올리기</button>', true);
     C.bindDrop($('xDrop'), addFiles);
@@ -460,7 +467,8 @@
             if (XUP !== session) return;
             pg.ai = 'fail';
             if (e && e.status === 429) stop = true;
-            xNote('<span class="dim">Gemini 가 읽지 못한 장이 있습니다(' + esc(String((e && e.message) || '').slice(0, 60)) + '). 그 줄은 직접 넣어 주세요.</span>');
+            if (e && e.message) console.warn('Gemini 읽기 실패:', e.message);
+            xNote('<span class="dim">Gemini 가 읽지 못한 장이 있습니다. 그 줄은 직접 넣어 주세요.</span>');
           }).then(function () {
             if (XUP !== session) return;
             if (!swapped) readRows();
@@ -799,10 +807,10 @@
     p.then(function (row) {
       VROWS[k] = row || null; FRESH[k] = sig(u, cyc); setPreviewed(k, false);
       C.toast(row ? '검증했습니다 — ' + C.vx.sumText(row.summary) : '검증했습니다.');
-    }).catch(function (e) { C.toast('검증하지 못했습니다: ' + ((e && e.message) || ''), true); })
+    }).catch(function (e) { C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true); })
       .then(function () { VRUN = { busy: false, note: '', who: '' }; C.render(); });
   }
-  var LV = { bad: ['불일치', 'bad'], warn: ['확인', 'warn'], info: ['참고', ''] };
+  var LV = { bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
   var VITEMS = [];
   function isAiItem(it) { return /^X0[2-5]/.test(String(it && it.code || '')) || /^X06/.test(String(it && it.code || '')) && /승인번호/.test(String(it.detail || '')); }
   function itemsHtml(items, links) {
@@ -875,7 +883,7 @@
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' + fact('불일치', n0(s.bad), '금액·영수증이 서로 다름', s.bad > 0) + fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '식비 기준 초과 등 — 알리기만') +
-        '<div class="fact"><div class="k">사진 판독 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'AI 가 읽은 영수증' : 'AI 미설정 — 규칙 검증만') + '</div></div></div>' : '') +
+        '<div class="fact"><div class="k">사진 판독 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'Gemini 가 읽은 영수증' : 'Gemini 미설정 — 규칙 검증만') + '</div></div></div>' : '') +
       (locked ? '<div class="vact">' + C.vx.gemBtn('data-xvrun' + (VRUN.busy ? ' disabled' : ''), busy ? (VRUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') +
         '<button class="btn" data-xpdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' : steps) + '</div>';
     if (row) {
@@ -887,7 +895,7 @@
         '<div class="d">사진의 금액·날짜·상호가 입력과 같은지, 같은 영수증을 두 번 올리지 않았는지, 사용내역이 비어 있지 않은지 봅니다.<br>' +
         '맞지 않는 곳이 있어도 상신은 할 수 있습니다 — 결재자가 같이 봅니다.</div></div></div>';
     }
-    h += '<div class="anote">금액은 입력한 값으로만 더합니다. ' + C.vx.gemBadge('Gemini AI') + ' 는 사진을 읽어 <b>입력값과 다른 곳을 표시</b>할 뿐, 값을 바꾸지 않습니다.</div>';
+    h += '<div class="anote">금액은 입력한 값으로만 더합니다. ' + C.vx.gemBadge('Gemini') + ' 는 <b>입력값과 다른 곳을 표시</b>만 하고 값은 바꾸지 않습니다.</div>';
     return h;
   }
   /** 상신 창이 「상신」을 누른 직후 부른다 — 검증을 돌려 요약을 돌려준다(실패하면 null, 상신은 막지 않음). */
@@ -1445,8 +1453,8 @@
         return C.orgGroupRow(g, 9, n0(g.list.length) + '건 · 합계 <b>' + won(g.list.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0)) + '</b>').replace(/<span class="on">[^<]*<\/span>/, '') + g.list.map(function (it) {
           return '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td><span class="lead">' + C.md(it.date_millis) + '</span></td>' + C.orgCell(it.username, true) +
             '<td>' + esc(C.nameOf(it.username)) + '</td><td><span class="kind">' + esc(it.category) + '</span></td>' +
-            '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td><td class="n total">' + n0(it.amount) + (mealOver(it) ? '<div>' + mealTag(it) + '</div>' : '') + '</td>' +
-            '<td class="el" title="' + esc(it.usage || '') + '">' + esc(it.usage || '') + '</td><td class="el dim">' + esc(it.note || '') + '</td><td style="white-space:nowrap">' + photoLink(it) + '</td></tr>';
+            '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td><td class="n total"><span class="xamt">' + n0(it.amount) + '</span>' + (mealOver(it) ? '<div class="xmealw">' + mealTag(it) + '</div>' : '') + '</td>' +
+            '<td class="el xuse" title="' + esc(it.usage || '') + '">' + esc(it.usage || '') + '</td><td class="el dim xnote">' + esc(it.note || '') + '</td><td class="xph" style="white-space:nowrap">' + photoLink(it) + '</td></tr>';
         }).join('');
       }).join('') + '</tbody><tfoot><tr><td colspan="5">보이는 ' + n0(rows.length) + '건 합계</td><td class="n total">' + n0(total) + '</td><td colspan="3"></td></tr></tfoot></table></div></div>'
       : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 경비가 없습니다.</div><div style="margin-top:12px"><button class="btn sm" data-xclear>조건 지우기</button></div></div></div>');
@@ -1619,7 +1627,7 @@
     }).catch(function (e) {
       if (FINJOB !== job) return;
       FINJOB = null;
-      if ($('xFinNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>묶지 못했습니다: ' + esc((e && e.message) || '') + '</span></div>';
+      if ($('xFinNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(failMsg('PDF 한 파일로 묶지 못했습니다', e, '새로 고침 뒤 다시 해 주세요.')) + '</span></div>';
       C.render();
     });
     C.render();
