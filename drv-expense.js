@@ -18,8 +18,8 @@
   var KST = 9 * 3600e3;
   var CATS = ['소모품비', '식비', '기타비용'];
   var MEAL_LIMIT = 13000;
-  var XVIEWS = ['x_month', 'x_verify', 'xa_close', 'xa_list', 'xa_final'];
-  var ADMIN_X = ['xa_close', 'xa_list', 'xa_final'];
+  var XVIEWS = ['x_month', 'x_verify', 'xa_close', 'xa_list', 'xa_final', 'xa_people'];
+  var ADMIN_X = ['xa_close', 'xa_list', 'xa_final', 'xa_people'];
 
   /* ══════════════════ 기간 (20일 ~ 19일) ══════════════════ */
   function xRange(y, m) { return { lo: Date.UTC(y, m - 2, 20) - KST, hi: Date.UTC(y, m - 1, 20) - KST }; }
@@ -1344,7 +1344,10 @@
   function orgUsers(view) {
     if (ADMIN_X.indexOf(view) < 0) return null;
     var x = ITEMS[itemKey(true, C.state().CYCKEY)];
-    return { label: '경비가 있는 사람', list: Object.keys(peopleOf((x && x.rows) || [])) };
+    var has = Object.keys(peopleOf((x && x.rows) || []));
+    // 직원 현황은 경비가 없는 사람도 명단에 있으므로 「보는 범위」도 등록된 전 직원으로 고른다.
+    if (view === 'xa_people') return { label: '등록 직원', list: Object.keys(C.state().USERS || {}).concat(has) };
+    return { label: '경비가 있는 사람', list: has };
   }
   function adminRows() {
     var rows = itemsFor(true);
@@ -1414,6 +1417,45 @@
     }
     h += '<div class="anote"><b>관리자 반려</b>는 결재자가 자리에 없어 결재가 멈췄을 때만 씁니다. <b>정정 열기</b>는 결재가 끝난 뒤 고칠 것이 생겼을 때 씁니다 — ' +
       '잠금이 풀려 직원이 고쳐 다시 상신하고, 그때의 결재 완료본은 이력에 남습니다.</div>';
+    return h;
+  }
+  /** 직원 현황(개인경비) — 등록된 모든 직원의 이번 기간 경비. 운행일지 직원 현황(운행·거리·유지비)과 따로 둔다(2026-10-08).
+   *  운전을 안 하는 직원도 개인경비는 쓰므로 uses_driving 으로 거르지 않는다. */
+  function viewAdminPeople() {
+    var S = C.state();
+    if (!S.LOADED) return C.head('직원 현황') + C.skeleton();
+    if (C.isMulti()) return C.singleOnly('직원 현황', '개인경비');
+    var rows = adminRows();
+    if (!rows || rows.err) return notReady('직원 현황', rows);
+    var users = Object.keys(S.USERS || {}).filter(function (u) { return C.orgMatch(u); });
+    var mine = {};
+    rows.forEach(function (it) { if (C.orgMatch(it.username)) (mine[it.username] = mine[it.username] || []).push(it); });
+    Object.keys(mine).forEach(function (u) { if (users.indexOf(u) < 0) users.push(u); });   // 명단에 없지만 경비가 있는 사람도 빠뜨리지 않는다
+    var list = users.map(function (u) { var s = sums(mine[u] || []); s.u = u; s.a = xApprOf(u, S.CYCKEY); return s; });
+    var none = list.filter(function (x) { return !x.n; }).length;
+    var scope = C.orgScopeName ? C.orgScopeName() : '';
+    var h = head('직원 현황', n0(list.length) + '명' + (scope ? ' · ' + esc(scope) : ''));
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 기간 개인경비</div>' +
+      '<p class="verdict">' + (list.length - none ? '<em>' + n0(list.length - none) + '명</em>이 경비를 올렸습니다' : '<em>아직 올린 경비가 없습니다</em>') + '</p>' +
+      '<div class="facts">' + fact('등록 인원', n0(list.length) + '<small>명</small>') + fact('경비 있음', n0(list.length - none) + '<small>명</small>') +
+      fact('경비 없음', n0(none) + '<small>명</small>') + '</div></div>';
+    list.sort(function (x, y) { return y.all - x.all; });
+    h += C.sect('명단', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>직급</th>' +
+      '<th class="n">건수</th><th class="n">합계</th>' + CATS.map(function (c) { return '<th class="n">' + c + '</th>'; }).join('') + '<th>식비 기준</th><th>결재</th></tr></thead><tbody>' +
+      C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
+        var gn = g.list.filter(function (x) { return x.n; }).length;
+        return C.orgGroupRow(g, 10, '경비 있음 ' + n0(gn) + '명 · 합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.all; }, 0)) + '</b>') + g.list.map(function (x) {
+          var u = S.USERS[x.u] || {};
+          return '<tr' + (x.n ? ' class="clk" tabindex="0" data-xperson="' + esc(x.u) + '"' : '') + '>' + C.orgCell(x.u, true) +
+            '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="dim">' + esc(u.position || '—') + '</td>' +
+            '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td>' +
+            '<td class="n total">' + (x.all ? n0(x.all) : '—') + '</td>' +
+            CATS.map(function (c) { return '<td class="n">' + (x.by[c].sum ? n0(x.by[c].sum) : '—') + '</td>'; }).join('') +
+            '<td>' + (x.meal ? '<span class="st warn">초과 ' + n0(x.meal) + '건</span>' : '<span class="dim">—</span>') + '</td>' +
+            '<td>' + (x.a ? stChip(x.a) : (x.n ? '<span class="st warn">상신 전</span>' : '<span class="dim">—</span>')) + '</td></tr>';
+        }).join('');
+      }).join('') + '</tbody></table></div></div>' : C.blank('보는 범위에 직원이 없습니다.', null, 'users'));
+    h += '<div class="anote">줄을 누르면 그 사람의 경비 내역(전체 내역)으로 갑니다. 운행·거리·차량 유지비는 운행일지의 직원 현황에서 봅니다.</div>';
     return h;
   }
   var XL = { cat: 'all', who: '', meal: false };
@@ -1742,7 +1784,7 @@
     verifyView: 'x_verify'
   };
   return {
-    views: { x_month: viewMonth, x_verify: viewVerify, xa_close: viewAdminClose, xa_list: viewAdminList, xa_final: viewAdminFinal },
+    views: { x_month: viewMonth, x_verify: viewVerify, xa_close: viewAdminClose, xa_list: viewAdminList, xa_final: viewAdminFinal, xa_people: viewAdminPeople },
     admin: ADMIN_X,
     orgbar: ADMIN_X,
     orgUsers: orgUsers,

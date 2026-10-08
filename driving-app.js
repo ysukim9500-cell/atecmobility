@@ -6354,7 +6354,7 @@
   }
   // 메뉴 갈래(2026-10-08): 'd' 운행일지 · 'x' 개인경비. 함께 쓰는 화면에서는 앞 갈래를 그대로 둔다.
   var NAV_MODE = (function () { try { return sessionStorage.getItem('drv_navmode') === 'x' ? 'x' : 'd'; } catch (e) { return 'd'; } })();
-  var SHARED_VIEWS = ['inbox', 'account', 'people', 'org', 'perm'];
+  var SHARED_VIEWS = ['inbox', 'account', 'org', 'perm'];   // 직원 현황은 갈래마다 따로(people / xa_people, 2026-10-08)
   function navModeOf(v) {
     if (/^xa?_/.test(v)) return 'x';
     if (SHARED_VIEWS.indexOf(v) >= 0) return NAV_MODE;
