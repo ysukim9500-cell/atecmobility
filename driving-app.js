@@ -6341,7 +6341,7 @@
     return VIEWS.x_month ? 'x_month' : 'inbox';
   }
   // 메뉴 갈래(2026-10-08): 'd' 운행일지 · 'x' 개인경비. 함께 쓰는 화면에서는 앞 갈래를 그대로 둔다.
-  var NAV_MODE = 'd';
+  var NAV_MODE = (function () { try { return sessionStorage.getItem('drv_navmode') === 'x' ? 'x' : 'd'; } catch (e) { return 'd'; } })();
   var SHARED_VIEWS = ['inbox', 'account', 'people', 'org', 'perm'];
   function navModeOf(v) {
     if (/^xa?_/.test(v)) return 'x';
@@ -6350,6 +6350,7 @@
   }
   function paintNavMode() {
     NAV_MODE = noDriving() ? 'x' : navModeOf(VIEW);
+    try { sessionStorage.setItem('drv_navmode', NAV_MODE); } catch (e) { }
     document.body.classList.toggle('mode-x', NAV_MODE === 'x');
     document.body.classList.toggle('mode-d', NAV_MODE === 'd');
     Array.prototype.forEach.call(document.querySelectorAll('#navMode [data-mode]'), function (a) {

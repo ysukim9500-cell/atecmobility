@@ -223,7 +223,7 @@
     if (a && (a.status === 'submitted' || a.status === 'approved')) wantSums([a.id]);
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind x">개인경비</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
-      (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 운행일지와 같은 결재함으로 갑니다.</div>') +
+      (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 상신하면 결재함으로 갑니다.</div>') +
       (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 경비를 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
