@@ -48,9 +48,13 @@
   }
   /** XML 1.0 이 금지하는 제어문자를 먼저 턴다. 주소·방문처에 한 글자라도 섞이면
    *  sheet1.xml 전체가 잘못된 XML 이 되어 엑셀이 파일을 통째로 거부한다. */
+  var XML_NONCHAR = new RegExp('[' + String.fromCharCode(0xFFFE, 0xFFFF) + ']', 'g');   // U+FFFE/FFFF — XML 금지 글자
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+      .replace(XML_NONCHAR, '')
+      // 짝 없는 서로게이트(반쪽 이모지 등)도 XML 에 쓸 수 없다 — 짝이 맞는 것만 남긴다(lookbehind 없이: 옛 사파리도 읽게).
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, function (m) { return m.length === 2 ? m : ''; })
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   /** 한 셀. opt.f=수식, opt.n=숫자, 그 외 inlineStr. 값이 비면 빈 셀. */

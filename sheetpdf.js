@@ -103,7 +103,8 @@
       var cp = s.codePointAt(i);
       var ch = String.fromCodePoint(cp);
       i += ch.length;
-      if (cp === 0x09 || cp === 0x0A || cp === 0x0D || cp === 0xA0) { out += ' '; continue; }
+      if (cp === 0x09 || cp === 0x0A || cp === 0x0D || cp === 0xA0 || cp === 0x2028 || cp === 0x2029) { out += ' '; continue; }
+      if (cp === 0xFFFE || cp === 0xFFFF) continue;     // 글자가 아닌 코드(엑셀 esc 와 같이 지운다)
       // 보이지 않는 글자는 그리지 않는다(제어문자 · BOM · 폭 없는 공백 · 붙여 넣기에 딸려 온 개체 자리표 U+FFFC/FFFD).
       if (cp < 0x20 || cp === 0x7F || cp === 0xFEFF || cp === 0xFFFC || cp === 0xFFFD || (cp >= 0x200B && cp <= 0x200F)) continue;
       if (cs && !cs[cp]) {
@@ -209,9 +210,10 @@
     if (o.fill != null || o.border !== false) {
       pg.drawRectangle({
         x: x, y: PH - yTop - h, width: w, height: h,
-        color: o.fill != null ? this.gray(o.fill) : undefined,
+        // fill: 회색 값(0~1) 또는 [r, g, b](0~1) — 개인경비 명세는 양식의 파랑·노랑 칠을 쓴다.
+        color: o.fill == null ? undefined : Array.isArray(o.fill) ? lib.rgb(o.fill[0], o.fill[1], o.fill[2]) : this.gray(o.fill),
         borderColor: o.border === false ? undefined : this.black,
-        borderWidth: o.border === false ? 0 : BW
+        borderWidth: o.border === false ? 0 : (o.bw || this.bw || BW)
       });
     }
     if (o.slash) {
@@ -366,14 +368,16 @@
 
   /** 결재란(담당·팀장·실장·사업부장·대표이사) — 운행기록부·개인경비 명세가 같이 쓴다. (ax, top) 은 왼쪽 위. 아래 끝 y 를 돌려준다.
    *  boxes[칸] = { name, date, sign } · 칸이 없으면 빗금(건너뜀) · name 이 비면 빈칸(아직 결재 전). */
-  var BOX_W = (7 + 17 * 5) * MM;
-  function drawBoxes(c, ax, top, boxesIn) {
-    var labW = 7 * MM, boxW = 17 * MM, hdH = 5.8 * MM, sgH = 13 * MM;
-    c.cell(ax, top, labW, hdH + sgH, { lines: ['결', '재'], size: 8, align: 'center', fill: 0.95 });
+  /*  g = 칸 크기·모양(없으면 운행기록부 크기). 개인경비 명세는 양식 결재란(흰 바탕, 「결 재」 세로 칸)에 맞춘 값을 넘긴다. */
+  function drawBoxes(c, ax, top, boxesIn, g) {
+    g = g || {};
+    var labW = g.labW || 7 * MM, boxW = g.boxW || 17 * MM, hdH = g.hdH || 5.8 * MM, sgH = g.sgH || 13 * MM;
+    var hfill = g.fill === undefined ? 0.95 : g.fill, hsz = g.size || 8;
+    c.cell(ax, top, labW, hdH + sgH, { lines: g.label || ['결', '재'], size: hsz, align: 'center', fill: hfill });
     var boxes = boxesIn || {};
     BOXES.forEach(function (b, i) {
       var bx = ax + labW + i * boxW;
-      c.cell(bx, top, boxW, hdH, { t: b, size: 8, align: 'center', fill: 0.95 });
+      c.cell(bx, top, boxW, hdH, { t: b, size: hsz, align: 'center', fill: hfill, padX: g.hpadX });
       var v = boxes[b];
       if (!v) { c.cell(bx, top + hdH, boxW, sgH, { slash: true }); return; }
       c.cell(bx, top + hdH, boxW, sgH, { t: '' });
@@ -801,7 +805,17 @@
      doc = { meta, person:{dept,name}, periodLabel, boxes, verify,
              items:[{ date, category, merchant, amount, usage, note, path }] }   ← 이미 명세 순서(구분 → 날짜)로 정렬해 넘긴다 */
   var X_CATS = ['소모품비', '식비', '기타비용'];
-  var XCOLS = [11, 22, 44, 25, 56, 32].map(function (w) { return w / 190 * CW; });
+  /* 양식을 엑셀에서 인쇄한 모습(A4 세로, 폭에 맞춤)을 그대로 옮긴다 — 엑셀 시트의 pt 값 × XK.
+     열(pt): 순번 34.5 · 날짜 112.5 · 사용처 121.5 · 금액 121.5 · 사용내역 186.75 · 비고 134.25 (양식 열 폭 5.75·18.75·20.25·20.25·31.125·22.375)
+     XK = 양식 인쇄본의 표 폭 522.6pt ÷ 시트 표 폭 711pt. 표 왼쪽 = MX.
+     결재란은 양식 그림 자리(오른쪽 위, 표 오른쪽 끝을 조금 넘는다) — 「결 재」 세로 칸 + 5칸(머리 + 서명 자리).
+     엑셀(drv-expense.js xlsxBytes)도 같은 자리·크기다: 시트 x 468 에서 시작, 칸 26.25 + 51.75 × 5, 머리 22 · 서명 50
+     (양식 그림은 4칸 248pt 이지만 우리는 5칸이라 칸을 조금 좁히고 왼쪽으로 조금 늘였다 — 제목에 닿지 않는 데까지). */
+  var XK = 0.735;
+  var XCOLS = [34.5, 112.5, 121.5, 121.5, 186.75, 134.25].map(function (w) { return w * XK; });
+  var XTW = XCOLS.reduce(function (a, b) { return a + b; }, 0);       // 표 폭(약 522.6pt)
+  var XBLUE = [155 / 255, 194 / 255, 230 / 255], XYELLOW = [1, 1, 153 / 255];   // 양식 #9BC2E6 · #FFFF99
+  var XFS = 12 * XK;                                                   // 표 글자(양식 12pt)
   var XHEAD = ['순번', '날 짜', '사용처', '금액', '사용내역', '비고'];
   /** 구분별 묶음. 세 구분은 늘 이 순서로 나온다(비어 있어도). 모르는 구분은 기타비용에 넣는다. */
   function expenseGroups(items) {
@@ -809,73 +823,119 @@
     (items || []).forEach(function (it) {
       var i = X_CATS.indexOf(it.category); gs[i < 0 ? 2 : i].list.push(it);
     });
-    gs.forEach(function (g) { g.sum = g.list.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0); });
+    // ★ 줄마다 원 단위로 반올림한 값을 더한다 — 표에 보이는 금액의 합 = 소계·합계(엑셀 xlsxBytes 와 같은 규칙).
+    gs.forEach(function (g) { g.sum = g.list.reduce(function (s, it) { return s + Math.round(Number(it.amount) || 0); }, 0); });
     return gs;
   }
+  /** 양식의 회계 서식처럼 — 0 은 「-」. */
+  function acc(n) { var v = Math.round(Number(n) || 0); return v === 0 ? '-' : n0(v); }
   function drawExpense(c, d) {
     var gs = expenseGroups(d.items), total = gs.reduce(function (s, g) { return s + g.sum; }, 0);
     var p = d.person || {};
+    var X0 = MX, sx = function (v) { return X0 + (v - 21) * XK; };   // 시트 x(pt, A열 폭 21 포함) → 쪽 x
+    var rowH = 28.5 * XK;                                              // 양식 표 행 높이 28.5
     c.newPage();
-    var tw = c.text('개인경비 지출 명세', MX + CW / 2, c.y, { size: 17, bold: true, align: 'center' });
-    c.page.drawLine({ start: { x: MX + CW / 2 - tw / 2, y: PH - (c.y + 17 * 1.02) }, end: { x: MX + CW / 2 + tw / 2, y: PH - (c.y + 17 * 1.02) }, thickness: 0.8, color: c.black });
-    c.y += 17 * 1.25 + 4.5 * MM;
-    c.text(d.periodLabel || '', MX + CW / 2, c.y, { size: 9, align: 'center', color: 0.2 });
-    c.y += 9 * LH + 4 * MM;
+    var y0 = MT - 3;                                                   // 시트 1행 위
 
-    var top = c.y, gap = 5 * MM, infoW = CW - BOX_W - gap, thW = 24 * MM, iy = top;
-    [['부 서', p.dept], ['성 명', p.name], ['합 계', won(total) + '  (' + n0((d.items || []).length) + '건)']].forEach(function (kv) {
-      var vo = { t: kv[1] || '', size: 9, padX: 2.4 * MM, padY: 0.8 * MM, wrap: true, maxLines: 2 };
-      var vl = c.layout(vo, infoW - thW), hh = Math.max(6.2 * MM, vl.h);
-      c.cell(MX, iy, thW, hh, { t: kv[0], size: 9, align: 'center', fill: 0.95 });
-      c.cell(MX + thW, iy, infoW - thW, hh, vo, vl);
-      iy += hh;
-    });
-    var bb = drawBoxes(c, MX + infoW + gap, top, d.boxes);
-    c.y = Math.max(iy, bb) + 5 * MM;
+    // ── 결재란 — 양식 그림 자리(오른쪽 위). 흰 바탕, 「결 재」 세로 칸, 머리 줄 + 서명 자리 ──
+    var bx = sx(468), btop = y0 + 6 * XK, bg = { labW: 26.25 * XK, boxW: 51.75 * XK, hdH: 22 * XK, sgH: 50 * XK, fill: null, size: 10 * XK, hpadX: 0.4 * MM, label: ['결', '', '재'] };
+    c.bw = 0.6;                                                        // 양식 인쇄본의 가는 선
+    drawBoxes(c, bx, btop, d.boxes, bg);
+    // 양식 결재란은 바깥 테두리만 굵다.
+    c.page.drawRectangle({ x: bx, y: PH - btop - bg.hdH - bg.sgH, width: bg.labW + 5 * bg.boxW, height: bg.hdH + bg.sgH, borderColor: c.black, borderWidth: 1.2 });
 
+    // ── 제목 — 맑은 고딕 22 굵게·밑줄, 표 가운데(결재란에 닿으면 왼쪽으로 민다) ──
+    var TS = 22 * XK, title = '개인경비 지출 명세', tw = c.w(title, TS, true);
+    var tcx = Math.min(X0 + XTW / 2, bx - 3 * MM - tw / 2);
+    var tTop = y0 + 42 * XK - TS * 0.45;
+    c.text(title, tcx, tTop, { size: TS, bold: true, align: 'center' });
+    var uy = tTop + TS * 1.0;
+    c.page.drawLine({ start: { x: tcx - tw / 2, y: PH - uy }, end: { x: tcx + tw / 2, y: PH - uy }, thickness: 0.9, color: c.black });
+
+    // ── 기간 — 양식에는 없는 줄. 어느 기간 문서인지 밝혀 둔다(띠 바로 위 왼쪽, 작게) ──
+    var bandTop = y0 + 118.5 * XK;
+    if (d.periodLabel) c.text(d.periodLabel, X0 + 0.5 * MM, bandTop - 8 * 1.2 - 1.5, { size: 8, color: 0.25, maxW: bx - X0 - 4 * MM });
+
+    // ── 부서·이름 띠 — 파랑 한 줄(칸 사이 세로줄 없음), 글자는 사용내역·비고 위 가운데 굵게 ──
+    c.y = bandTop;
+    c.cell(X0, c.y, XTW, rowH, { t: '', fill: XBLUE });
+    var fg = XCOLS[4] + XCOLS[5], fx = X0 + XTW - fg;
+    var bandTxt = '부서 :  ' + (p.dept || '') + '          이름 :  ' + (p.name || '');
+    var bs = XFS, bw0 = c.w(c.clean(bandTxt), bs, true);
+    while (bw0 > XTW - 4 * MM && bs > 6) { bs = Math.max(6, bs - 0.2); bw0 = c.w(c.clean(bandTxt), bs, true); }
+    if (bw0 > XTW - 4 * MM) c.issue('overflow', '부서·이름 띠가 넘침');
+    var btx = bw0 <= fg - 2 * MM ? fx + (fg - bw0) / 2 : X0 + XTW - 2 * MM - bw0;   // 길면 오른쪽 끝에 맞춰 왼쪽으로 늘인다
+    c.text(bandTxt, btx, c.y + rowH / 2 - bs * 0.5, { size: bs, bold: true });
+    c.y += rowH;
+
+    // ── 표 ──
     var head = function () {
-      c.row(XHEAD.map(function (h, i) { return { w: XCOLS[i], t: h, size: 8.4, bold: true, align: 'center', fill: 0.93 }; }), { minH: 7 * MM });
+      c.row(XHEAD.map(function (h, i) { return { w: XCOLS[i], t: h, size: XFS, bold: true, align: 'center', fill: XYELLOW }; }), { minH: rowH });
     };
+    // 다음 쪽 — 머리글 위에 「(계속) · 이름 · 기간」 작은 줄, 그리고 엑셀 인쇄 제목 행처럼 머리글 줄을 되풀이한다.
     var brk = function () {
       c.newPage();
-      c.text('개인경비 지출 명세 (계속)', MX, c.y, { size: 9.5, bold: true });
-      c.text([p.name, d.periodLabel].filter(Boolean).join(' · '), MX + CW, c.y + 0.8, { size: 8, align: 'right', color: 0.2, maxW: CW * 0.6 });
-      c.y += 9.5 * LH + 1.5 * MM;
+      c.text('개인경비 지출 명세 (계속)  ·  ' + [p.name, d.periodLabel].filter(Boolean).join('  ·  '), X0 + 0.5 * MM, c.y, { size: 7.6, color: 0.3, maxW: XTW - 1 * MM });
+      c.y += 7.6 * LH + 1.2 * MM;
       head();
     };
     var span = function (a, b) { var s = 0; for (var i = a; i <= b; i++) s += XCOLS[i]; return s; };
+    var itemCells = function (it, k) {
+      if (!it) return XCOLS.map(function (w) { return { w: w, t: '' }; });
+      return [
+        { w: XCOLS[0], t: String(k + 1), size: XFS, align: 'center' },
+        { w: XCOLS[1], t: it.date || '', size: 11 * XK, align: 'center' },
+        { w: XCOLS[2], t: it.merchant || '', size: XFS, align: 'center', wrap: true, maxLines: 3, padX: 1.4 * MM },
+        { w: XCOLS[3], t: acc(it.amount), size: XFS, align: 'right', padX: 2 * MM },
+        { w: XCOLS[4], t: it.usage || '', size: XFS, align: 'center', wrap: true, maxLines: 4, padX: 1.4 * MM },
+        { w: XCOLS[5], t: it.note || '', size: XFS, align: 'center', wrap: true, maxLines: 3, padX: 1.4 * MM }
+      ];
+    };
+    var footH = rowH + 0.8 * MM + XFS * LH;            // 합계 줄 + 별첨 문구
     head();
-    gs.forEach(function (g) {
-      c.row([{ w: CW, t: '<' + g.cat + '>', size: 8.6, bold: true, padX: 2.4 * MM, fill: 0.97 }], { onBreak: brk, minH: 6.4 * MM });
+    gs.forEach(function (g, gi) {
+      var gh = [{ w: XTW, t: '<' + g.cat + '>', size: XFS, align: 'center' }];
       var rows = g.list.length ? g.list : [null];
+      var tail = rowH + (gi === gs.length - 1 ? footH : 0);   // 소계(+ 마지막 묶음이면 합계·별첨)
+      // 묶음 머리가 쪽 끝에 홀로 남지 않게 — 첫 줄과 같이 넘긴다. 줄이 0~1건이면 첫 줄이 곧 마지막 줄이라
+      // 소계(·합계·별첨)까지 한 쪽에 들어가야 한다(안 그러면 머리 + 줄만 남고 소계가 다음 쪽 머리에 홀로 간다).
+      if (c.y + c.rowHeight(gh, rowH) + c.rowHeight(itemCells(rows[0], 0), rowH) + (rows.length <= 1 ? tail : 0) > LIMIT + 0.01) brk();
+      c.row(gh, { onBreak: brk, minH: rowH });
       rows.forEach(function (it, k) {
-        if (!it) { c.row(XCOLS.map(function (w) { return { w: w, t: '' }; }), { onBreak: brk, minH: 6.4 * MM }); return; }
-        c.row([
-          { w: XCOLS[0], t: String(k + 1), size: 8, align: 'center' },
-          { w: XCOLS[1], t: it.date || '', size: 8, align: 'center' },
-          { w: XCOLS[2], t: it.merchant || '', size: 8, wrap: true, maxLines: 3, padX: 1.6 * MM },
-          { w: XCOLS[3], t: n0(it.amount), size: 8, align: 'right', padX: 2 * MM },
-          { w: XCOLS[4], t: it.usage || '', size: 8, wrap: true, maxLines: 4, padX: 1.6 * MM },
-          { w: XCOLS[5], t: it.note || '', size: 8, wrap: true, maxLines: 3, padX: 1.6 * MM }
-        ], { onBreak: brk, minH: 6.4 * MM });
+        var cells = itemCells(it, k);
+        // 묶음의 마지막 줄은 소계와 같은 쪽에 — 소계(·합계)만 다음 쪽에 덩그러니 남지 않게 데리고 넘어간다.
+        if (k === rows.length - 1 && c.y + c.rowHeight(cells, rowH) + tail > LIMIT + 0.01) brk();
+        c.row(cells, { onBreak: brk, minH: rowH });
       });
+      if (c.y + tail > LIMIT + 0.01) brk();
       c.row([
         { w: XCOLS[0], t: '' }, { w: XCOLS[1], t: '' },
-        { w: XCOLS[2], t: '소계', size: 8.2, bold: true, align: 'center', fill: 0.97 },
-        { w: XCOLS[3], t: n0(g.sum), size: 8.2, bold: true, align: 'right', padX: 2 * MM, fill: 0.97 },
+        { w: XCOLS[2], t: '소계', size: XFS, align: 'center' },
+        { w: XCOLS[3], t: acc(g.sum), size: XFS, align: 'right', padX: 2 * MM },
         { w: XCOLS[4], t: '' }, { w: XCOLS[5], t: '' }
-      ], { onBreak: brk, minH: 6.4 * MM });
+      ], { onBreak: brk, minH: rowH });
     });
-    if (c.y + 7 * MM + 10 * MM > LIMIT) brk();
+    if (c.y + footH > LIMIT + 0.01) brk();
     c.row([
-      { w: span(0, 2), t: '합계', size: 9, bold: true, align: 'center', fill: 0.88 },
-      { w: XCOLS[3], t: n0(total), size: 9, bold: true, align: 'right', padX: 2 * MM, fill: 0.88 },
-      { w: span(4, 5), t: '', fill: 0.88 }
-    ], { minH: 7.4 * MM });
-    c.y += 2.5 * MM;
-    c.text('* 해당 증빙은 명세서 기재순으로 별첨', MX, c.y, { size: 8.5, color: 0.15 });
-    c.y += 8.5 * LH;
+      { w: span(0, 2), t: '합계', size: XFS, bold: true, align: 'center', fill: XBLUE },
+      { w: XCOLS[3], t: acc(total), size: XFS, bold: true, align: 'right', padX: 2 * MM, fill: XBLUE },
+      { w: XCOLS[4], t: '', fill: XBLUE }, { w: XCOLS[5], t: '', fill: XBLUE }
+    ], { minH: rowH });
+    c.y += 0.8 * MM;
+    c.text('* 해당 증빙은 명세서 기재순으로 별첨', X0 + 0.5 * MM, c.y, { size: XFS });
+    c.y += XFS * LH;
+    c.bw = null;
     return { all: total, groups: gs.map(function (g) { return { cat: g.cat, n: g.list.length, sum: g.sum }; }) };
+  }
+  /** 증빙 쪽 머리 — 양식 둘째 쪽의 「< 개인경비 증빙 >」(굵게, 왼쪽)과 안내 문구. 오른쪽엔 이 쪽 금액·쪽 번호. */
+  function expenseReceiptHead(c, pageNo, pageCnt, sumText) {
+    c.newPage();
+    var hs = XFS + 1;
+    c.text('< 개인경비 증빙 >', MX + 0.5 * MM, c.y, { size: hs, bold: true });
+    c.text((sumText ? sumText + '    ' : '') + pageNo + ' / ' + pageCnt, MX + CW, c.y + 0.6, { size: 8.5, align: 'right', bold: !!sumText, maxW: CW * 0.6 });
+    c.y += hs * LH + 0.4 * MM;
+    c.text('* 영수증은 명세서 기재순(최초 날짜부터 차례로)으로 첨부', MX + 0.5 * MM, c.y, { size: XFS - 0.6 });
+    c.y += (XFS - 0.6) * LH + 2.6 * MM;
   }
   /** 명세 번호 — 「식비 1」처럼 구분 + 그 구분 안의 순번. 명세 표의 순번 칸과 같은 수(사진이 없는 줄도 센다). */
   function expenseLabels(items) {
@@ -901,11 +961,12 @@
     expenseGroups(items).forEach(function (g) { g.list.forEach(function (it) { if (it.path) list.push(it); }); });
     if (!list.length) return;
     var per = 4, pages = Math.ceil(list.length / per);
-    var all = list.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    var addR = function (s, e) { return s + Math.round(Number(e.amount) || 0); };   // 명세와 같게 줄마다 반올림
+    var all = list.reduce(addR, 0);
     for (var i = 0; i < list.length; i += per) {
       var chunk = list.slice(i, i + per);
-      var sum = chunk.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
-      receiptHead(c, '증빙 (영수증)', meta, i / per + 1, pages,
+      var sum = chunk.reduce(addR, 0);
+      expenseReceiptHead(c, i / per + 1, pages,
         pages > 1 ? '이 쪽 소계 ' + won(sum) + ' · 전체 ' + n0(list.length) + '건 ' + won(all) : '합계 ' + n0(list.length) + '건 ' + won(all));
       var S1 = 8.2, S2 = 7.6, MIN = 7;
       var top = c.y, gap = 4 * MM, capH = (S1 + S2) * LH + 1.6 * MM;

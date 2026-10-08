@@ -1011,46 +1011,82 @@
      docs/expense/개인경비 지출명세서_양식.xlsx 와 같은 칸: 순번·날짜·사용처·금액·사용내역·비고,
      제목 · 기간 줄 · 결재란 5칸(담당·팀장·실장·사업부장·대표이사, 운행일지와 같은 규칙) · 부서·이름 띠,
      <소모품비>·<식비>·<기타비용> 묶음(가운데)마다 줄·소계(SUM), 합계(소계의 합), 별첨 문구. A4 세로, 폭에 맞춤.
-     ★ 결재란 다섯 칸을 같은 폭으로 — 열 폭을 C·D·E·F = 23.5, G+H = 23.5 로 잡고 사용내역은 F:G 를 합쳐 쓴다.
-       (양식의 열 폭 18.75·20.25·20.25·31.125·22.375 로는 칸이 들쭉날쭉해진다. 사용내역 폭 31 은 양식과 같다.)
+     ★ 양식을 엑셀로 인쇄한 모습과 같게(2026-10-08): 열 폭은 양식 그대로(A 3.5 · B 5.75 · C 18.75 · D 20.25 · E 20.25 · F 31.125 · G 22.375 · H 9),
+       행 높이 28.5, 띠·합계 파랑(#9BC2E6), 머리글 노랑(#FFFF99)·굴림 12 굵게, 제목 맑은 고딕 22 굵게·밑줄, 칸은 모두 가운데, 소계·묶음은 칠 없음.
+     ★ 결재란은 양식 그림 자리(오른쪽 위, 표 오른쪽 끝을 조금 넘는다)에 칸으로 그린다 — 「결 재」 세로 칸 + 5칸(머리 22 · 서명 50, 바깥 굵은 선).
+       칸 경계를 만들려고 양식의 F·G·H 열을 잘게 나눴다: F → F(9.5)·G(4.375 「결 재」)·H·I(8.625), G → J·K(8.625)·L(5.125), H → M(3.5)·N(5.5).
+       그래서 표의 사용내역은 F:I, 비고는 J:L 를 합쳐 쓰고(폭은 양식과 같다), 결재 칸은 H·I·J·K·L:M 이다. sheetpdf.js 의 PDF 도 같은 자리·크기로 그린다.
+     ★ 제목은 B:F 를 합쳐 오른쪽 맞춤 + 들여쓰기 3 — 결재란과 떨어져 끝나 양식처럼 표 가운데쯤에 온다.
+     ★ 쪽 나눔은 PDF 와 같은 규칙으로 손수(rowBreaks) — 묶음 머리·소계·합계가 쪽 끝/첫머리에 홀로 남지 않게.
      ★ 소계·합계는 수식을 두고 계산한 값(<v>)도 같이 적는다 — 수식을 계산하지 않는 보기 프로그램에서도 숫자가 보인다.
      ★ 날짜는 진짜 엑셀 날짜(일련번호 + yyyy-mm-dd), 금액은 양식과 같은 회계 서식(0 은 「-」).
      ★ 긴 사용처·사용내역·비고는 줄을 바꿔 다 보이게 하고, 행 높이는 글자 수로 어림해 늘린다(2~6줄).
-     ★ 인쇄: 머리글 줄을 쪽마다 되풀이(Print_Titles), 인쇄 영역 B2:H끝. */
+     ★ 인쇄: 양식과 같은 여백·가로 가운데·폭에 맞춤, 머리글 줄을 쪽마다 되풀이(Print_Titles), 인쇄 영역 A1:N끝. */
+  var XL_BD = function (l, r, t, b, diag) {
+    var s = function (tag, v) { return v ? '<' + tag + ' style="' + v + '"><color indexed="64"/></' + tag + '>' : '<' + tag + '/>'; };
+    return '<border' + (diag ? ' diagonalUp="1"' : '') + '>' + s('left', l) + s('right', r) + s('top', t) + s('bottom', b) +
+      (diag ? '<diagonal style="thin"><color indexed="64"/></diagonal>' : '<diagonal/>') + '</border>';
+  };
+  var XL_XF = function (numFmt, font, fill, border, align) {
+    return '<xf numFmtId="' + numFmt + '" fontId="' + font + '" fillId="' + fill + '" borderId="' + border + '"' + (numFmt ? ' applyNumberFormat="1"' : '') +
+      ' applyFont="1" applyFill="1" applyBorder="1"' + (align ? ' applyAlignment="1"><alignment ' + align + '/></xf>' : '/>');
+  };
+  var XL_C = 'horizontal="center" vertical="center"';
   var XL_STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0"/>' +
     '<numFmt numFmtId="165" formatCode="_-* #,##0_-;\\-* #,##0_-;_-* &quot;-&quot;_-;_-@_-"/><numFmt numFmtId="166" formatCode="yyyy\\-mm\\-dd"/></numFmts>' +
-    '<fonts count="5"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font><font><b/><u/><sz val="22"/><name val="맑은 고딕"/></font>' +
-    '<font><b/><sz val="12"/><name val="맑은 고딕"/></font><font><sz val="12"/><name val="맑은 고딕"/></font></fonts>' +
-    '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fonts count="9"><font><sz val="11"/><name val="맑은 고딕"/></font>' +                    // 0 기본
+    '<font><b/><u/><sz val="22"/><name val="맑은 고딕"/></font>' +                              // 1 제목
+    '<font><b/><sz val="12"/><name val="맑은 고딕"/></font>' +                                  // 2 띠·합계
+    '<font><sz val="12"/><name val="맑은 고딕"/></font>' +                                      // 3 묶음·순번·별첨
+    '<font><b/><sz val="12"/><name val="굴림"/></font>' +                                       // 4 머리글
+    '<font><sz val="12"/><name val="굴림"/></font>' +                                           // 5 내용
+    '<font><sz val="11"/><name val="굴림"/></font>' +                                           // 6 날짜
+    '<font><sz val="10"/><name val="맑은 고딕"/></font>' +                                      // 7 결재란
+    '<font><sz val="10"/><color rgb="FF595959"/><name val="맑은 고딕"/></font></fonts>' +       // 8 기간 줄
+    '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
     '<fill><patternFill patternType="solid"><fgColor rgb="FF9BC2E6"/><bgColor indexed="64"/></patternFill></fill>' +
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF99"/><bgColor indexed="64"/></patternFill></fill>' +
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>' +
-    '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
-    '<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>' +
-    // 결재선에 없는 결재 칸 — 빗금(왼쪽 위 → 오른쪽 아래). 운행기록부·PDF 와 같은 뜻.
-    '<border diagonalDown="1"><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal style="thin"><color indexed="64"/></diagonal></border></borders>' +
-    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="19">' +
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' +                                                                                       // 0
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 1 제목
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 2 기간 줄
-    '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1" shrinkToFit="1"/></xf>' +  // 3 부서·이름 띠
-    '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 4 머리글
-    '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 5 묶음(<식비> — 양식처럼 가운데)
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" shrinkToFit="1"/></xf>' +  // 6 가운데(순번)
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>' +       // 7 왼쪽(줄 바꿈)
-    '<xf numFmtId="165" fontId="4" fillId="0" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +   // 8 금액(회계)
-    '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 9 소계
-    '<xf numFmtId="165" fontId="3" fillId="4" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +  // 10 소계 금액
-    '<xf numFmtId="0" fontId="3" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +                   // 11 합계
-    '<xf numFmtId="165" fontId="3" fillId="2" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="center" shrinkToFit="1"/></xf>' +  // 12 합계 금액
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf>' +                                       // 13 별첨 문구
-    '<xf numFmtId="0" fontId="1" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 14 결재 머리
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +      // 15 결재 칸
-    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1"/>' +                                                                                       // 16 빈 칸
-    '<xf numFmtId="166" fontId="4" fillId="0" borderId="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center" shrinkToFit="1"/></xf>' +  // 17 날짜
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="2" applyBorder="1"/>' +                                                                       // 18 결재 칸 — 빗금
-    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF99"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="13">' + [
+      XL_BD(), XL_BD('thin', 'thin', 'thin', 'thin'),                                  // 0 없음 · 1 가는 선
+      XL_BD('thin', 'thin', 'thin', 'thin', 1),                                        // 2 (예전 빗금 — 쓰지 않음)
+      XL_BD('thin', '', 'thin', 'thin'), XL_BD('', '', 'thin', 'thin'), XL_BD('', 'thin', 'thin', 'thin'),   // 3·4·5 띠 왼쪽·가운데·오른쪽(칸 사이 세로줄 없음)
+      XL_BD('medium', 'thin', 'medium', 'medium'),                                     // 6 「결 재」
+      XL_BD('thin', 'thin', 'medium', 'thin'), XL_BD('thin', 'medium', 'medium', 'thin'),   // 7·8 결재 머리 · 마지막 칸
+      XL_BD('thin', 'thin', 'thin', 'medium'), XL_BD('thin', 'medium', 'thin', 'medium'),   // 9·10 서명 자리 · 마지막 칸
+      // 결재선에 없는 결재 칸 — 빗금 「/」(왼쪽 아래 → 오른쪽 위). PDF 결재란·사용자 결정(빈칸 빗금 /)과 같다.
+      XL_BD('thin', 'thin', 'thin', 'medium', 1), XL_BD('thin', 'medium', 'thin', 'medium', 1)   // 11·12
+    ].join('') + '</borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="28">' + [
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>',                                  // 0
+      XL_XF(0, 1, 0, 0, 'horizontal="right" vertical="center" indent="3"'),                     // 1 제목(B:F 오른쪽 맞춤, 결재란과 띄움)
+      XL_XF(0, 8, 0, 0, 'horizontal="left" vertical="bottom"'),                                 // 2 기간 줄
+      XL_XF(0, 2, 2, 3, 'vertical="center"'),                                                   // 3 띠 왼쪽 끝
+      XL_XF(0, 2, 2, 4, 'vertical="center"'),                                                   // 4 띠 가운데
+      XL_XF(0, 2, 2, 4, XL_C + ' shrinkToFit="1"'),                                             // 5 띠 글자(F:L)
+      XL_XF(0, 2, 2, 5, XL_C + ' shrinkToFit="1"'),                                             // 6 띠 오른쪽 끝
+      XL_XF(0, 4, 3, 1, XL_C + ' wrapText="1"'),                                                // 7 머리글
+      XL_XF(0, 3, 0, 1, XL_C + ' shrinkToFit="1"'),                                             // 8 묶음 <식비>
+      XL_XF(0, 3, 0, 1, XL_C + ' shrinkToFit="1"'),                                             // 9 순번
+      XL_XF(166, 6, 0, 1, XL_C + ' shrinkToFit="1"'),                                           // 10 날짜
+      XL_XF(0, 6, 0, 1, XL_C + ' shrinkToFit="1"'),                                             // 11 날짜(글자)
+      XL_XF(0, 5, 0, 1, XL_C + ' wrapText="1"'),                                                // 12 사용처·사용내역·비고
+      XL_XF(165, 5, 0, 1, 'vertical="center" shrinkToFit="1"'),                                 // 13 금액(회계)
+      XL_XF(0, 5, 0, 1, XL_C),                                                                  // 14 소계
+      XL_XF(0, 5, 0, 1, ''),                                                                    // 15 빈 칸
+      XL_XF(0, 2, 2, 1, XL_C),                                                                  // 16 합계
+      XL_XF(165, 2, 2, 1, 'vertical="center" shrinkToFit="1"'),                                 // 17 합계 금액
+      XL_XF(0, 3, 2, 1, 'vertical="center"'),                                                   // 18 합계 줄 빈 칸
+      XL_XF(0, 3, 0, 0, 'vertical="center"'),                                                   // 19 별첨 문구
+      XL_XF(0, 7, 0, 6, XL_C + ' wrapText="1"'),                                                // 20 「결 재」
+      XL_XF(0, 7, 0, 7, XL_C + ' shrinkToFit="1"'),                                             // 21 결재 머리
+      XL_XF(0, 7, 0, 8, XL_C + ' shrinkToFit="1"'),                                             // 22 결재 머리 — 마지막 칸
+      XL_XF(0, 7, 0, 9, XL_C + ' wrapText="1"'),                                                // 23 서명 자리
+      XL_XF(0, 7, 0, 10, XL_C + ' wrapText="1"'),                                               // 24 서명 자리 — 마지막 칸
+      XL_XF(0, 7, 0, 11, XL_C),                                                                 // 25 서명 자리 — 빗금
+      XL_XF(0, 7, 0, 12, XL_C),                                                                 // 26 서명 자리 — 빗금, 마지막 칸
+      XL_XF(0, 2, 2, 3, 'horizontal="right" vertical="center" indent="1" shrinkToFit="1"')     // 27 띠 글자 — 부서가 길 때(B:L)
+    ].join('') + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
   /** 'YYYY-MM-DD' → 엑셀 날짜 일련번호(1900 체계). 못 읽으면 null. */
   function xlDate(s) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
@@ -1069,78 +1105,119 @@
       return n + Math.max(1, Math.ceil(u / per));
     }, 0);
   }
-  var XL_W = { A: 3.5, B: 7.5, C: 23.5, D: 23.5, E: 23.5, F: 23.5, G: 7.5, H: 16 };   // C~F 와 G+H 가 결재 칸 하나씩(23.5 = 7.5 + 16 — 엑셀에서 잰 칸 폭 141pt 로 같다)
+  // 양식 열 폭 그대로(F = F~I 31.125, G = J~L 22.375, H = M~N 9). 결재 칸 H·I·J·K·L+M 은 모두 69px(8.625 = 5.125 + 3.5)로 같다.
+  var XL_W = { A: 3.5, B: 5.75, C: 18.75, D: 20.25, E: 20.25, F: 9.5, G: 4.375, H: 8.625, I: 8.625, J: 8.625, K: 8.625, L: 5.125, M: 3.5, N: 5.5 };
+  var XL_USE = 31.125, XL_NOTE = 22.375;                // 사용내역(F:I) · 비고(J:L) 폭 — 줄 수 어림에 쓴다
   var XL_SHEET = '개인경비';
+  /** 엑셀에 쓸 글자 정리 — PDF(sheetpdf clean)처럼: 풀어쓴 한글은 모아 쓰고, 탭·전각 공백·nbsp 는 공백,
+   *  보이지 않는 글자(폭 없는 공백·BOM·개체 자리표 U+FFFC/FFFD)는 지운다(엑셀에서 □ 로 보인다). 줄바꿈은 남긴다(칸 안 줄 바꿈). */
+  // 줄바꿈(CR·U+2028/2029) → \n, 탭·nbsp·전각 공백 → 공백, 폭 없는 공백 U+200B~200F·BOM·U+FFFC/FFFD → 지움.
+  //   특수 글자는 소스에 직접 쓰지 않고 코드 번호로 만든다(편집기가 보이지 않는 글자로 바꾸거나 줄바꿈으로 깨뜨리지 않게).
+  var XL_NL = new RegExp('\r\n?|[' + String.fromCharCode(0x2028, 0x2029) + ']', 'g');
+  var XL_SP = new RegExp('[\t' + String.fromCharCode(0xA0, 0x3000) + ']', 'g');
+  var XL_GONE = new RegExp('[' + String.fromCharCode(0x200B) + '-' + String.fromCharCode(0x200F) + String.fromCharCode(0xFEFF, 0xFFFC, 0xFFFD) + ']', 'g');
+  function xlText(v) {
+    var s = String(v == null ? '' : v);
+    if (s.normalize) s = s.normalize('NFC');
+    return s.replace(XL_NL, '\n').replace(XL_SP, ' ').replace(XL_GONE, '');
+  }
+  // 인쇄 한 쪽에 들어가는 시트 높이(pt) — A4 842pt − 위아래 여백 1cm×2 ≈ 785pt 를 폭 맞춤 배율(시트 폭 786pt → 약 0.74)로 나눈 값 ≈ 1060.
+  // 엑셀 배율 반올림·글꼴 차이를 생각해 조금 줄여 잡는다. 이보다 앞에서 우리가 손수 쪽을 나눈다(rowBreaks).
+  var XL_PAGE = 1010;
   function xlsxBytes(d) {
     var X = window.Xlsx, cell = function (col, row, s, v, o) {
       var ref = X.colName(col) + row; o = o || {};
       if (o.f) return '<c r="' + ref + '" s="' + s + '"><f>' + X.esc(v) + '</f>' + (o.v != null ? '<v>' + o.v + '</v>' : '') + '</c>';
       if (v == null || v === '') return '<c r="' + ref + '" s="' + s + '"/>';
       if (o.n) return '<c r="' + ref + '" s="' + s + '"><v>' + v + '</v></c>';
-      return '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t xml:space="preserve">' + X.esc(v) + '</t></is></c>';
+      return '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t xml:space="preserve">' + X.esc(xlText(v)) + '</t></is></c>';
     };
-    var B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7, rows = '', merges = [], r, c;
+    // 열 번호(0 = A): 순번 B · 날짜 C · 사용처 D · 금액 E · 사용내역 F:I · 비고 J:L · 「결 재」 G · 결재 칸 H·I·J·K·L:M
+    var B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7, I = 8, J = 9, K = 10, L = 11, M = 12, N = 13, rows = '', merges = [], r, c;
     var line = function (rr, ht, cells) { rows += '<row r="' + rr + '"' + (ht ? ' ht="' + ht + '" customHeight="1"' : '') + '>' + cells + '</row>'; };
     var fillRow = function (rr, s, from, to) { var h = ''; for (c = from; c <= to; c++) h += cell(c, rr, s); return h; };
-    // 제목(B2:H3) · 기간 줄(B4:H4)
-    line(2, 16.5, cell(B, 2, 1, '개인경비 지출 명세') + fillRow(2, 1, B + 1, H));
-    line(3, 45, fillRow(3, 1, B, H)); merges.push('B2:H3');
-    line(4, 22, cell(B, 4, 2, d.periodText || '') + fillRow(4, 2, B + 1, H)); merges.push('B4:H4');
-    line(5, 6, '');
-    // 결재란 — 결 재 · 담당 · 팀장 · 실장 · 사업부장 · 대표이사(다섯 칸 같은 폭: C · D · E · F · G:H)
-    var BX = ['담당', '팀장', '실장', '사업부장', '대표이사'], BXC = [C, D, E, F, G];
-    line(6, 20, cell(B, 6, 14, '결 재') + BX.map(function (b, i) { return cell(BXC[i], 6, 14, b) + (i === 4 ? cell(H, 6, 14) : ''); }).join(''));
-    line(7, 46, cell(B, 7, 14) + BX.map(function (b, i) {
-      var v = d.boxes[b], s = v ? 15 : 18;
-      return cell(BXC[i], 7, s, !v ? '' : v.name ? v.name + (v.date ? '\n' + v.date : '') : '') + (i === 4 ? cell(H, 7, s) : '');
-    }).join(''));
-    merges.push('B6:B7', 'G6:H6', 'G7:H7');
-    line(8, 8, '');
-    // 부서 · 이름 띠(B9:H9 — 긴 부서도 잘리지 않게 한 칸으로 합치고 글자를 줄여 맞춘다)
-    line(9, 28.5, cell(B, 9, 3, '부서 :  ' + (d.person.dept || '') + '          이름 :  ' + (d.person.name || '')) + fillRow(9, 3, B + 1, H));
-    merges.push('B9:H9');
-    var HEADR = 10;
-    line(HEADR, 28.5, cell(B, HEADR, 4, '순번') + cell(C, HEADR, 4, '날 짜') + cell(D, HEADR, 4, '사용처') + cell(E, HEADR, 4, '금액') +
-      cell(F, HEADR, 4, '사용내역') + cell(G, HEADR, 4) + cell(H, HEADR, 4, '비고'));
-    merges.push('F' + HEADR + ':G' + HEADR);
+    var ref = function (col, rr) { return X.colName(col) + rr; };
+    // 사용내역(F:I) · 비고(J:L) 를 합친 칸
+    var useNote = function (rr, s, use, note) { merges.push(ref(F, rr) + ':' + ref(I, rr), ref(J, rr) + ':' + ref(L, rr)); return cell(F, rr, s, use) + fillRow(rr, s, G, I) + cell(J, rr, s, note) + fillRow(rr, s, K, L); };
+    // 1~3행: 제목(B2:F3, 오른쪽 맞춤) + 결재란(G2:M3). 4행: 기간 줄(양식에는 없는 줄 — 어느 기간 문서인지 밝힌다).
+    var BX = ['담당', '팀장', '실장', '사업부장', '대표이사'], BXC = [H, I, J, K, L];
+    line(1, 6, '');
+    line(2, 22, cell(B, 2, 1, '개인경비 지출 명세') + fillRow(2, 1, C, F) + cell(G, 2, 20, '결\n\n재') +
+      BX.map(function (b, i) { return cell(BXC[i], 2, 21, b); }).join('') + cell(M, 2, 22));
+    line(3, 50, fillRow(3, 1, B, F) + cell(G, 3, 20) + BX.map(function (b, i) {
+      var v = d.boxes[b], last = i === 4, s = v ? (last ? 24 : 23) : (last ? 26 : 25);
+      return cell(BXC[i], 3, s, !v ? '' : v.name ? v.name + (v.date ? '\n' + v.date : '') : '');
+    }).join('') + cell(M, 3, d.boxes['대표이사'] ? 24 : 26));
+    merges.push('B2:F3', 'G2:G3', 'L2:M2', 'L3:M3');
+    line(4, 40.5, cell(B, 4, 2, d.periodText || '') + fillRow(4, 2, C, F)); merges.push('B4:F4');
+    // 5행: 부서·이름 띠 — 파랑 한 줄, 칸 사이 세로줄 없음. 글자는 사용내역·비고(F:L) 위 가운데 굵게(길면 줄여 맞춘다).
+    // 부서 이름이 길어 F:L 에 한 줄로 안 들어가면 띠 전체(B:L)를 합쳐 오른쪽 끝에 맞춘다(PDF 와 같다).
+    var band = '부서 :  ' + (d.person.dept || '') + '          이름 :  ' + (d.person.name || '');
+    if (xlLines(band, XL_USE + XL_NOTE) > 1) {
+      line(5, 28.5, cell(B, 5, 27, band) + fillRow(5, 4, C, K) + cell(L, 5, 6));
+      merges.push('B5:L5');
+    } else {
+      line(5, 28.5, cell(B, 5, 3) + fillRow(5, 4, C, E) + cell(F, 5, 5, band) + fillRow(5, 5, G, K) + cell(L, 5, 6));
+      merges.push('F5:L5');
+    }
+    var HEADR = 6;
+    line(HEADR, 28.5, cell(B, HEADR, 7, '순번') + cell(C, HEADR, 7, '날 짜') + cell(D, HEADR, 7, '사용처') + cell(E, HEADR, 7, '금액') +
+      useNote(HEADR, 7, '사용내역', '비고'));
     r = HEADR + 1;
+    // ── 쪽 나눔 — PDF(sheetpdf drawExpense)와 같은 규칙으로 우리가 손수 나눈다(엑셀 자동 나눔에 맡기면 마지막 쪽에 소계·합계만 남는다).
+    //   묶음 머리는 첫 줄과 함께(줄이 0~1건이면 소계·합계까지), 묶음 마지막 줄은 소계와 함께, 마지막 소계는 합계·별첨과 함께.
+    //   다음 쪽엔 머리글 줄(Print_Titles)이 되풀이되므로 그 높이부터 센다.
+    var used = 6 + 22 + 50 + 40.5 + 28.5 + 28.5, brks = [];
+    var fit = function (h) { if (used + h > XL_PAGE) { brks.push(r - 1); used = 28.5; } };
+    var body = function (ht, cells) { fit(ht); line(r, ht, cells); used += ht; };
+    var itemHt = function (it) {
+      if (!it) return 28.5;
+      // 긴 글은 다 보이게 — 줄 수만큼 늘린다(엑셀 행 높이 상한 409pt 안에서, 24줄).
+      var n = Math.min(24, Math.max(xlLines(xlText(it.merchant), XL_W.D), xlLines(xlText(it.usage), XL_USE), xlLines(xlText(it.note), XL_NOTE)));
+      return Math.max(28.5, n * 16.5 + 8);
+    };
+    var FOOT = 28.5 + 17.25;                               // 합계 줄 + 별첨 문구
+    var gsx = window.SheetPdf.expenseGroups(d.items);
     var subs = [], total = 0;
-    window.SheetPdf.expenseGroups(d.items).forEach(function (g) {
-      line(r, 28.5, cell(B, r, 5, '<' + g.cat + '>') + fillRow(r, 5, B + 1, H)); merges.push('B' + r + ':H' + r); r++;
+    gsx.forEach(function (g, gi) {
+      var rowsG = g.list.length ? g.list : [null], tail = 28.5 + (gi === gsx.length - 1 ? FOOT : 0);
+      fit(28.5 + itemHt(rowsG[0]) + (rowsG.length <= 1 ? tail : 0));
+      body(28.5, cell(B, r, 8, '<' + g.cat + '>') + fillRow(r, 8, C, L)); merges.push('B' + r + ':L' + r); r++;
       var first = r, sum = 0;
-      if (!g.list.length) {
-        line(r, 28.5, cell(B, r, 6) + cell(C, r, 17) + cell(D, r, 7) + cell(E, r, 8) + cell(F, r, 7) + cell(G, r, 7) + cell(H, r, 7));
-        merges.push('F' + r + ':G' + r); r++;
-      }
-      g.list.forEach(function (it, k) {
+      rowsG.forEach(function (it, k) {
+        var ht = itemHt(it);
+        if (k === rowsG.length - 1) fit(ht + tail);
+        if (!it) { body(ht, cell(B, r, 9) + cell(C, r, 10) + cell(D, r, 12) + cell(E, r, 13) + useNote(r, 12)); r++; return; }
         var amt = Math.round(Number(it.amount) || 0), ds = xlDate(it.date);
         sum += amt;
-        var n = Math.min(6, Math.max(xlLines(it.merchant, XL_W.D), xlLines(it.usage, XL_W.F + XL_W.G), xlLines(it.note, XL_W.H)));
-        line(r, Math.max(28.5, n * 16.5 + 8), cell(B, r, 6, String(k + 1), { n: 1 }) +
-          (ds != null ? cell(C, r, 17, String(ds), { n: 1 }) : cell(C, r, 6, it.date)) + cell(D, r, 7, it.merchant) +
-          cell(E, r, 8, String(amt), { n: 1 }) + cell(F, r, 7, it.usage) + cell(G, r, 7) + cell(H, r, 7, it.note));
-        merges.push('F' + r + ':G' + r);
+        body(ht, cell(B, r, 9, String(k + 1), { n: 1 }) +
+          (ds != null ? cell(C, r, 10, String(ds), { n: 1 }) : cell(C, r, 11, it.date)) + cell(D, r, 12, it.merchant) +
+          cell(E, r, 13, String(amt), { n: 1 }) + useNote(r, 12, it.usage, it.note));
         r++;
       });
       total += sum;
-      line(r, 28.5, cell(B, r, 16) + cell(C, r, 16) + cell(D, r, 9, '소계') + cell(E, r, 10, 'SUM(E' + first + ':E' + (r - 1) + ')', { f: 1, v: sum }) +
-        cell(F, r, 16) + cell(G, r, 16) + cell(H, r, 16));
-      merges.push('F' + r + ':G' + r);
+      fit(tail);
+      body(28.5, cell(B, r, 15) + cell(C, r, 15) + cell(D, r, 14, '소계') + cell(E, r, 13, 'SUM(E' + first + ':E' + (r - 1) + ')', { f: 1, v: sum }) +
+        useNote(r, 15));
       subs.push('E' + r); r++;
     });
-    line(r, 28.5, cell(B, r, 11, '합계') + cell(C, r, 11) + cell(D, r, 11) + cell(E, r, 12, subs.join('+'), { f: 1, v: total }) + cell(F, r, 11) + cell(G, r, 11) + cell(H, r, 11));
-    merges.push('B' + r + ':D' + r, 'F' + r + ':H' + r); r++;
-    line(r, 0, cell(B, r, 13, '* 해당 증빙은 명세서 기재순으로 별첨'));
-    var cols = Object.keys(XL_W).map(function (L, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + XL_W[L] + '" customWidth="1"/>'; }).join('');
+    fit(FOOT);
+    body(28.5, cell(B, r, 16, '합계') + cell(C, r, 16) + cell(D, r, 16) + cell(E, r, 17, subs.join('+'), { f: 1, v: total }) + useNote(r, 18));
+    merges.push('B' + r + ':D' + r); r++;
+    line(r, 0, cell(B, r, 19, '* 해당 증빙은 명세서 기재순으로 별첨'));
+    var cols = Object.keys(XL_W).map(function (Lt, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + XL_W[Lt] + '" customWidth="1"/>'; }).join('');
     var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="B2:H' + r + '"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
+      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="B2:M' + r + '"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
       '<sheetFormatPr defaultRowHeight="17.25"/><cols>' + cols + '</cols>' +
       '<sheetData>' + rows + '</sheetData><mergeCells count="' + merges.length + '">' + merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join('') + '</mergeCells>' +
-      '<printOptions horizontalCentered="1"/><pageMargins left="0.24" right="0.24" top="0.39" bottom="0.39" header="0.31" footer="0.31"/>' +
-      '<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="portrait"/></worksheet>';
+      // 양식과 같은 인쇄 설정 — 좌우 여백 0.2cm, 위아래 1cm, 가로 가운데, 폭 1쪽에 맞춤.
+      '<printOptions horizontalCentered="1"/><pageMargins left="0.0787" right="0.0787" top="0.3937" bottom="0.3937" header="0.315" footer="0.315"/>' +
+      '<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="portrait"/>' +
+      (brks.length ? '<rowBreaks count="' + brks.length + '" manualBreakCount="' + brks.length + '">' +
+        brks.map(function (b) { return '<brk id="' + b + '" max="16383" man="1"/>'; }).join('') + '</rowBreaks>' : '') + '</worksheet>';
     var book = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<sheets><sheet name="' + XL_SHEET + '" sheetId="1" r:id="rId1"/></sheets>' +
-      '<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">\'' + XL_SHEET + '\'!$B$2:$H$' + r + '</definedName>' +
+      '<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">\'' + XL_SHEET + '\'!$A$1:$N$' + r + '</definedName>' +
       '<definedName name="_xlnm.Print_Titles" localSheetId="0">\'' + XL_SHEET + '\'!$' + HEADR + ':$' + HEADR + '</definedName></definedNames>' +
       '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
     return X.zip([
