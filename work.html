@@ -60,34 +60,119 @@ button,input{font-family:inherit}
 .ub .who span{font-size:11.5px;color:var(--grey-2)}
 .tag{display:inline-block;margin-left:6px;padding:1px 6px;font-size:10.5px;font-weight:700;color:var(--red);border:1px solid var(--red)}
 
-/* ── 첫 화면 ── */
-.hero{position:relative;color:#fff;overflow:hidden;background:#111}
-.hero::before{content:"";position:absolute;inset:0;
-  background:linear-gradient(105deg,rgba(17,17,17,.97) 0%,rgba(17,17,17,.86) 52%,rgba(215,0,81,.55) 100%)}
-.hero::after{content:"";position:absolute;inset:0;opacity:.18;
-  background-image:linear-gradient(rgba(255,255,255,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.18) 1px,transparent 1px);
-  background-size:34px 34px}
-.hero .wrap{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:48px;align-items:center;padding-block:84px 92px}
-.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(255,255,255,.22);
-  background:rgba(255,255,255,.06);font-size:12px;font-weight:700;letter-spacing:.02em}
-.chip i{width:7px;height:7px;border-radius:50%;background:#7CE0B0}
-.hero h1{margin:22px 0 0;font-size:clamp(34px,5.6vw,56px);line-height:1.15;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
-.hero h1 em{font-style:normal;color:#F4B8D0}
-.hero p.lead{margin:20px 0 0;max-width:34em;font-size:16px;line-height:1.75;color:rgba(255,255,255,.78)}
-.hero .cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
-/* 오른쪽 — 예시 화면(실제 자료 아님) */
-.demo{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);padding:20px 22px;backdrop-filter:blur(4px)}
-.demo .dh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7)}
-.demo .dh .sp{flex:1}
-.demo .ex{font-size:10.5px;padding:2px 7px;border:1px solid rgba(255,255,255,.3)}
-.demo .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid rgba(255,255,255,.1);font-size:13px}
-.demo .row:first-of-type{border-top:0}
-.demo .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none;border:1.5px solid rgba(255,255,255,.4)}
-.demo .n.done{background:#0FA36E;border-color:#0FA36E}
-.demo .n.now{background:var(--red);border-color:var(--red)}
-.demo .t{flex:1}
-.demo .s{font-size:11.5px;color:rgba(255,255,255,.6)}
-.demo .alert{margin-top:10px;padding:10px 12px;background:rgba(215,0,81,.22);border:1px solid rgba(244,184,208,.35);font-size:12.5px}
+/* ── 첫 화면(로그인 전) — A안 「결재는 한 번에, 마감은 한눈에」(2026-10-12) ──
+   왼쪽: 소개 + 바로 쓰는 로그인 칸 · 오른쪽: 이번 달 마감 일정(D-day). 색은 CI 에서 뽑은 것 — 로그인 전 화면에만 쓴다. */
+#landing{--c-red:#D6004F;--c-red-d:#B0003F;--c-slate:#5B6670;--c-ink:#1C2126;--c-paper:#F4F3F1;--c-panel:#1F252B;
+  --c-line:#E3E1DE;--c-inp:#CFCCC8;--c-mute:#A7B0B8;--c-rule:#3A434C;background:var(--c-paper);color:var(--c-ink)}
+.lw{max-width:1440px;margin:0 auto;padding-inline:clamp(16px,5.5vw,80px)}
+#landing .top.lt{position:static;background:#fff;backdrop-filter:none;border-bottom:1px solid var(--c-line)}
+.lt .lw{height:80px;display:flex;align-items:center;gap:20px}
+#landing .lt .brand{gap:20px}
+#landing .lt .brand img{height:26px}
+#landing .lt .brand .bar{height:20px;background:#D5D2CE}
+#landing .lt .brand .nm{font-size:15px;font-weight:600;color:var(--c-slate);letter-spacing:.03em}
+#landing .lt .lnk{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:14px;font-weight:500;color:var(--c-slate);text-decoration:none}
+#landing .lt .lnk:hover{color:var(--c-red-d)}
+.lp{padding-block:64px 56px}
+.lp-grid{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:clamp(40px,5vw,72px);align-items:start}
+.lp-left{display:flex;flex-direction:column;gap:32px;min-width:0}
+.lp-intro{display:flex;flex-direction:column;gap:14px}
+.lp-eye{font-size:13px;font-weight:700;letter-spacing:.23em;color:var(--c-red)}
+.lp h1{margin:0;font-size:44px;line-height:1.22;font-weight:700;letter-spacing:-.025em}
+.lp .lead{margin:0;font-size:16px;line-height:1.7;color:var(--c-slate)}
+/* 로그인 칸 */
+.lcard{background:#fff;border:1px solid var(--c-line);padding:32px;box-shadow:0 18px 40px -24px rgba(28,33,38,.35)}
+#fLogin{display:flex;flex-direction:column;gap:12px}
+.lcard .lb{font-size:13px;font-weight:600;color:var(--c-slate)}
+.lcard .lb + .inp{margin-top:-4px}
+.lcard .lb.pw{margin-top:4px}
+.lcard .inp{height:50px;padding:0 16px;border-color:var(--c-inp);background:#FBFAF9;font-size:16px}
+.lcard .inp:focus{border-color:var(--c-ink);background:#fff}
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+.keep{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:#3A424A;cursor:pointer}
+.keep input{width:18px;height:18px;margin:0;accent-color:var(--c-red)}
+.tlink{background:none;border:0;padding:0 2px;min-height:44px;font-size:14px;color:var(--c-red-d);cursor:pointer;font-weight:500}
+.tlink:hover{color:#80002E;text-decoration:underline}
+.lgo{height:54px;margin-top:8px;border:0;background:var(--c-red);color:#fff;font-size:17px;font-weight:700;letter-spacing:.06em;cursor:pointer;width:100%}
+.lgo:hover{background:var(--c-red-d)}
+.lgo[disabled]{opacity:.6;cursor:default}
+#fLogin .msg{margin:0}
+.lnote{margin:2px 0 0;font-size:13px;color:var(--c-slate)}
+.lnote .tlink{font-size:13px;min-height:44px;padding:0 4px;vertical-align:middle;text-decoration:underline;text-underline-offset:3px}
+#landing .lt .brand{min-height:44px}
+#landing .sec .wrap,#landing footer .wrap{max-width:1440px;padding-inline:clamp(16px,5.5vw,80px)}
+/* 마감 일정 판 */
+.dl{background:var(--c-panel);color:#fff;padding:40px 44px;display:flex;flex-direction:column;gap:28px;min-width:0}
+.dl-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.dl-head h2{margin:0;font-size:22px;font-weight:700}
+.dl-head > span{font-size:14px;color:var(--c-mute)}
+.tl{position:relative;height:64px}
+.tl > i{position:absolute;display:block}
+.tl .tr{left:0;right:0;top:30px;height:4px;background:var(--c-rule)}
+.tl .fi{left:0;top:30px;height:4px;background:#fff}
+.tl .td{top:24px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#fff}
+.tl .dt0{top:26px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#E5E9EC}
+.tl .dt0.hot{background:var(--c-red)}
+.tl .tx{position:absolute;white-space:nowrap;font-size:12px;color:var(--c-mute)}
+.tl .tx.today{top:0;font-weight:700;color:#fff}
+.tl .tx.lab{top:46px}
+.tl .tx .hot{color:#FF8AB0}
+.dl-rows{list-style:none;margin:0;padding:0}
+.dr{display:grid;grid-template-columns:120px minmax(0,1fr) auto;align-items:center;gap:20px;padding:20px 0;border-top:1px solid var(--c-rule)}
+.dr:last-child{border-bottom:1px solid var(--c-rule)}
+.dd{font-size:44px;font-weight:700;line-height:1;letter-spacing:-.02em;white-space:nowrap}
+.dd.now{font-size:24px;line-height:1.2}
+.dr.first .dd{color:#FF5C93}
+.dtx{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dtx b{font-size:18px;font-weight:700}
+.dtx .per{font-size:14px;color:var(--c-mute);line-height:1.5}
+.dtx .sh,.dtx .chm,.dtx .due-m{display:none}
+.chip1{padding:6px 12px;border:1px solid var(--c-red);color:#FF8AB0;font-size:13px;font-weight:700;white-space:nowrap}
+.due{font-size:13px;color:var(--c-mute);white-space:nowrap}
+.news{display:flex;align-items:center;gap:12px;font-size:14px;color:#E5E9EC;line-height:1.5}
+.news[hidden]{display:none}
+.news .new{flex:none;padding:3px 10px;background:var(--c-red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:1040px){
+  .lp-grid{grid-template-columns:minmax(0,1fr)}
+  .lp{padding-block:48px 48px}
+}
+@media (max-width:600px){
+  .lt .lw{height:60px;gap:12px}
+  #landing .lt .brand{flex:1;gap:12px}
+  #landing .lt .brand img{height:18px}
+  #landing .lt .brand .bar,#landing .lt .lnk{display:none}
+  #landing .lt .brand .nm{display:block;margin-left:auto;font-size:13px;letter-spacing:0}
+  .lp{padding-block:24px 16px}
+  .lp-grid,.lp-left{gap:16px}
+  .lp-intro{gap:6px}
+  .lp-eye{font-size:12px}
+  .lp h1{font-size:28px;line-height:1.25;letter-spacing:-.02em}
+  .lp .lead{display:none}
+  .lcard{padding:18px;box-shadow:0 14px 30px -22px rgba(28,33,38,.4)}
+  #fLogin{gap:8px}
+  .lcard .lb + .inp{margin-top:0}
+  .lcard .lb.pw{margin-top:0}
+  .lcard .inp{height:46px;padding:0 12px}
+  .lgo{height:50px;margin-top:4px}
+  .dl{padding:16px 18px;gap:0}
+  .dl-head{padding-bottom:8px}
+  .dl-head h2{font-size:16px}
+  .dl-head > span{font-size:12px}
+  .dl-head .pc{display:none}
+  .tl{display:none}
+  .dr{grid-template-columns:64px minmax(0,1fr);gap:12px;padding:10px 0}
+  .dr:last-child{border-bottom:0}
+  .dd{font-size:26px}
+  .dd.now{font-size:15px}
+  .dtx{display:block;font-size:14px;gap:0}
+  .dtx b{font-size:14px}
+  .dtx .lg,.dtx .per,.dside{display:none}
+  .dtx .sh{display:inline}
+  .dtx .chm{display:inline;margin-left:4px;font-style:normal;color:#FF8AB0;font-size:12px;font-weight:700}
+  .dtx .due-m{display:block;color:var(--c-mute);font-size:12px}
+  .news{margin-top:12px;align-items:flex-start;font-size:13px}
+}
 
 /* ── 구역 공통 ── */
 .sec{padding-block:84px}
@@ -185,11 +270,14 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .pwhelp{margin-top:14px;padding:14px;border:1px solid var(--line);background:#F7F9FC}
 .pwhelp .pwrow{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .pwhelp .inp{flex:1 1 110px;width:auto;height:40px;font-size:14px;background:#fff}
-.modal .pwhelp .btn.pri{width:auto;height:40px;margin:0;padding:0 18px;font-size:14px;flex:none}
+.pwhelp .btn.pri{width:auto;height:40px;margin:0;padding:0 18px;font-size:14px;flex:none}
 .pwhelp .msg{margin:10px 0 0}
+.lcard .pwhelp{margin-top:16px;background:#FBFAF9;border-color:var(--c-line)}
+.lcard .pwhelp .inp,.lcard .pwhelp .btn.pri{height:44px}
+.lcard .pwhelp .btn.pri{background:var(--c-red);border-color:var(--c-red)}
+.lcard .pwhelp .btn.pri:hover{background:var(--c-red-d);border-color:var(--c-red-d)}
 
 @media (max-width:900px){
-  .hero .wrap{grid-template-columns:1fr;padding-block:56px 64px}
   .cards,.steps{grid-template-columns:1fr}
   .grid{grid-template-columns:1fr}
   .launch{border-right:0;min-height:0}
@@ -206,7 +294,6 @@ a.launch:hover .go svg{transform:translateX(4px)}
   .ub{gap:6px}
   .modal{padding:30px 20px 22px}
   .two{grid-template-columns:1fr}
-  .demo{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 /* ═══ 운행일지와 같은 모양 — 시안 A 「또렷하게」(2026-10-07) ═══
@@ -216,9 +303,6 @@ a.launch:hover .go svg{transform:translateX(4px)}
 body{font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Malgun Gothic",-apple-system,sans-serif;letter-spacing:-.01em}
 .brand .nm{font-size:13px}
 .ub .who span{font-size:12.5px}
-.demo .dh,.demo .s{font-size:13px}
-.demo .row{font-size:14px}
-.demo .alert{font-size:13.5px}
 .card p,.steps p,.pick .sub,.launch p{font-size:14.5px}
 .soon{font-size:12.5px}
 footer .wrap{font-size:13px}
@@ -247,36 +331,59 @@ footer .wrap{font-size:13px}
 
 <!-- ═══════════ 로그인 전 ═══════════ -->
 <div id="landing">
-  <header class="top">
-    <div class="wrap">
+  <header class="top lt">
+    <div class="lw">
       <a class="brand" href="#" aria-label="업무 결재 포털 처음으로"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><span class="bar"></span><span class="nm">업무 결재 포털</span></a>
       <span class="sp"></span>
-      <button class="lnk wideonly" type="button" data-open="signup">회원가입</button>
-      <button class="btn pri" type="button" data-open="login">로그인</button>
+      <a class="lnk" href="#systems">사용 안내</a>
+      <button class="lnk" type="button" data-open="signup">회원가입</button>
     </div>
   </header>
 
-  <section class="hero">
-    <div class="wrap">
-      <div>
-        <span class="chip"><i></i>운행일지 · 결재 · 정산 통합 업무</span>
-        <h1>결재를 기다리지 않고<br><em>한 번에 끝냅니다</em></h1>
-        <p class="lead">운행일지 마감부터 결재 상신, 승인과 정산까지. 에이텍모빌리티 직원이 쓰는 결재 시스템을 한 번의 로그인으로 오갑니다.</p>
-        <div class="cta">
-          <button class="btn white" type="button" data-open="login">로그인하고 시작하기</button>
-          <a class="btn ghost" href="#systems">시스템 둘러보기 ↓</a>
+  <main class="lp">
+    <div class="lw lp-grid">
+      <section class="lp-left">
+        <div class="lp-intro">
+          <span class="lp-eye">ATEC WORKFLOW</span>
+          <h1>결재는 한 번에,<br>마감은 한눈에.</h1>
+          <p class="lead">운행일지 · 개인경비 · 법인카드 지출결의를<br>하나의 계정으로 상신하고 결재합니다.</p>
         </div>
-      </div>
-      <div class="demo" aria-label="예시 화면">
-        <div class="dh">이번 달 마감<span class="sp"></span><span class="ex">예시 화면</span></div>
-        <div class="row"><span class="n done">✓</span><span class="t">운행 기록</span><span class="s">완료</span></div>
-        <div class="row"><span class="n now">2</span><span class="t">영수증·통행료</span><span class="s">지금 할 일</span></div>
-        <div class="row"><span class="n">3</span><span class="t">검증·상신</span><span class="s">남음</span></div>
-        <div class="row"><span class="n">4</span><span class="t">정산·엑셀</span><span class="s">결재 후</span></div>
-        <div class="alert">결재 차례가 되면 팀즈 개인 채팅으로 알려 드립니다.</div>
-      </div>
+        <!-- 로그인 칸 — 예전 로그인 창(#vLogin)을 이 자리로 옮겼다. 아이디(id)는 그대로라 로그인 코드는 하나다. -->
+        <div class="lcard" id="loginCard">
+          <h2 class="sr" id="tLogin">로그인</h2>
+          <form id="fLogin" novalidate aria-labelledby="tLogin">
+            <label class="lb" for="liUser">아이디</label>
+            <input class="inp" id="liUser" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+            <label class="lb pw" for="liPw">비밀번호</label>
+            <input class="inp" id="liPw" type="password" autocomplete="current-password" required>
+            <div class="lrow">
+              <label class="keep"><input type="checkbox" id="liKeep">아이디 저장</label>
+              <button type="button" class="tlink" id="btnForgot">비밀번호 찾기</button>
+            </div>
+            <div class="msg" id="liMsg" role="alert" hidden></div>
+            <button class="lgo" type="submit" id="liBtn">로그인</button>
+            <p class="lnote">운행일지 앱과 같은 아이디입니다 · 처음이면 <button type="button" class="tlink" data-open="signup">회원가입</button></p>
+          </form>
+          <form class="hint pwhelp" id="forgotT" hidden novalidate>
+            <div>아이디와 이름을 넣고 <b>초기화 요청</b>을 누르면 운행일지 관리자에게 팀즈로 <b>비밀번호 초기화 요청</b>이 갑니다. 관리자가 본인인지 확인한 뒤 임시 비밀번호를 알려 드립니다.</div>
+            <div class="pwrow">
+              <input class="inp" id="pwUser" autocomplete="username" placeholder="아이디" aria-label="아이디">
+              <input class="inp" id="pwName" autocomplete="name" placeholder="이름" aria-label="이름">
+              <button class="btn pri" type="submit" id="pwBtn">초기화 요청</button>
+            </div>
+            <div class="msg" id="pwMsg" role="alert" hidden></div>
+          </form>
+        </div>
+      </section>
+      <!-- 마감 일정 — 오늘 날짜(KST)로 스크립트가 채운다(규칙은 아래 renderDeadlines 주석) -->
+      <section class="dl" id="deadlines" aria-labelledby="dlTitle">
+        <div class="dl-head"><h2 id="dlTitle">마감 일정</h2><span id="dlToday"></span></div>
+        <div class="tl" id="dlLine" aria-hidden="true"></div>
+        <ol class="dl-rows" id="dlRows"></ol>
+        <div class="news" id="dlNews" hidden><span class="new">NEW</span><span id="dlNewsT"></span></div>
+      </section>
     </div>
-  </section>
+  </main>
 
   <section class="sec" id="systems">
     <div class="wrap">
@@ -363,36 +470,6 @@ footer .wrap{font-size:13px}
   <footer><div class="wrap"><span>ATEC 에이텍모빌리티 · 업무 결재 포털 · 탭을 닫으면 로그아웃됩니다</span><span class="sp"></span><span>정도 · 혁신 · 협업</span></div></footer>
 </div>
 
-<!-- ═══════════ 로그인 창 ═══════════ -->
-<div class="veil" id="vLogin">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tLogin">
-    <button class="x" type="button" data-close aria-label="닫기">×</button>
-    <div class="mhead"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><div>업무 결재 포털</div></div>
-    <h2 id="tLogin">로그인</h2>
-    <form id="fLogin" novalidate>
-      <label class="fld"><span>아이디 <small>(운행일지 앱 아이디)</small></span>
-        <input class="inp" id="liUser" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
-      <label class="fld"><span>비밀번호</span>
-        <input class="inp" id="liPw" type="password" autocomplete="current-password" required></label>
-      <div class="msg" id="liMsg" role="alert" hidden></div>
-      <button class="btn pri" type="submit" id="liBtn">로그인</button>
-    </form>
-    <div class="links">
-      <button type="button" id="btnForgot">비밀번호 찾기</button>
-      <span>계정이 없으신가요? <button type="button" class="em" data-open="signup">회원가입</button></span>
-    </div>
-    <form class="hint pwhelp" id="forgotT" hidden novalidate>
-      <div>아이디와 이름을 넣고 <b>초기화 요청</b>을 누르면 운행일지 관리자에게 팀즈로 <b>비밀번호 초기화 요청</b>이 갑니다. 관리자가 본인인지 확인한 뒤 임시 비밀번호를 알려 드립니다.</div>
-      <div class="pwrow">
-        <input class="inp" id="pwUser" autocomplete="username" placeholder="아이디" aria-label="아이디">
-        <input class="inp" id="pwName" autocomplete="name" placeholder="이름" aria-label="이름">
-        <button class="btn pri" type="submit" id="pwBtn">초기화 요청</button>
-      </div>
-      <div class="msg" id="pwMsg" role="alert" hidden></div>
-    </form>
-  </div>
-</div>
-
 <!-- ═══════════ 회원가입 창 ═══════════ -->
 <div class="veil" id="vSignup">
   <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="tSignup">
@@ -449,15 +526,37 @@ footer .wrap{font-size:13px}
   var lastFocus = null;
   function openModal(which) {
     closeModals();
+    // 로그인은 이제 창이 아니라 첫 화면의 로그인 칸이다(2026-10-12) — 「로그인」을 여는 곳은 모두 그 칸으로 데려간다.
+    if (which !== 'signup') { focusLogin(); return; }
     lastFocus = document.activeElement;
-    var v = $(which === 'signup' ? 'vSignup' : 'vLogin');
+    var v = $('vSignup');
     v.classList.add('open');
     var f = v.querySelector('input'); if (f) setTimeout(function () { f.focus(); }, 30);
   }
-  function closeModals() {
-    ['vLogin', 'vSignup'].forEach(function (id) { $(id).classList.remove('open'); });
-    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) { } }
+  function focusLogin() {
+    var c = $('loginCard'); if (!c) return;
+    try { c.scrollIntoView({ block: 'center' }); } catch (e) { c.scrollIntoView(); }
+    var f = $('liUser').value ? $('liPw') : $('liUser');
+    setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }, 30);
   }
+  function closeModals() {
+    ['vSignup'].forEach(function (id) { $(id).classList.remove('open'); });
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) { } }
+    lastFocus = null;
+  }
+
+  /* ── 아이디 저장 — 아이디만 이 브라우저(localStorage)에 둔다. 비밀번호는 절대 두지 않는다. ── */
+  var K_UID = 'work_saved_uid';
+  var ls = function (k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }
+    catch (e) { return null; }
+  };
+  (function () {
+    var u = ls(K_UID);
+    if (u) { $('liUser').value = u; $('liKeep').checked = true; }
+    $('liKeep').addEventListener('change', function () { if (!this.checked) ls(K_UID, null); });
+  })();
+  function keepUid(u) { if ($('liKeep').checked && u) ls(K_UID, u); else ls(K_UID, null); }
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-open]');
     if (t) { e.preventDefault(); openModal(t.getAttribute('data-open')); return; }
@@ -521,6 +620,7 @@ footer .wrap{font-size:13px}
       }
       ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token); ss(K_ME, JSON.stringify(res.j.profile));
       $('liPw').value = '';
+      keepUid(u);
       closeModals(); enter();
     }).catch(function () {
       b.disabled = false; b.textContent = '로그인';
@@ -582,6 +682,7 @@ footer .wrap{font-size:13px}
     ss('drv_navmode', null);            // 운행일지 메뉴 갈래(2026-10-08) — 다음 사람이 앞사람 갈래로 열리지 않게
     document.body.classList.remove('in');
     $('signupNote').hidden = true;
+    if (!ls(K_UID)) $('liUser').value = '';   // 「아이디 저장」을 안 했으면 다음 사람에게 아이디를 남기지 않는다
   }
   $('btnOut').addEventListener('click', function () { leave(); });
 
@@ -607,6 +708,83 @@ footer .wrap{font-size:13px}
       });
     }).catch(function () { done(); });
   }
+
+  /* ── 첫 화면 오른쪽: 마감 일정 ──────────────────────────────────────────────
+     ★ 소식 한 줄 — 바꿀 때는 이 글자만 고친다(빈 글자 '' 면 줄을 감춘다).                                      */
+  var NEWS = '법인카드 지출결의가 열렸습니다 · 결재 차례는 팀즈로 알려 드립니다';
+  /* 규칙(모두 KST 날짜로만 센다 — 시각은 보지 않는다):
+     · 개인경비 지출결의  기간 20일~19일. 오늘이 19일 이하면 이번 달 19일이 마감, 20일부터는 다음 달 19일.
+     · 운행일지           기간 21일~20일. 오늘이 20일 이하면 이번 달 20일이 마감, 21일부터는 다음 달 20일.
+     · 법인카드 지출결의  기간 1일~말일. 늘 이번 달 말일(그래서 가장 가까운 마감은 늘 이번 달 안에 있다).
+     · D-day = 마감일 − 오늘(날 수). 0 이면 「오늘 마감」. 가까운 순으로 늘어놓고, 같으면 위 순서(개인경비·운행일지·법인카드).
+       가장 가까운 줄만 빨간 D-day + 「가장 먼저」.
+     · 줄 그림은 이번 달 1일부터 세 마감 중 가장 늦은 날까지. 20일이 지나면 다음 달 19·20일까지 늘어나고,
+       제목도 「10–11월 마감 일정」처럼 두 달을 적는다(날짜 이름표도 그때는 MM.DD).                                */
+  var DL_KINDS = [
+    { k: 'x', name: '개인경비 지출결의', short: '개인경비', note: '영수증 사진을 올리면 채워집니다', day: 19 },
+    { k: 'd', name: '운행일지', short: '운행일지', note: '운행 기록·영수증·통행료', day: 20 },
+    { k: 'c', name: '법인카드 지출결의', short: '법인카드', note: 'ERP 엑셀을 올리고 구분만 적습니다', day: 0 }   // 0 = 말일
+  ];
+  var DAY = 864e5;
+  var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  var mdOf = function (u) { var t = new Date(u); return p2(t.getUTCMonth() + 1) + '.' + p2(t.getUTCDate()); };
+  /** ms(지금 시각) → { today, list:[{k,K,due,from,dday}] } — 날짜는 모두 UTC 자정 값(KST 날짜를 담는 그릇). */
+  function deadlines(ms) {
+    var k = new Date(ms + 9 * 3600e3), y = k.getUTCFullYear(), m = k.getUTCMonth(), d = k.getUTCDate();
+    var today = Date.UTC(y, m, d);
+    var list = DL_KINDS.map(function (K, i) {
+      var due, from;
+      if (!K.day) { due = Date.UTC(y, m + 1, 0); from = Date.UTC(y, m, 1); }
+      else { var mm = d <= K.day ? m : m + 1; due = Date.UTC(y, mm, K.day); from = Date.UTC(y, mm - 1, K.day + 1); }
+      return { k: K.k, K: K, i: i, due: due, from: from, dday: Math.round((due - today) / DAY) };
+    });
+    list.sort(function (a, b) { return a.dday - b.dday || a.i - b.i; });
+    return { today: today, y: y, m: m, list: list };
+  }
+  function renderDeadlines() {
+    var R = deadlines(Date.now()), T = new Date(R.today), L = R.list;
+    var start = Date.UTC(R.y, R.m, 1), end = Math.max.apply(null, L.map(function (x) { return x.due; }));
+    var endM = new Date(end).getUTCMonth(), cross = endM !== R.m;
+    $('dlTitle').innerHTML = (R.m + 1) + (cross ? '–' + (endM + 1) : '') + '월 마감<span class="pc"> 일정</span>';
+    $('dlToday').innerHTML = '오늘 ' + mdOf(R.today) + '<span class="pc"> (' + '일월화수목금토'.charAt(T.getUTCDay()) + ')</span>';
+    // 줄 그림
+    var pct = function (u) { return Math.max(0, Math.min(100, (u - start) / (end - start) * 100)); };
+    var anchor = function (p) { return p > 88 ? '-100%' : p < 12 ? '0' : '-50%'; };
+    var tp = pct(R.today), h = [];
+    h.push('<i class="tr"></i><i class="fi" style="width:' + tp + '%"></i>');
+    h.push('<span class="tx today" style="left:' + tp + '%;transform:translateX(' + anchor(tp) + ')">오늘</span><i class="td" style="left:' + tp + '%"></i>');
+    var byDue = L.slice().sort(function (a, b) { return a.due - b.due; }), groups = [];
+    byDue.forEach(function (x) {
+      var g = groups[groups.length - 1];
+      if (g && x.due - g[g.length - 1].due <= 2 * DAY) g.push(x); else groups.push([x]);   // 하루·이틀 차이는 이름표 하나로(겹치지 않게)
+    });
+    byDue.forEach(function (x) { h.push('<i class="dt0' + (x === L[0] ? ' hot' : '') + '" style="left:' + pct(x.due) + '%"></i>'); });
+    h.push('<span class="tx lab" style="left:0">' + mdOf(start) + '</span>');
+    groups.forEach(function (g) {
+      var p = pct(g[g.length - 1].due);
+      var t = g.map(function (x, j) {
+        var s = j === 0 ? (cross ? mdOf(x.due) : p2(new Date(x.due).getUTCDate())) : p2(new Date(x.due).getUTCDate());
+        return '<span' + (x === L[0] ? ' class="hot"' : '') + '>' + s + '</span>';
+      }).join('·');
+      h.push('<span class="tx lab" style="left:' + p + '%;transform:translateX(' + anchor(p) + ')">' + t + '</span>');
+    });
+    $('dlLine').innerHTML = h.join('');
+    // 줄(가까운 순)
+    $('dlRows').innerHTML = L.map(function (x, i) {
+      var first = i === 0, dd = x.dday === 0 ? '오늘 마감' : 'D-' + x.dday, due = mdOf(x.due) + ' 마감';
+      return '<li class="dr' + (first ? ' first' : '') + '" data-k="' + x.k + '" data-dday="' + x.dday + '" data-due="' + new Date(x.due).toISOString().slice(0, 10) + '">' +
+        '<span class="dd' + (x.dday === 0 ? ' now' : '') + '">' + dd + '</span>' +
+        '<span class="dtx"><b><span class="lg">' + x.K.name + '</span><span class="sh">' + x.K.short + '</span></b>' +
+        (first ? '<em class="chm">가장 먼저</em>' : '') +
+        '<span class="per">' + mdOf(x.from) + ' – ' + mdOf(x.due) + ' · ' + x.K.note + '</span>' +
+        '<span class="due-m">' + due + '</span></span>' +
+        '<span class="dside">' + (first ? '<span class="chip1">가장 먼저</span>' : '<span class="due">' + due + '</span>') + '</span></li>';
+    }).join('');
+    $('dlNewsT').textContent = NEWS; $('dlNews').hidden = !NEWS;
+  }
+  renderDeadlines();
+  // 탭을 켜 둔 채 날이 바뀌어도 돌아오면 다시 센다
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) renderDeadlines(); });
   boot();
 })();
 </script>
