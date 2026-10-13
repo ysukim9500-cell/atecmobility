@@ -244,7 +244,7 @@
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind x">개인경비</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
       (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 상신하면 결재함으로 갑니다.</div>') +
-      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) : '') +
+      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) + (C.apvSlot ? C.apvSlot('expense', a) : '') : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 경비를 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
       '</div></section>';
@@ -968,8 +968,12 @@
   }
   function vOf(v) { return v ? { ranAt: C.vx.whenText(v.ran_at || v.created_at), ai: !!v.ai, summary: v.summary || {}, items: v.items || (v.result && v.result.items) || [] } : null; }
   function showPdf(d, o) {
+    return C.vx.makePdf(pdfOpts(d, o)).catch(function () { });
+  }
+  /** makePdf·buildPdf 재료 — 「결재 문서 PDF」와 결재 카드 미리보기(2026-10-12)가 같이 쓴다. */
+  function pdfOpts(d, o) {
     var nImg = d.items.filter(function (i) { return i.path; }).length;
-    return C.vx.makePdf({
+    return {
       doc: { sheets: d.sheets, scans: [], photos: [] }, nImg: nImg, verify: d.verify, title: o.title, sub: o.sub, file: o.file,
       note: o.note, expect: o.expect, expectName: o.expectName, okKey: o.okKey || '', okAttr: 'data-xpdfok', meta: d.meta,
       // 명세가 길면 2장 이상 — 실제로 그린 쪽 수(sheetpdf totals[0].pages)로 적는다.
@@ -977,7 +981,7 @@
       build: function (lib, loadImage) {
         return window.SheetPdf.buildExpense(d, { PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold, loadImage: loadImage });
       }
-    }).catch(function () { });
+    };
   }
   /** 상신 전 미리보기(지금 자료). 결재 중·완료면 고정본으로. */
   function pdfMine() {
@@ -1014,12 +1018,24 @@
     if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
     fetchFrozen(a).then(function (fz) {
       if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다. 관리자에게 알려 주세요.', true); return; }
-      var d = frozenDoc(a, fz), done = a.status === 'approved';
-      showPdf(d, { title: done ? '결재 완료본 — 개인경비' : a.status === 'submitted' ? '결재 문서 — 개인경비' : '상신했던 문서 — 개인경비',
-        sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ')',
-        file: '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + a.cycle + ({ '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' }[d.meta.mark]) + '.pdf',
-        expect: (a.snapshot || {}).cost, expectName: '상신 때 집계한 금액' });
+      C.vx.makePdf(frozenOpts(a, fz)).catch(function () { });
     }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.', true); });
+  }
+  function frozenOpts(a, fz) {
+    var d = frozenDoc(a, fz), done = a.status === 'approved';
+    return pdfOpts(d, { title: done ? '결재 완료본 — 개인경비' : a.status === 'submitted' ? '결재 문서 — 개인경비' : '상신했던 문서 — 개인경비',
+      sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ')',
+      file: '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + a.cycle + ({ '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' }[d.meta.mark]) + '.pdf',
+      expect: (a.snapshot || {}).cost, expectName: '상신 때 집계한 금액' });
+  }
+  /** 결재 카드 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 재료·같은 생성기로 바이트만. */
+  function previewBytes(id) {
+    var a = apprById(id);
+    if (!a) return Promise.reject(new Error('noappr'));
+    return fetchFrozen(a).then(function (fz) {
+      if (!fz) throw new Error('nofrozen');
+      return C.vx.buildPdf(frozenOpts(a, fz)).then(function (res) { return res.bytes; });
+    });
   }
 
   /* ── 엑셀(사용자 양식) ──
@@ -1774,6 +1790,7 @@
     sumLine: function (a) { var s = a.snapshot || {}; return s.cost != null ? n0(s.n) + '건 · ' + won(s.cost) : ''; },
     sumHtml: sumHtml,
     extra: extra,
+    previewBytes: previewBytes,
     wantSummaries: wantSums,
     cycName: function (a) { return cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ') · 개인경비 지출결의'; },
     cycLabel: function (a) { return cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ')'; },

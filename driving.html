@@ -149,6 +149,9 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 .ctab tr.flash td{background:var(--red-50)}
 .cdrop tr.cbad td{background:var(--red-50)}
 .cfacts{margin:0 0 12px}
+/* 저장 상태 줄(2026-10-12) — 표 위: 자동 저장됨 · 마지막 저장 HH:MM / 저장 중… / 저장 못 함 N곳 */
+.csaveline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 8px;font-size:12.5px;color:var(--ink-500);line-height:1.5;overflow-wrap:anywhere}
+.csaveline .st{flex:none}
 /* 휴대폰: 한 줄 = 카드 한 장. 위 두 줄은 순번·승인일·시간·금액 / 가맹점·업종, 그 아래 손으로 적는 칸 셋(이름표와 함께) */
 @media (max-width:720px){
   .scroll.cscroll{max-height:none;overflow:visible}
@@ -422,6 +425,24 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .vchip{border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);padding:3px 10px;cursor:pointer;font:inherit}
 .vchip:hover{border-color:var(--ink-400);background:var(--sunken)}
 .aext{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+/* 결재 문서 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 PDF 를 쪽마다 그림으로, 카드 아래 세로로 */
+.apv{margin-top:12px;padding-top:10px;border-top:1px dashed var(--ink-200);min-width:0;max-width:100%}
+.apvbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.apvpages{margin-top:10px;display:flex;flex-direction:column;gap:10px;min-width:0;max-width:820px}
+.apvpages[hidden]{display:none}
+.apvpg{display:block;width:100%;max-width:100%;padding:0;margin:0;border:1px solid var(--ink-200);border-radius:6px;background:#fff;
+  cursor:zoom-in;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.apvpg:hover{border-color:var(--ink-400)}
+.apvpg img,.apvbig img{display:block;width:100%;max-width:100%;height:auto;background:#fff}
+.apvbig img{border:1px solid var(--ink-200);border-radius:4px;margin-bottom:12px}
+.apvwait{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--ink-500)}
+/* 자리 잡기 — 한 쪽 크기(A4 세로, 법인카드는 가로)를 미리 차지해 그림이 들어올 때 아래 카드가 덜 밀린다 */
+.apv[data-apvk="card"] .apvsk{aspect-ratio:1.414/1}
+.apvsk{width:100%;aspect-ratio:1/1.414;border-radius:6px;background:linear-gradient(90deg,var(--ink-100),var(--sunken),var(--ink-100));
+  background-size:200% 100%;animation:apvsh 1.4s linear infinite}
+@keyframes apvsh{from{background-position:200% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.apvsk{animation:none}}
+.apverr{font-size:12.5px;color:var(--ink-600);background:var(--sunken);border-radius:6px;padding:10px 12px}
 /* 결재 요약 — 문서를 열지 않고도 승인 판단 */
 .abrief{margin-top:14px;border:1px solid var(--ink-200);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
 .abrief .abv{display:flex;align-items:center;gap:9px;padding:10px 14px;font-size:13.5px}
@@ -1502,6 +1523,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .hpnote > span{flex:1 1 calc(100% - 30px)}
   .hpnote > .btn{margin-left:26px}
   .vitem{flex-wrap:wrap}
+  .vitem .vb{flex:1 1 calc(100% - 66px)}      /* 글 칸이 단추에 눌려 한 글자씩 꺾이던 것(법인카드 C07~C09 긴 문구) — 단추는 아래 줄로 */
   .vitem .vgo{margin-left:66px}
   .cycband > span{flex:1 1 100%;min-width:0}
   .cycband .btn{margin-left:0}

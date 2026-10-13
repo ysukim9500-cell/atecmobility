@@ -7,7 +7,10 @@
    ★ 자료는 직원이 ERP 에서 받은 자기 카드 승인내역 엑셀(card-erp.js 가 읽는다 — SheetJS 는 올리기 창을 열 때만 싣는다).
      손으로 적는 칸은 구분·사용목적·비고뿐. 칸을 고치면 바로 저장한다(화면을 다시 그리지 않는다 — 커서가 튀지 않게).
    ★ 구분·사용목적이 빈 줄이 있으면 상신하지 못한다(beforeSubmit {blocked} + 서버 CARD_INCOMPLETE). 나머지 검증은 표시만.
-   ★ 검증은 브라우저에서 규칙으로만(card-rules.js — 서버 _shared/card-verify.ts 와 같은 판정). AI·사진 없음.
+   ★ 검증(2026-10-12): 「검증하기」 = expense-ai op card_review(서버가 줄을 읽어 규칙 C01~C09 + Gemini C07·C08, card_verifications 에 저장).
+     서버·Gemini 를 못 쓰면 브라우저 규칙(card-rules.js — 서버 _shared/card-verify.ts 와 같은 판정)만 + 「AI 검증을 하지 못했습니다(규칙 검증만)」.
+     Gemini 는 표시만 한다(warn). 상신을 막는 것은 빈칸(C01·C02)뿐. 사진 없음.
+   ★ 임시저장(2026-10-12): 자동 저장은 그대로 + 「임시저장」 단추(기다리는 칸을 지금 보냄) + 표 위 저장 상태 줄(자동 저장됨·저장 중…·저장 못 함 N곳).
    ★ 다시 올리기는 ERP 칸만 upsert(CardErp.toRow) — 적어 둔 구분·사용목적·비고는 그대로, 파일에 없는 줄은 표시만.
    화면: c_month(이번 달 카드 내역) · c_verify(검증·상신) · 관리 ca_close(현황) · ca_list(전체 내역) · ca_final(결재 완료 출력) · ca_people(직원 현황)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -76,7 +79,7 @@
     if (!force && ITEMS[k] && (ITEMS[k].rows || ITEMS[k].wait)) return ITEMS[k].wait || Promise.resolve(ITEMS[k].rows);
     var p = C.fetchAll('/rest/v1/card_items?select=*&cycle=eq.' + encodeURIComponent(cyc) +
       (all ? '' : '&username=eq.' + encodeURIComponent(me())) + '&order=appr_date.asc,appr_time.asc,id.asc')
-      .then(function (rows) { ITEMS[k] = { rows: (rows || []).sort(byDate) }; return ITEMS[k].rows; })
+      .then(function (rows) { ITEMS[k] = { rows: (rows || []).sort(byDate) }; if (!all) pruneFailed(cyc); return ITEMS[k].rows; })
       .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료되었습니다.' : '법인카드 내역을 불러오지 못했습니다.' }; return null; });
     ITEMS[k] = { wait: p };
     if (!all) {
@@ -210,7 +213,7 @@
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind c">법인카드</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
       (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 상신하면 결재함으로 갑니다.</div>') +
-      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) : '') +
+      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) + (C.apvSlot ? C.apvSlot('card', a) : '') : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 카드 내역을 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
       '</div></section>';
@@ -240,15 +243,16 @@
       top.map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') + '</div>' +
       (locked ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-cup>' + ic('card', 14) + 'ERP 엑셀 올리기</button>' +
         (nSug ? '<button class="btn" data-csugall>추천 구분 채우기 (' + n0(nSug) + ')</button>' : '') +
+        (rows.length ? '<button class="btn" id="btnCSave" data-csavenow title="적어 둔 칸을 지금 바로 저장합니다(평소에도 자동 저장됩니다)">' + ic('check', 14) + '임시저장</button>' : '') +
         (rows.length ? '<button class="btn" data-v="c_verify">검증·상신으로 ' + ic('chev', 13) + '</button>' : '') + '</div>') + '</div>';
     if (locked) h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' + (a && a.status === 'approved' ? '결재가 끝난 기간입니다.' : '결재 중인 기간입니다.') +
       '</b> 카드 내역을 올리거나 고칠 수 없습니다.' + (a && a.status === 'approved' ? ' 고칠 것이 있으면 관리자에게 「정정 열기」를 요청하세요.' : '') + '</span></div>';
     h += C.sect('내역', n0(rows.length) + '건' + (blank ? ' · 빈칸 ' + n0(blank) + '줄' : '') + (nMiss ? ' · 파일에 없는 줄 ' + n0(nMiss) : ''), '',
-      rows.length ? tableHtml(rows, locked, hist)
+      rows.length ? (locked ? '' : saveLineHtml(rows)) + tableHtml(rows, locked, hist)
         : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">이 기간에 올린 카드 내역이 없습니다.</div>' +
           '<div class="d">ERP 에서 <b>내 법인카드 승인내역</b>을 엑셀(.xls · .xlsx)로 받아 올려 주세요. 0원·취소 줄은 자동으로 뺍니다.<br>법인카드를 쓰지 않았으면 할 일이 없습니다.</div>' +
           (locked ? '' : '<div style="margin-top:16px"><button class="btn pri" data-cup>' + ic('card', 14) + 'ERP 엑셀 올리기</button></div>') + '</div></div>');
-    h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다.</b> 칸을 고치면 바로 저장됩니다. 연한 글씨와 점선 단추는 <b>추천</b>입니다 — ' +
+    h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다.</b> 칸을 고치면 바로 저장됩니다(「임시저장」은 지금 바로 저장). 연한 글씨와 점선 단추는 <b>추천</b>입니다 — ' +
       '누르거나 「추천 구분 채우기」로 확정합니다. 같은 파일을 다시 올려도 적어 둔 구분·사용목적·비고는 그대로입니다.</div>';
     return h;
   }
@@ -283,6 +287,8 @@
   /* ── 칸 저장 — 칸마다 차례로(늦게 온 응답이 새 값을 덮지 않게), 다시 그리지 않는다 ── */
   // SAVE_T: 'id|f' → { t: 타이머, id, f, v, cyc } — 기다리는 칸(쓰는 중). 기간은 넣을 때 굳힌다(그사이 기간을 바꿔도 그 줄로 간다).
   var SAVE_T = {}, CHAIN = {}, SAVING = 0;
+  // 저장 상태 줄(2026-10-12): INFL 'id|f' → id(보내는 중) · FAILED 'id|f' → 1(마지막 저장이 실패한 칸) · LAST_SAVE 마지막으로 저장된 시각(ms)
+  var INFL = {}, FAILED = {}, LAST_SAVE = 0;
   function queueSave(el, now) {
     var id = el.dataset.cid, f = el.dataset.f, k = id + '|' + f;
     if (f !== 'note') el.classList.toggle('need', !el.value.trim());
@@ -291,6 +297,52 @@
     w.v = el.value;
     w.t = setTimeout(function () { if (SAVE_T[k] === w) { delete SAVE_T[k]; saveCell(id, f, w.v, w.cyc); } }, now ? 0 : 800);
     SAVE_T[k] = w;
+    paintSave();
+  }
+  /* ── 저장 상태 줄 · 「임시저장」 ── */
+  function hhmm(ms) { var d = C.kd(ms); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); }
+  function lastSaveMs(rows) {
+    if (LAST_SAVE) return LAST_SAVE;
+    var mx = 0;
+    (rows || []).forEach(function (it) { var t = Date.parse(it.updated_at || ''); if (isFinite(t) && t > mx) mx = t; });
+    return mx;
+  }
+  function saveLineText(rows) {
+    var nf = Object.keys(FAILED).length;
+    if (pending()) return '<span class="st warn">저장 중…</span> <span>칸에 적은 값을 보내고 있습니다</span>';
+    // 실패한 칸은 서버 값으로 되돌려 두므로 「임시저장」으로 다시 보낼 값이 없다 — 다시 적어 달라고 말한다.
+    if (nf) return '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span> <span>적은 값이 되돌려졌습니다 — 빨간 「저장 못 함」 표시가 있는 칸을 다시 적어 주세요</span>';
+    var t = lastSaveMs(rows);
+    return '<span class="st ok">자동 저장됨</span> <span>' + (t ? '· 마지막 저장 ' + hhmm(t) + ' ' : '') +
+      '— 같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적은 그대로입니다</span>';
+  }
+  /** 다시 받은 줄(지금 기간)에 없는 줄의 「저장 못 함」 표시는 지운다(지운 줄·다른 기간으로 옮겨진 줄). */
+  function pruneFailed(cyc) {
+    if (cyc !== C.state().CYCKEY) return;
+    var have = {};
+    mineRows(cyc).forEach(function (it) { have[String(it.id)] = 1; });
+    Object.keys(FAILED).forEach(function (k) { if (!have[k.split('|')[0]]) delete FAILED[k]; });
+    paintSave();
+  }
+  function saveLineHtml(rows) { return '<div class="csaveline" id="cSaveLine" aria-live="polite">' + saveLineText(rows) + '</div>'; }
+  function paintSave() { var el = $('cSaveLine'); if (el) el.innerHTML = saveLineText(mineRows(C.state().CYCKEY)); }
+  /** 「임시저장」 — 기다리는 칸을 지금 보내고 끝날 때까지 기다린 뒤 알린다. 기다리는 칸이 없으면 「이미 모두 저장되어 있습니다」. */
+  function manualSave() {
+    var keys = Object.keys(Object.assign({}, SAVE_T, INFL)), ids = {};      // 같은 칸이 기다림·보내는 중 둘 다면 한 번만
+    keys.forEach(function (k) { ids[k.split('|')[0]] = 1; });
+    var n = Object.keys(ids).length;
+    if (!n) {
+      var nf = Object.keys(FAILED).length;
+      if (nf) C.toast('저장하지 못한 칸이 ' + n0(nf) + '곳 있습니다 — 적은 값이 되돌려졌으니 빨간 「저장 못 함」 칸을 다시 적어 주세요.', true);
+      else C.toast('이미 모두 저장되어 있습니다');
+      return;
+    }
+    settleSaves().then(function () {
+      var bad = keys.filter(function (k) { return FAILED[k]; }).length;
+      if (bad) C.toast('저장하지 못한 칸이 ' + n0(bad) + '곳 있습니다 — 빨간 「저장 못 함」 표시를 확인해 주세요.', true);
+      else C.toast('저장했습니다 (' + n0(n) + '줄)');
+      paintSave();
+    });
   }
   /** 기다리는 칸을 지금 보낸다(페이지를 떠날 때 · 상신 직전). */
   function flushSaves() {
@@ -312,6 +364,8 @@
   /** 실패하면 칸을 서버 값으로 되돌리고 「저장 못 함」 + 까닭. 말없이 버리지 않는다. */
   function failCell(id, f, prev, msg) {
     mark(id, '저장 못 함', true);
+    FAILED[id + '|' + f] = 1;
+    paintSave();
     var el = document.querySelector('.cin[data-cid="' + id + '"][data-f="' + f + '"]');
     C.toast(msg, true);
     if (SAVE_T[id + '|' + f] || (el && el === document.activeElement)) return;     // 더 새 값이 기다리거나 쓰는 중이면 되돌리지 않는다
@@ -329,21 +383,23 @@
         return;
       }
       v = String(v == null ? '' : v).trim().slice(0, MAXLEN[f]);
-      if (String(it[f] == null ? '' : it[f]) === v) { mark(id, ''); return; }
+      var k = id + '|' + f;
+      if (String(it[f] == null ? '' : it[f]) === v) { mark(id, ''); delete FAILED[k]; paintSave(); return; }
       var body = {}, prev = it[f];
       body[f] = v;
-      it[f] = v; SAVING++; mark(id, '저장 중…');
+      it[f] = v; SAVING++; INFL[k] = id; mark(id, '저장 중…'); paintSave();
       // keepalive — 페이지를 닫는 중(pagehide)에 보낸 저장도 끝까지 간다
       return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id) + '&select=id,' + f + ',updated_at', {
         method: 'PATCH', keepalive: true, headers: { Prefer: 'return=representation' }, body: JSON.stringify(body)
       }).then(function (out) {
         if (!out || !out.length) throw new Error('저장되지 않았습니다(권한 또는 잠금)');
         it[f] = out[0][f]; it.updated_at = out[0].updated_at;
+        delete FAILED[k]; LAST_SAVE = Date.now();
         mark(id, '저장됨');
       }).catch(function (e) {
         it[f] = prev;
         failCell(id, f, prev, failMsg('저장하지 못했습니다', e, why(e)));
-      }).then(function () { SAVING--; paintBlank(); });
+      }).then(function () { SAVING--; delete INFL[k]; paintBlank(); paintSave(); });
     });
   }
   // 쓰다가 새로 고침·탭 닫기 — 본체의 묻기는 창(panel)이 열려 있을 때만 모듈을 본다. 칸 저장은 창 밖이라 여기서 따로 묻는다.
@@ -389,6 +445,7 @@
       .then(function (rows) {
         if (!rows || !rows.length) throw new Error('지워지지 않았습니다(권한 또는 잠금)');
         delete MISSING[id];
+        Object.keys(FAILED).forEach(function (k) { if (k.split('|')[0] === String(id)) delete FAILED[k]; });
         C.closePanel(); C.toast('지웠습니다.');
         var S = C.state(); dropItems(S.CYCKEY);
         return loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
@@ -445,7 +502,7 @@
       prevMsg('파일이 너무 큽니다(' + (f.size / 1048576).toFixed(1) + 'MB). 5MB 까지 올릴 수 있습니다 — ERP 에서 한 달치만 받아 올려 주세요.');
       return;
     }
-    s.busy = true; s.res = null; s.plan = null;
+    s.busy = true; s.res = null; s.plan = null; s.painted = false;
     var el = $('cPrev'); if (el) el.innerHTML = '<div class="pdfwait"><div class="spin"></div><div role="status">엑셀을 읽는 중…</div></div>';
     var btn = $('btnCUpGo'); if (btn) btn.disabled = true;
     Promise.all([ensureXlsx(), f.arrayBuffer(), loadItems(s.cyc, false)]).then(function (r) {
@@ -531,7 +588,8 @@
     }
     // 경고가 있으면 창 안을 미리보기 머리까지 내려 둔다(올리기 칸 아래에 묻히지 않게) — 뒤 화면은 건드리지 않는다
     var pb = $('pBody');
-    if (pb && (erpBad || bad.length)) pb.scrollTop += Math.max(0, el.getBoundingClientRect().top - pb.getBoundingClientRect().top - 8);
+    var firstPaint = !s.painted; s.painted = true;      // 새 파일의 첫 그림에서만 — 체크박스 등으로 다시 그릴 때는 자리를 지킨다
+    if (pb && firstPaint && (erpBad || bad.length)) pb.scrollTop += Math.max(0, el.getBoundingClientRect().top - pb.getBoundingClientRect().top - 8);
   }
   function runUpload() {
     var s = CUP;
@@ -595,14 +653,71 @@
     if (on) PREV[k] = { at: Date.now(), sig: sig(p[0], p[1]) }; else delete PREV[k];
     try { sessionStorage.setItem('drv.cpreviewed', JSON.stringify(PREV)); } catch (e) { }
   }
+  /* ── AI 검증(2026-10-12, SPEC §3-1) — expense-ai op card_review: 서버가 card_items 를 직접 읽어 규칙(C01~C09) + Gemini(C07·C08).
+     같은 자료면 서버가 보관해 둔 Gemini 결과를 쓴다. 서버·Gemini 를 못 쓰면 브라우저 규칙만 + 「AI 검증을 하지 못했습니다(규칙 검증만)」. */
+  var VRUN = { busy: false, note: '', k: '', t0: 0 }, VTICK = null, EXP = {};
+  var AI_FAIL = 'AI 검증을 하지 못했습니다(규칙 검증만)';
+  function cai(body) {
+    return C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (!r.ok || !j || j.error) { var e = new Error((j && j.error) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+          return j;
+        });
+      });
+  }
+  /** C09 재료(화면) — 내 개인경비 줄 중 이 달(KST)에 결제한 것. 못 받으면 null(C09 를 화면에서 건너뜀 — 서버는 따로 본다). */
+  function loadExp(cyc) {
+    var rg = R.expenseRangeMs(cyc);
+    return C.fetchAll('/rest/v1/expense_items?select=id,date_millis,amount,category,merchant&username=eq.' + encodeURIComponent(me()) +
+      '&date_millis=gte.' + rg.lo + '&date_millis=lt.' + rg.hi + '&order=id.asc')
+      .then(function (rows) { EXP[cyc] = rows || []; return EXP[cyc]; }, function () { return EXP[cyc] || null; });
+  }
+  function localVerify(cyc, aiData) {
+    return R.runVerify(mineRows(cyc), { cycle: cyc, submitterName: myFullName(), expenses: EXP[cyc] || null, ai: aiData || null });
+  }
+  function sayRun(t) {
+    VRUN.note = t;
+    var v = document.querySelector('.hero .verdict .cvnote'); if (v) v.textContent = t;
+    var gl = document.querySelector('[data-cvrun] .gl'); if (gl) gl.textContent = t;
+  }
   function runCheck() {
     var S = C.state(), u = me(), cyc = S.CYCKEY, k = vkey(u, cyc);
+    if (VRUN.busy) return;
     if (pending()) { C.toast('칸을 저장하는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
-    var res = R.runVerify(mineRows(cyc), { cycle: cyc, submitterName: myFullName() });
-    VR[k] = { at: Date.now(), sig: sig(u, cyc), res: res };
-    setPreviewed(k, false);
-    C.toast('검증했습니다 — ' + sumText(res.summary));
+    var n = mineRows(cyc).length, s0 = sig(u, cyc);
+    VRUN = { busy: true, note: '규칙을 살피는 중…', k: k, t0: Date.now() };
     C.render();
+    loadExp(cyc).then(function () {
+      var tick = function () { if (VRUN.busy && VRUN.k === k) sayRun('카드 ' + n0(n) + '줄을 읽는 중… ' + Math.round((Date.now() - VRUN.t0) / 1000) + '초'); };
+      tick(); clearInterval(VTICK); VTICK = setInterval(tick, 1000);
+      return cai({ op: 'card_review', cycle: cyc }).then(function (j) { return { j: j }; }, function (e) { return { e: e }; });
+    }).then(function (x) {
+      clearInterval(VTICK); VTICK = null;
+      var res, ai, row = x.j && x.j.row;
+      if (row && row.summary && row.result && Array.isArray(row.result.items)) {
+        var a = x.j.ai || {};
+        res = { summary: row.summary, items: row.result.items };
+        ai = { status: a.status || row.result.ai_status || 'none', note: a.note || row.result.ai_note || '', model: a.model || '', data: row.result.ai || null,
+          exNote: x.j.ex_note || row.result.ex_note || '' };
+      } else {
+        if (x.e) console.warn('법인카드 AI 검증:', String((x.e && x.e.message) || x.e));
+        res = localVerify(cyc, null);
+        ai = { status: 'failed', note: AI_FAIL, model: '', data: null };
+      }
+      VR[k] = { at: Date.now(), sig: s0, res: res, ai: ai };
+      setPreviewed(k, false);
+      C.toast('검증했습니다 — ' + sumText(res.summary) + (ai.note ? ' · ' + ai.note : '') + (ai.exNote ? ' · ' + ai.exNote : ''));
+    }).catch(function (e) { C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true); })
+      .then(function () { clearInterval(VTICK); VTICK = null; VRUN = { busy: false, note: '', k: '', t0: 0 }; C.render(); });
+  }
+  /** AI 상태 → [값, 설명]. */
+  function aiFact(ai, nRows) {
+    if (!ai) return ['—', '검증 전'];
+    if (ai.status === 'ok') return ['완료', 'Gemini 가 ' + n0(nRows) + '줄의 구분·사용목적을 봤습니다'];
+    if (ai.status === 'cached') return ['완료', '같은 자료로 본 Gemini 결과를 다시 썼습니다'];
+    if (ai.status === 'none') return ['—', '카드 내역이 없습니다'];
+    return ['규칙만', ai.note || AI_FAIL];
   }
   var LV = { block: ['빈칸', 'bad'], bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
   function itemsHtml(items, links) {
@@ -610,8 +725,8 @@
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, ref = (it.ref && it.ref.items) || [], go = '';
       if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-cvfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>'; }
-      return '<div class="vitem v-' + esc(it.level === 'block' ? 'bad' : it.level) + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + esc(it.title) + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
+      return '<div class="vitem v-' + esc(it.level === 'block' ? 'bad' : it.level) + (it.ai ? ' v-ai' : '') + '" data-ccode="' + esc(it.code || '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
+        '<div class="vb"><div class="vt">' + esc(it.title) + (it.ai ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
   /** 그 줄로 가서 빈 칸(없으면 첫 칸)에 커서를 둔다. */
@@ -640,11 +755,13 @@
     var locked = !!(a && (a.status === 'submitted' || a.status === 'approved'));
     var v = VR[k], fresh = !!(v && v.sig === sig(u, cyc)), s = v ? v.res.summary : {}, items = v ? v.res.items : [];
     var seen = previewOk(k), blocked = !!(v && fresh && s.block);
+    var busy = VRUN.busy && VRUN.k === k;
     var stage = locked ? 0 : !v || !fresh ? 1 : !seen ? 2 : 3;
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     VITEMS = [];
     var verdict, clean = '';
-    if (!v) verdict = '아직 검증하지 않았습니다';
+    if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('Gemini') + '</span><span class="cvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
+    else if (!v) verdict = '아직 검증하지 않았습니다';
     else if (!fresh) verdict = '자료가 바뀌었습니다 — 다시 검증해 주세요';
     else if (s.block) verdict = '빈 칸이 있는 줄이 <em>' + n0(s.blank_rows) + '줄</em> — 채워야 상신할 수 있습니다';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
@@ -656,33 +773,39 @@
     };
     var none = !rows.length;
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
-      card(1, '검증하기', none ? '먼저 「이번 달 카드 내역」에서 ERP 엑셀을 올려 주세요.'
+      card(1, '검증하기 ' + C.vx.gemBadge('Gemini'), none ? '먼저 「이번 달 카드 내역」에서 ERP 엑셀을 올려 주세요.'
+        : busy ? '규칙으로 살피고, Gemini 가 구분·사용목적을 읽는 중입니다…'
         : v && fresh ? '지금 자료로 검증했습니다. 고친 게 있으면 다시 눌러 주세요.'
-        : '구분·사용목적 빈칸, 같은 승인번호, 기간 밖 승인일, 소유자, 0원 줄을 살핍니다.',
-        '<button class="btn big' + (stage === 1 && !none ? ' pri cta' : '') + '" data-cvrun' + (none ? ' disabled' : '') + '>' + ic('check', 16) + (v && fresh ? '다시 검증하기' : '검증하기') + '</button>') +
+        : '빈칸·같은 승인번호·기간 밖·소유자·0원 줄과 같은 날 같은 금액의 개인경비를 규칙으로 보고, Gemini 가 구분이 가맹점·시간과 맞는지와 사용목적을 봅니다.',
+        C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? (VRUN.note || 'Gemini 가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
+          busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
       card(2, 'PDF 미리보기', v && fresh ? '결재자에게 갈 지출결의서(가로 A4)를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
-        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>') +
+        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>') +
       card(3, '결재 상신', !canSubmit ? '이미 상신했습니다.' : blocked ? '구분·사용목적이 빈 줄이 있어 상신할 수 없습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
-        (canSubmit ? '<button class="btn big' + (stage === 3 && !blocked ? ' pri cta' : '') + '" id="btnOpenSubmit" data-kind="card"' + (stage === 3 && !blocked ? '' : ' disabled') + '>' +
+        (canSubmit ? '<button class="btn big' + (stage === 3 && !blocked ? ' pri cta' : '') + '" id="btnOpenSubmit" data-kind="card"' + (stage === 3 && !blocked && !busy ? '' : ' disabled') + '>' +
           (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '') +
         (blocked ? ' <button class="btn big" data-cgoblank>' + ic('chev', 14) + '빈 칸으로 가기</button>' : '')) + '</ol>';
     var h = head('검증·상신', '상신하기 전에 빈 칸과 맞지 않는 곳을 살펴봅니다');
     h += apprStrip(a);
+    var af = aiFact(v && v.ai, rows.length);
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && fresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
       (v ? '마지막 검증 ' + esc(C.vx.whenText(new Date(v.at).toISOString())) : '검증 전') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
-      '<p class="verdict' + clean + '">' + verdict + '</p>' +
-      (v ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적 — 상신을 막음', s.block > 0) +
-        fact('불일치', n0(s.bad), '같은 승인번호가 두 번', s.bad > 0) + fact('확인 필요', n0(s.warn), '기간 밖 승인일 · 소유자') + fact('참고', n0(s.info), '0원 줄') + '</div>' : '') +
+      '<p class="verdict' + (busy ? '' : clean) + '">' + verdict + '</p>' +
+      (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적 — 상신을 막음', s.block > 0) +
+        fact('불일치', n0(s.bad), '같은 승인번호가 두 번', s.bad > 0) + fact('확인 필요', n0(s.warn), '기간 밖 · 소유자 · 구분·사용목적 · 개인경비 중복') + fact('참고', n0(s.info), '0원 줄') +
+        '<div class="fact" id="cAiFact"><div class="k">AI 확인 ' + C.vx.gemBadge() + '</div><div class="v">' + esc(af[0]) + '</div><div class="sub">' + esc(af[1]) + '</div></div></div>' +
+        (v.ai && v.ai.note ? '<div class="awarn" id="cAiNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.note) + '</span></div>' : '') +
+        (v.ai && v.ai.exNote ? '<div class="awarn" id="cExNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.exNote) + '</span></div>' : '') : '') +
       (locked ? '<div class="vact"><button class="btn" data-cpdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' : steps) + '</div>';
-    if (v && fresh) {
+    if (v && fresh && !busy) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, !locked));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
-    } else if (!none) {
+    } else if (!none && !busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">위 ① 「검증하기」를 누르면 이번 달 카드 내역을 살펴봅니다.</div>' +
-        '<div class="d">구분·사용목적이 빈 줄만 상신을 막습니다. 나머지(같은 승인번호·기간 밖·소유자·0원)는 결재자가 같이 봅니다.</div></div></div>';
+        '<div class="d">구분·사용목적이 빈 줄만 상신을 막습니다. 나머지(같은 승인번호·기간 밖·소유자·0원·구분과 내역·사용목적·개인경비 중복)는 결재자가 같이 봅니다.</div></div></div>';
     }
-    h += '<div class="anote">검증은 정해진 규칙으로만 합니다(AI·사진 없음). 금액은 ERP 승인금액 그대로이고 바꾸지 않습니다.</div>';
+    h += '<div class="anote">금액은 ERP 승인금액 그대로이고 바꾸지 않습니다. ' + C.vx.gemBadge('Gemini') + ' 는 <b>구분이 가맹점·시간과 맞지 않아 보이는 줄과 성의 없는 사용목적을 표시</b>만 하고 값을 고치거나 상신을 막지 않습니다(카드번호·이름은 보내지 않습니다).</div>';
     return h;
   }
   /** 상신 창이 「상신」을 누른 직후 — 미리보기 뒤 자료가 바뀌었거나 빈 칸이 있으면 멈추고({blocked}), 아니면 요약을 돌려준다. */
@@ -692,17 +815,19 @@
     // 쓰다 만 칸·보내는 중인 칸을 먼저 끝낸다 — 끝나기 전에 서버에서 다시 받으면 방금 적은 값이 빠진 채 판정한다
     return settleSaves().then(function () {
       if (onNote) onNote('카드 내역을 다시 확인하는 중');
-      return loadItems(cyc, false, true);
+      return Promise.all([loadItems(cyc, false, true), loadExp(cyc)]).then(function (r) { return r[0]; });
     }).then(function (rows) {
       if (!rows) return null;                       // 다시 받지 못했으면 막지 않는다(서버가 CARD_INCOMPLETE 로 지킨다)
+      var v0 = VR[k], ai0 = v0 && v0.ai ? v0.ai : null;
       var goVerify = function () { C.closePanel(); if (C.state().VIEW !== 'c_verify') C.go('c_verify'); else C.render(); };
       if (seen != null && sig(u, cyc) !== seen) {
         setPreviewed(k, false); goVerify();
         C.toast('미리보기 뒤에 카드 내역이 바뀌었습니다. PDF를 다시 확인해 주세요.', true);
         return { blocked: true };
       }
-      var res = R.runVerify(mineRows(cyc), { cycle: cyc, submitterName: myFullName() });
-      VR[k] = { at: Date.now(), sig: sig(u, cyc), res: res };
+      // 검증하기 때 받은 Gemini 결과(같은 자료)를 그대로 더한다 — 서버도 같은 지문의 보관본으로 C07·C08 을 굳힌다.
+      var res = localVerify(cyc, ai0 && ai0.data);
+      VR[k] = { at: Date.now(), sig: sig(u, cyc), res: res, ai: ai0 };
       if (res.summary.block) {
         goVerify();
         C.toast('구분·사용목적이 빈 줄이 ' + n0(res.summary.blank_rows) + '건 있습니다. 채운 뒤 상신해 주세요.', true);
@@ -747,12 +872,15 @@
     };
   }
   /** 검증 결과 → PDF 검증 쪽 재료. 빈칸(block)은 「[상신 막음]」을 붙여 불일치로 보인다. */
-  function vOf(res, atMs) {
+  function vOf(res, atMs, ai) {
     if (!res) return null;
     var s = res.summary || {};
+    // Gemini 를 썼는가 — 화면 검증은 ai.status, 고정본은 verify.ai_used(2026-10-12 부터). 모르면 말하지 않는다.
+    var aiUsed = ai ? (ai.status === 'ok' || ai.status === 'cached') : typeof res.ai_used === 'boolean' ? res.ai_used : null;
     return {
       ranAt: isFinite(atMs) ? C.vx.whenText(new Date(atMs).toISOString()) : '', ai: false,
-      noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원)',
+      noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원 · 개인경비 중복)' +
+        (aiUsed === true ? ' + Gemini 구분·사용목적 확인' : aiUsed === false ? ' · Gemini 확인 없음' : ''),
       notes: ['· 금액은 ERP 에서 받은 승인금액 그대로입니다(취소·0원 줄은 올릴 때 뺐습니다).',
         '· 구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다. 나머지 항목은 결재자가 보고 판단합니다.'],
       summary: { bad: (s.block || 0) + (s.bad || 0), warn: s.warn || 0, info: s.info || 0, receipts: 0, read: 0 },
@@ -760,14 +888,18 @@
     };
   }
   function showPdf(d, o) {
-    return C.vx.makePdf({
+    return C.vx.makePdf(pdfOpts(d, o)).catch(function () { });
+  }
+  /** makePdf·buildPdf 재료 — 「결재 문서 PDF」와 결재 카드 미리보기(2026-10-12)가 같이 쓴다. */
+  function pdfOpts(d, o) {
+    return {
       doc: { sheets: d.sheets, scans: [], photos: [] }, nImg: 0, verify: d.verify, title: o.title, sub: o.sub, file: o.file,
       note: o.note, expect: o.expect, expectName: o.expectName, okKey: o.okKey || '', okAttr: 'data-cpdfok', meta: d.meta,
       stat: function (res) { var t = (res && res.totals && res.totals[0]) || {}; return '지출결의서 ' + n0(t.pages || 1) + '장 · ' + n0(d.items.length) + '건'; },
       build: function (lib) {
         return window.SheetPdf.buildCard(d, { PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold });
       }
-    }).catch(function () { });
+    };
   }
   /** 상신 전 미리보기(지금 자료). 결재 중·완료면 고정본으로. */
   function pdfMine() {
@@ -776,7 +908,7 @@
     var rows = mineRows(cyc);
     if (!rows.length) { C.toast('이 기간에 담을 카드 내역이 없습니다.', true); return; }
     var k = vkey(u, cyc), v = VR[k];
-    var d = cDoc(u, cyc, rows, null, null, v ? vOf(v.res, v.at) : null, 'preview', '상신 전 미리보기 · ' + C.vx.whenText(new Date().toISOString()) + ' 출력');
+    var d = cDoc(u, cyc, rows, null, null, v ? vOf(v.res, v.at, v.ai) : null, 'preview', '상신 전 미리보기 · ' + C.vx.whenText(new Date().toISOString()) + ' 출력');
     showPdf(d, { title: 'PDF 미리보기 — 법인카드', sub: d.person.name + ' · ' + cycName(cyc) + ' (' + R.span(cyc) + ')',
       file: '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + cyc + '_미리보기.pdf',
       expect: R.totals(rows).cost, expectName: '화면 합계', okKey: k });
@@ -802,12 +934,24 @@
     if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
     fetchFrozen(a).then(function (fz) {
       if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다. 관리자에게 알려 주세요.', true); return; }
-      var d = frozenDoc(a, fz), done = a.status === 'approved';
-      showPdf(d, { title: done ? '결재 완료본 — 법인카드' : a.status === 'submitted' ? '결재 문서 — 법인카드' : '상신했던 문서 — 법인카드',
-        sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + R.span(a.cycle) + ')',
-        file: '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + a.cycle + MARK_SUFFIX[d.meta.mark] + '.pdf',
-        expect: (a.snapshot || {}).cost, expectName: '상신 때 집계한 금액' });
+      C.vx.makePdf(frozenOpts(a, fz)).catch(function () { });
     }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.', true); });
+  }
+  function frozenOpts(a, fz) {
+    var d = frozenDoc(a, fz), done = a.status === 'approved';
+    return pdfOpts(d, { title: done ? '결재 완료본 — 법인카드' : a.status === 'submitted' ? '결재 문서 — 법인카드' : '상신했던 문서 — 법인카드',
+      sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + R.span(a.cycle) + ')',
+      file: '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + a.cycle + MARK_SUFFIX[d.meta.mark] + '.pdf',
+      expect: (a.snapshot || {}).cost, expectName: '상신 때 집계한 금액' });
+  }
+  /** 결재 카드 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 재료·같은 생성기로 바이트만. */
+  function previewBytes(id) {
+    var a = apprById(id);
+    if (!a) return Promise.reject(new Error('noappr'));
+    return fetchFrozen(a).then(function (fz) {
+      if (!fz) throw new Error('nofrozen');
+      return C.vx.buildPdf(frozenOpts(a, fz)).then(function (res) { return res.bytes; });
+    });
   }
   function xlsxFrozen(id) {
     var a = apprById(id); if (!a) return;
@@ -867,8 +1011,14 @@
     var v = f && f.verify, vs = (v && v.summary) || null;
     var items = ((v && v.items) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
     var checks = [];
-    if (vs) checks.push(vs.bad ? ['bad', '같은 승인번호 ' + n0(vs.bad) + '건'] : vs.warn ? ['warn', '검증 확인 필요 ' + n0(vs.warn) + '건'] : ['ok', '검증 이상 없음']);
-    else if (f === undefined) checks.push(['warn', '검증 결과를 불러오는 중…']);
+    if (vs) {
+      checks.push(vs.bad ? ['bad', '같은 승인번호 ' + n0(vs.bad) + '건'] : vs.warn ? ['warn', '검증 확인 필요 ' + n0(vs.warn) + '건'] : ['ok', '검증 이상 없음']);
+      // C07~C09(2026-10-12) — 줄 수로 딱지 하나씩
+      var rowsOf = function (code) { return ((v && v.items) || []).filter(function (i) { return i.code === code; }).reduce(function (n, i) { return n + ((i.ref && i.ref.items) || []).length; }, 0); };
+      [['C07', '구분·내역 불일치'], ['C08', '사용목적 부실'], ['C09', '개인경비 중복 의심']].forEach(function (c) {
+        var n = rowsOf(c[0]); if (n) checks.push(['warn', c[1] + ' ' + n0(n) + '줄']);
+      });
+    } else if (f === undefined) checks.push(['warn', '검증 결과를 불러오는 중…']);
     else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
     var nBad = checks.filter(function (c) { return c[0] === 'bad'; }).length, nWarn = checks.filter(function (c) { return c[0] === 'warn'; }).length;
     var verdict = !vs ? ['warn', '검증 결과를 아직 받지 못했습니다 — 결재 문서를 열어 확인해 주세요']
@@ -1053,7 +1203,7 @@
         it.merchant || '', it.biz_type || '', Number(it.amount) || 0, it.category || '', it.purpose || '', it.note || '']);
     });
     out.push(['합계', '', '', '', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '']);
-    C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_내역_' + S.CYCKEY + scopeSuffix() + '.csv');
+    C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_내역_' + S.CYCKEY + scopeSuffix() + '.csv', 'text/csv;charset=utf-8');
     C.toast('CSV 를 내려받습니다(' + n0(rows.length) + '건).');
   }
   var FINSEL = {}, FINJOB = null;
@@ -1126,7 +1276,7 @@
       out.push([C.nameOf(a.username), a.username, [C.orgName(op), op.unit].filter(Boolean).join(' · '), a.closed_at ? C.vx.whenText(a.closed_at) : '', Number(s.n) || 0, Number(s.cost) || 0, a.id]);
     });
     out.push(['합계', '', '', '', tn, tc, '']);
-    C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_결재완료_금액요약_' + S.CYCKEY + scopeSuffix() + '.csv');
+    C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_결재완료_금액요약_' + S.CYCKEY + scopeSuffix() + '.csv', 'text/csv;charset=utf-8');
     C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
   }
   /** 고른 결재 완료 건을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 이어 붙인다(한 번에 20명까지). */
@@ -1208,6 +1358,7 @@
       return;
     }
     if (e.target.closest('[data-csugall]')) { fillSuggest(); return; }
+    if (e.target.closest('[data-csavenow]')) { manualSave(); return; }
     if ((el = e.target.closest('[data-cdel]'))) { openDel(el.dataset.cdel); return; }
     if ((el = e.target.closest('#btnCDelGo'))) { if (!el.disabled) runDel(el.dataset.id); return; }
     if (e.target.closest('[data-creload]')) { ITEMS = {}; C.render(); return; }
@@ -1262,6 +1413,7 @@
     sumLine: function (a) { var s = a.snapshot || {}; return s.cost != null ? n0(s.n) + '건 · ' + won(s.cost) : ''; },
     sumHtml: sumHtml,
     extra: extra,
+    previewBytes: previewBytes,
     wantSummaries: wantSums,
     cycName: function (a) { return cycName(a.cycle) + ' (' + R.span(a.cycle) + ') · 법인카드 지출결의'; },
     cycLabel: function (a) { return cycName(a.cycle) + ' (' + R.span(a.cycle) + ')'; },
@@ -1290,7 +1442,7 @@
       if (v === 'ca_list' && prev !== 'ca_close' && prev !== 'ca_people') CL = { cat: '', who: '', blank: false };
       if (ADMIN_C.indexOf(v) >= 0 && isAdmin()) loadItems(C.state().CYCKEY, true);
     },
-    onCycle: function () { MISSING = {}; FINSEL = {}; },
+    onCycle: function () { MISSING = {}; FINSEL = {}; FAILED = {}; LAST_SAVE = 0; },
     dirty: function () {
       if (C_SENDING || pending()) return true;
       if ($('cDrop') && CUP && CUP.plan && !CUP.sent) return true;

@@ -98,6 +98,8 @@
   function xlDate(s) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
     if (!m) return null;
+    var t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));      // 2026-02-31 같은 없는 날은 다음 달로 넘기지 않고 글자 그대로 둔다
+    if (t.getUTCFullYear() !== +m[1] || t.getUTCMonth() !== +m[2] - 1 || t.getUTCDate() !== +m[3]) return null;
     return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400e3);
   }
 
@@ -153,7 +155,7 @@
       if (!it) { body(ht, fill(r, 6, B, I) + tail(r, 8, 7, '', '')); r++; return; }
       var amt = Math.round(Number(it.amount) || 0), ds = xlDate(it.date);
       total += amt;
-      body(ht, cell(B, r, 6, String(it.no), { n: 1 }) + cell(C2, r, 6, it.card_no) +
+      body(ht, cell(B, r, 6, String(it.no != null && it.no !== '' && isFinite(Number(it.no)) ? Number(it.no) : k + 1), { n: 1 }) + cell(C2, r, 6, it.card_no) +
         (ds != null ? cell(D, r, 20, String(ds), { n: 1 }) : cell(D, r, 6, it.date)) + cell(E, r, 6, it.appr_no) + cell(F, r, 7, it.merchant) +
         cell(G, r, 9, String(amt), { n: 1 }) + cell(H, r, 6, it.user) + cell(I, r, 6, it.category) + tail(r, 8, 7, it.purpose, it.note));
       r++;
@@ -164,6 +166,9 @@
       cell(H, r, 12) + cell(I, r, 12) + tail(r, 12, 12, '', ''));
     merges.push('B' + r + ':F' + r);
     var totalRow = r;
+    // 쪽 아래 — PDF 와 같게 왼쪽 「이름 · 2026년 7월분 법인카드」, 오른쪽 「쪽 / 전체」. 머리글·바닥글에서 글자 &amp; 는 && 로 쓴다.
+    var hfText = function (t) { return xlText(t).replace(/\n/g, ' ').replace(/&/g, '&&'); };
+    var footL = [p.name, (d.meta && d.meta.cycleName) || (d.periodLabel ? String(d.periodLabel).replace(/\s*\(.*$/, '') + ' 법인카드' : '')].filter(Boolean).join(' · ');
     var cols = Object.keys(W).map(function (Lt, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + W[Lt] + '" customWidth="1"/>'; }).join('');
     var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="B2:P' + totalRow + '"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
@@ -171,6 +176,7 @@
       '<sheetData>' + rows + '</sheetData><mergeCells count="' + merges.length + '">' + merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join('') + '</mergeCells>' +
       '<printOptions horizontalCentered="1"/><pageMargins left="0.0787" right="0.0787" top="0.3937" bottom="0.3937" header="0.315" footer="0.315"/>' +
       '<pageSetup paperSize="9" fitToWidth="1" fitToHeight="0" orientation="landscape"/>' +
+      '<headerFooter><oddFooter>' + X.esc('&L&8 ' + hfText(footL) + '&R&8 &P / &N') + '</oddFooter></headerFooter>' +
       (brks.length ? '<rowBreaks count="' + brks.length + '" manualBreakCount="' + brks.length + '">' +
         brks.map(function (b) { return '<brk id="' + b + '" max="16383" man="1"/>'; }).join('') + '</rowBreaks>' : '') + '</worksheet>';
     var book = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    card-rules.js — 법인카드 지출결의 규칙(웹) (2026-10-09, docs/card/SPEC.md §0·§3·§4)
    ---------------------------------------------------------------------------
-   · 기간(달력 한 달)·검증(C01~C06)·합계 — 서버 supabase/functions/_shared/card-verify.ts 와 **글자 하나까지 같은 판정**.
+   · 기간(달력 한 달)·검증(C01~C09 — C07·C08 의 AI 쪽은 서버가 받아 둔 Gemini 결과를 표시만)·합계 — 서버 supabase/functions/_shared/card-verify.ts 와 **글자 하나까지 같은 판정**.
      한쪽을 고치면 다른 쪽도 고치고 `node ACTs-ATECmobility/web/test/card-parity.test.mjs` 를 돌린다.
    · 구분 추천(웹만): ① 같은 가맹점에 본인이 전에 쓴 구분 ② 음식 업종은 승인 시각
      (05–10 조식대 · 10–15 중식대 · 15–17 다과비 · 17–05 석식대) ③ 주유·충전 → 주유비 ④ 주차 → 주차비 ⑤ 통신 → 통신비
@@ -52,19 +52,56 @@
   /** 줄을 한 마디로: "07.03 가짜식당 19,800원" */
   function tagOf(e) { return str(e.appr_date).slice(5).replace('-', '.') + ' ' + merchantOf(e) + ' ' + n0(e.amount) + '원'; }
 
+  /** 결제 시각(ms) → KST 날짜 'YYYY-MM-DD'. 숫자가 아니면 ''. */
+  function kstDate(ms) {
+    if (ms == null || ms === '') return '';
+    var x = Number(ms);
+    if (!isFinite(x)) return '';
+    var d = new Date(Math.round(x) + 9 * 3600e3);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+  /** 그 달(KST 1일 00:00 ~ 다음 달 1일 00:00)의 ms 범위 — C09 개인경비 줄을 읽는 범위(서버·웹 같다). */
+  function expenseRangeMs(cycle) {
+    var rg = cycleRange(cycle);
+    return { lo: Date.parse(rg.lo + 'T00:00:00+09:00'), hi: Date.parse(rg.hi + 'T00:00:00+09:00') };
+  }
+  /** C08 규칙에서 「이것만 적으면 성의 없음」으로 보는 낱말(공백·기호를 뺀 꼴). */
+  var VAGUE_WORDS = ['업무', '식대', '기타', '없음', '회의', '구매', '경비', '비용', '식사', '업무용', '업무상', '업무관련', '기타비용', '해당없음', '상동', '동일', '테스트'];
   /**
-   * 검증. items = 그 사람·그 기간의 card_items 줄. opts = { cycle, submitterName }.
+   * C08 규칙 — n = 사용목적에서 한글 음절·영문·숫자만 남긴 것. 빈칸은 C02 몫이라 false.
+   * ① n 이 비었음(기호·자모뿐) ② n 이 2자 이하 ③ n 이 뻔한 낱말(VAGUE_WORDS) ④ n 이 구분과 같음(구분을 되풀이) → true.
+   * 그 밖(「팀 점심」처럼 짧아도 뜻이 있는 것)은 Gemini 에 맡긴다.
+   */
+  function purposeVague(v, category) {
+    var s = str(v).trim();
+    if (!s) return false;
+    var n = s.replace(/[^가-힣A-Za-z0-9]/g, '');
+    if (!n) return true;
+    if (Array.from(n).length <= 2) return true;
+    if (VAGUE_WORDS.indexOf(n) >= 0) return true;
+    var c = str(category).replace(/[^가-힣A-Za-z0-9]/g, '');
+    return c !== '' && n === c;
+  }
+  function aiKey(no, d) { return str(no).trim() + '|' + str(d).trim(); }
+  function clip(v, max) { var a = Array.from(str(v).trim()); return a.length > max ? a.slice(0, max).join('') + '…' : a.join(''); }
+  var PER_ROW_MAX = 30;
+
+  /**
+   * 검증. items = 그 사람·그 기간의 card_items 줄. opts = { cycle, submitterName, expenses?, ai? }.
    * C01 구분 빈칸(block) · C02 사용목적 빈칸(block) · C03 같은 승인번호 두 번 이상(bad) · C04 기간 밖 승인일(warn)
-   * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시) · C06 0원 줄(info).
+   * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시) · C06 0원 줄(info)
+   * C07 구분·내역 불일치(warn, Gemini — opts.ai.rows) · C08 사용목적 성의 없음(warn, 규칙 + Gemini) · C09 개인경비 이중 청구 의심(warn, opts.expenses).
    */
   function runVerify(items, opts) {
     opts = opts || {};
     var out = [];
-    var add = function (code, level, title, detail, ids) {
+    var add = function (code, level, title, detail, ids, ai) {
       var u = [];
       (ids || []).forEach(function (x) { x = Number(x); if (isFinite(x) && u.indexOf(x) < 0) u.push(x); });
       u = u.slice(0, 60);
-      out.push(u.length ? { code: code, level: level, title: title, detail: detail, ref: { items: u } } : { code: code, level: level, title: title, detail: detail });
+      var o = u.length ? { code: code, level: level, title: title, detail: detail, ref: { items: u } } : { code: code, level: level, title: title, detail: detail };
+      if (ai) o.ai = true;
+      out.push(o);
     };
     var idsOf = function (l) { return l.map(function (e) { return e.id; }); };
     var list = (items || []).slice().sort(function (a, b) {
@@ -101,7 +138,61 @@
     var zero = list.filter(function (e) { return Math.round(Number(e.amount) || 0) === 0; });
     if (zero.length) add('C06', 'info', '0원 줄 ' + zero.length + '건',
       '금액이 0원인 줄입니다(올릴 때 빼는 줄 — 남겨 둔 까닭을 비고에 적어 주세요): ' + some(zero.map(tagOf), 8), idsOf(zero));
-    var rank = { block: 0, bad: 1, warn: 2, info: 3 };
+    // ── C07 구분·내역 불일치(Gemini) — 구분이 적힌 줄만, 줄마다 하나(30건 넘으면 나머지는 한 항목) ──
+    var aiBy = {};
+    (opts.ai && Array.isArray(opts.ai.rows) ? opts.ai.rows : []).forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var k = aiKey(r.appr_no, r.appr_date);
+      if (!aiBy[k]) aiBy[k] = r;
+    });
+    var aiOf = function (e) { return aiBy[aiKey(e.appr_no, e.appr_date)] || null; };
+    var hm = function (e) { return str(e.appr_time).slice(0, 5); };
+    var c7 = list.filter(function (e) { var r = aiOf(e); return !blank(e.category) && !!r && r.mismatch === true; });
+    c7.slice(0, PER_ROW_MAX).forEach(function (e) {
+      var r = aiOf(e), cat = str(e.category).trim(), sug = str(r.suggest_category).trim(), biz = str(e.biz_type).trim();
+      add('C07', 'warn', '구분·내역이 맞지 않아 보임 — ' + tagOf(e),
+        '구분 「' + cat + '」' + (biz ? ' · 업종 ' + biz : '') + (hm(e) ? ' · 승인 ' + hm(e) : '') + ' — ' +
+        (clip(r.reason, 60) || '구분과 가맹점·시간이 맞지 않아 보입니다') + (sug && sug !== cat ? ' (추천 구분: ' + clip(sug, 20) + ')' : ''), [e.id], true);
+    });
+    if (c7.length > PER_ROW_MAX) {
+      var rest7 = c7.slice(PER_ROW_MAX);
+      add('C07', 'warn', '구분·내역이 맞지 않아 보이는 줄 그 밖 ' + rest7.length + '건', some(rest7.map(tagOf), 8), idsOf(rest7), true);
+    }
+    // ── C08 사용목적 성의 없음 — 규칙(4자 미만·기호뿐) + Gemini(모호함). 빈칸은 C02 ──
+    var c8 = list.filter(function (e) { var r = aiOf(e); return !blank(e.purpose) && (purposeVague(e.purpose, e.category) || (!!r && r.purpose_vague === true)); });
+    if (c8.length) {
+      add('C08', 'warn', '사용목적이 짧거나 모호한 줄 ' + c8.length + '건',
+        some(c8.map(function (e) {
+          var r = aiOf(e), why = r && r.purpose_vague === true ? clip(r.purpose_reason, 40) : '';
+          return tagOf(e) + ' 「' + clip(e.purpose, 20) + '」' + (why ? '(' + why + ')' : '');
+        }), 8) + ' — 무엇에 썼는지(어떤 일로·누구와) 알 수 있게 적어 주세요.', idsOf(c8), c8.some(function (e) { return !purposeVague(e.purpose, e.category); }));
+    }
+    // ── C09 개인경비 이중 청구 의심 — 같은 날(KST)·같은 금액의 개인경비 줄 ──
+    if (Array.isArray(opts.expenses)) {
+      var exBy = {};
+      opts.expenses.forEach(function (x) {
+        if (!x) return;
+        var a = Math.round(Number(x.amount) || 0), d = kstDate(x.date_millis);
+        if (!d || a <= 0) return;
+        (exBy[d + '|' + a] = exBy[d + '|' + a] || []).push(x);
+      });
+      var exOf = function (e) { return exBy[str(e.appr_date) + '|' + Math.round(Number(e.amount) || 0)] || []; };
+      var exTag = function (x) {
+        return kstDate(x.date_millis).slice(5).replace('-', '.') + ' ' + (str(x.category).trim() || '경비') +
+          (str(x.merchant).trim() ? ' ' + str(x.merchant).trim() : '') + ' ' + n0(x.amount) + '원';
+      };
+      var c9 = list.filter(function (e) { return Math.round(Number(e.amount) || 0) > 0 && exOf(e).length > 0; });
+      c9.slice(0, PER_ROW_MAX).forEach(function (e) {
+        add('C09', 'warn', '개인경비와 겹칠 수 있음 — ' + tagOf(e),
+          '같은 날 같은 금액의 개인경비가 있습니다: ' + some(exOf(e).map(exTag), 3) +
+          ' — 같은 결제를 법인카드와 개인경비로 두 번 청구하지 않았는지 확인해 주세요.', [e.id]);
+      });
+      if (c9.length > PER_ROW_MAX) {
+        var rest9 = c9.slice(PER_ROW_MAX);
+        add('C09', 'warn', '개인경비와 겹칠 수 있는 줄 그 밖 ' + rest9.length + '건', some(rest9.map(tagOf), 8), idsOf(rest9));
+      }
+    }
+    var rank ={ block: 0, bad: 1, warn: 2, info: 3 };
     out.sort(function (a, b) { return rank[a.level] - rank[b.level] || Number(a.code.slice(1)) - Number(b.code.slice(1)); });
     var cnt = function (l) { return out.filter(function (i) { return i.level === l; }).length; };
     return {
@@ -160,6 +251,7 @@
   return {
     isCycle: isCycle, lastDay: lastDay, cycleRange: cycleRange, span: span, cycleLabel: cycleLabel,
     blankRows: blankRows, runVerify: runVerify, totals: totals,
+    kstDate: kstDate, expenseRangeMs: expenseRangeMs, purposeVague: purposeVague,
     suggest: suggest, mealOf: mealOf, normMerchant: normMerchant
   };
 });

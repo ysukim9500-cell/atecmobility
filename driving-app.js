@@ -233,7 +233,7 @@
   var APPR = [], PEOPLE = {};               // 결재 건 · 사람 목록(이름·부서·직급)
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
-  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, onCycle: [], dirty: [], onGo: [],
+  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [],
     // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
     // 2026-10-09 법인카드 — 기간 규칙이 둘이 되어 목록으로(개인경비 20~19일 'x' · 법인카드 1일~말일 'c'). 규칙마다 mode.
     kinds: {}, periods: [], load: [], orgUsers: null };
@@ -3116,6 +3116,8 @@
     // 결재 문서 종류(개인경비 등)가 붙어 있으면 한 결재함에서 어느 문서인지 딱지로 가른다.
     var kd = kindDef(kindOf(a)), anyKind = Object.keys(EXT.kinds).length > 0;
     var kattr = kd ? ' data-kind="' + esc(kindOf(a)) + '"' : '';
+    // 검증 요약 · 결재 문서(고정본) — drv-verify.js(운행일지) · drv-expense.js(개인경비)가 채운다.
+    var ext = kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '');
     return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc((kindOf(a) || 'd') + ':' + a.id) + '">' +
       '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' ' + (kd.mode || 'x') : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
@@ -3127,9 +3129,7 @@
       (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
         : (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '')) +
       '</div>' +
-      apprTrack(a) +
-      // 검증 요약 · 결재 문서(고정본) — drv-verify.js(운행일지) · drv-expense.js(개인경비)가 채운다.
-      (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
+      apprTrack(a) + ext +
       (canAct || canWithdraw || canReopen(a)
         ? '<div class="aact">' +
           (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
@@ -3138,8 +3138,192 @@
             '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button>' : '') +
           '</div>'
         : '') +
+      // 결재 문서 미리보기 — 승인·반려 단추 아래(쪽이 길어도 단추가 밀려나지 않게). 「결재 문서 PDF」 단추가 있는 카드에만.
+      apvIfPdf(kindOf(a), a, ext) +
       '</div>';
   }
+  /** 모듈이 그린 줄에 그 종류의 「결재 문서 PDF」 단추가 있을 때만 미리보기 자리(고정본이 없는 옛 건 등은 빠진다). */
+  function apvIfPdf(kind, a, html) {
+    var at = APV_PDFATTR[kind || ''];
+    return at && String(html || '').indexOf(at + '="') >= 0 ? apvSlot(kind, a) : '';
+  }
+
+  /* ── 결재 문서 미리보기(2026-10-12 사용자: 「눌러서 확인하는 것 말고 미리보기로」 — 카드 아래 전체 펼침) ──
+     「결재 문서 PDF」 단추가 만드는 것과 같은 바이트(모듈 previewBytes → buildPdf, 같은 고정본·같은 생성기)를
+     pdf.js 로 쪽마다 그림(JPEG)으로 그려 카드 아래 세로로 늘어놓는다. 미리보기만의 다른 그리기 길은 없다.
+       · 화면에 들어올 때만(IntersectionObserver) · 한 번만 — 결재 건(종류·id·상태·상신·완료 시각) 별로 그림을 맡아 둔다.
+         화면을 다시 그려도(render) 맡아 둔 그림을 바로 다시 붙인다.
+       · 한 번에 하나씩 만든다(APV.MAX) — 결재함에 카드가 많아도 한꺼번에 PDF 를 만들지 않는다.
+       · 내 차례 카드는 펼쳐서, 나머지는 「문서 펼치기」로. 누른 것은 카드마다 sessionStorage 에 남긴다.
+       · 실패해도 카드는 그대로 — 짧은 안내만. 서버에서 더 받는 것은 단추가 받는 그 고정본뿐이다(RLS 그대로). */
+  var APV = { cache: {}, q: [], busy: 0, io: null, MAX: 1 };
+  var APV_FAIL = '미리보기를 만들지 못했습니다 — 「결재 문서 PDF」로 열어 보세요';
+  var APV_PDFATTR = { '': 'data-fzpdf', expense: 'data-xfzpdf', card: 'data-cfzpdf' };
+  function apvProv(kind) { return kind ? (EXT.kinds[kind] || {}).previewBytes : EXT.previewBytes; }
+  function apvKey(kind, a) { return (kind || 'd') + ':' + a.id + ':' + a.status + ':' + (a.submitted_at || '') + ':' + (a.closed_at || ''); }
+  function apvSaved(kind, id) { try { return sessionStorage.getItem('apv.' + (kind || 'd') + ':' + id); } catch (e) { return null; } }
+  /** 결재 카드·결재 띠에 끼우는 미리보기 자리(모듈의 extra/apprExtra 가 「결재 문서 PDF」 줄 아래에 붙인다). */
+  function apvSlot(kind, a) {
+    if (!a || a.status === 'draft' || !apvProv(kind) || (kind && !APV_PDFATTR[kind])) return '';
+    var sv = apvSaved(kind, a.id);
+    var open = sv === '1' || sv === '0' ? sv === '1' : inbox().indexOf(a) >= 0;
+    return '<div class="apv' + (open ? ' open' : '') + '" data-apv="' + esc(apvKey(kind, a)) + '" data-apvk="' + esc(kind || '') + '" data-apvid="' + esc(a.id) + '">' +
+      '<div class="apvbar"><button type="button" class="btn sm" data-apvtog aria-expanded="' + open + '">' + (open ? '문서 접기' : '문서 펼치기') + '</button>' +
+      '<span style="flex:1"></span><button type="button" class="btn sm" data-apvbig>크게 보기</button></div>' +
+      '<div class="apvpages" aria-label="결재 문서 미리보기"' + (open ? '' : ' hidden') + '></div></div>';
+  }
+  function apvPagesHtml(pages, big) {
+    return pages.map(function (p, i) {
+      var img = '<img src="' + p.url + '" width="' + p.w + '" height="' + p.h + '" alt="결재 문서 ' + (i + 1) + '쪽" loading="lazy" decoding="async">';
+      return big ? img : '<button type="button" class="apvpg" data-apvpg="' + i + '" title="크게 보기">' + img + '</button>';
+    }).join('');
+  }
+  /** 화면을 그린 뒤(afterPaint) — 펼친 자리에 맡아 둔 그림을 붙이고, 아직 없으면 화면에 들어올 때 만들게 건다. */
+  function apvMount() {
+    var els = document.querySelectorAll('.apv[data-apv]');
+    if (APV.io) APV.io.disconnect();          // 지난 화면의 (떨어져 나간) 자리는 잊는다
+    if (!els.length) return;
+    if (!APV.io && 'IntersectionObserver' in window) {
+      APV.io = new IntersectionObserver(function (ents) {
+        ents.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          APV.io.unobserve(en.target);
+          var el = en.target.closest('.apv');
+          if (el && el.isConnected) apvWant(el);
+        });
+      }, { rootMargin: '240px 0px' });
+    }
+    Array.prototype.forEach.call(els, apvPaint);
+  }
+  function apvPaint(el) {
+    if (!el.classList.contains('open')) return;
+    var key = el.dataset.apv, c = APV.cache[key], box = el.querySelector('.apvpages');
+    if (!box) return;
+    if (c && c.pages) {
+      if (box.dataset.k !== key) { box.innerHTML = apvPagesHtml(c.pages); box.dataset.k = key; }
+      return;
+    }
+    if (c && c.err) { box.innerHTML = '<div class="apverr" role="status">' + esc(APV_FAIL) + '</div>'; box.dataset.k = key; return; }
+    if (!box.firstChild) box.innerHTML = '<div class="apvwait" role="status"><div class="apvsk"></div><span>결재 문서를 그리는 중입니다…</span></div>';
+    if (c) return;                              // 만드는 중 — 끝나면 apvDone 이 붙인다
+    if (APV.io) APV.io.observe(box); else apvWant(el);
+  }
+  function apvPump() {
+    while (APV.busy < APV.MAX && APV.q.length) {
+      var t = APV.q.shift();
+      APV.busy++;
+      t().then(function () { APV.busy--; apvPump(); });
+    }
+  }
+  /** 그 결재 건 미리보기를 (아직이면) 만든다. front = 줄 맨 앞에(크게 보기). */
+  function apvWant(el, front) {
+    var key = el.dataset.apv, c = APV.cache[key];
+    if (c) {
+      if (front && c.task) { var qi = APV.q.indexOf(c.task); if (qi > 0) { APV.q.splice(qi, 1); APV.q.unshift(c.task); } }
+      return c.p;
+    }
+    var kind = el.dataset.apvk, id = el.dataset.apvid;
+    // 카드 폭에 맞춰 그린다(화소 비율 반영, 2배까지). 화면 폭이 바뀌어도 그림은 폭에 맞춰 줄고 는다.
+    var cssW = Math.min(1000, Math.max(280, el.clientWidth || 600));
+    var job = APV.cache[key] = {};
+    job.p = new Promise(function (ok) {
+      job.task = function () {
+        var prov = apvProv(kind);
+        return Promise.resolve().then(function () {
+          if (!prov) throw new Error('noprov');
+          return prov(id);
+        }).then(function (bytes) {
+          job.bytes = bytes;
+          return apvRender(bytes, cssW);
+        }).then(function (pages) { job.pages = pages; }, function (e) { job.err = (e && e.message) || 'fail'; })
+          .then(function () { job.task = null; ok(job); apvDone(key); });
+      };
+      if (front) APV.q.unshift(job.task); else APV.q.push(job.task);
+      apvPump();
+    });
+    return job.p;
+  }
+  /** PDF 바이트 → 쪽마다 JPEG(object URL). 영수증 PDF 읽기와 같은 pdf.js(같은 출처 워커·eval 끔). */
+  function apvRender(bytes, cssW) {
+    var dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1)), px = Math.round(cssW * dpr);
+    return loadPdfJs().then(function (pdfjs) {
+      // pdf.js 가 받은 버퍼를 워커로 넘기며 비운다 — 사본을 준다.
+      return pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false }).promise;
+    }).then(function (doc) {
+      var out = [], chain = Promise.resolve();
+      for (var i = 1; i <= doc.numPages; i++) {
+        (function (n) {
+          chain = chain.then(function () { return doc.getPage(n); }).then(function (page) {
+            var v1 = page.getViewport({ scale: 1 });
+            var vp = page.getViewport({ scale: px / v1.width });          // 가로 문서(법인카드)도 폭에 맞춘다
+            var cv = document.createElement('canvas');
+            cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+            var cx = cv.getContext('2d');
+            cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+            return page.render({ canvasContext: cx, viewport: vp }).promise
+              .then(function () { page.cleanup(); return canvasToJpeg(cv); })
+              .then(function (b) {
+                if (!b) throw new Error('blob');
+                out.push({ url: URL.createObjectURL(b), w: cv.width, h: cv.height });
+                cv.width = cv.height = 0;
+              });
+          });
+        })(i);
+      }
+      return chain.then(function () { doc.destroy(); return out; }, function (e) {
+        doc.destroy();
+        out.forEach(function (p) { URL.revokeObjectURL(p.url); });
+        throw e;
+      });
+    });
+  }
+  /** 다 만들었으면 지금 화면에 있는 그 건의 자리(다시 그렸으면 새 자리)와 「크게 보기」 창에 붙인다. */
+  function apvDone(key) {
+    Array.prototype.forEach.call(document.querySelectorAll('.apv[data-apv]'), function (el) {
+      if (el.dataset.apv !== key) return;
+      var box = el.querySelector('.apvpages');
+      if (box) { box.innerHTML = ''; box.dataset.k = ''; }
+      apvPaint(el);
+    });
+    apvBigFill(key);
+  }
+  /** 「크게 보기」 — 옆 창에 쪽을 크게. 아래 「결재 문서 PDF」는 단추와 같은 창(내려받기·열기·인쇄)을 연다. */
+  function apvBig(el, n) {
+    var key = el.dataset.apv, kind = el.dataset.apvk, id = el.dataset.apvid;
+    var card = el.closest('.acard');
+    var who = card && card.querySelector('.ahd b'), cyc = card && card.querySelector('.ahd .acyc');
+    openPanel('결재 문서 미리보기', [who && who.textContent, cyc && cyc.textContent].filter(Boolean).join(' · '),
+      '<div id="apvBig" data-k="' + esc(key) + '" data-n="' + (n || 0) + '"><div class="pdfwait"><div class="spin"></div>' +
+      '<div role="status">결재 문서를 그리는 중입니다…</div></div></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
+      '<button class="btn pri" ' + APV_PDFATTR[kind || ''] + '="' + esc(id) + '">' + ic('dl', 14) + '결재 문서 PDF</button>', true);
+    apvWant(el, true);
+    apvBigFill(key);
+  }
+  function apvBigFill(key) {
+    var b = $('apvBig'), c = APV.cache[key];
+    if (!b || b.dataset.k !== key || !c || (!c.pages && !c.err) || !$('panel').classList.contains('open')) return;
+    if (c.err) { b.innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(APV_FAIL) + '</span></div>'; return; }
+    b.innerHTML = '<div class="apvbig">' + apvPagesHtml(c.pages, true) + '</div>';
+    var im = b.querySelectorAll('img')[+b.dataset.n || 0];
+    if (im && +b.dataset.n) { im.loading = 'eager'; try { im.scrollIntoView({ block: 'start' }); } catch (e) { } }
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-apvtog],[data-apvbig],[data-apvpg]');
+    var el = t && t.closest('.apv');
+    if (!el) return;
+    if (t.hasAttribute('data-apvtog')) {
+      var open = !el.classList.contains('open'), box = el.querySelector('.apvpages');
+      el.classList.toggle('open', open);
+      t.setAttribute('aria-expanded', String(open));
+      t.textContent = open ? '문서 접기' : '문서 펼치기';
+      if (box) box.hidden = !open;
+      try { sessionStorage.setItem('apv.' + (el.dataset.apvk || 'd') + ':' + el.dataset.apvid, open ? '1' : '0'); } catch (er) { }
+      if (open) apvPaint(el);
+      return;
+    }
+    apvBig(el, t.hasAttribute('data-apvpg') ? +t.dataset.apvpg : 0);
+  });
 
   /* ══════════════════ 공통 조각 ══════════════════ */
   function head(title, sub) {
@@ -3231,6 +3415,7 @@
       if (!w.dataset.moreOn) { w.dataset.moreOn = '1'; w.addEventListener('scroll', more, { passive: true }); }
       more();
     });
+    apvMount();
   }
   /** 하이패스 대조 — 고른 건수·합계와 확정 버튼만 제자리에서 고쳐 쓴다. */
   function paintHpCount() {
@@ -3661,7 +3846,7 @@
       '<span style="flex:1"></span>' + btn + '</div>' +
       (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' +
         '결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 지난번 결재선을 불러올 수도 있습니다.</div>') +
-      (locked && EXT.apprExtra ? EXT.apprExtra(a) : '') +
+      (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x); })(EXT.apprExtra(a)) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
         withdrawHow(a) + '</div>' : '') +
       '</div></section>';
@@ -5358,9 +5543,9 @@
       n0(Math.abs(Math.round(sum) - Math.round(Number(expect)))) + '원 다릅니다. 관리자에게 알려 주세요.';
   }
 
-  function saveBlob(bytes, filename) {
+  function saveBlob(bytes, filename, type) {
     var blob = new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      type: type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -7797,14 +7982,15 @@
       apprTrack: apprTrack, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
       addCycle: addCycle, cmpCycle: cmpCycle, currentCycle: currentCycle, kd: kd,
-      usesDriving: usesDriving, noDriving: noDriving
+      usesDriving: usesDriving, noDriving: noDriving,
+      apvSlot: apvSlot
     };
     (window.DrvExtQ || []).forEach(function (make) {
       var x;
       try { x = make(C) || {}; } catch (e) { console.error('확장 모듈을 붙이지 못했습니다:', e); return; }
       Object.keys(x.views || {}).forEach(function (k) { VIEWS[k] = x.views[k]; });
       (x.admin || []).forEach(function (k) { if (ADMIN_VIEWS.indexOf(k) < 0) ADMIN_VIEWS.push(k); });
-      ['apprExtra', 'wantSummaries', 'beforeSubmit', 'sumText'].forEach(function (k) { if (x[k]) EXT[k] = x[k]; });
+      ['apprExtra', 'wantSummaries', 'beforeSubmit', 'sumText', 'previewBytes'].forEach(function (k) { if (x[k]) EXT[k] = x[k]; });
       if (x.onCycle) EXT.onCycle.push(x.onCycle);
       if (x.dirty) EXT.dirty.push(x.dirty);
       if (x.onGo) EXT.onGo.push(x.onGo);

@@ -327,7 +327,9 @@
           row.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, row.ai) +
         '</div>' : '') +
       (locked ? '<div class="vact">' + gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-        busy ? (RUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') + '<button class="btn" data-pdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' : steps) + '</div>';
+        busy ? (RUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') + '<button class="btn" data-pdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' +
+        // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만(없으면 단추가 지금 자료로 만든다).
+        (FZSUM[fzKey(a)] !== null && C.apvSlot ? C.apvSlot('', a) : '') : steps) + '</div>';
 
     if (locked) {
       h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' +
@@ -715,22 +717,18 @@
    *   o = { doc(기록부 재료), verify, meta{name,cycleName,docNo,mark}, title, sub, file, note(안내문 HTML),
    *         expect(상신 때 집계한 총액 — 문서 총계와 다르면 알린다) }
    */
-  function makePdf(o) {
+  function pdfImgs(o) {
     var scanPaths = {};
     (o.doc.scans || []).forEach(function (s) { scanPaths[s.path] = 1; });
-    // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
-    var nImg = o.nImg != null ? o.nImg : Object.keys(scanPaths).length + (o.doc.photos || []).length;
-    C.openPanel(o.title, o.sub,
-      '<div class="pdfwait"><div class="spin"></div><div id="pdfNote" role="status">PDF 를 만드는 중입니다…</div>' +
-      '<div class="dim" style="margin-top:6px">' + (nImg ? '사진 ' + n0(nImg) + '장을 넣습니다. ' : '') +
-      '처음 한 번은 글꼴을 받느라 조금 걸립니다.</div></div>',
-      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
-    // ★ 만드는 데 몇 초~수십 초 걸린다. 그 사이 창을 닫고 다른 창(운행 추가 등)을 열었으면
-    //   결과로 그 창을 덮어쓰면 안 된다 — 이 작업이 띄운 '만드는 중' 줄이 아직 있을 때만 쓴다.
-    var job = PDF_JOB = {};
-    var mine = function () { return PDF_JOB === job && !!$('pdfNote') && $('panel').classList.contains('open'); };
-    var note = function (t) { var el = $('pdfNote'); if (el && PDF_JOB === job) el.textContent = t; };
-    var loaded = 0;
+    return { scanPaths: scanPaths, nImg: o.nImg != null ? o.nImg : Object.keys(scanPaths).length + (o.doc.photos || []).length };
+  }
+  /**
+   * PDF 바이트만 만든다(창을 건드리지 않는다). makePdf(「결재 문서 PDF」)와 결재 카드 미리보기(2026-10-12)가
+   * 같은 길로 만든다 — 미리보기가 단추로 받는 문서와 달라질 수 없게. note(t) 는 진행 글(없어도 된다).
+   */
+  function buildPdf(o, note) {
+    var im = pdfImgs(o), scanPaths = im.scanPaths, nImg = im.nImg, loaded = 0;
+    note = note || function () { };
     // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
     return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
       note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
@@ -751,7 +749,22 @@
           });
         }
       });
-    }).then(function (res) {
+    });
+  }
+  function makePdf(o) {
+    // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
+    var nImg = pdfImgs(o).nImg;
+    C.openPanel(o.title, o.sub,
+      '<div class="pdfwait"><div class="spin"></div><div id="pdfNote" role="status">PDF 를 만드는 중입니다…</div>' +
+      '<div class="dim" style="margin-top:6px">' + (nImg ? '사진 ' + n0(nImg) + '장을 넣습니다. ' : '') +
+      '처음 한 번은 글꼴을 받느라 조금 걸립니다.</div></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
+    // ★ 만드는 데 몇 초~수십 초 걸린다. 그 사이 창을 닫고 다른 창(운행 추가 등)을 열었으면
+    //   결과로 그 창을 덮어쓰면 안 된다 — 이 작업이 띄운 '만드는 중' 줄이 아직 있을 때만 쓴다.
+    var job = PDF_JOB = {};
+    var mine = function () { return PDF_JOB === job && !!$('pdfNote') && $('panel').classList.contains('open'); };
+    var note = function (t) { var el = $('pdfNote'); if (el && PDF_JOB === job) el.textContent = t; };
+    return buildPdf(o, note).then(function (res) {
       if (!mine()) return res;
       var blob = new Blob([res.bytes], { type: 'application/pdf' });
       PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); });
@@ -864,6 +877,20 @@
     if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
     fetchFrozen(a).then(function (fz) {
       if (!fz) { if (liveOk(a)) { C.bizOnly(); pdfLive(a.username); } else C.toast(NO_FZ, true); return; }
+      makePdf(frozenOpts(a, fz)).catch(function () { });
+    }).catch(frozenFail);
+  }
+  /** 결재 카드 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 재료·같은 생성기로 바이트만. 고정본이 없으면 실패. */
+  function previewBytes(id) {
+    var a = apprById(id);
+    if (!a) return Promise.reject(new Error('noappr'));
+    return fetchFrozen(a).then(function (fz) {
+      if (!fz) throw new Error('nofrozen');
+      return buildPdf(frozenOpts(a, fz)).then(function (res) { return res.bytes; });
+    });
+  }
+  /** 고정본 → makePdf 재료(창 제목·파일 이름 포함). */
+  function frozenOpts(a, fz) {
       var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
       var done = a.status === 'approved';
       var mark = done ? '' : a.status === 'submitted' ? 'pending' : a.status === 'rejected' ? 'rejected' : 'withdrawn';
@@ -871,7 +898,7 @@
       var vv = fz.verify || null;
       var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
       var snap = a.snapshot || {};
-      makePdf({
+      return {
         doc: doc,
         verify: vv ? { ranAt: whenText(vv.ran_at), ai: !!vv.ai, summary: vv.summary, items: vv.items || [] } : null,
         title: done ? '결재 완료본' : mark === 'pending' ? '결재 문서' : '상신했던 문서', sub: name + ' · ' + cname,
@@ -881,8 +908,7 @@
         expect: snap.version >= 2 ? snap.cost : null,
         meta: { name: name, cycleName: cname, mark: mark,
           docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (done && a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') }
-      }).catch(function () { });
-    }).catch(frozenFail);
+      };
   }
 
   function xlsxFrozen(id) {
@@ -1223,7 +1249,7 @@
   });
   // 개인경비(drv-expense.js)가 같은 모양·같은 순서를 쓰도록 내어 준다 — 결과 창·Gemini 단추·검증 딱지·사진 받기.
   C.vx = {
-    makePdf: makePdf, ensureLibs: ensureLibs, loadPhoto: loadPhoto, pool: pool, safeName: safeName,
+    makePdf: makePdf, buildPdf: buildPdf, ensureLibs: ensureLibs, loadPhoto: loadPhoto, pool: pool, safeName: safeName,
     gemBtn: gemBtn, gemBadge: gemBadge, sumChip: sumChip, sumText: sumText, whenText: whenText, showItems: showItems,
     pdfUrls: function () { return PDF_URLS; }, setPdfUrls: function (a) { PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); }); PDF_URLS = a || []; }
   };
@@ -1232,7 +1258,7 @@
     onGo: function (v) { if (v === 'verify') FRESH = {}; },
     admin: ['a_verify', 'a_final'],
     apprExtra: apprExtra, wantSummaries: wantSummaries, beforeSubmit: beforeSubmit,
-    sumText: sumText, pdfFrozen: pdfFrozen, xlsxFrozen: xlsxFrozen,
+    sumText: sumText, pdfFrozen: pdfFrozen, xlsxFrozen: xlsxFrozen, previewBytes: previewBytes,
     // ★ 주기가 바뀌어도 돌고 있는 검증은 그대로 둔다. 여기서 '안 도는 중'으로 풀면 같은 검증이 겹쳐 돈다.
     onCycle: function () { }
   };
