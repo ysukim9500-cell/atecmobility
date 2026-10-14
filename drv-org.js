@@ -152,10 +152,12 @@
         var d = parts(k).length;
         // 이 부서 직원의 결재선을 다 못 채우면(장이 없음·둘 이상·계정 없음) 주황 점 — 부서 모두에 지정했으면 그 결재선으로 본다
         // 사람마다 다르게 지정했어도 맞게 — 계정 있는 직원이 있으면 그 사람들 결재선으로, 없으면 부서 결재선으로 본다(검증로봇)
-        var mem = members(k), warn = mem.length ? mem.some(function (o) { return need(lineOf(o)) > 0; }) : need(nodeLine(k)) > 0;
+        // 다만 직원이 모두 장이라 자기 결재선은 다 차도(예: 사업부장 둘), 지정 없는 직원이 있으면 그 부서 보통 직원 결재선도 본다
+        var mem = members(k), anyAuto = !mem.length || mem.some(function (o) { return !C.lineOverride(o.username); }),
+          warn = mem.some(function (o) { return need(lineOf(o)) > 0; }) || (anyAuto && need(nodeLine(k)) > 0);
         return '<button class="onode d' + d + (SEL === k ? ' on' : '') + '" data-onode="' + esc(k) + '"' + (warn ? ' data-owarn="1"' : '') + '>' +
           '<span class="nm">' + esc(nodeName(k)) + '</span>' +
-          (nn.length ? '<span class="dot warn" title="' + esc(nn.map(function (n) { return n.box + ': ' + n.why; }).join(' / ')) + '"></span>' : '') +
+          (warn ? '<span class="dot warn" title="결재선을 다 못 채우는 직원이 있습니다"></span>' : '') +
           '<span class="c">' + n0(tree[k]) + '</span></button>';
       }).join('');
 
