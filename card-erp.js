@@ -151,11 +151,11 @@
       var g = function (k) { return cols[k] == null ? '' : R0[cols[k]]; };
       var gt = function (k) { return cols[k] == null ? '' : text(T0[cols[k]]); };
       var card = gt('card'), date = ymd(g('date'));
-      if (cols.s != null) {
-        var f = norm(gt('s')).toUpperCase();
-        if (f === 'N') { sums.push(r); continue; }
-        if (f !== 'Y') continue;
-      } else if (!CARD_RE.test(card) || !date) { sums.push(r); continue; }
+      // ★ S 칸 값으로 승인 줄·합계 줄을 가르지 않는다(2026-10-14 실파일). 예전 표본은 승인 줄 Y · 합계 줄 N 이었는데,
+      //   실제 10월 ERP 파일은 승인 줄이 N 이고 합계 줄은 S 가 비어 있다 — S 로 가르면 승인 0줄·합계 없음이 된다.
+      //   카드번호 모양 + 승인일이 있으면 승인 줄(S 가 Y 인 줄도 승인 줄), 나머지는 합계 줄 후보.
+      var sFlag = cols.s != null ? norm(gt('s')).toUpperCase() : '';
+      if (!date || !(CARD_RE.test(card) || sFlag === 'Y')) { sums.push(r); continue; }
       var amt = num(g('amount')), no = gt('no');
       var rec = {
         row: r + 1, card_no: card.slice(0, 25), appr_date: date, appr_time: hms(g('time')), appr_no: no,
