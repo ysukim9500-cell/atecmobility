@@ -946,7 +946,8 @@
   function xDoc(u, cyc, rows, a, fz, verify, mark, docNo) {
     var p = personOf(u, fz);
     // 결재란 — 세 문서 공통(C.docBoxes · C.boxLabels): 칸 이름은 그 건의 칸 모양(예전 건 v1 · 새 건 v2, 2026-10-14)
-    var boxes = C.docBoxes(a, p.name);
+    //   담당 칸 — 상신 전(·반려·회수 뒤) 본인 문서면 지금 내 서명(운행일지 boxesOf 와 같게, 2026-10-14)
+    var boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null);
     var its = docItems(rows);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 개인경비', mark: mark, docNo: docNo },
@@ -1259,7 +1260,9 @@
       if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다.', true); return; }
       var d = frozenDoc(a, fz);
       var sum = d.items.reduce(function (s, it) { return s + it.amount; }, 0), exp = (a.snapshot || {}).cost;
-      C.saveBlob(xlsxBytes(d), '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + a.cycle + (a.status === 'approved' ? '_결재완료' : '_결재중') + '.xlsx');
+      // 파일 이름 꼬리 — PDF·법인카드와 같은 짝(반려·회수된 건이 「_결재중」으로 나가지 않게, 2026-10-14)
+      C.saveBlob(xlsxBytes(d), '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + a.cycle +
+        ({ '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' }[d.meta.mark]) + '.xlsx');
       if (a.status === 'approved' && C.prints) C.prints.log('expense', a.id, 'xlsx');     // 출력 기록(기다리지 않는다)
       if (exp != null && Math.round(sum) !== Math.round(Number(exp))) C.toast('엑셀 합계 ' + n0(sum) + '원이 상신 때 금액 ' + n0(exp) + '원과 다릅니다. 관리자에게 알려 주세요.', true);
       else C.toast('엑셀을 내려받습니다.');
@@ -1561,17 +1564,17 @@
     var total = done.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0);
     var ok = {}; done.forEach(function (a) { ok[a.id] = 1; });
     Object.keys(FINSEL).forEach(function (k) { if (!ok[k]) delete FINSEL[k]; });
-    var nSel = Object.keys(FINSEL).length;
+    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로). 고른 수·전체 선택·묶어 받기도 보이는 줄만.
+    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('expense', a); }) : done;
+    var nSel = shown.filter(function (a) { return FINSEL[a.id]; }).length;
     var h = head('개인경비 결재 완료 출력', '결재가 끝난 지출결의를 모아 출력합니다');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(xSpanKey(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 경비가 있는데 상신 전', notYet.length > 0) + '</div></div>';
-    var tools = done.length ? '<label class="finall"><input type="checkbox" id="xFinAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
+    var tools = done.length ? '<label class="finall"><input type="checkbox" id="xFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
       '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-xfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-xfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('expense') : '') : '';
-    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계·고르기는 그대로)
-    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('expense', a); }) : done;
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
       : done.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
@@ -1627,7 +1630,7 @@
   /** 고른 결재 완료 건들을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 이어 붙인다(한 번에 20명까지). */
   function finBundle() {
     var S = C.state();
-    var list = Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved'; })
+    var list = Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); })   // 보이는 줄만(2026-10-14)
       .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     if (!list.length || FINJOB) return;
     if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true); return; }
@@ -1777,10 +1780,12 @@
     }
     if (t.matches && t.matches('[data-xfinsel]')) { if (t.checked) FINSEL[t.dataset.xfinsel] = 1; else delete FINSEL[t.dataset.xfinsel]; C.render(); return; }
     if (t.id === 'xFinAll') {
-      cycAppr().forEach(function (a) { if (a.status === 'approved' && C.orgMatch(a.username)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
+      // 보이는 줄만(2026-10-14 — 「출력 안 한 것만」이 켜져 있으면 출력 안 한 문서만 고른다)
+      cycAppr().forEach(function (a) { if (a.status === 'approved' && C.orgMatch(a.username) && finVisible(a)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
       C.render();
     }
   });
+  function finVisible(a) { return !C.prints || C.prints.keep('expense', a); }
   // 칸을 고칠 때 식비 초과 표시를 바로 바꾸려고 줄을 다시 그리지는 않는다(커서가 튄다) — 올리기 전 검사에서 다시 본다.
 
   var S0 = {

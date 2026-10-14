@@ -5772,8 +5772,9 @@
         '<div class="hpnote" style="margin-top:0">' + ic('check', 16) + '<span><b>' +
         (done ? '결재가 끝났습니다.' : '결재 중입니다.') + '</b> 상신할 때 저장한 자료로 문서를 만듭니다. ' +
         '언제 받아도 같은 내용이 나옵니다.</span></div>' + apprTrack(ap) +
-        '<div class="anote"><b>PDF</b> — 운행기록부(결재란 포함) · 검증 결과 · 영수증 사진이 한 권으로 나옵니다' +
-        (done ? '.' : '. 결재가 끝나기 전에는 쪽마다 「결재 중」이 찍힙니다.') + '<br>' +
+        // 결재 완료본에는 검증 결과 쪽이 없다(2026-10-14) — 안내 글도 그대로 말한다.
+        '<div class="anote"><b>PDF</b> — ' + (done ? '운행기록부(결재란 포함) · 영수증 사진이 한 권으로 나옵니다.'
+          : '운행기록부(결재란 포함) · 검증 결과 · 영수증 사진이 한 권으로 나옵니다. 결재가 끝나기 전에는 쪽마다 「결재 중」이 찍힙니다.') + '<br>' +
         '<b>엑셀</b> — 앱에서 받는 것과 같은 양식입니다(차량별로 한 장씩). 업무(일반업무) 운행만 담깁니다.</div>',
         '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<button class="btn" data-fzxlsx="' + ap.id + '">' + ic('dl', 14) + (done ? '결재 완료본 엑셀' : '결재 문서 엑셀') + '</button>' +
@@ -7842,8 +7843,12 @@
   /** 운행기록부 결재란 — 세 문서 공통 docBoxes 를 그대로 쓴다(2026-10-14 「세 결재 시스템 동일」).
    *  담당 칸: 상신된 건이면 상신 때 서명, 상신 전 미리보기(·반려·회수 뒤)면 지금 내 서명. */
   function boxesOf(a, u, mine) {
-    var mySign = mine === myName() && MYSIGN && MYSIGN.image ? MYSIGN.id : null;
-    return docBoxes(a, u.name || mine, mySign);
+    return docBoxes(a, u.name || mine, liveSign(mine));
+  }
+  /** 상신 전(·반려·회수 뒤) 문서의 담당 칸에 찍을 지금 내 서명 id — 본인 문서이고 올린 서명이 있을 때만.
+   *  개인경비·법인카드도 같은 것을 쓴다(C.liveSign, 2026-10-14 — 세 문서 담당 칸이 같게). */
+  function liveSign(who) {
+    return who === myName() && MYSIGN && MYSIGN.image ? MYSIGN.id : null;
   }
   /**
    * 정산 영수증(주차·통행료, 0원 초과)을 어느 장에 실을지 **한 번에** 정한다. 돌려주는 값: 장 순서대로 [{ 증빙 id: 1 }].
@@ -8037,11 +8042,16 @@
     // 운행이 없어도 영수증(주차·통행료)만 있으면 근거자료 행만 든 한 장을 만든다 — PDF 와 같은 내용이어야 한다.
     var g = platesOf(all, hasSettleEvid(mine, r) ? (u.plate_no || '') : null);
     var pick = evidBySheet(mine, g.plates, r);
-    var labels = boxLabels(a === undefined ? apprOf(mine, CYCKEY()) : a);
+    var ap = a === undefined ? apprOf(mine, CYCKEY()) : a;
+    var labels = boxLabels(ap);
+    // 결재란 칸 값(2026-10-14 — 법인카드·개인경비 엑셀과 같게): 결재 건이 있으면 PDF 와 같은 boxesOf(docBoxes)로
+    //   승인한 칸 이름·날짜, 결재선에 없는 칸 빗금. 결재 건이 없는 상신 전 엑셀은 앱 엑셀 그대로 빈칸.
+    var boxes = ap ? boxesOf(ap, u, mine) : null;
     return g.plates.map(function (plate, i) {
       var safe = String(plate).replace(/[^0-9A-Za-z가-힣]/g, '') || '차량';
       var data = sheetDataFor(mine, u, plate, g.by[plate], r, pick[i]);
       data.boxLabels = labels;
+      if (boxes) data.boxes = boxes;
       return {
         name: 'ATEC Driving 운행일지_' + safe + '_' + ymd(r.lo) + '_' + ymd(r.hi - 1) + '.xlsx',
         bytes: window.Xlsx.build(data),
@@ -8111,7 +8121,7 @@
       pdfDocFor: pdfDocFor, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
-      BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes,
+      BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes, liveSign: liveSign,
       autoLine: autoLine, lineAt: lineAt, apprHint: APPR_HINT, canApprove: canApprove,
       state: function () {
         return {

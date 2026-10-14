@@ -20,7 +20,8 @@
   // cellXfs 스타일 인덱스 — styles.xml 의 <cellXfs> 순서와 같아야 한다.
   var S_TITLE = 1, S_SUB = 2, S_LABEL = 3, S_VALUE = 4, S_HEAD = 5,
       S_DATA = 6, S_NUM = 7, S_TLABEL = 8, S_TNUM = 9,
-      S_FUELV = 11, S_FUELL = 10, S_FUELN = 12;
+      S_FUELV = 11, S_FUELL = 10, S_FUELN = 12,
+      S_SLASH = 13;                    // 결재란 — 결재선에 없는 칸 빗금 「/」(웹 결재 문서만, 2026-10-14)
 
   /* ── 고정 부품 (ExcelExporter.kt 447~462행과 글자 그대로 같다) ───────────── */
   var CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -36,9 +37,9 @@
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
 
   var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="3"><font><sz val="9"/><name val="맑은 고딕"/></font><font><b/><sz val="9"/><name val="맑은 고딕"/></font><font><b/><sz val="15"/><name val="맑은 고딕"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6E8EA"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="13"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="3"><font><sz val="9"/><name val="맑은 고딕"/></font><font><b/><sz val="9"/><name val="맑은 고딕"/></font><font><b/><sz val="15"/><name val="맑은 고딕"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6E8EA"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border><border diagonalUp="1"><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal style="thin"><color indexed="64"/></diagonal></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="14"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="2" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 
-  var COLS = '<cols><col min="1" max="1" width="11"/><col min="2" max="3" width="15"/><col min="4" max="4" width="11"/><col min="5" max="5" width="9"/><col min="6" max="6" width="7"/><col min="7" max="8" width="9"/><col min="9" max="9" width="10"/><col min="10" max="10" width="9"/><col min="11" max="12" width="8"/><col min="13" max="13" width="9"/></cols>';
+  var COLS = '<cols><col min="1" max="1" width="11"/><col min="2" max="3" width="15"/><col min="4" max="4" width="11"/><col min="5" max="5" width="9"/><col min="6" max="6" width="7"/><col min="7" max="8" width="9"/><col min="9" max="9" width="10"/><col min="10" max="10" width="11"/><col min="11" max="12" width="8"/><col min="13" max="13" width="9"/></cols>';
 
   /* ── 도우미 (ExcelExporter.kt 132~168행) ─────────────────────────────────── */
   function colName(i) {
@@ -81,6 +82,9 @@
    * @param o.orphans     [{date,parking,toll}] 운행 없이 영수증만 있는 날
    * @param o.parts       [{region,rate,km,amount}] 지역별 분해(2종 이상일 때만)
    * @param o.boxLabels   결재란 칸 이름 5개(없으면 새 칸 v2 — driving-app.js boxLabels)
+   * @param o.boxes       결재란 칸 값 { 칸 이름: { name, date } } (driving-app.js docBoxes — 법인카드·개인경비 엑셀과 같은 재료).
+   *                      없으면(결재 건이 없는 상신 전 엑셀) 앱 엑셀처럼 빈칸. 있으면 칸마다 이름·날짜(MM.DD),
+   *                      칸이 없으면 빗금, 이름이 비면(아직 결재 전·반려한 칸) 빈칸 — card-sheet.js 와 같은 규칙(2026-10-14).
    */
   function buildSheetXml(o) {
     var merges = [], rows = '';
@@ -114,7 +118,13 @@
       cell(0, 5, S_LABEL, '성 명') + cell(1, 5, S_LABEL) + cell(2, 5, S_VALUE, o.name);
     for (c = 3; c <= 6; c++) rows += cell(c, 5, S_VALUE);
     rows += cell(7, 5, S_LABEL);
-    for (c = 8; c <= 12; c++) rows += cell(c, 5, S_VALUE);
+    // 서명 자리(I5:M7 칸마다 세 줄 합침) — o.boxes 가 있으면 이름·날짜 / 빗금, 없으면 빈칸(앱 엑셀 그대로)
+    var BV = o.boxes || null;
+    var boxStyle = function (i) { return BV && !BV[BX[i]] ? S_SLASH : S_VALUE; };
+    for (c = 8; c <= 12; c++) {
+      var bv = BV && BV[BX[c - 8]];
+      rows += cell(c, 5, boxStyle(c - 8), bv && bv.name ? bv.name + (bv.date ? '\n' + bv.date : '') : null);
+    }
     rows += '</row>';
     merges.push('A5:B5', 'C5:G5', 'I5:I7', 'J5:J7', 'K5:K7', 'L5:L7', 'M5:M7');
 
@@ -122,14 +132,14 @@
       cell(0, 6, S_LABEL, '차량번호') + cell(1, 6, S_LABEL) + cell(2, 6, S_VALUE, o.plateNo);
     for (c = 3; c <= 6; c++) rows += cell(c, 6, S_VALUE);
     rows += cell(7, 6, S_LABEL);
-    for (c = 8; c <= 12; c++) rows += cell(c, 6, S_VALUE);
+    for (c = 8; c <= 12; c++) rows += cell(c, 6, boxStyle(c - 8));
     rows += '</row>'; merges.push('A6:B6', 'C6:G6');
 
     rows += '<row r="7" ht="18" customHeight="1">' +
       cell(0, 7, S_LABEL, '차 종') + cell(1, 7, S_LABEL) + cell(2, 7, S_VALUE, o.vehicleType);
     for (c = 3; c <= 6; c++) rows += cell(c, 7, S_VALUE);
     rows += cell(7, 7, S_LABEL);
-    for (c = 8; c <= 12; c++) rows += cell(c, 7, S_VALUE);
+    for (c = 8; c <= 12; c++) rows += cell(c, 7, boxStyle(c - 8));
     rows += '</row>'; merges.push('A7:B7', 'C7:G7');
 
     rows += '<row r="8" ht="6" customHeight="1"></row>';

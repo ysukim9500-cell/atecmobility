@@ -853,7 +853,8 @@
       var v = row ? { ranAt: whenText(row.created_at), ai: !!row.ai, summary: row.summary, items: (row.result || {}).items || [] } : null;
       var now = whenText(new Date().toISOString());
       makePdf({
-        doc: doc, verify: v,
+        // 결재 완료본에는 검증 결과 쪽을 붙이지 않는다 — 고정본이 없는 옛 건도 frozenOpts 와 같게(2026-10-14)
+        doc: doc, verify: done ? null : v,
         title: done ? '결재 완료본' : old ? '결재 문서' : 'PDF 미리보기',
         sub: C.nameOf(u) + ' · ' + C.cycleName(S.CYC.y, S.CYC.m),
         file: '운행기록부_' + safeName(C.nameOf(u)) + '_' + cyc + (done ? '_결재완료' : old ? '_결재중' : '_미리보기') + '.pdf',
@@ -920,7 +921,8 @@
   function xlsxFrozen(id) {
     var a = apprById(id);
     if (!a) return;
-    var tag = '_결재' + (a.status === 'approved' ? '완료' : '중');
+    // 파일 이름 꼬리 — PDF(frozenOpts)·법인카드와 같은 짝(반려·회수된 건이 「_결재중」으로 나가지 않게, 2026-10-14)
+    var tag = { approved: '_결재완료', submitted: '_결재중', rejected: '_반려', withdrawn: '_회수' }[a.status] || '_결재중';
     var snap = a.snapshot || {};
     var save = function (files) {
       if (!files.length) { C.toast('담을 운행·영수증이 없습니다.', true); return; }
@@ -1018,6 +1020,9 @@
      금액 요약표(CSV). 결재 중·아직 상신 안 한 사람도 같이 보여 누구를 챙겨야 하는지 알게 한다.
      문서는 모두 상신 때 저장한 고정본(driving_frozen)으로 만든다 — 결재자가 본 그 문서다. */
   var FINSEL = {}, FINJOB = null;
+  /** 보이는 줄 중 고른 것(2026-10-14) — 「출력 안 한 것만」으로 숨은 줄은 고른 채 남아 있어도 세지·묶지 않는다. */
+  function finPicked(rows) { return rows.filter(function (a) { return FINSEL[a.id]; }); }
+  function finVisible(a) { return !C.prints || C.prints.keep('driving', a); }
   function viewFinal() {
     var S = C.state();
     if (!S.LOADED) return C.head('결재 완료 출력') + C.skeleton();
@@ -1043,7 +1048,10 @@
     // 고른 것 중 이 주기의 결재 완료 건만 남긴다(주기를 바꾸면 고른 것이 섞이지 않게).
     var okIds = {}; done.forEach(function (a) { okIds[a.id] = 1; });
     Object.keys(FINSEL).forEach(function (k) { if (!okIds[k]) delete FINSEL[k]; });
-    var nSel = Object.keys(FINSEL).length;
+    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로 결재 완료 전체).
+    //   고른 수·전체 선택·묶어 받기도 보이는 줄만 센다 — 숨은 줄이 묶음에 몰래 들어가지 않게.
+    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('driving', a); }) : done;
+    var nSel = finPicked(shown).length;
 
     var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력합니다');
     var fact = function (k, v, sub, alert) {
@@ -1062,14 +1070,12 @@
 
     // ── 결재 완료 — 출력 ──
     var tools = done.length
-      ? '<label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
+      ? '<label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
         '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
         (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
         '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' +
         (C.prints ? C.prints.onlyBtn('driving') : '')
       : '';
-    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계·고르기는 그대로 결재 완료 전체).
-    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('driving', a); }) : done;
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
       : done.length
@@ -1092,18 +1098,21 @@
             '<td class="n total">' + n0((a.snapshot || {}).cost) + '</td>' +
             '<td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
-            '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button></td></tr>';
+            '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button> ' +
+            // 정정 열기 · 관리자 반려 — 개인경비·법인카드 출력 화면과 같게(2026-10-14). 운행일지는 data-kind 없이(driving-app.js openApprAct 가 APPR 에서 찾는다).
+            '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '">정정 열기</button></td></tr>';
     }
 
     if (going.length) {
       h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-        '<th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th></tr></thead><tbody>' +
+        '<th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
         going.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
           return '<tr>' + C.orgCell(a.username) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td class="dim">' + (a.submitted_at ? esc(whenText(a.submitted_at)) : '') + '</td>' +
             '<td class="n">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td>' + esc((cur.name || C.nameOf(cur.approver || '')) + (cur.box ? ' (' + cur.box + ')' : '')) + '</td></tr>';
+            '<td>' + esc((cur.name || C.nameOf(cur.approver || '')) + (cur.box ? ' (' + cur.box + ')' : '')) + '</td>' +
+            '<td class="n"><button class="btn sm" data-appr="force_reject" data-id="' + a.id + '">관리자 반려</button></td></tr>';
         }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
@@ -1128,7 +1137,7 @@
   function finBundle() {
     var S = C.state();
     var ids = Object.keys(FINSEL);
-    var list = ids.map(apprById).filter(function (a) { return a && a.status === 'approved'; })
+    var list = ids.map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); })
       .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     if (!list.length || FINJOB) return;
     // ★ 한 번에 묶는 인원 상한(2026-10-07 검증로봇 R15) — 사진이 든 PDF 를 모두 메모리에 쌓았다가 합치므로
@@ -1258,7 +1267,10 @@
     if (t.matches && t.matches('[data-finsel]')) { if (t.checked) FINSEL[t.dataset.finsel] = 1; else delete FINSEL[t.dataset.finsel]; C.render(); return; }
     if (t.id === 'finAll') {
       var S = C.state();
-      S.APPR.forEach(function (a) { if (a.cycle === S.CYCKEY && a.status === 'approved') { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
+      // 보이는 줄만(2026-10-14 — 「출력 안 한 것만」이 켜져 있으면 출력 안 한 문서만 고른다)
+      S.APPR.forEach(function (a) {
+        if (a.cycle === S.CYCKEY && a.status === 'approved' && C.orgMatch(a.username) && finVisible(a)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; }
+      });
       C.render();
     }
   });

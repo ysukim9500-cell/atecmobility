@@ -20,6 +20,9 @@
   var PEND = { driving: {}, expense: {}, card: {} }, ASKING = { driving: {}, expense: {}, card: {} };
   var FAIL = { driving: 0, expense: 0, card: 0 };          // 요약을 못 받은 때 — 1분 동안 다시 묻지 않고 딱지를 숨긴다
   var ONLY = { driving: false, expense: false, card: false };
+  // VER[kind][id] = 요약을 받을 때의 결재 완료 시각(closed_at). 정정 열기 → 다시 결재 완료되면 closed_at 이 바뀐다 —
+  //   그때는 받은 요약(옛 판의 출력 횟수)을 버리고 다시 묻는다(2026-10-14 검증로봇: 같은 세션에서 옛 횟수가 남던 것).
+  var VER = { driving: {}, expense: {}, card: {} };
   var TIMER = null;
 
   function rpc(name, body) {
@@ -38,6 +41,12 @@
     return (withYear ? d.getUTCFullYear() + '.' : '') + p(d.getUTCMonth() + 1) + '.' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
   }
   function down(kind) { return FAIL[kind] && Date.now() - FAIL[kind] < 60000; }
+  /** 이 결재 건의 받아 둔 요약 — 결재 완료 시각이 바뀌었으면(정정 뒤 재결재) 버리고 undefined(아직 모름). */
+  function cur(kind, a) {
+    var v = String(a.closed_at || '');
+    if (VER[kind][a.id] !== v) { VER[kind][a.id] = v; delete ST[kind][a.id]; }
+    return ST[kind][a.id];
+  }
 
   /* ── 요약 받기 — 화면을 그리는 동안 모았다가 종류마다 한 번에 ── */
   function want(kind, ids) {
@@ -105,7 +114,7 @@
   /* ── 딱지 ── */
   function badge(kind, a) {
     if (!a || a.status !== 'approved' || !KINDS[kind]) return '';
-    var s = ST[kind][a.id];
+    var s = cur(kind, a);
     if (s === undefined) { want(kind, [a.id]); return ''; }
     if (!s || down(kind)) return '';
     var key = esc(kind + ':' + a.id), who = esc(C.nameOf(a.username) + ' · ' + String(a.cycle || ''));
@@ -127,7 +136,7 @@
   /** 거른 뒤에도 남길 문서인가 — 아직 요약을 모르면(받는 중·실패) 남긴다. */
   function keep(kind, a) {
     if (!ONLY[kind] || down(kind)) return true;
-    var s = ST[kind][a.id];
+    var s = cur(kind, a);
     return !s || !s.n;
   }
   function only(kind) { return !!ONLY[kind] && !down(kind); }

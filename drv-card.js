@@ -852,7 +852,8 @@
   /** 문서 모델 하나(사람 × 기간) — SheetPdf.buildCard · CardSheet.xlsxBytes 가 같이 쓴다. */
   function cDoc(u, cyc, rows, a, fz, verify, mark, docNo) {
     // 결재란 — 세 문서 공통(C.docBoxes · C.boxLabels): 칸 이름은 그 건의 칸 모양(예전 건 v1 · 새 건 v2, 2026-10-14)
-    var p = personOf(u, fz), boxes = C.docBoxes(a, p.name);
+    //   담당 칸 — 상신 전(·반려·회수 뒤) 본인 문서면 지금 내 서명(운행일지 boxesOf 와 같게, 2026-10-14)
+    var p = personOf(u, fz), boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 법인카드', mark: mark, docNo: docNo },
       person: p, periodLabel: cycName(cyc) + ' (' + R.span(cyc) + ')', boxes: boxes, boxLabels: C.boxLabels(a), items: docItems(rows, p.name), verify: verify,
@@ -1217,17 +1218,17 @@
     var total = done.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0);
     var ok = {}; done.forEach(function (a) { ok[a.id] = 1; });
     Object.keys(FINSEL).forEach(function (k) { if (!ok[k]) delete FINSEL[k]; });
-    var nSel = Object.keys(FINSEL).length;
+    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로). 고른 수·전체 선택·묶어 받기도 보이는 줄만.
+    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('card', a); }) : done;
+    var nSel = shown.filter(function (a) { return FINSEL[a.id]; }).length;
     var h = head('법인카드 결재 완료 출력', '결재가 끝난 지출결의서를 모아 출력합니다');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 달 카드 내역이 있는데 상신 전', notYet.length > 0) + '</div></div>';
-    var tools = done.length ? '<label class="finall"><input type="checkbox" id="cFinAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
+    var tools = done.length ? '<label class="finall"><input type="checkbox" id="cFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
       '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('card') : '') : '';
-    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계·고르기는 그대로)
-    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('card', a); }) : done;
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
       : done.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
@@ -1281,7 +1282,7 @@
   /** 고른 결재 완료 건을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 이어 붙인다(한 번에 20명까지). */
   function finBundle() {
     var S = C.state();
-    var list = Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved'; })
+    var list = Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); })   // 보이는 줄만(2026-10-14)
       .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     if (!list.length || FINJOB) return;
     if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true); return; }
@@ -1400,10 +1401,12 @@
     if (t.id === 'cCat') { CL.cat = t.value; C.render(); var w2 = $('cCat'); if (w2) w2.focus(); return; }
     if (t.matches && t.matches('[data-cfinsel]')) { if (t.checked) FINSEL[t.dataset.cfinsel] = 1; else delete FINSEL[t.dataset.cfinsel]; C.render(); return; }
     if (t.id === 'cFinAll') {
-      cycAppr().forEach(function (a) { if (a.status === 'approved' && C.orgMatch(a.username)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
+      // 보이는 줄만(2026-10-14 — 「출력 안 한 것만」이 켜져 있으면 출력 안 한 문서만 고른다)
+      cycAppr().forEach(function (a) { if (a.status === 'approved' && C.orgMatch(a.username) && finVisible(a)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
       C.render();
     }
   });
+  function finVisible(a) { return !C.prints || C.prints.keep('card', a); }
 
   var K0 = {
     tag: '법인카드', mode: 'c',
