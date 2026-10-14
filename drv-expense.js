@@ -947,7 +947,7 @@
     var p = personOf(u, fz);
     // 결재란 — 세 문서 공통(C.docBoxes · C.boxLabels): 칸 이름은 그 건의 칸 모양(예전 건 v1 · 새 건 v2, 2026-10-14)
     //   담당 칸 — 상신 전(·반려·회수 뒤) 본인 문서면 지금 내 서명(운행일지 boxesOf 와 같게, 2026-10-14)
-    var boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null);
+    var boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null, u);
     var its = docItems(rows);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 개인경비', mark: mark, docNo: docNo },

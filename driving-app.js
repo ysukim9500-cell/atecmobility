@@ -2261,7 +2261,7 @@
    * 담당 = 상신자, 승인한 칸만 이름·날짜·서명(안 한 칸·반려한 칸은 빈칸 — 서명처럼 보이면 위조로 오해된다, 2026-09-15).
    * 반려·회수된 건과 상신 전은 결재선을 찍지 않는다(다시 상신하면 처음부터). liveSign = 그때 담당 칸에 찍을 내 서명 id(운행일지만).
    */
-  function docBoxes(a, name, liveSign) {
+  function docBoxes(a, name, liveSign, who) {
     var at = a && a.submitted_at ? Date.parse(a.submitted_at) : NaN;
     var live = !a || a.status === 'withdrawn' || a.status === 'rejected';
     var labels = boxLabels(a);
@@ -2272,6 +2272,9 @@
         b[s.box] = s.result === 'approved' ? { name: s.name || s.approver, date: isFinite(t) ? md(t) : '', signId: s.sign_id || null } : { name: '', date: '' };
       }
     });
+    // 대표이사 칸은 전자 결재를 하지 않는다. 상신자가 사업부장(조직도 직책)이면 빗금 대신 빈칸으로 두어
+    // 출력한 종이에 대표이사가 손으로 서명한다. 나머지 직원 문서는 그대로 빗금(2026-10-14 사용자).
+    if (!b['대표이사'] && isDivHead(who || (a && a.username))) b['대표이사'] = { name: '', date: '' };
     return b;
   }
 
@@ -2359,6 +2362,8 @@
     for (var i = 0; i < ORG.length; i++) if (ORG[i].username === u && ORG[i].active !== false) return ORG[i];
     return null;
   }
+  /** 조직도 직책이 사업부장인 계정인가 — 그 사람이 올린 문서는 대표이사 칸을 손 서명 빈칸으로 둔다(2026-10-14). */
+  function isDivHead(u) { var o = u ? orgOf(u) : null; return !!(o && String(o.role || '').trim() === '사업부장'); }
   function orgLabel(u) {
     var o = orgOf(u), p = personOf(u);
     if (!o) return [p.dept, p.position].filter(Boolean).join(' · ');
@@ -2710,7 +2715,9 @@
      미리 채운 칸도 × 로 비우고 다른 분을 넣을 수 있다. 비워 둔 칸은 빗금(/)으로 찍히고 건너뛴다.
      결재는 왼쪽 칸부터 채워진 칸 차례로 진행된다(DRAFT 는 늘 칸 순서로 정렬해 둔다).
      (2026-10-02 사용자 결정 — "결재란 화면은 그대로 있고 본인이 선택해서 이름 넣는 방식, 건너뛰면 / 처리") */
-  var APPR_BOXES = BOXES.slice(1);       // 센터·파트장 · 팀장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
+  // 센터·파트장 · 팀장 · 사업부장 (담당 = 상신자 본인). 전자 결재는 사업부장에서 끝난다 — 대표이사 칸은 고를 수 없고
+  // 출력한 종이에 손으로 서명하는 빈칸이다(2026-10-14 사용자).
+  var APPR_BOXES = BOXES.slice(1, 4);
   var APPR_BOX = '';                     // 지금 이름을 넣을 칸
   function draftAt(box) { return DRAFT.filter(function (s) { return s.box === box; })[0] || null; }
   /** 칸 순서로 정렬하고, 한 칸에 한 명만 남긴다(같은 분이 여러 칸에 있어도 된다). */
@@ -2784,6 +2791,11 @@
           '<span class="ag-h">' + bh(b) + '</span><span class="ag-b"><span class="ag-pick">' + (on ? '이름 입력' : '눌러서 넣기') + '</span></span></button>';
       }
     });
+    // 대표이사 — 고르지 않는 칸. 사업부장이 올린 문서만 출력한 종이에 대표이사가 손으로 서명하는 빈칸, 나머지는 빗금.
+    h += isDivHead(myName())
+      ? '<div class="ag-cell hand" title="출력한 문서에 대표이사가 손으로 서명하는 칸입니다"><div class="ag-h">대표이사</div>' +
+        '<div class="ag-b"><small>수기 서명</small></div></div>'
+      : '<div class="ag-cell hand slash" title="전자 결재는 사업부장에서 끝납니다"><div class="ag-h">대표이사</div><div class="ag-b"></div></div>';
     h += '</div>';
     // 결재 순서 — 채워진 칸을 왼쪽부터.
     h += '<div class="ag-order">' + (DRAFT.length
@@ -2821,7 +2833,8 @@
         esc(prev.map(function (s) { return nameOf(s.approver) + '(' + s.box + ')'; }).join(' → ')) + '</button></div>';
     }
     h += '<div class="anote" style="margin-top:10px">결재받을 <b>칸을 누르고 이름</b>을 넣으세요. <b>비워 둔 칸은 빗금(/)</b>으로 찍히고 건너뜁니다. ' +
-      '결재는 왼쪽 칸부터 차례로 진행됩니다.</div>';
+      '결재는 왼쪽 칸부터 차례로 진행되고 <b>사업부장에서 끝납니다</b>' +
+      (isDivHead(myName()) ? '. 「대표이사」 칸은 출력한 문서에 대표이사가 손으로 서명하는 빈칸입니다.</div>' : '(대표이사 칸은 빗금).</div>');
 
     var warn = [];
     if (KD) warn = KH.warn || [];
@@ -7843,7 +7856,7 @@
   /** 운행기록부 결재란 — 세 문서 공통 docBoxes 를 그대로 쓴다(2026-10-14 「세 결재 시스템 동일」).
    *  담당 칸: 상신된 건이면 상신 때 서명, 상신 전 미리보기(·반려·회수 뒤)면 지금 내 서명. */
   function boxesOf(a, u, mine) {
-    return docBoxes(a, u.name || mine, liveSign(mine));
+    return docBoxes(a, u.name || mine, liveSign(mine), mine);
   }
   /** 상신 전(·반려·회수 뒤) 문서의 담당 칸에 찍을 지금 내 서명 id — 본인 문서이고 올린 서명이 있을 때만.
    *  개인경비·법인카드도 같은 것을 쓴다(C.liveSign, 2026-10-14 — 세 문서 담당 칸이 같게). */
