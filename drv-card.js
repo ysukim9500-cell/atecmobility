@@ -212,7 +212,7 @@
     if (a && (a.status === 'submitted' || a.status === 'approved')) wantSums([a.id]);
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind c">법인카드</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
-      (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 상신하면 결재함으로 갑니다.</div>') +
+      (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 상신하면 결재함으로 갑니다.</div>') +
       (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) + (C.apvSlot ? C.apvSlot('card', a) : '') : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 카드 내역을 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
@@ -838,19 +838,6 @@
   }
 
   /* ══════════════════ 문서(PDF · 엑셀) ══════════════════ */
-  /** 결재란 — 운행기록부·개인경비와 같은 규칙. 담당 = 상신자, 승인한 칸만 이름·날짜·서명, 결재선에 없는 칸은 빗금. */
-  function boxesOf(a, name) {
-    var at = a && a.submitted_at ? Date.parse(a.submitted_at) : NaN;
-    var live = !a || a.status === 'withdrawn' || a.status === 'rejected';
-    var b = { 담당: { name: name, date: !live && isFinite(at) ? C.md(at) : '', signId: live ? null : ((a.snapshot || {}).sign_id || null) } };
-    if (!live) ((a && a.steps) || []).forEach(function (s) {
-      if (s.box && C.BOXES.indexOf(s.box) > 0) {
-        var t = s.acted_at ? Date.parse(s.acted_at) : NaN;
-        b[s.box] = s.result === 'approved' ? { name: s.name || s.approver, date: isFinite(t) ? C.md(t) : '', signId: s.sign_id || null } : { name: '', date: '' };
-      }
-    });
-    return b;
-  }
   function personOf(u, fz) {
     var p = (fz && fz.person) || {}, o = C.orgPath(u), q = C.personOf(u);
     return { name: p.name || q.name || C.nameOf(u), dept: p.dept || [C.orgName(o), o.unit].filter(Boolean).join(' ') || q.dept || '', position: p.position || q.position || '' };
@@ -864,11 +851,12 @@
   }
   /** 문서 모델 하나(사람 × 기간) — SheetPdf.buildCard · CardSheet.xlsxBytes 가 같이 쓴다. */
   function cDoc(u, cyc, rows, a, fz, verify, mark, docNo) {
-    var p = personOf(u, fz), boxes = boxesOf(a, p.name);
+    // 결재란 — 세 문서 공통(C.docBoxes · C.boxLabels): 칸 이름은 그 건의 칸 모양(예전 건 v1 · 새 건 v2, 2026-10-14)
+    var p = personOf(u, fz), boxes = C.docBoxes(a, p.name);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 법인카드', mark: mark, docNo: docNo },
-      person: p, periodLabel: cycName(cyc) + ' (' + R.span(cyc) + ')', boxes: boxes, items: docItems(rows, p.name), verify: verify,
-      sheets: [{ boxes: boxes }]               // fillSigns 가 결재란 서명을 여기에 채운다(같은 객체)
+      person: p, periodLabel: cycName(cyc) + ' (' + R.span(cyc) + ')', boxes: boxes, boxLabels: C.boxLabels(a), items: docItems(rows, p.name), verify: verify,
+      sheets: [{ boxes: boxes, boxLabels: C.boxLabels(a) }]   // fillSigns 가 결재란 서명을 여기에 채운다(같은 객체)
     };
   }
   /** 검증 결과 → PDF 검증 쪽 재료. 빈칸(block)은 「[상신 막음]」을 붙여 불일치로 보인다. */
@@ -934,11 +922,15 @@
     if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
     fetchFrozen(a).then(function (fz) {
       if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다. 관리자에게 알려 주세요.', true); return; }
-      C.vx.makePdf(frozenOpts(a, fz)).catch(function () { });
+      var o = frozenOpts(a, fz);
+      if (a.status === 'approved') o.prints = { kind: 'card', ids: [a.id] };      // 결재 완료본 — 내려받기·열기를 누르면 출력 기록(2026-10-14)
+      C.vx.makePdf(o).catch(function () { });
     }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.', true); });
   }
   function frozenOpts(a, fz) {
     var d = frozenDoc(a, fz), done = a.status === 'approved';
+    // 결재 완료본에는 검증 결과 쪽을 붙이지 않는다(2026-10-14 사용자 — 출력물엔 필요 없다). 결재 중 문서에는 그대로 — 결재자가 본다.
+    if (done) d = Object.assign({}, d, { verify: null });
     return pdfOpts(d, { title: done ? '결재 완료본 — 법인카드' : a.status === 'submitted' ? '결재 문서 — 법인카드' : '상신했던 문서 — 법인카드',
       sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + R.span(a.cycle) + ')',
       file: '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + a.cycle + MARK_SUFFIX[d.meta.mark] + '.pdf',
@@ -960,6 +952,7 @@
       var d = frozenDoc(a, fz), x = SH.xlsxBytes(d, window.Xlsx);
       var sum = d.items.reduce(function (s, it) { return s + it.amount; }, 0), exp = (a.snapshot || {}).cost;
       C.saveBlob(x.bytes, '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + a.cycle + MARK_SUFFIX[d.meta.mark] + '.xlsx');
+      if (a.status === 'approved' && C.prints) C.prints.log('card', a.id, 'xlsx');        // 출력 기록(기다리지 않는다)
       if (exp != null && Math.round(sum) !== Math.round(Number(exp))) C.toast('엑셀 합계 ' + n0(sum) + '원이 상신 때 금액 ' + n0(exp) + '원과 다릅니다. 관리자에게 알려 주세요.', true);
       else C.toast('엑셀을 내려받습니다.');
     }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다.', true); });
@@ -992,6 +985,7 @@
     if (!a) return '';
     var f = FZSUM[fzKey(a)], done = a.status === 'approved', live = a.status === 'submitted' || done;
     var chip = f && f.verify ? '<button class="vchip" data-cfzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' + sumChip(f.verify.summary) + '</button>' : '';
+    if (done && C.prints) chip += C.prints.badge('card', a);            // 출력 딱지(2026-10-14)
     return brief(a, f) + '<div class="aext">' + chip + '<span style="flex:1"></span>' +
       '<button class="btn sm" data-cfzpdf="' + a.id + '">' + ic('dl', 13) + (done ? '결재 완료본 PDF' : live ? '결재 문서 PDF' : '상신했던 문서 PDF') + '</button>' +
       (done ? '<button class="btn sm" data-cfzxlsx="' + a.id + '">결재 완료본 엑셀</button>' : '') + '</div>';
@@ -1231,14 +1225,19 @@
       fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 달 카드 내역이 있는데 상신 전', notYet.length > 0) + '</div></div>';
     var tools = done.length ? '<label class="finall"><input type="checkbox" id="cFinAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
       '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
-      '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' : '';
-    h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
+      '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('card') : '') : '';
+    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계·고르기는 그대로)
+    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('card', a); }) : done;
+    h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
+      ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
+      : done.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
       '<th>결재 완료</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
-      C.orgGroups(done, function (a) { return a.username; }, true).map(function (g) {
+      C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
         return C.orgGroupRow(g, 8, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') + g.list.map(function (a) {
           var line = (a.steps || []).map(function (s) { return (s.name || C.nameOf(s.approver)) + '(' + (s.box || '') + ')'; }).join(' → ');
           return '<tr><td><input type="checkbox" data-cfinsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
-            C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.closed_at ? esc(C.vx.whenText(a.closed_at)) : '—') + '</td>' +
+            C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.closed_at ? esc(C.vx.whenText(a.closed_at)) : '—') +
+            (C.prints ? '<div class="prline">' + C.prints.badge('card', a) + '</div>' : '') + '</td>' +
             '<td class="n">' + n0((a.snapshot || {}).n) + '</td><td class="n total">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n" style="white-space:nowrap"><button class="btn sm" data-cfzpdf="' + a.id + '">PDF</button> <button class="btn sm" data-cfzxlsx="' + a.id + '">엑셀</button> ' +
             '<button class="btn sm" data-appr="reopen" data-kind="card" data-id="' + a.id + '">정정 열기</button></td></tr>';
@@ -1292,7 +1291,7 @@
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('cFinNote'); if (el) el.textContent = t; };
     var alive = function () { if (FINJOB === job && !$('cFinNote')) { FINJOB = null; C.render(); } return FINJOB === job; };
-    var parts = [], skipped = [], checks = [];
+    var parts = [], skipped = [], checks = [], partIds = [];   // partIds — 묶음에 실제로 들어간 결재 건(출력 기록용)
     var one = function (i) {
       if (i >= list.length || !alive()) return Promise.resolve();
       var a = list[i];
@@ -1303,7 +1302,7 @@
         return C.fillSigns(d).then(C.vx.ensureLibs).then(function (lib) {
           return window.SheetPdf.buildCard(d, { PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold });
         }).then(function (res) {
-          parts.push(res.bytes);
+          parts.push(res.bytes); partIds.push(a.id);
           var sum = (res.totals[0] || {}).all || 0, exp = (a.snapshot || {}).cost;
           if (exp != null && Math.round(sum) - Math.round(Number(exp)) !== 0) checks.push(d.person.name + ' — 문서 합계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(exp) + '원');
         });
@@ -1336,6 +1335,7 @@
         (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다 — 합계 점검 이상 없음</span></div>' : '') + '</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button><a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
+      if (C.prints) C.prints.bindOut($('pFoot'), 'card', partIds, url);    // 묶은 사람마다 한 번씩 출력 기록
       C.render();
     }).catch(function (e) {
       if (FINJOB !== job) return;

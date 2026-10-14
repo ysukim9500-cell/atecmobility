@@ -122,7 +122,8 @@
       merges.push(ref(J, rr) + ':' + ref(M, rr), ref(N, rr) + ':' + ref(P, rr));
       return cell(J, rr, s1, purpose) + fill(rr, s1, K, M) + cell(N, rr, s2, note) + fill(rr, s2, O, P);
     };
-    var BX = ['담당', '팀장', '실장', '사업부장', '대표이사'], BXC = [L, M, N, O, P], boxes = d.boxes || {};
+    // 결재란 칸 이름은 문서 모델이 정한다(d.boxLabels = C.boxLabels(결재 건) — 예전 건 v1 · 새 건 v2, 2026-10-14)
+    var BX = d.boxLabels, BXC = [L, M, N, O, P], boxes = d.boxes || {};
     line(1, 6, '');
     line(2, 18, cell(B, 2, 1, '지 출 결 의 서') + fill(2, 1, C2, J) + cell(K, 2, 13, '결\n\n재') +
       BX.map(function (b, i) { return cell(BXC[i], 2, i === 4 ? 15 : 14, b); }).join(''));

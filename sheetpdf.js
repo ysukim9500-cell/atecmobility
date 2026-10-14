@@ -37,7 +37,10 @@
   })();
   var HEAD = ['운행일자', '출발지역', '도착지역', '방문처', '업무\n구분', '입력\n구분',
     '출발시\n키로수', '도착시\n키로수', '운행거리\n(km)', '유류비', '주차비', '통행료', '금액합계'];
-  var BOXES = ['담당', '팀장', '실장', '사업부장', '대표이사'];
+  // 결재란 칸 이름 — 문서 모델(sh.boxLabels · d.boxLabels)이 결재 건의 칸 모양에 따라 넘긴다(driving-app.js boxLabels, 2026-10-14).
+  //   v2(새 상신) 담당·센터·파트장·팀장·사업부장·대표이사 · v1(예전 건) 담당·팀장·실장·사업부장·대표이사. 안 넘기면 v2.
+  var BOXES_V1 = ['담당', '팀장', '실장', '사업부장', '대표이사'];
+  var BOXES = ['담당', '센터·파트장', '팀장', '사업부장', '대표이사'];
   var CATS = ['계기판', '주유', '주차', '통행료'];
 
   function n0(n) {
@@ -352,7 +355,7 @@
         c.cell(MX + thW, iy, infoW - thW, hh, vo, vl);
         iy += hh;
       });
-    var boxBottom = drawBoxes(c, MX + infoW + gap, top, sh.boxes);
+    var boxBottom = drawBoxes(c, MX + infoW + gap, top, sh.boxes, null, sh.boxLabels);
     c.y = Math.max(iy, boxBottom) + 4 * MM;
 
     // ── 요약 한 줄 ──
@@ -369,16 +372,16 @@
     return drawSheetBody(c, sh, calc, t);
   }
 
-  /** 결재란(담당·팀장·실장·사업부장·대표이사) — 운행기록부·개인경비 명세가 같이 쓴다. (ax, top) 은 왼쪽 위. 아래 끝 y 를 돌려준다.
+  /** 결재란(담당·센터·파트장·팀장·사업부장·대표이사 — labels, 예전 건은 v1 칸) — 세 문서가 같이 쓴다. (ax, top) 은 왼쪽 위. 아래 끝 y 를 돌려준다.
    *  boxes[칸] = { name, date, sign } · 칸이 없으면 빗금(건너뜀) · name 이 비면 빈칸(아직 결재 전). */
   /*  g = 칸 크기·모양(없으면 운행기록부 크기). 개인경비 명세는 양식 결재란(흰 바탕, 「결 재」 세로 칸)에 맞춘 값을 넘긴다. */
-  function drawBoxes(c, ax, top, boxesIn, g) {
+  function drawBoxes(c, ax, top, boxesIn, g, labels) {
     g = g || {};
     var labW = g.labW || 7 * MM, boxW = g.boxW || 17 * MM, hdH = g.hdH || 5.8 * MM, sgH = g.sgH || 13 * MM;
     var hfill = g.fill === undefined ? 0.95 : g.fill, hsz = g.size || 8;
     c.cell(ax, top, labW, hdH + sgH, { lines: g.label || ['결', '재'], size: hsz, align: 'center', fill: hfill });
     var boxes = boxesIn || {};
-    BOXES.forEach(function (b, i) {
+    (labels || BOXES).forEach(function (b, i) {
       var bx = ax + labW + i * boxW;
       c.cell(bx, top, boxW, hdH, { t: b, size: hsz, align: 'center', fill: hfill, padX: g.hpadX });
       var v = boxes[b];
@@ -847,7 +850,7 @@
     // ── 결재란 — 양식 그림 자리(오른쪽 위). 흰 바탕, 「결 재」 세로 칸, 머리 줄 + 서명 자리 ──
     var bx = sx(468), btop = y0 + 6 * XK, bg = { labW: 26.25 * XK, boxW: 51.75 * XK, hdH: 22 * XK, sgH: 50 * XK, fill: null, size: 10 * XK, hpadX: 0.4 * MM, label: ['결', '', '재'] };
     c.bw = 0.6;                                                        // 양식 인쇄본의 가는 선
-    drawBoxes(c, bx, btop, d.boxes, bg);
+    drawBoxes(c, bx, btop, d.boxes, bg, d.boxLabels);
     // 양식 결재란은 바깥 테두리만 굵다.
     c.page.drawRectangle({ x: bx, y: PH - btop - bg.hdH - bg.sgH, width: bg.labW + 5 * bg.boxW, height: bg.hdH + bg.sgH, borderColor: c.black, borderWidth: 1.2 });
 
@@ -1072,7 +1075,7 @@
     // ── 결재란(오른쪽 위) ──
     var bg = { labW: 16, boxW: 50, hdH: 16, sgH: 48, fill: null, size: 8.5, hpadX: 0.4 * MM, label: ['결', '', '재'] };
     var bw5 = bg.labW + 5 * bg.boxW, bx = X0 + CCW - bw5, btop = 20;
-    drawBoxes(c, bx, btop, d.boxes, bg);
+    drawBoxes(c, bx, btop, d.boxes, bg, d.boxLabels);
     c.page.drawRectangle({ x: bx, y: c.ph - btop - bg.hdH - bg.sgH, width: bw5, height: bg.hdH + bg.sgH, borderColor: c.black, borderWidth: 1.2 });
     // ── 제목 — 굵게, 밑줄 두 줄. 결재란에 닿으면 왼쪽으로 민다 ──
     var TS = 24, title = '지 출 결 의 서', tw = c.w(title, TS, true);
@@ -1172,6 +1175,6 @@
     build: build, basePay: basePay, sheetTotals: sheetTotals, exifOrientation: exifOrientation,
     buildExpense: buildExpense, expenseGroups: expenseGroups, EXPENSE_CATS: X_CATS,
     buildCard: buildCard, CARD_COLS_W: CCOLS_W,
-    COLS_MM: COLS_MM, BOXES: BOXES, VERSION: '1.4.0'
+    COLS_MM: COLS_MM, BOXES: BOXES, BOXES_V1: BOXES_V1, VERSION: '1.4.0'
   };
 });

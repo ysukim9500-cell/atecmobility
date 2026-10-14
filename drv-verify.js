@@ -573,6 +573,7 @@
     var chip = f && f.verify ? '<button class="vchip" data-fzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' +
       sumChip(f.verify.summary) + '</button>' : '';
     return apprBrief(a, f) + '<div class="aext">' + chip +
+      (done && C.prints ? C.prints.badge('driving', a) : '') +       // 출력 딱지(2026-10-14)
       '<span style="flex:1"></span>' +
       '<button class="btn sm" data-fzpdf="' + a.id + '">' + ic('dl', 13) +
       (done ? '결재 완료본 PDF' : live ? '결재 문서 PDF' : '상신했던 문서 PDF') + '</button>' +
@@ -806,6 +807,8 @@
         // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
         // 2026-10-07: 문서를 먼저 열어 봐야 「확인 완료」가 눌린다(열기·내려받기 중 하나).
         (o.okKey ? '<button class="btn" id="pdfOkBtn" ' + (o.okAttr || 'data-pdfok') + '="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">② 확인 완료 → 결재 상신</button>' : '');
+      // 결재 완료본이면 「내려받기」(pdf) · 「열기 · 인쇄」(print)를 누를 때 출력 기록을 남긴다(기다리지 않는다, 2026-10-14).
+      if (o.prints && C.prints) C.prints.bindOut($('pFoot'), o.prints.kind, o.prints.ids, url);
       if (o.okKey) {
         $('pBody').insertAdjacentHTML('beforeend', '<div class="hpnote" id="pdfStepNote" style="margin-top:14px">' + ic('alert', 15) +
           '<span><b>① 열어서 보기</b>로 문서를 끝까지 확인한 뒤 <b>② 확인 완료 → 결재 상신</b>을 눌러 주세요.</span></div>');
@@ -857,6 +860,7 @@
         note: old ? '이 결재 건은 상신 때 저장한 자료가 없어(예전 방식) <b>지금 자료</b>로 만들었습니다.' : null,
         expect: expect, expectName: old ? '상신 때 집계한 금액' : '화면 합계',
         okKey: !old && u === C.myName() ? k : '',
+        prints: done ? { kind: 'driving', ids: [ap.id] } : null,
         meta: { name: C.nameOf(u), cycleName: C.cycleName(S.CYC.y, S.CYC.m), mark: mark,
           docNo: old ? '결재 #' + ap.id + ' · 지금 자료로 ' + now + ' 출력' : '상신 전 미리보기 · ' + now + ' 출력' }
       }).catch(function () { });
@@ -895,7 +899,8 @@
       var done = a.status === 'approved';
       var mark = done ? '' : a.status === 'submitted' ? 'pending' : a.status === 'rejected' ? 'rejected' : 'withdrawn';
       var cname = cycName(a.cycle);
-      var vv = fz.verify || null;
+      // 결재 완료본에는 검증 결과 쪽을 붙이지 않는다(2026-10-14 사용자 — 출력물엔 필요 없다). 결재 중 문서에는 그대로 — 결재자가 본다.
+      var vv = done ? null : fz.verify || null;
       var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
       var snap = a.snapshot || {};
       return {
@@ -906,6 +911,7 @@
           ({ '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' }[mark]) + '.pdf',
         // 영수증까지 넣어 집계한 것은 version 2 부터다. 그 전 것은 기준이 달라 견주지 않는다.
         expect: snap.version >= 2 ? snap.cost : null,
+        prints: done ? { kind: 'driving', ids: [a.id] } : null,
         meta: { name: name, cycleName: cname, mark: mark,
           docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (done && a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') }
       };
@@ -922,13 +928,15 @@
         setTimeout(function () { C.saveBlob(f.bytes, f.name.replace(/\.xlsx$/, tag + '.xlsx')); }, i * 400);
       });
       // PDF 와 같은 대조: 장별 총계의 합이 상신 때 집계와 다르면 말없이 내보내지 않는다.
+      // 결재 완료본 엑셀 — 출력 기록(차량별 여러 파일이어도 한 번, 기다리지 않는다)
+      if (a.status === 'approved' && C.prints) C.prints.log('driving', a.id, 'xlsx');
       var warn = C.sheetSumWarn(files, snap.version >= 2 ? snap.cost : null);
       if (warn) C.toast(warn, true);
       else C.toast(files.length > 1 ? '엑셀 ' + files.length + '개를 내려받습니다(차량별로 한 장씩).' : '엑셀을 내려받습니다.');
     };
     fetchFrozen(a).then(function (fz) {
-      if (!fz) { if (liveOk(a)) { C.bizOnly(); save(C.xlsxFiles(a.username)); } else C.toast(NO_FZ, true); return; }
-      save(C.withFrozen(fz.data, function () { return C.xlsxFiles(a.username); }));
+      if (!fz) { if (liveOk(a)) { C.bizOnly(); save(C.xlsxFiles(a.username, a)); } else C.toast(NO_FZ, true); return; }
+      save(C.withFrozen(fz.data, function () { return C.xlsxFiles(a.username, a); }));
     }).catch(frozenFail);
   }
 
@@ -1057,12 +1065,17 @@
       ? '<label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === done.length ? ' checked' : '') + '> 전체 선택</label>' +
         '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
         (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
-        '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>'
+        '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' +
+        (C.prints ? C.prints.onlyBtn('driving') : '')
       : '';
-    h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length
+    // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계·고르기는 그대로 결재 완료 전체).
+    var shown = C.prints ? done.filter(function (a) { return C.prints.keep('driving', a); }) : done;
+    h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
+      ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
+      : done.length
       ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
         '<th>결재 완료</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
-        C.orgGroups(done, function (a) { return a.username; }, true).map(function (g) {
+        C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
           return C.orgGroupRow(g, 7, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') +
             g.list.map(doneRow).join('');
         }).join('') + '</tbody><tfoot><tr><td></td><td colspan="3">결재 완료 ' + n0(done.length) + '명 합계</td>' +
@@ -1074,7 +1087,8 @@
           return '<tr><td><input type="checkbox" data-finsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') +
             ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
-            '<td class="dim">' + (a.closed_at ? esc(whenText(a.closed_at)) : '—') + '</td>' +
+            '<td class="dim">' + (a.closed_at ? esc(whenText(a.closed_at)) : '—') +
+            (C.prints ? '<div class="prline">' + C.prints.badge('driving', a) + '</div>' : '') + '</td>' +
             '<td class="n total">' + n0((a.snapshot || {}).cost) + '</td>' +
             '<td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
@@ -1132,7 +1146,7 @@
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('finNote'); if (el) el.textContent = t; };
     // checks: 한 사람씩 받는 PDF 와 같은 자체 점검 — 문서 총계 ≠ 결재 금액, 못 불러온 사진(2026-10-06 검증로봇 5)
-    var parts = [], skipped = [], checks = [];
+    var parts = [], skipped = [], checks = [], partIds = [];   // partIds — 묶음에 실제로 들어간 결재 건(출력 기록용)
     var one = function (i) {
       if (i >= list.length) return Promise.resolve();
       var a = list[i];
@@ -1140,7 +1154,7 @@
       return fetchFrozen(a).then(function (fz) {
         if (!fz) { skipped.push(C.nameOf(a.username)); return; }
         var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
-        var vv = fz.verify || null;
+        var vv = null;                  // 결재 완료본 묶음 — 검증 결과 쪽은 넣지 않는다(2026-10-14 사용자)
         var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
         return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
           return window.SheetPdf.build({
@@ -1153,7 +1167,7 @@
             loadImage: function (p) { return loadPhoto(p, 1500); }
           });
         }).then(function (res) {
-          parts.push(res.bytes);
+          parts.push(res.bytes); partIds.push(a.id);
           var snap = a.snapshot || {}, why = [];
           var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
           if (snap.version >= 2 && isFinite(Number(snap.cost)) && Math.round(sum) - Math.round(Number(snap.cost)) !== 0) {   // 1원 차이도(2026-10-08)
@@ -1198,6 +1212,7 @@
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
+      if (C.prints) C.prints.bindOut($('pFoot'), 'driving', partIds, url);    // 묶은 사람마다 한 번씩 출력 기록
       C.render();
     }).catch(function (e) {
       FINJOB = null;

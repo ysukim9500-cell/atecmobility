@@ -80,6 +80,7 @@
    *                      — 이미 정렬·영수증 합산이 끝난 상태로 넘긴다.
    * @param o.orphans     [{date,parking,toll}] 운행 없이 영수증만 있는 날
    * @param o.parts       [{region,rate,km,amount}] 지역별 분해(2종 이상일 때만)
+   * @param o.boxLabels   결재란 칸 이름 5개(없으면 새 칸 v2 — driving-app.js boxLabels)
    */
   function buildSheetXml(o) {
     var merges = [], rows = '';
@@ -104,9 +105,9 @@
     rows += '<row r="4" ht="18" customHeight="1">' +
       cell(0, 4, S_LABEL, '부 서') + cell(1, 4, S_LABEL) + cell(2, 4, S_VALUE, o.dept);
     for (c = 3; c <= 6; c++) rows += cell(c, 4, S_VALUE);
-    rows += cell(7, 4, S_LABEL, '결 재') +
-      cell(8, 4, S_LABEL, '담당') + cell(9, 4, S_LABEL, '팀장') + cell(10, 4, S_LABEL, '실장') +
-      cell(11, 4, S_LABEL, '사업부장') + cell(12, 4, S_LABEL, '대표이사') + '</row>';
+    // 결재란 칸 이름 — o.boxLabels(결재 건의 칸 모양: 예전 건 v1 담당·팀장·실장·사업부장·대표이사, 새 건·상신 전 v2, 2026-10-14)
+    var BX = o.boxLabels || ['담당', '센터·파트장', '팀장', '사업부장', '대표이사'];
+    rows += cell(7, 4, S_LABEL, '결 재') + BX.map(function (b, i) { return cell(8 + i, 4, S_LABEL, b); }).join('') + '</row>';
     merges.push('A4:B4', 'C4:G4', 'H4:H7');
 
     rows += '<row r="5" ht="24" customHeight="1">' +

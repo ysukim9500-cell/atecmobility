@@ -2,9 +2,15 @@
    drv-org.js — 조직도 (운행일지 관리자)
    ---------------------------------------------------------------------------
    · 조직도(driving_org)는 **사람 명단**이다(이름·소속·직급·직책·앱 계정). 앱 계정이 없는 사람도 들어 있다.
-   · 결재선은 여기서 정하지 않는다. **상신자가 상신 창에서 결재받을 분의 이름을 넣어 직접 고른다**
-     (2026-10-02 사용자 결정 — "이름만 넣어 주면 결재하는 사람이 알아서 지정할 수 있게, 딱 누구다 이렇게 넣지 말고").
-     그래서 부서별 결재선 지정도, 직책으로 결재선을 자동으로 만드는 것도 하지 않는다.
+   · 결재선은 상신 창을 열 때 **조직도의 직책으로 미리 채운다**(2026-10-14 사용자 결정 — driving-app.js autoLine,
+     운행일지·개인경비·법인카드 세 상신 창이 같은 함수). 결재란 칸은 담당 · 센터·파트장 · 팀장 · 사업부장 · 대표이사.
+       상신자와 같은 센터·파트의 센터장·파트장 → 「센터·파트장」 칸
+       같은 팀의 팀장                         → 「팀장」 칸
+       같은 사업부의 사업부장                 → 「사업부장」 칸,  「대표이사」 칸은 비운다(빗금)
+     본인이 그 장이면 그 칸은 비운다. 장이 없거나 둘 이상이거나 앱 계정이 없으면 비우고 상신 창에 까닭을 적는다.
+     미리 채운 칸도 상신자가 칸마다 바꾸거나 비운다 — 결재선의 정본은 여전히 상신자다(2026-10-02 결정은 그대로).
+     그래서 관리자가 할 일은 사람마다 **직책**(센터장·파트장·팀장·사업부장)과 **앱 계정**을 맞춰 두는 것이다.
+     이 화면은 부서를 고르면 그 부서 직원의 자동 결재선을 미리 보이고, 결재선을 다 못 채우는 부서·사람을 주황으로 표시한다.
      예전 부서별 결재선(driving_approval_lines) 2건은 지우지 않고 그대로 두었다(더 읽지 않는다).
    · 결재를 누르려면 앱 계정이 있어야 하므로, 사람마다 '계정 연결'을 보여 준다.
    · 사람을 지우지 않는다. '내리기'는 active=false 로 감출 뿐이다(기록이 남는다).
@@ -39,13 +45,40 @@
   }
   function nodeName(k) { var p = parts(k); return p.length ? (p[p.length - 1] || p[p.length - 2]) : '전체'; }
 
+  /* ══════════════════ 자동 결재선 미리보기 (2026-10-14) ══════════════════
+     계산은 상신 창과 같은 함수(C.lineAt · C.autoLine — driving-app.js)로 한다. 여기서 따로 규칙을 만들지 않는다. */
+  function posOf(o) { return { division: o.division || '', team: o.team || '', unit: o.unit || '' }; }
+  function nodePos(k) { var p = parts(k); return { division: p[0] || '', team: p[1] || '', unit: p[2] || '' }; }
+  /** 그 사람(조직도 행)의 자동 결재선 — 상신 창이 그 사람에게 미리 채울 것과 같다. */
+  function lineOf(o) { return C.lineAt(posOf(o), o); }
+  /** 결재선 한 줄(이름만) — 표 칸에 넣는다. */
+  function lineText(steps) {
+    return steps.map(function (s) { return C.nameOf(s.approver) + '(' + s.box + ')'; }).join(' → ');
+  }
+  /** 결재란 모양 그대로 — 담당 · 센터·파트장 · 팀장 · 사업부장 · 대표이사, 빈칸은 빗금 칸. */
+  function lineHtml(steps) {
+    return '<div class="oline">' + C.BOXES.map(function (b, i) {
+      var s = i === 0 ? null : steps.filter(function (x) { return x.box === b; })[0];
+      return (i ? '<span class="oarrow">→</span>' : '') + '<span class="ostep' + (i === 0 ? ' me' : '') + '" data-obox="' + esc(b) + '"><em>' + esc(b) + ' 칸</em>' +
+        (i === 0 ? '<b>상신자</b>' : s ? '<b>' + esc(C.nameOf(s.approver)) + '</b>' : '<b><small>/ 비움</small></b>') + '</span>';
+    }).join('') + '</div>';
+  }
+  function notesHtml(notes) {
+    return notes.length ? '<div class="onotes">' + notes.map(function (n) {
+      return '<div data-onote="' + esc(n.box) + '">' + ic('alert', 13) + '<span>' + esc(n.t) + '</span></div>';
+    }).join('') + '</div>' : '';
+  }
+
   /* ══════════════════ 화면 ══════════════════ */
   function viewOrg() {
     var S = C.state();
     if (!S.LOADED) return C.head('조직도') + C.skeleton();
     var org = S.ORG;
     var linked = org.filter(function (o) { return o.username && S.PEOPLE[o.username]; }).length;
-    var h = C.head('조직도', n0(org.length) + '명 · 앱 계정 연결 ' + n0(linked) + '명');
+    // 앱 계정이 있는데 자동 결재선을 다 못 채우는 사람(까닭이 하나라도 있음) — 관리자가 직책·계정을 맞춰야 한다.
+    var short = org.filter(function (o) { return o.active !== false && o.username && S.PEOPLE[o.username] && lineOf(o).notes.length; });
+    var h = C.head('조직도', n0(org.length) + '명 · 앱 계정 연결 ' + n0(linked) + '명' +
+      (short.length ? ' · 결재선을 다 못 채우는 사람 ' + n0(short.length) + '명' : ''));
 
     // ── 왼쪽: 부서 나무 ──
     var tree = {}, order = [], first = {};
@@ -78,15 +111,34 @@
     var left = '<button class="onode root' + (SEL === '' ? ' on' : '') + '" data-onode="">전체 <span class="c">' + n0(org.length) + '</span></button>' +
       order.map(function (k) {
         var d = parts(k).length;
-        return '<button class="onode d' + d + (SEL === k ? ' on' : '') + '" data-onode="' + esc(k) + '">' +
+        // 이 부서 직원의 자동 결재선을 다 못 채우면(장이 없음·둘 이상·계정 없음) 주황 점
+        var nn = C.lineAt(nodePos(k), null).notes;
+        return '<button class="onode d' + d + (SEL === k ? ' on' : '') + '" data-onode="' + esc(k) + '"' + (nn.length ? ' data-owarn="1"' : '') + '>' +
           '<span class="nm">' + esc(nodeName(k)) + '</span>' +
+          (nn.length ? '<span class="dot warn" title="' + esc(nn.map(function (n) { return n.box + ': ' + n.why; }).join(' / ')) + '"></span>' : '') +
           '<span class="c">' + n0(tree[k]) + '</span></button>';
       }).join('');
 
     // ── 오른쪽: 사람 ──
-    var right = '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 직원이 상신할 때 직접 고릅니다.</b> ' +
-      '상신 창에서 결재받을 분의 이름을 넣어 순서대로 고르고, 지난번 결재선을 불러올 수도 있습니다. ' +
-      '여기서는 사람의 <b>이름·소속</b>과 <b>앱 계정</b>만 맞춰 두면 됩니다 — 앱 계정이 있어야 결재자로 찾히고 결재를 누를 수 있습니다.</div></div>';
+    var right;
+    if (SEL) {
+      // 고른 부서의 직원(장이 아닌 보통 직원)이 상신할 때 미리 채워지는 결재선 — 상신 창과 같은 계산
+      var ch = C.lineAt(nodePos(SEL), null);
+      right = '<div class="ocard" id="oLine"><div class="ohd"><b>' + esc(nodeName(SEL)) + ' 직원의 결재선(자동)</b>' +
+        '<span class="st ' + (ch.notes.length ? 'warn' : 'ok') + '">' + (ch.notes.length ? '다 못 채움 ' + ch.notes.length + '칸' : '조직도로 다 채움') + '</span></div>' +
+        lineHtml(ch.steps) + notesHtml(ch.notes) +
+        '<div class="anote" style="margin-top:10px">장 본인이 상신하면 자기 칸은 비웁니다. 결재선을 바꾸려면 사람의 <b>직책</b>(센터장·파트장·팀장·사업부장)·' +
+        '<b>소속</b>·<b>앱 계정</b>을 고치세요 — 바로 반영됩니다. 직원은 상신 창에서 칸마다 바꾸거나 비울 수 있습니다.</div></div>';
+    } else {
+      right = '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 상신 창을 열 때 조직도로 미리 채워집니다.</b> ' +
+        '상신자가 속한 <b>센터·파트의 센터장·파트장 → 팀장 → 사업부장</b>이 결재란의 「센터·파트장」·「팀장」·「사업부장」 칸에 들어가고, 「대표이사」 칸은 비웁니다. ' +
+        '직원은 상신 창에서 칸마다 바꾸거나 비울 수 있습니다. 여기서는 사람의 <b>직책</b>·<b>소속</b>과 <b>앱 계정</b>을 맞춰 두면 됩니다 — ' +
+        '앱 계정이 있어야 결재자로 찾히고 결재를 누를 수 있습니다. 부서를 고르면 그 부서 직원의 결재선을 미리 볼 수 있습니다.</div>' +
+        (short.length ? '<div class="awarn" id="oShort" style="margin-top:12px">' + ic('alert', 15) + '<span>앱 계정이 있는데 결재선을 다 못 채우는 사람이 <b>' +
+          n0(short.length) + '명</b> 있습니다: ' +
+          esc(short.slice(0, 8).map(function (o) { return o.name; }).join(', ') + (short.length > 8 ? ' 외 ' + (short.length - 8) + '명' : '')) +
+          '. 나무의 주황 점 부서를 눌러 까닭을 보세요.</span></div>' : '') + '</div>';
+    }
 
     // ── 정리할 것 — 계정 잇기·메일 채우기 ──
     var unl = unlinkedAccts(S);
@@ -116,7 +168,7 @@
       '<div class="sp" style="flex:1"></div>' +
       '<button class="btn sm pri" data-oadd>＋ 사람 추가</button></div>';
     right += people.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정 · 메일</th><th></th></tr></thead><tbody>' +
+      '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정 · 메일</th><th>결재선(자동)</th><th></th></tr></thead><tbody>' +
       people.map(function (o) {
         var acct = o.username
           ? (S.PEOPLE[o.username] ? '<span class="st ok">' + esc(o.username) + '</span>'
@@ -131,6 +183,14 @@
           esc([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + '</td>' +
           '<td class="el" title="' + esc(o.duty || '') + '">' + esc(o.duty || '') + '</td>' +
           '<td>' + acct + '</td>' +
+          // 이 사람이 상신할 때 미리 채워질 결재선(계정이 있는 사람만 — 없으면 상신을 못 한다)
+          (function () {
+            if (!(o.username && S.PEOPLE[o.username])) return '<td class="dim">—</td>';
+            var ln = lineOf(o), lt = lineText(ln.steps), why = ln.notes.map(function (n) { return n.t; }).join(' / ');
+            return '<td class="el" data-oline="' + esc(o.username) + '" title="' + esc([lt, why].filter(Boolean).join(' · ')) + '">' +
+              (lt ? esc(lt) : '<span class="dim">비움</span>') +
+              (ln.notes.length ? ' <span class="st warn" title="' + esc(why) + '">' + ln.notes.length + '칸 직접</span>' : '') + '</td>';
+          })() +
           // 「내리기」는 고치기 창 안에 있다 — 줄마다 두면 표가 넘쳐 잘리고, 「고치기」 옆이라 잘못 누르기 쉽다.
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-oedit="' + o.id + '" aria-label="' +
           esc(o.name) + ' 고치기">고치기</button></td></tr>';
@@ -178,8 +238,8 @@
         '팀 직속이면 비워 둡니다', 'oUnit') +
       fld('직급', '<input class="inp" id="oRank" list="dlRank" maxlength="20" value="' + esc(v.rank) + '">' + dl('dlRank', RANKS), null, 'oRank') +
       fld('직책', '<input class="inp" id="oRole" list="dlRole" maxlength="20" value="' + esc(v.role) + '">' +
-        dl('dlRole', ['사업부장', '공장장', '실장', '팀장', '센터장', '파트장']),
-        '참고용입니다(센터장·팀장 등). 없으면 비워 둡니다. 결재선은 직원이 상신할 때 직접 고릅니다', 'oRole') +
+        dl('dlRole', ['사업부장', '팀장', '센터장', '파트장', '공장장', '실장']),
+        '<b>그 부서의 장</b>일 때만 넣습니다. 센터장·파트장·팀장·사업부장이면 직원들의 결재선이 이 칸으로 미리 채워집니다(한 부서에 한 명). 장이 아니면 비워 둡니다', 'oRole') +
       fld('담당 업무', '<input class="inp" id="oDuty" maxlength="80" value="' + esc(v.duty) + '">', null, 'oDuty') +
       fld('회사 메일', '<input class="inp" id="oEmail" type="email" maxlength="80" value="' + esc(v.email || '') + '">',
         '팀즈 아이디와 같은 메일. 결재 차례가 오면 이 주소로 팀즈 개인 채팅 알림을 보냅니다', 'oEmail') +
@@ -317,7 +377,14 @@
   /* ══════════════════ 이벤트 ══════════════════ */
   document.addEventListener('click', function (e) {
     var el;
-    if ((el = e.target.closest('[data-onode]'))) { SEL = el.dataset.onode; Q = ''; C.render(); return; }
+    if ((el = e.target.closest('[data-onode]'))) {
+      // 다시 그리면 부서 나무의 스크롤이 맨 위로 돌아갔다(2026-10-14 사용자) — 보던 자리를 지킨다.
+      var tr = el.closest('.otree'), st = tr ? tr.scrollTop : 0, py = window.scrollY;
+      SEL = el.dataset.onode; Q = ''; C.render();
+      var nt = document.querySelector('.otree'); if (nt) nt.scrollTop = st;
+      window.scrollTo(0, py);
+      return;
+    }
     if (e.target.closest('[data-ounl]')) { openUnlinked(); return; }
     if ((el = e.target.closest('[data-olink]'))) { linkAcct(el.dataset.olink); return; }
     if ((el = e.target.closest('[data-of]'))) { OF = OF === el.dataset.of ? '' : el.dataset.of; C.render(); return; }

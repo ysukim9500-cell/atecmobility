@@ -925,6 +925,12 @@
     EVSUB_FX = fx || '';
     EVF.cat = EV_SUBS[i]; EVF.touched = false;
   }
+  /** 하이패스 대조·통행료 직접 채우기를 마치고 영수증 › 2/4 통행료 차례로 돌아온다 — 거기서 금액을 보고 「다음: 주유」. */
+  function tollBack(msg) {
+    setEvSub(EV_SUBS.indexOf('통행료'), 'back');
+    go('evid');
+    if (msg) toast(msg);
+  }
   /** 영수증 화면 위 — 주차 → 통행료 → 주유 → 계기판 차례와 지금 차례의 할 일. */
   function evSubHtml(by, unk) {
     var cur = evSub(), name = EV_SUBS[cur];
@@ -1705,6 +1711,8 @@
         });
         AUDIT = null;
         loadAll();                       // 서버 값을 다시 받아 화면을 맞춘다
+        // 다 저장됐으면 영수증 › 통행료 차례로 돌아간다(2026-10-14 사용자 — 「채운 다음은 통행료 칸에 반영된 화면으로」).
+        if (!skipped.length && !isMulti()) { tollBack(n0(applied) + '건 저장했습니다 — 통행료에 반영됐습니다.'); return; }
         toastOk(n0(applied) + '건 저장했습니다.',
           skipped.length ? skipped.length + '건은 건너뛰었습니다 (' + skipped[0].why + ')' : null);
       }).catch(function () {
@@ -2226,9 +2234,46 @@
 
   /* ══════════════════ 결재 ══════════════════
      결재 단위는 사람 × 마감주기. 운행 건별로 결재하지 않는다.
-     결재선은 조직도에서 자동으로 채워 주되 잠그지 않는다 — 빼고 더할 수 있다.  */
+     결재선은 상신 창을 열 때 조직도에서 자동으로 채워 주되 잠그지 않는다 — 칸마다 바꾸거나 비울 수 있다(autoLine).
+     운행일지·개인경비·법인카드 세 상신 창이 모두 이 한 벌(openSubmit · renderSubmit · autoLine · docBoxes)을 쓴다.  */
   var CYCKEY = function () { return CYC.y + '-' + pad(CYC.m); };
-  var BOXES = ['담당', '팀장', '실장', '사업부장', '대표이사'];
+  /* ── 결재란 칸 모양 (2026-10-14 사용자 결정) ──
+     v2(새것) 담당 · 센터·파트장 · 팀장 · 사업부장 · 대표이사 — 새로 상신하는 문서는 모두 이것(box_set 'v2').
+     v1(예전) 담당 · 팀장 · 실장 · 사업부장 · 대표이사 — 이미 상신·완료된 문서는 화면·PDF·엑셀 모두 예전 칸 이름 그대로.
+     「팀장」 칸이 v1 은 둘째, v2 는 셋째라 칸 이름으로는 모양을 알 수 없다 — 결재 건의 box_set 을 본다
+     (서버 20261014100000_approval_box_v2.sql: 그 전 건은 모두 'v1'). 결재 순서는 어느 쪽이든 칸 순서(왼쪽부터). */
+  var BOXES_V1 = ['담당', '팀장', '실장', '사업부장', '대표이사'];
+  var BOXES_V2 = ['담당', '센터·파트장', '팀장', '사업부장', '대표이사'];
+  var BOXES = BOXES_V2;                  // 새 상신 · 상신 전 미리보기
+  /** 결재 건의 결재선이 어느 칸 모양으로 저장됐나 — box_set 이 'v2' 면 새 모양, 없거나 'v1' 이면 예전 건(v1). */
+  function boxSetOf(a) { return a && a.box_set === 'v2' ? 'v2' : 'v1'; }
+  /**
+   * 그 결재 건의 문서에 찍을 결재란 칸 이름 5개(담당 포함).
+   * 결재 중·완료 건은 그 건의 칸 모양 그대로(예전 건은 예전 칸). 상신 전(a 없음)·결재선 없는 건·반려·회수된 건은
+   * 다음에 올릴 문서의 미리보기라 새 모양 — 그때 결재란에는 담당 칸만 찍힌다(docBoxes).
+   */
+  function boxLabels(a) {
+    var live = !a || !(a.steps || []).length || a.status === 'rejected' || a.status === 'withdrawn' || a.status === 'draft';
+    return !live && boxSetOf(a) === 'v1' ? BOXES_V1 : BOXES_V2;
+  }
+  /**
+   * 문서(PDF·엑셀·인쇄)의 결재란 칸 값 — 세 문서가 같이 쓴다. { 칸 이름: { name, date, signId } }, 없는 칸 = 빗금.
+   * 담당 = 상신자, 승인한 칸만 이름·날짜·서명(안 한 칸·반려한 칸은 빈칸 — 서명처럼 보이면 위조로 오해된다, 2026-09-15).
+   * 반려·회수된 건과 상신 전은 결재선을 찍지 않는다(다시 상신하면 처음부터). liveSign = 그때 담당 칸에 찍을 내 서명 id(운행일지만).
+   */
+  function docBoxes(a, name, liveSign) {
+    var at = a && a.submitted_at ? Date.parse(a.submitted_at) : NaN;
+    var live = !a || a.status === 'withdrawn' || a.status === 'rejected';
+    var labels = boxLabels(a);
+    var b = { 담당: { name: name, date: !live && isFinite(at) ? md(at) : '', signId: live ? (liveSign || null) : ((a.snapshot || {}).sign_id || null) } };
+    if (!live) ((a && a.steps) || []).forEach(function (s) {
+      if (s.box && labels.indexOf(s.box) > 0) {
+        var t = s.acted_at ? Date.parse(s.acted_at) : NaN;
+        b[s.box] = s.result === 'approved' ? { name: s.name || s.approver, date: isFinite(t) ? md(t) : '', signId: s.sign_id || null } : { name: '', date: '' };
+      }
+    });
+    return b;
+  }
 
   function myAppr(cycle) {
     var k = cycle || CYCKEY(), mine = myName();
@@ -2268,26 +2313,34 @@
    * 이번 주기에 반려·회수된 건이 있으면 그것, 없으면 다른 주기에 가장 최근 상신한 것.
    * 계정이 없어진 사람·본인은 뺀다. 없으면 null.
    *
-   * ★ 결재선은 **상신자가 직접 이름을 넣어 고른다**(2026-10-02 사용자 결정 —
-   *   "이름만 넣어 주면 결재하는 사람이 알아서 지정할 수 있게, 딱 누구다 이렇게 넣지 말고").
-   *   부서별 고정 결재선·조직도 자동 결재선으로 미리 채우지 않는다. 상신 창은 빈 칸으로 열린다.
+   * 결재선의 정본은 상신자다 — 상신 창이 조직도로 미리 채워도(autoLine) 칸마다 직접 바꾸고 비운다
+   * (2026-10-02 「상신자가 칸마다 직접」 + 2026-10-14 「조직도로 미리 채우기」 사용자 결정).
+   * ★ 예전 칸 모양(v1 — 팀장·실장 …)으로 올린 결재선은 쓰지 않는다. 칸 이름이 같아도 자리가 달라
+   *   (v1 「팀장」 칸 = 센터장) 그대로 옮기면 다른 사람이 다른 칸에 들어간다(2026-10-14 사용자 결정).
    */
   function previousSteps() {
     var mine = myName(), kd = kindDef(SUB_KIND);
-    var cur = kd ? kd.mine(CYCKEY()) : myAppr();
+    var cur = sameCycleLine();
     var latest = function (list) {
       return list.filter(function (a) {
-        return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length;
+        return a.username === mine && a.cycle !== CYCKEY() && (a.steps || []).length && boxSetOf(a) === 'v2';
       }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
     };
-    // 개인경비는 개인경비 결재 건에서 먼저 찾고, 처음 올리는 것이면 운행일지 때의 결재선을 불러온다.
-    var past = (cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length) ? cur
-      : kd ? (latest(kd.rows() || []) || latest(APPR)) : latest(APPR);
+    // 개인경비·법인카드는 그 종류 결재 건에서 먼저 찾고, 처음 올리는 것이면 운행일지 때의 결재선을 불러온다.
+    var past = cur || (kd ? (latest(kd.rows() || []) || latest(APPR)) : latest(APPR));
     if (!past) return null;
-    // 버튼에 적는 것과 실제로 불러오는 것이 같아야 한다 — 지금 규칙(칸마다 한 명 · 한 사람은 한 칸 ·
-    // 결재할 수 있는 사람)으로 미리 걸러 둔다. 예전 화면에서 만든 결재선은 칸이 겹치거나 비어 있을 수 있다.
-    var seenB = {}, seenU = {};
-    var out = past.steps.filter(function (s) {
+    return usableSteps(past.steps);
+  }
+  /** 이번 기간에 반려·회수된 내 결재 건(새 칸 모양 v2 일 때만) — 상신 창을 열 때 자동 결재선보다 먼저 쓴다. 없으면 null. */
+  function sameCycleLine() {
+    var kd = kindDef(SUB_KIND), cur = kd ? kd.mine(CYCKEY()) : myAppr();
+    return cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length && boxSetOf(cur) === 'v2' ? cur : null;
+  }
+  /** 지금 규칙(새 칸 모양 · 칸마다 한 명 · 결재할 수 있는 사람)으로 거른 [{approver, box}], 칸 순서. 남는 것이 없으면 null. */
+  function usableSteps(steps) {
+    // 버튼에 적는 것과 실제로 불러오는 것이 같아야 한다 — 미리 걸러 둔다. 예전 화면에서 만든 결재선은 칸이 겹치거나 비어 있을 수 있다.
+    var seenB = {};
+    var out = (steps || []).filter(function (s) {
       if (!s.approver || !canApprove(s.approver)) return false;      // 본인 칸도 그대로(2026-10-07 본인 넣기 허용)
       if (APPR_BOXES.indexOf(s.box) < 0 || seenB[s.box]) return false;
       seenB[s.box] = 1; return true;
@@ -2313,6 +2366,59 @@
   }
   function canApprove(u) {
     return !!PEOPLE[u] && ORG.some(function (o) { return o.username === u && o.active !== false; });
+  }
+
+  /* ── 조직도 자동 결재선 (2026-10-14 사용자 결정) ──
+     상신 창을 열 때 결재란을 조직도로 미리 채운다. 세 문서(운행일지·개인경비·법인카드)가 이 함수 하나를 쓰고,
+     관리 › 조직도 화면(drv-org.js)도 같은 함수로 부서별 결재선을 미리 보인다.
+       상신자의 조직도 행(앱 계정으로 이음) →
+         같은 센터·파트(unit)에서 직책이 센터장·파트장인 분 → 「센터·파트장」 칸
+         같은 팀에서 직책이 팀장인 분                        → 「팀장」 칸
+         같은 사업부에서 직책이 사업부장인 분                → 「사업부장」 칸
+         「대표이사」 칸은 채우지 않는다(빗금 /).
+       · 상신자 본인이 그 장이면 그 칸은 비운다(빗금).
+       · 센터·파트 없이 팀 직속이면 센터·파트장 칸은 말없이 비운다(담당 → 팀장 → 사업부장).
+       · 그 자리에 장이 없거나, 둘 이상이거나, 장에게 앱 계정이 없거나 조직도에서 내려가 있으면 비우고 까닭을 적는다
+         (「센터·파트장: 조직도에 직책이 없습니다 — 직접 골라 주세요」).
+     미리 채운 칸도 지금처럼 칸마다 바꾸거나 × 로 비울 수 있다 — 결재선의 정본은 여전히 상신자다. */
+  /** 결재 카드(상신 전)의 안내 — 세 문서가 같은 글을 쓴다. */
+  var APPR_HINT = '결재선은 상신 창을 열면 조직도(센터·파트장 → 팀장 → 사업부장)로 미리 채워집니다. 칸마다 바꾸거나 비울 수 있습니다.';
+  var AUTO_LEVELS = [
+    { box: '센터·파트장', roles: ['센터장', '파트장'], key: 'unit' },
+    { box: '팀장', roles: ['팀장'], key: 'team' },
+    { box: '사업부장', roles: ['사업부장'], key: 'division' }
+  ];
+  /**
+   * 조직도 자리 pos = { division, team, unit } 에 있는 사람(self = 그 사람의 조직도 행, 부서 미리보기면 null)의 자동 결재선.
+   * 돌려주는 값: { steps: [{ approver, box }](칸 순서), notes: [{ box, why, t }](비운 까닭 — t 는 화면 글) }
+   */
+  function lineAt(pos, self) {
+    var steps = [], notes = [];
+    var same = function (o, key) {
+      if ((o.division || '') !== (pos.division || '')) return false;
+      if (key === 'division') return true;
+      if ((o.team || '') !== (pos.team || '')) return false;
+      return key === 'team' || (o.unit || '') === (pos.unit || '');
+    };
+    AUTO_LEVELS.forEach(function (lv) {
+      if (!pos[lv.key]) return;                                   // 그 단계가 없는 자리(팀 직속 등) — 말없이 건너뜀
+      var heads = ORG.filter(function (o) { return lv.roles.indexOf(String(o.role || '').trim()) >= 0 && same(o, lv.key); });
+      if (self && heads.some(function (o) { return o === self || (o.id != null && o.id === self.id) || (self.username && o.username === self.username); })) return;   // 본인이 장
+      var on = heads.filter(function (o) { return o.active !== false; });
+      var note = function (why) { notes.push({ box: lv.box, why: why, t: lv.box + ': ' + why + ' — 직접 골라 주세요' }); };
+      if (!on.length) { note(heads.length ? '조직도에서 내려간 분뿐입니다(' + heads.map(function (o) { return o.name; }).join('·') + ')' : '조직도에 직책이 없습니다'); return; }
+      if (on.length > 1) { note('직책이 ' + on.length + '명입니다(' + on.map(function (o) { return o.name; }).join('·') + ')'); return; }
+      var h = on[0];
+      if (!h.username || !canApprove(h.username)) { note(h.name + ' 님은 앱 계정이 없습니다'); return; }
+      steps.push({ approver: h.username, box: lv.box });
+    });
+    return { steps: steps, notes: notes };
+  }
+  /** 이 계정 사람의 자동 결재선. 조직도에 없으면 steps 없이 까닭 하나. */
+  function autoLine(u) {
+    var me = orgOf(u);
+    if (!me) return { steps: [], notes: [{ box: '', why: '조직도에 없습니다', t: '조직도에 없어 결재선을 미리 채우지 못했습니다 — 직접 골라 주세요' }] };
+    return lineAt({ division: me.division || '', team: me.team || '', unit: me.unit || '' }, me);
   }
 
   /* ══════════════════ 관리 화면 공통 — 소속(사업부 › 팀 › 파트·센터)으로 좁히고 묶기 (2026-10-07) ══════════════════
@@ -2484,11 +2590,24 @@
     if (a && (a.status === 'submitted' || a.status === 'approved')) {
       toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
     }
-    // 빈 칸으로 연다 — 결재받을 분은 상신자가 이름을 넣어 고른다. 지난번 것은 버튼으로 불러온다.
-    // 이 주기에 넣다 만 결재선이 있으면 되살린다 — 창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게.
-    DRAFT = (DRAFT_KEEP[draftKey()] || []).slice();
+    // 미리 채우는 차례(2026-10-14 사용자 결정):
+    //   ① 이 기간에 넣다 만 결재선(창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게 — 다 비운 것도 그대로)
+    //   ② 이 기간에 반려·회수된 건의 결재선(새 칸 모양일 때만 — 상신자가 이미 손본 것)
+    //   ③ 조직도 자동 결재선(autoLine)
+    //   예전 칸 모양(v1)으로 올린 결재선은 미리 채우는 데 쓰지 않는다.
+    var key = draftKey();
+    if (Object.prototype.hasOwnProperty.call(DRAFT_KEEP, key)) {
+      DRAFT = DRAFT_KEEP[key].slice();
+    } else {
+      var back = sameCycleLine(), bs = back && usableSteps(back.steps);
+      if (bs) { DRAFT = bs; FILL_SRC[key] = { src: 'prev', notes: [] }; }
+      else { var al = autoLine(myName()); DRAFT = al.steps.slice(); FILL_SRC[key] = { src: 'auto', notes: al.notes }; }
+    }
     APPR_Q = '';
-    APPR_BOX = DRAFT.length ? nextEmptyBox(APPR_BOXES[0]) : APPR_BOXES[0];           // 「팀장」 칸부터 — 바로 이름을 칠 수 있게
+    // 넣을 칸: 비어 있으면 첫 칸(바로 이름을 칠 수 있게), 미리 채웠으면 까닭이 적힌 빈칸(「직접 골라 주세요」), 없으면 고르지 않는다.
+    var fs0 = FILL_SRC[key] || { notes: [] };
+    APPR_BOX = !DRAFT.length ? APPR_BOXES[0]
+      : (fs0.notes.map(function (n) { return n.box; }).filter(function (b) { return b && !draftAt(b); })[0] || '');
     renderSubmit();
     var box = $('apprQ'); if (box) box.focus();
   }
@@ -2586,11 +2705,12 @@
   }
 
   /* ── 결재란 칸 고르기 ──
-     상신 창은 운행기록부의 결재란 모양(담당 · 팀장 · 실장 · 사업부장 · 대표이사) 그대로 보여 준다.
-     상신자가 칸을 누르고 이름을 넣어 그 칸의 결재자를 고른다. 비워 둔 칸은 빗금(/)으로 찍히고 건너뛴다.
+     상신 창은 결재 문서의 결재란 모양(담당 · 센터·파트장 · 팀장 · 사업부장 · 대표이사 — 2026-10-14 새 칸) 그대로 보여 준다.
+     창을 열 때 조직도로 미리 채운다(openSubmit · autoLine). 상신자는 칸을 누르고 이름을 넣어 그 칸의 결재자를 고르고,
+     미리 채운 칸도 × 로 비우고 다른 분을 넣을 수 있다. 비워 둔 칸은 빗금(/)으로 찍히고 건너뛴다.
      결재는 왼쪽 칸부터 채워진 칸 차례로 진행된다(DRAFT 는 늘 칸 순서로 정렬해 둔다).
      (2026-10-02 사용자 결정 — "결재란 화면은 그대로 있고 본인이 선택해서 이름 넣는 방식, 건너뛰면 / 처리") */
-  var APPR_BOXES = BOXES.slice(1);       // 팀장 · 실장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
+  var APPR_BOXES = BOXES.slice(1);       // 센터·파트장 · 팀장 · 사업부장 · 대표이사 (담당 = 상신자 본인)
   var APPR_BOX = '';                     // 지금 이름을 넣을 칸
   function draftAt(box) { return DRAFT.filter(function (s) { return s.box === box; })[0] || null; }
   /** 칸 순서로 정렬하고, 한 칸에 한 명만 남긴다(같은 분이 여러 칸에 있어도 된다). */
@@ -2626,6 +2746,8 @@
 
   /** 주기별로 넣다 만 결재선(상신 창을 닫아도 남는다, 상신하면 비운다). */
   var DRAFT_KEEP = {};
+  /** 주기별로 처음 미리 채운 출처 — { src: 'auto'(조직도) | 'prev'(이번 기간 반려·회수 건), notes: 비운 칸의 까닭 }. */
+  var FILL_SRC = {};
   function renderSubmit() {
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
     SUBMIT.token = null; SUBMIT.send = null;
@@ -2647,17 +2769,19 @@
       '<div class="ag-lab" aria-hidden="true">결<br>재</div>' +
       '<div class="ag-cell me"><div class="ag-h">담당</div><div class="ag-b"><b>' + esc(ME.name || myName()) + '</b>' +
       '<small>' + esc(me0.position || '본인') + '</small></div></div>';
+    // 칸 머리 — 「센터·파트장」은 폰 칸에 한 줄로 안 들어가 가운뎃점 뒤에서 줄을 바꿀 수 있게 한다.
+    var bh = function (b) { return esc(b).replace('·', '·<wbr>'); };
     APPR_BOXES.forEach(function (b) {
       var s = draftAt(b), on = APPR_BOX === b;
       if (s) {
         var u = personOf(s.approver);
-        h += '<div class="ag-cell set' + (on ? ' on' : '') + '"><div class="ag-h">' + esc(b) + '</div>' +
+        h += '<div class="ag-cell set' + (on ? ' on' : '') + '" data-agset="' + esc(b) + '" data-appr="' + esc(s.approver) + '"><div class="ag-h">' + bh(b) + '</div>' +
           '<div class="ag-b"><b>' + esc(u.name || s.approver) + '</b><small>' + esc(u.position || '') + '</small>' +
           '<button class="ag-x" data-agclr="' + esc(b) + '" aria-label="' + esc(b) + ' 칸 비우기">' + ic('close', 11) + '</button></div></div>';
       } else {
         h += '<button class="ag-cell empty' + (on ? ' on' : '') + '" data-agbox="' + esc(b) + '" aria-pressed="' + (on ? 'true' : 'false') + '" ' +
           'aria-label="' + esc(b) + ' 칸 — 비어 있음(건너뜀). 눌러서 이름 넣기">' +
-          '<span class="ag-h">' + esc(b) + '</span><span class="ag-b"><span class="ag-pick">' + (on ? '이름 입력' : '눌러서 넣기') + '</span></span></button>';
+          '<span class="ag-h">' + bh(b) + '</span><span class="ag-b"><span class="ag-pick">' + (on ? '이름 입력' : '눌러서 넣기') + '</span></span></button>';
       }
     });
     h += '</div>';
@@ -2665,6 +2789,18 @@
     h += '<div class="ag-order">' + (DRAFT.length
       ? '결재 순서: ' + DRAFT.map(function (s, i) { return (i + 1) + '. ' + esc(nameOf(s.approver)) + '(' + esc(s.box) + ')'; }).join(' → ')
       : '아직 넣은 분이 없습니다. 결재받을 칸을 누르고 이름을 넣어 주세요.') + '</div>';
+    // 미리 채운 출처 + 비운 칸의 까닭(그 칸을 아직 비워 둔 동안만) — 2026-10-14
+    var fs = FILL_SRC[draftKey()];
+    if (fs) {
+      var left = (fs.notes || []).filter(function (n) { return !n.box || !draftAt(n.box); });
+      h += '<div class="ag-fill" data-fill="' + esc(fs.src) + '">' + (fs.src === 'prev'
+        ? '이번 기간에 반려·회수된 결재선을 불러왔습니다.'
+        : fs.src === 'last' ? '지난번 결재선을 불러왔습니다.'
+          : '조직도에서 결재선을 미리 채웠습니다(센터·파트장 → 팀장 → 사업부장).') + ' 칸마다 바꾸거나 × 로 비울 수 있습니다.</div>' +
+        (left.length ? '<div class="ag-notes">' + left.map(function (n) {
+          return '<div data-agnote="' + esc(n.box) + '">' + ic('alert', 13) + '<span>' + esc(n.t) + '</span></div>';
+        }).join('') + '</div>' : '');
+    }
 
     // 이름 넣기 — 고른 칸에 들어간다.
     if (APPR_BOX) {
@@ -2677,8 +2813,10 @@
         '<div class="acand" id="apprCand">' + apprCandHtml() + '</div></div>';
     }
 
+    // 지난번 결재선(새 칸 모양으로 올린 것만) — 지금 칸과 다를 때만 버튼을 보인다(미리 채운 것과 같으면 누를 까닭이 없다).
     var prev = previousSteps();
-    if (prev && !DRAFT.length) {
+    var sameLine = function (x, y) { return JSON.stringify(x.map(function (s) { return s.box + ':' + s.approver; })) === JSON.stringify(y.map(function (s) { return s.box + ':' + s.approver; })); };
+    if (prev && !sameLine(prev, DRAFT)) {
       h += '<div style="margin-top:10px"><button class="btn sm" id="btnPrevLine">' + ic('list', 13) + '지난번 결재선 불러오기 — ' +
         esc(prev.map(function (s) { return nameOf(s.approver) + '(' + s.box + ')'; }).join(' → ')) + '</button></div>';
     }
@@ -3844,8 +3982,7 @@
     return '<section class="sect" style="margin-top:16px"><div class="astrip">' +
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
-      (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' +
-        '결재선은 상신할 때 결재받을 분의 이름을 넣어 직접 고릅니다. 지난번 결재선을 불러올 수도 있습니다.</div>') +
+      (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선을 불러올 수도 있습니다.</div>') +
       (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x); })(EXT.apprExtra(a)) : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
         withdrawHow(a) + '</div>' : '') +
@@ -5139,8 +5276,7 @@
        다시 넣어야 한다. 브라우저는 한글 글꼴도, 사진도 이미 갖고 있다.
        그래서 화면을 인쇄 규격(A4)으로 짜고 브라우저에 맡긴다 — 미리보기도 공짜다.  */
 
-  /** 사내 양식 결재란. 배정 안 된 칸은 빗금으로 지운다. */
-  var FORM_BOXES = ['담당', '팀장', '실장', '사업부장', '대표이사'];
+  /* 사내 양식 결재란 칸 이름은 결재 건마다 boxLabels(a) 로 고른다(예전 건 v1 · 새 건 v2, 2026-10-14). 배정 안 된 칸은 빗금으로 지운다. */
   /** 기본지급액 — 사내 양식 수식 그대로(ExcelExporter.kt 291행). */
   function basePay(km) {
     if (km <= 499) return 0;
@@ -5376,7 +5512,7 @@
     //   아직 결재 안 했거나 반려한 사람의 이름을 찍으면 서명처럼 보여
     //   사내 결재 문서가 위조로 오해된다(2026-09-15 지적). 그 칸은 비워서
     //   앱 엑셀처럼 도장을 찍을 수 있게 둔다.
-    var boxMap = boxesOf(a, u, mine);
+    var boxMap = boxesOf(a, u, mine), FORM_BOXES = boxLabels(a);
     var signIds = Object.keys(boxMap).map(function (k) { return boxMap[k].signId; })
       .filter(function (id) { return id && SIGNS[id] === undefined && !SIGN_ASKED[id]; });
     if (signIds.length) loadSigns(signIds).then(render);
@@ -5392,7 +5528,7 @@
       pinfo('차 종', esc(veh.vehicle_type || u.vehicle_type || '')) +
       '</tbody></table>' +
       '<table class="pappr"><tbody><tr><th rowspan="2" class="plabel">결<br>재</th>' +
-      FORM_BOXES.map(function (b) { return '<th>' + b + '</th>'; }).join('') + '</tr><tr>' +
+      FORM_BOXES.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') + '</tr><tr>' +
       FORM_BOXES.map(function (b) {
         var v = boxMap[b];
         if (!v) return '<td class="pslash"></td>';
@@ -5948,7 +6084,8 @@
         // 전부 맞은 상태. 여기서 표를 그대로 두면 '아직 할 일이 있다' 로 읽힌다.
         h += '<div class="panel"><div class="blank"><div class="ico" style="color:var(--ok)">' +
           ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐습니다.</div>' +
-          '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같습니다.</div></div></div>';
+          '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같습니다.</div>' +
+          '<button class="btn pri" style="margin-top:14px" data-tollback="1">← 통행료로 돌아가기</button></div></div>';
       } else {
         h += '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
           '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"' +
@@ -6121,7 +6258,12 @@
         else toast(applied + '건 확정했습니다.');
         // 남은 것만 다시 계산
         hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
-        paintPills(); render();
+        paintPills();
+        // 모든 카드를 다 맞췄으면 영수증 › 통행료 차례로 돌아가 반영된 금액을 보여 준다(2026-10-14 사용자).
+        // 건너뛴 것·경고가 있으면 여기 남아 까닭을 보게 한다.
+        var left = HP.groups.some(function (x) { return x.plate && (x.matched || []).some(function (e) { return !hpDone(e); }); });
+        if (applied && !skipped.length && !res.j.warning && !left) { tollBack(applied + '건 확정했습니다 — 통행료에 반영됐습니다.'); return; }
+        render();
         // 통째로 다시 그리면 스크롤이 맨 위로 간다 — 눌렀던 카드로 돌려놓는다.
         var card = document.querySelector('[data-hpcard="' + gi + '"]');
         if (card) card.scrollIntoView({ block: 'start' });
@@ -6757,6 +6899,14 @@
       html = html.slice(0, at) + orgBarHtml() + html.slice(at);
     }
     var sn = STEP_OF[VIEW];
+    // 하이패스 대조·직접 채우기는 영수증 › 통행료 차례 안의 화면이다 — 맨 아래는 「통행료로 돌아가기」 하나(2026-10-14 사용자).
+    //   예전에는 「← 1 운행 기록」만 있어서 다 맞춘 뒤 어디로 가야 할지 몰랐다.
+    if ((VIEW === 'hipass' || VIEW === 'tollfill') && !isAll() && !isMulti()) {
+      html += '<div class="nextstep"><span class="stepbadge">2</span><span class="t">' +
+        '다 맞췄으면 <b>통행료</b> 차례로 돌아가 반영된 금액을 확인하고 「다음: 주유」로 넘어가세요.</span>' +
+        '<button class="btn pri cta" data-tollback="1">← 통행료로 돌아가기</button></div>';
+      sn = 0;
+    }
     if (sn && sn <= 3 && !isAll() && !isMulti() && !cycleLocked(myName())) {
       var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
@@ -7163,6 +7313,10 @@
       var ni = +el.dataset.evsub, ci = evSub();
       setEvSub(ni, ni > ci ? 'fwd' : ni < ci ? 'back' : ''); render(); return;
     }
+    if (e.target.closest('[data-tollback]')) {
+      if (VIEW === 'tollfill' && unsavedFills()) { toast('저장하지 않은 통행료 ' + n0(unsavedFills()) + '구간이 있습니다. 먼저 저장해 주세요.', true); return; }
+      tollBack(); return;
+    }
     if ((el = e.target.closest('[data-evsubmove]'))) {
       var d = +el.dataset.evsubmove, ti = evSub() + d;
       setEvSub(ti, d > 0 ? 'fwd' : 'back');
@@ -7321,7 +7475,7 @@
     if (e.target.closest('#ofClear')) { ORGF = { div: '', team: '', unit: '' }; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
     if (e.target.closest('#btnPrevLine')) {
       var pv = previousSteps();
-      if (pv) { DRAFT = pv.slice(); APPR_Q = ''; APPR_BOX = ''; renderSubmit(); }
+      if (pv) { DRAFT = pv.slice(); FILL_SRC[draftKey()] = { src: 'last', notes: [] }; APPR_Q = ''; APPR_BOX = ''; renderSubmit(); }
       return;
     }
     if (e.target.closest('#btnApprPdf')) { doPrint(); return; }
@@ -7373,8 +7527,9 @@
         if (!DRAFT.length || DRAFT.some(function (s) { return !s.approver; })) {
           toast('결재선을 다시 확인해 주세요.', true); renderSubmit(); return;
         }
+        // box_set 'v2' — 새 결재란 칸(담당·센터·파트장·팀장·사업부장·대표이사)으로 올린다는 표시(2026-10-14). 세 문서 같다.
         var payload = {
-          action: 'submit', cycle: cyc0,
+          action: 'submit', cycle: cyc0, box_set: 'v2',
           steps: DRAFT.map(function (s) { return { approver: s.approver, box: s.box }; })
         };
         if (subKD) payload.kind = subKind;             // 개인경비 상신 — 서버가 그 기간 expense_items 를 굳힌다
@@ -7684,22 +7839,11 @@
     });
   }
 
+  /** 운행기록부 결재란 — 세 문서 공통 docBoxes 를 그대로 쓴다(2026-10-14 「세 결재 시스템 동일」).
+   *  담당 칸: 상신된 건이면 상신 때 서명, 상신 전 미리보기(·반려·회수 뒤)면 지금 내 서명. */
   function boxesOf(a, u, mine) {
-    var at = a && a.submitted_at ? Date.parse(a.submitted_at) : NaN;
-    // 담당 칸: 상신된 건이면 상신 때 서명, 상신 전 미리보기면 지금 내 서명.
-    var live = !a || a.status === 'withdrawn' || a.status === 'rejected';
-    var mySign = live && mine === myName() && MYSIGN && MYSIGN.image ? MYSIGN.id : null;
-    var b = { 담당: { name: u.name || mine, date: isFinite(at) ? md(at) : '',
-      signId: live ? mySign : ((a.snapshot || {}).sign_id || null) } };
-    ((a && a.steps) || []).forEach(function (s) {
-      if (s.box && FORM_BOXES.indexOf(s.box) > 0) {
-        var t = s.acted_at ? Date.parse(s.acted_at) : NaN;
-        b[s.box] = s.result === 'approved'
-          ? { name: s.name || s.approver, date: isFinite(t) ? md(t) : '', signId: s.sign_id || null }
-          : { name: '', date: '' };
-      }
-    });
-    return b;
+    var mySign = mine === myName() && MYSIGN && MYSIGN.image ? MYSIGN.id : null;
+    return docBoxes(a, u.name || mine, mySign);
   }
   /**
    * 정산 영수증(주차·통행료, 0원 초과)을 어느 장에 실을지 **한 번에** 정한다. 돌려주는 값: 장 순서대로 [{ 증빙 id: 1 }].
@@ -7858,11 +8002,11 @@
       return t.username === mine && PRINT_PURPOSES.indexOf(t.purpose || '') >= 0;
     });
     var g = platesOf(all, u.plate_no || '');
-    var boxes = boxesOf(a, u, mine);
+    var boxes = boxesOf(a, u, mine), labels = boxLabels(a);
     var pick = evidBySheet(mine, g.plates, r);
     var sheets = g.plates.map(function (p, i) {
       var d = sheetDataFor(mine, u, p, g.by[p], r, pick[i]);
-      d.boxes = boxes;
+      d.boxes = boxes; d.boxLabels = labels;
       return d;
     });
     var evid = EVID.filter(function (e) {
@@ -7882,8 +8026,9 @@
     var hasRow = sheets.some(function (s) { return s.rows.length || s.orphans.length; });
     return { sheets: sheets, scans: scans, photos: photos, any: hasRow || scans.length > 0 || photos.length > 0 };
   }
-  /** 엑셀 파일들(차량별 1개). 지금 전역에서 만든다 — downloadXlsx 와 같은 규칙·같은 파일 이름. */
-  function xlsxFiles(who) {
+  /** 엑셀 파일들(차량별 1개). 지금 전역에서 만든다 — downloadXlsx 와 같은 규칙·같은 파일 이름.
+   *  a = 그 문서의 결재 건(결재란 칸 이름을 고른다 — 예전 건 v1). 안 넘기면 그 사람·기간의 운행일지 결재 건. */
+  function xlsxFiles(who, a) {
     if (!window.Xlsx) return [];
     var mine = who || myName(), u = personOf(mine), r = cycleRange(CYC.y, CYC.m);
     var all = TRIPS.filter(function (t) {
@@ -7892,9 +8037,11 @@
     // 운행이 없어도 영수증(주차·통행료)만 있으면 근거자료 행만 든 한 장을 만든다 — PDF 와 같은 내용이어야 한다.
     var g = platesOf(all, hasSettleEvid(mine, r) ? (u.plate_no || '') : null);
     var pick = evidBySheet(mine, g.plates, r);
+    var labels = boxLabels(a === undefined ? apprOf(mine, CYCKEY()) : a);
     return g.plates.map(function (plate, i) {
       var safe = String(plate).replace(/[^0-9A-Za-z가-힣]/g, '') || '차량';
       var data = sheetDataFor(mine, u, plate, g.by[plate], r, pick[i]);
+      data.boxLabels = labels;
       return {
         name: 'ATEC Driving 운행일지_' + safe + '_' + ymd(r.lo) + '_' + ymd(r.hi - 1) + '.xlsx',
         bytes: window.Xlsx.build(data),
@@ -7963,6 +8110,9 @@
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
       pdfDocFor: pdfDocFor, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
+      // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
+      BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes,
+      autoLine: autoLine, lineAt: lineAt, apprHint: APPR_HINT, canApprove: canApprove,
       state: function () {
         return {
           ME: ME, VIEW: VIEW, CYC: CYC, CYCKEY: CYCKEY(), LOADED: LOADED,

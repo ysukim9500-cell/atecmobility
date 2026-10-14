@@ -1,7 +1,7 @@
 <!--
   ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
-  같이 올라가야 하는 것: driving-app.js · drv-verify.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
+  같이 올라가야 하는 것: driving-app.js · drv-verify.js · drv-prints.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
                          card-rules.js · card-erp.js · card-sheet.js · drv-card.js (법인카드)
                          vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF / xlsx.full.min.js · LICENSE-SheetJS.txt — 카드 엑셀)
                          brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
@@ -425,6 +425,14 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .vchip{border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);padding:3px 10px;cursor:pointer;font:inherit}
 .vchip:hover{border-color:var(--ink-400);background:var(--sunken)}
 .aext{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+/* 결재 완료 문서 출력 딱지(2026-10-14, drv-prints.js) — 「미출력」 / 「출력 N회 · 마지막 MM.DD HH:MM 이름」. 누르면 출력 기록 창 */
+.prb{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--ink-200);border-radius:999px;background:var(--surface);
+  padding:3px 10px;cursor:pointer;font:inherit;font-size:12px;line-height:1.5;color:var(--ink-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prb:hover{border-color:var(--ink-400);background:var(--sunken)}
+.prb.none{color:var(--warn);border-color:#EBD3A6;background:var(--warn-50)}
+.prb.done{color:var(--ok);border-color:#BFE3D3;background:var(--ok-50)}
+.prline{margin-top:4px}
+table.prhist tr.old td{color:var(--ink-500)}
 /* 결재 문서 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 PDF 를 쪽마다 그림으로, 카드 아래 세로로 */
 .apv{margin-top:12px;padding-top:10px;border-top:1px dashed var(--ink-200);min-width:0;max-width:100%}
 .apvbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -993,7 +1001,7 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 
 /* 상신 창 */
 .aline-list{border-top:1px solid var(--ink-100);margin-top:4px}
-/* ── 상신 창의 결재란 — 운행기록부에 찍히는 모양 그대로(결 재 | 담당 | 팀장 | 실장 | 사업부장 | 대표이사) ──
+/* ── 상신 창의 결재란 — 결재 문서에 찍히는 모양 그대로(결 재 | 담당 | 센터·파트장 | 팀장 | 사업부장 | 대표이사 — 2026-10-14 새 칸) ──
    빈칸은 빗금(/)이 그어진 채로 보인다 — 문서에도 그렇게 찍히고 그 단계는 건너뛴다. */
 .agrid{display:grid;grid-template-columns:28px repeat(5,minmax(0,1fr));margin-top:8px;border:1px solid var(--ink-700);
   border-radius:4px;overflow:hidden;background:var(--surface)}
@@ -1020,10 +1028,18 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
   cursor:pointer;display:grid;place-items:center}
 .ag-x:hover{background:var(--ink-100);color:var(--ink-900)}
 .ag-order{margin-top:8px;font-size:12.5px;color:var(--ink-700);line-height:1.6}
+/* 미리 채운 출처 · 비운 칸의 까닭(조직도 자동 결재선, 2026-10-14) */
+.ag-fill{margin-top:6px;font-size:12px;color:var(--ink-600);line-height:1.6}
+.ag-notes{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.ag-notes>div{display:flex;gap:7px;align-items:flex-start;padding:7px 10px;background:var(--warn-50);border-radius:var(--r-xs);
+  font-size:12px;color:var(--warn);line-height:1.5}
+.ag-notes svg{margin-top:2px;flex:none}
 .ag-pick{white-space:nowrap}
 /* 폰: 칸이 좁다(약 55px). 빈칸 안내 글자는 고른 칸에만 짧게, × 는 칸 위 모서리로 — 이름에 겹치지 않게. */
 @media (max-width:480px){
-  .ag-h{font-size:11px;padding:5px 1px}
+  /* 「센터·파트장」은 한 줄에 안 들어간다 — 가운뎃점 뒤에서 두 줄로, 모든 칸 머리를 두 줄 높이로 맞춘다 */
+  .ag-h{font-size:11px;padding:3px 1px;white-space:normal;word-break:keep-all;line-height:1.25;min-height:calc(2.5em + 6px);
+    display:flex;align-items:center;justify-content:center}
   .ag-b{min-height:58px;padding:14px 2px 6px}
   .ag-b b{font-size:12px}
   .ag-b small{font-size:10.5px}
@@ -1845,6 +1861,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 <!-- 확장 모듈은 본체보다 먼저 싣는다(DrvExtQ 에 올려 두면 본체가 붙인다). PDF 도구·글꼴은 쓸 때 받는다. -->
 <script src="sheetpdf.js"></script>
 <script src="drv-verify.js"></script>
+<script src="drv-prints.js"></script>
 <script src="drv-org.js"></script>
 <script src="drv-expense.js"></script>
 <!-- 법인카드 지출결의(2026-10-09) — 순수 모듈 셋을 먼저, 확장 모듈은 본체 앞에. SheetJS(vendor/xlsx.full.min.js)는 올리기 창을 열 때만 싣는다. -->
