@@ -232,6 +232,8 @@
   var TRIPS = [], USERS = {}, VEHICLES = [], EVID = [], EDUV = [], EDUP = [], EDUT = [];
   var APPR = [], PEOPLE = {};               // 결재 건 · 사람 목록(이름·부서·직급)
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
+  // 관리자가 사람마다 지정한 결재선(driving_line_override, 2026-10-14) — { 상신자 아이디: 행 }. 표가 없으면 LINE_OV_OK = false.
+  var LINE_OV = {}, LINE_OV_OK = false;
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
   var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [],
     // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
@@ -684,7 +686,9 @@
       // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
       fetchAll('/rest/v1/v_driving_people?select=*&order=name.asc'),
       // 조직도(사람 명단 — 관리 화면). 내려간 사람(active=false)은 받지 않는다.
-      fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc')
+      fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc'),
+      // 관리자가 지정한 결재선(2026-10-14). 표가 아직 없거나 못 받아도 화면은 멈추지 않는다(자동 결재선만 쓴다).
+      fetchLineOv()
     ]);
 
     Promise.all([tripsP, staticP, extP]).then(function (both) {
@@ -711,6 +715,7 @@
         APPR = out[8] || [];
         PEOPLE = {}; (out[9] || []).forEach(function (p) { PEOPLE[p.username] = p; });
         ORG = out[10] || [];
+        setLineOv(out[11]);
         STATIC_AT = Date.now();
       }
       RATE_MISS = {};
@@ -721,6 +726,8 @@
       paintPills();
       paintCycle();
       render();
+      // 안전교육 이번 회차 내 대상 여부 스냅샷(앱 MainScreen 의 eduEnsureSelfTarget 과 같다, 2026-10-14).
+      eduEnsureSelf();
     }).catch(function (e) {
       if (seq !== LOAD_SEQ) return;
       LOADING = false;
@@ -1252,26 +1259,68 @@
     var r = viewRange();
     return EVID.filter(function (e) { var d = Number(e.date_millis); return d >= r.lo && d < r.hi; });
   }
-  function eduMonthKey() {
-    // ★ 교육 회차 키 = 시청 기간이 **시작하는 달**(앱 EduMonth.key: 21일 이후면 이번 달, 20일까지는 전달).
-    //   보고 있는 정산 주기 CYC 는 **끝나는 달**로 부르므로(9/21~10/20 = 10월분) 한 달을 뺀다.
-    //   예전에는 CYC 를 그대로 써서 웹이 앱보다 한 회차 앞을 보여 주고, 의무 대상자에게 '대상 아님'이라 했다.
-    var c = addCycle(CYC, -1);
-    return c.y + '-' + pad(c.m);
+  /* ── 안전교육 회차·의무 — 앱 edu/EduModels.kt(EduMonth)·EduLogic.kt 를 그대로 옮긴 것(2026-10-14) ──
+     회차 키 "YYYY-MM" = 시청 기간이 **시작하는 달**. 21일에 열리고 다음 달 20일이 마감(KST).
+     예: 회차 2026-09 = 평가 8/21~9/20 내역 → 시청 9/21~10/20.
+     ★ 보고 있는 정산 기간(CYC)이 아니라 **지금 시각**으로 정한다 — 앱과 같다. 예전 웹은 CYC 에서 한 달을 빼서
+       지난 기간을 보고 있으면 지난 회차가 '이번 회차' 로 나왔다.
+     한쪽을 고치면 앱(Kotlin·Swift)도 같이 고친다 — 같은 사람의 의무·진도가 앱과 웹에서 다르면 안 된다. */
+  var EDU_START_DAY = 21;          // 앱 EduMonth.CYCLE_START_DAY
+  var EDU_THRESHOLD = 80;          // 앱 EDU_TARGET_THRESHOLD — 직전 평가기간 평균이 이보다 낮으면 의무 대상
+  function eduKeyAt(ms) {
+    var d = kd(ms), y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
+    if (d.getUTCDate() < EDU_START_DAY) { m--; if (m < 1) { m = 12; y--; } }
+    return y + '-' + pad(m);
+  }
+  function eduNowKey() { return eduKeyAt(Date.now()); }
+  function eduYm(month) { var p = String(month || '').split('-'); return { y: +p[0], m: +p[1] }; }
+  /** 이번 회차의 평가 [시작, 끝) = 전달 21일 00:00 ~ 회차달 21일 00:00 (KST). 앱 EduMonth.prevRange. */
+  function eduPrevRange(nowMs) {
+    var c = eduYm(eduKeyAt(nowMs));
+    return { lo: Date.UTC(c.y, c.m - 2, EDU_START_DAY) - KST, hi: Date.UTC(c.y, c.m - 1, EDU_START_DAY) - KST };
+  }
+  /** 마감 라벨 = 다음 달 20일(예: 회차 2026-08 → "9/20"). */
+  function eduDeadlineLabel(month) { var c = eduYm(month); return (c.m % 12 + 1) + '/' + (EDU_START_DAY - 1); }
+  /** 공개일 라벨(예: 회차 2026-09 → "9/21"). */
+  function eduOpenLabel(month) { return eduYm(month).m + '/' + EDU_START_DAY; }
+  /** 공개된 회차인가 — 회차 키는 글자 순서가 시간 순서와 같다. */
+  function eduIsOpen(month, nowMs) { return String(month) <= eduKeyAt(nowMs == null ? Date.now() : nowMs); }
+  /** 마감 카운트다운: "D-3" / "D-DAY" / 지나면 "지연 5일". */
+  function eduDday(month, nowMs) {
+    var c = eduYm(month), t = kd(nowMs == null ? Date.now() : nowMs);
+    var dl = Date.UTC(c.y, c.m, EDU_START_DAY - 1), today = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+    var d = Math.round((dl - today) / 864e5);
+    return d > 0 ? 'D-' + d : d === 0 ? 'D-DAY' : '지연 ' + (-d) + '일';
+  }
+  /** 그 사람의 영상별 진도(%) — video_id → progress_pct. */
+  function eduPctOf(user) {
+    var m = {};
+    EDUP.forEach(function (p) { if (p.username === user) m[p.video_id] = Number(p.progress_pct) || 0; });
+    return m;
+  }
+  /** 그 사람이 의무 대상으로 지정된 회차들(month → true). */
+  function eduTargetMonths(user) {
+    var m = {};
+    EDUT.forEach(function (t) { if (t.username === user) m[t.month] = true; });
+    return m;
+  }
+  /** 의무 영상 = 대상으로 지정된 모든 회차의 영상 중 진도 100 미만(이월은 이 정의로 저절로 된다).
+   *  삭제 영상 제외. 회차 오름차순 → id 오름차순(오래된 의무 먼저). 앱 EduLogic.obligations. */
+  function eduObligations(months, pct) {
+    return EDUV.filter(function (v) { return !v.deleted && months[v.month] && (pct[v.id] || 0) < 100; })
+      .sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : (Number(a.id) - Number(b.id)); });
+  }
+  /** 그 회차 수료 — 그 회차 영상 전부 100%. 영상 0개면 true(의무 없음). 앱 EduLogic.monthCompleted. */
+  function eduMonthDone(month, pct) {
+    return EDUV.filter(function (v) { return !v.deleted && v.month === month; })
+      .every(function (v) { return (pct[v.id] || 0) >= 100; });
   }
   function myName() { return (ME && (ME.username || ME.app_username)) || ''; }
+  /** 메뉴 숫자 = 앱 홈 배너의 의무 건수(이월 포함). 의무 대상이 아니면 0. */
   function eduTodo() {
     if (!ME) return 0;
-    var key = eduMonthKey(), mine = myName();
-    // ★ 의무 대상(edu_targets)이 아니면 숫자를 띄우지 않는다. 예전에는 뱃지가
-    //   빨갛게 뜨는데 들어가 보면 "의무 대상이 아닙니다" 라고만 적혀 있었다.
-    var amTarget = EDUT.some(function (t) { return t.month === key && t.username === mine; });
-    if (!amTarget) return 0;
-    var vids = EDUV.filter(function (v) { return v.month === key; });
-    if (!vids.length) return 0;
-    var done = {};
-    EDUP.forEach(function (p) { if (p.username === mine && p.completed_at) done[p.video_id] = 1; });
-    return vids.filter(function (v) { return !done[v.id]; }).length;
+    var me = myName();
+    return eduObligations(eduTargetMonths(me), eduPctOf(me)).length;
   }
 
   /* ══════════════════ 안전운전 점수 ══════════════════
@@ -2387,7 +2436,7 @@
          (「센터·파트장: 조직도에 직책이 없습니다 — 직접 골라 주세요」).
      미리 채운 칸도 지금처럼 칸마다 바꾸거나 × 로 비울 수 있다 — 결재선의 정본은 여전히 상신자다. */
   /** 결재 카드(상신 전)의 안내 — 세 문서가 같은 글을 쓴다. */
-  var APPR_HINT = '결재선은 상신 창을 열면 조직도(센터·파트장 → 팀장 → 사업부장)로 미리 채워집니다. 칸마다 바꾸거나 비울 수 있습니다.';
+  var APPR_HINT = '결재선은 상신 창을 열면 조직도(센터·파트장 → 팀장 → 사업부장)로, 관리자가 지정해 두었으면 그 결재선으로 미리 채워집니다. 칸마다 바꾸거나 비울 수 있습니다.';
   var AUTO_LEVELS = [
     { box: '센터·파트장', roles: ['센터장', '파트장'], key: 'unit' },
     { box: '팀장', roles: ['팀장'], key: 'team' },
@@ -2424,6 +2473,77 @@
     var me = orgOf(u);
     if (!me) return { steps: [], notes: [{ box: '', why: '조직도에 없습니다', t: '조직도에 없어 결재선을 미리 채우지 못했습니다 — 직접 골라 주세요' }] };
     return lineAt({ division: me.division || '', team: me.team || '', unit: me.unit || '' }, me);
+  }
+
+  /* ── 관리자가 지정한 결재선 (2026-10-14 사용자: 「결재라인을 일일이 수정할 수 있게」) ──
+     관리 › 조직도에서 관리자가 사람마다(또는 한 부서 모두) 칸마다 정한다 — driving_line_override.boxes
+       키 없음 = 그 칸은 자동(조직도 직책) · '' = 비움(빗금) · 아이디 = 그 분
+     상신 창은 「이번 기간 넣다 만 것 → 이번 기간 반려·회수된 결재선 → 관리자 지정 → 조직도 자동」 차례로 미리 채운다.
+     직원은 여전히 칸마다 바꾸거나 비울 수 있다(결재선의 정본은 상신자). 서버(approval-act)는 바뀌지 않는다.
+       · 지정한 분이 지금 결재할 수 없으면(조직도에서 내려감·계정 없어짐) 그 칸만 자동으로 채우고 까닭을 남긴다.
+       · 지정한 분이 상신자 본인이면 자동과 같이 그 칸은 비운다. */
+  /** 표가 없거나(배포 순서) 못 받으면 null — 그때는 자동 결재선만 쓰고 「결재선 지정」을 숨긴다. */
+  /** 지정 결재선 받기 — 1000줄씩 끝까지(서버 기본 상한에 말없이 잘리지 않게, 2026-10-14 검증로봇).
+   *  표가 아직 없으면(404) null = 기능 숨김. 그 밖의 실패(5xx·네트워크)는 undefined = 받아 둔 목록을 그대로 둔다
+   *  — 한 번 실패로 관리자 지정이 사라지고 자동 결재선이 대신 채워지던 것. */
+  function fetchLineOv() {
+    var acc = [];
+    function page(off) {
+      return apiRetry('/rest/v1/driving_line_override?select=username,boxes,updated_by,updated_at&order=username.asc&offset=' +
+        off + '&limit=1000').then(function (r) {
+        if (r.status === 404) return null;
+        if (!r.ok) return undefined;
+        return r.json().then(function (a) {
+          if (!Array.isArray(a)) return undefined;
+          acc = acc.concat(a);
+          return a.length < 1000 || off > 40000 ? acc : page(off + 1000);
+        });
+      });
+    }
+    return page(0).catch(function () { return undefined; });
+  }
+  function setLineOv(rows) {
+    if (rows === undefined) return;                          // 받지 못함 — 전에 받은 목록 그대로
+    LINE_OV = {}; LINE_OV_OK = Array.isArray(rows);
+    (rows || []).forEach(function (x) {
+      if (x && x.username && x.boxes && typeof x.boxes === 'object' && !Array.isArray(x.boxes)) LINE_OV[x.username] = x;
+    });
+  }
+  /** 이 사람에게 관리자가 지정한 칸들({ 칸: '' | 아이디 }), 없으면 null. */
+  function lineOverride(u) { var x = u && LINE_OV[u]; return x ? x.boxes : null; }
+  /** 지정(boxes)을 자동 결재선(al = lineAt·autoLine 결과)에 칸마다 얹는다. self = 상신자 아이디(본인 칸은 비움). */
+  function applyOverride(al, boxes, self) {
+    var steps = [], notes = [], anyAuto = false;
+    APPR_BOXES.forEach(function (b) {
+      var a = al.steps.filter(function (s) { return s.box === b; })[0];
+      var an = al.notes.filter(function (n) { return n.box === b; });
+      if (!Object.prototype.hasOwnProperty.call(boxes, b)) {          // 자동
+        anyAuto = true;
+        if (a) steps.push(a);
+        notes = notes.concat(an);
+        return;
+      }
+      var v = boxes[b];
+      if (!v) return;                                                 // 비움(빗금)
+      if (self && v === self) return;                                 // 본인 칸은 비움(자동과 같은 규칙)
+      if (canApprove(v)) { steps.push({ approver: v, box: b }); return; }
+      // 지정한 분이 지금 결재할 수 없다 — 그 칸만 자동으로. keep = 칸이 채워져도 상신 창에 까닭을 남긴다.
+      var why = '관리자가 지정한 ' + nameOf(v) + ' 님은 지금 결재할 수 없습니다';
+      if (a) { steps.push(a); notes.push({ box: b, keep: true, why: why, t: b + ': ' + why + ' — 조직도로 채웠습니다' }); }
+      else if (an.length) notes = notes.concat(an.map(function (n) { return { box: b, why: why + ' · ' + n.why, t: b + ': ' + why + ' · ' + n.why + ' — 직접 골라 주세요' }; }));
+      else notes.push({ box: b, why: why, t: b + ': ' + why + ' — 직접 골라 주세요' });
+    });
+    // 칸 없는 까닭(조직도에 없음)은 자동 칸이 하나라도 남을 때만
+    if (anyAuto) al.notes.forEach(function (n) { if (!n.box) notes.push(n); });
+    return { steps: steps, notes: notes, part: anyAuto };
+  }
+  /** 이 사람의 실제로 미리 채워질 결재선(지정 + 자동). over = 관리자 지정이 있는가. */
+  function effLine(u) {
+    var al = autoLine(u), b = lineOverride(u);
+    if (!b) { al.over = false; return al; }
+    var m = applyOverride(al, b, u);
+    m.over = true; m.boxes = b;
+    return m;
   }
 
   /* ══════════════════ 관리 화면 공통 — 소속(사업부 › 팀 › 파트·센터)으로 좁히고 묶기 (2026-10-07) ══════════════════
@@ -2598,7 +2718,8 @@
     // 미리 채우는 차례(2026-10-14 사용자 결정):
     //   ① 이 기간에 넣다 만 결재선(창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게 — 다 비운 것도 그대로)
     //   ② 이 기간에 반려·회수된 건의 결재선(새 칸 모양일 때만 — 상신자가 이미 손본 것)
-    //   ③ 조직도 자동 결재선(autoLine)
+    //   ③ 관리자가 지정한 결재선(effLine — 지정 안 한 칸은 자동, 2026-10-14)
+    //   ④ 조직도 자동 결재선(autoLine)
     //   예전 칸 모양(v1)으로 올린 결재선은 미리 채우는 데 쓰지 않는다.
     var key = draftKey();
     if (Object.prototype.hasOwnProperty.call(DRAFT_KEEP, key)) {
@@ -2606,6 +2727,9 @@
     } else {
       var back = sameCycleLine(), bs = back && usableSteps(back.steps);
       if (bs) { DRAFT = bs; FILL_SRC[key] = { src: 'prev', notes: [] }; }
+      else if (lineOverride(myName())) {
+        var el = effLine(myName()); DRAFT = el.steps.slice(); FILL_SRC[key] = { src: 'admin', notes: el.notes, part: !!el.part };
+      }
       else { var al = autoLine(myName()); DRAFT = al.steps.slice(); FILL_SRC[key] = { src: 'auto', notes: al.notes }; }
     }
     APPR_Q = '';
@@ -2753,7 +2877,7 @@
 
   /** 주기별로 넣다 만 결재선(상신 창을 닫아도 남는다, 상신하면 비운다). */
   var DRAFT_KEEP = {};
-  /** 주기별로 처음 미리 채운 출처 — { src: 'auto'(조직도) | 'prev'(이번 기간 반려·회수 건), notes: 비운 칸의 까닭 }. */
+  /** 주기별로 처음 미리 채운 출처 — { src: 'auto'(조직도) | 'prev'(이번 기간 반려·회수 건) | 'admin'(관리자 지정, part = 자동 칸이 섞임), notes: 비운 칸의 까닭 }. */
   var FILL_SRC = {};
   function renderSubmit() {
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
@@ -2804,10 +2928,12 @@
     // 미리 채운 출처 + 비운 칸의 까닭(그 칸을 아직 비워 둔 동안만) — 2026-10-14
     var fs = FILL_SRC[draftKey()];
     if (fs) {
-      var left = (fs.notes || []).filter(function (n) { return !n.box || !draftAt(n.box); });
+      // keep = 관리자가 지정한 분을 못 써서 자동으로 채운 칸 — 채워져 있어도 까닭을 남긴다(2026-10-14)
+      var left = (fs.notes || []).filter(function (n) { return !n.box || n.keep || !draftAt(n.box); });
       h += '<div class="ag-fill" data-fill="' + esc(fs.src) + '">' + (fs.src === 'prev'
         ? '이번 기간에 반려·회수된 결재선을 불러왔습니다.'
         : fs.src === 'last' ? '지난번 결재선을 불러왔습니다.'
+        : fs.src === 'admin' ? '관리자가 지정한 결재선을 불러왔습니다' + (fs.part ? '(지정하지 않은 칸은 조직도로 채움).' : '.')
           : '조직도에서 결재선을 미리 채웠습니다(센터·파트장 → 팀장 → 사업부장).') + ' 칸마다 바꾸거나 × 로 비울 수 있습니다.</div>' +
         (left.length ? '<div class="ag-notes">' + left.map(function (n) {
           return '<div data-agnote="' + esc(n.box) + '">' + ic('alert', 13) + '<span>' + esc(n.t) + '</span></div>';
@@ -5213,54 +5339,398 @@
 
 
   /* ══════════════════ 안전교육 ══════════════════ */
+  /* 안전교육 — 앱과 같은 화면·같은 규칙(2026-10-14 사용자: 「웹에서도 시청·이수, %도 앱하고 동일하게」).
+     · 목록: 회차별(최신 먼저) · 미래 회차는 🔒 공개예정(그 달 21일에 열림) · 의무 배지 · 진도 % · 100% 면 ✅ 시청 완료
+     · 시청: 이 창 안에서 유튜브를 틀고, 앱과 **같은 가드 코드**(아래 guard-core)가 앞으로 건너뛰기(+2초)·배속을 막고
+       본 만큼만 진도로 센다. 진도는 앱과 같은 표·같은 방식(edu_progress upsert)으로 저장된다 — 앱과 웹이 함께 쌓인다.
+     · 진도는 줄지 않는다(가드의 최고 시청 위치 + 저장 직전 서버 시작값 미만이면 보내지 않음), completed_at 은 처음 100% 때 한 번만. */
+
+  /* guard-core:begin — app/src/main/assets/edu_player.html 의 <script id="guard-core"> 를 **글자 그대로** 옮긴 것.
+     고치지 말 것. 앱 쪽을 고치면 여기에 다시 복사한다(test/edu-web.test.mjs 가 한 글자라도 다르면 실패한다). */
+// 순수 가드코어 — DOM/YouTube 미참조. Node 테스트(tools/edu/edu-guard.test.mjs)가 이 블록만 추출해 검증한다.
+// Android/iOS 가 같은 파일을 그대로 번들한다(검증로봇이 SHA 대조). 수정 시 반드시 양쪽 복사.
+window.EduGuard = {
+  FORWARD_TOLERANCE: 2, SAVE_MS: 5000, MIN_DELTA_PCT: 1,
+  create: function (d) {
+    var max = Number(d.savedSeconds) || 0, lastSavedPct = -1, lastSaveAt = 0, playing = false;
+    function pct() {
+      var dur = d.player.getDuration();
+      if (!dur || dur <= 0) return 0;
+      return Math.min(100, Math.round((max / dur) * 100));
+    }
+    function save(ended) {
+      var p = pct();
+      d.onSave(p, Math.round(max), !!ended);
+      lastSavedPct = p; lastSaveAt = d.now();
+    }
+    return {
+      tick: function () {
+        var cur = d.player.getCurrentTime();
+        if (cur > max + window.EduGuard.FORWARD_TOLERANCE) {   // 앞으로 스킵 차단
+          d.player.seekTo(max); d.onBlockedSeek(); return;
+        }
+        if (d.player.getPlayerState() === d.states.PLAYING) {
+          max = Math.max(max, cur);
+          if (playing && d.now() - lastSaveAt >= window.EduGuard.SAVE_MS &&
+              Math.abs(pct() - lastSavedPct) >= window.EduGuard.MIN_DELTA_PCT) save(false);
+        }
+      },
+      onStateChange: function (s) {
+        playing = (s === d.states.PLAYING);
+        if (s === d.states.PAUSED) save(false);
+        if (s === d.states.ENDED) {
+          // ENDED 시 현재 위치가 시청 최고점의 허용범위 안일 때만 인정한다.
+          // 끝으로 드래그해 ENDED 를 유발하는 우회(웹 버전 허점)를 차단 — 실제 시청분만 진도가 된다.
+          var cur = d.player.getCurrentTime();
+          if (cur <= max + window.EduGuard.FORWARD_TOLERANCE) max = Math.max(max, cur);
+          save(true);
+        }
+      },
+      onRateChange: function () { d.player.setPlaybackRate(1); },   // 배속 잠금(웹 허점 수정)
+      maybeSave: function () { save(false); },
+      setServerSeconds: function (s) { max = Math.max(max, Number(s) || 0); },
+      state: function () { return { maxWatchedSec: max }; },
+    };
+  },
+};
+  /* guard-core:end */
+
+  /** YouTube 링크 → 영상 ID. 앱 EduModels.kt parseYoutubeId 와 같은 규칙(키보드가 바꿔 넣은 대시·제로폭 문자 정리,
+   *  youtu.be · watch?v= · shorts · embed · 11자 ID, 주소로 못 읽으면 정규식 안전망). 못 읽으면 null. */
+  function parseYoutubeId(input) {
+    var s = String(input == null ? '' : input)
+      .replace(/[‐-―−]/g, '-')          // 각종 대시 → 하이픈
+      .replace(/[​-‏﻿⁠]/g, '')     // 제로폭·방향 문자 제거
+      .trim();
+    if (!s) return null;
+    var idp = /^[A-Za-z0-9_-]{11}$/;
+    if (idp.test(s)) return s;
+    // java.net.URI 처럼: 주소에 쓸 수 없는 글자가 있으면 주소로 읽지 않고(앱은 예외로 넘어간다) 안전망으로 간다.
+    // 호스트 대소문자도 앱처럼 그대로 둔다.
+    var u = /[\s<>"{}|\\^`]/.test(s) ? null
+      : /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^\/?#@]*@)?([^\/?#:]+)(?::\d*)?([^?#]*)(?:\?([^#]*))?/.exec(s);
+    if (u) {
+      var host = u[1].indexOf('www.') === 0 ? u[1].slice(4) : u[1], path = u[2] || '', query = u[3], got = null;
+      var ends = host.length >= 11 && host.slice(-11) === 'youtube.com';
+      if (host === 'youtu.be') { got = path.replace(/^\/+|\/+$/g, ''); }
+      else if (ends && path === '/watch') {
+        got = query == null ? null : (query.split('&').filter(function (x) { return x.indexOf('v=') === 0; })[0] || null);
+        if (got) got = got.slice(2);
+      } else if (ends && path.indexOf('/shorts/') === 0) { got = path.slice(8).replace(/^\/+|\/+$/g, ''); }
+      if (got && idp.test(got)) return got;
+    }
+    // 마지막 안전망 — 문자열 어디에 있든 유튜브 ID 모양을 직접 뽑는다
+    var m = /(?:youtu\.be\/|[?&]v=|shorts\/|embed\/)([A-Za-z0-9_-]{11})/.exec(s);
+    return m ? m[1] : null;
+  }
+
+  /* ── 이번 회차 대상자 스냅샷(edu_targets) — 앱과 같은 계산·같은 쓰기(2026-10-14) ──
+     앱은 직원이 앱을 열 때 본인 것(eduEnsureSelfTarget), 관리자가 교육 관리를 열 때 전 직원 것(eduEnsureMonthTargets)을
+     만든다. 직전 평가기간(전달 21일~이번 달 20일) **자동 기록만**의 거리 가중 평균이 80점 미만이면 대상.
+     최초 기록이 이긴다(ignore-duplicates, 이후 불변) — 웹이 먼저 써도 앱이 쓸 값과 같다(같은 safeScore·safeAvg).
+     서버 규칙(20261008160000 edu_targets_app_insert): 본인 행이거나 관리자. */
+  var EDU_TRIP_COLS = 'username,start_time,distance_km,is_manual,overspeed_count,rapid_accel_count,rapid_decel_count,' +
+    'school_zone_overspeed_count,sustained_overspeed_count,harsh_corner_count';
+  /** 운행 목록 → { avg: 거리 가중 평균(없으면 −1), n: 자동 운행 수 }. 앱 eduAverageOf. */
+  function eduAverageOf(list) {
+    var pairs = list.filter(function (t) { return !t.is_manual; })
+      .map(function (t) { return [safeScore(t), Number(t.distance_km) || 0]; });
+    return { avg: pairs.length ? safeAvg(pairs) : -1, n: pairs.length };
+  }
+  function eduIsTarget(avg, n) { return n > 0 && avg >= 0 && avg < EDU_THRESHOLD; }
+  function eduInsertTargets(rows) {
+    if (!rows.length) return Promise.resolve(false);
+    return apiRetry('/rest/v1/edu_targets?on_conflict=month,username', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(rows)
+    }).then(function (r) { return r.ok; });
+  }
+  /** 교육 표 셋만 다시 받는다(영상 등록·삭제, 스냅샷 생성 뒤). 보고 있는 교육 화면이면 다시 그린다. */
+  function eduReload() {
+    return Promise.all([
+      fetchAll('/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc'),
+      fetchAll('/rest/v1/edu_progress?select=*'),
+      fetchAll('/rest/v1/edu_targets?select=*')
+    ]).then(function (o) {
+      EDUV = o[0] || []; EDUP = o[1] || []; EDUT = o[2] || [];
+      paintPills();
+      if ((VIEW === 'edu' || VIEW === 'eduadm') && !$('panel').classList.contains('open')) render();
+      return true;
+    }).catch(function (e) { console.warn('edu reload', e); return false; });
+  }
+  var EDU_SELF = {};
+  /** 직원: 이번 회차 내 대상 여부가 아직 없으면 직전 평가기간 내 운행으로 계산해 기록한다(페이지당 한 번). */
+  function eduEnsureSelf() {
+    var me = myName(), now = Date.now(), month = eduKeyAt(now);
+    if (!ME || !me || EDU_SELF[month]) return;
+    if (EDUT.some(function (t) { return t.month === month && t.username === me; })) return;
+    EDU_SELF[month] = 1;
+    var r = eduPrevRange(now);
+    fetchAll('/rest/v1/trips?username=eq.' + encodeURIComponent(me) + '&start_time=gte.' + r.lo + '&start_time=lt.' + r.hi +
+      '&deleted_at=is.null&select=' + EDU_TRIP_COLS + '&order=start_time.desc,id.desc')
+      .then(function (list) {
+        var a = eduAverageOf(list || []);
+        if (!eduIsTarget(a.avg, a.n)) return false;
+        return eduInsertTargets([{ month: month, username: me, avg_score: a.avg, trip_count: a.n }]);
+      })
+      .then(function (ins) { if (ins) eduReload(); })
+      .catch(function () { delete EDU_SELF[month]; });
+  }
+  var EDU_ADM = { tab: 'videos', month: '', ensured: {} };
+  /** 관리자: 이번 회차 전 직원 스냅샷(아직 없는 사람만). 교육 관리를 열 때 페이지당 한 번. */
+  function eduEnsureMonth() {
+    if (!(ME && ME.is_admin)) return;
+    var now = Date.now(), month = eduKeyAt(now);
+    if (EDU_ADM.ensured[month]) return;
+    EDU_ADM.ensured[month] = 1;
+    var r = eduPrevRange(now);
+    Promise.all([
+      fetchAll('/rest/v1/edu_targets?select=month,username&month=eq.' + month),
+      fetchAll('/rest/v1/app_users?select=username&order=name.asc,username.asc'),
+      fetchAll('/rest/v1/trips?start_time=gte.' + r.lo + '&start_time=lt.' + r.hi + '&deleted_at=is.null&select=' + EDU_TRIP_COLS +
+        '&order=start_time.asc,username.asc,id.asc')
+    ]).then(function (o) {
+      var have = {}, by = {}, rows = [];
+      (o[0] || []).forEach(function (t) { have[t.username] = 1; });
+      (o[2] || []).forEach(function (t) { (by[t.username] = by[t.username] || []).push(t); });
+      (o[1] || []).forEach(function (u) {
+        var un = u.username;
+        if (!un || have[un]) return;
+        var a = eduAverageOf(by[un] || []);
+        if (eduIsTarget(a.avg, a.n)) rows.push({ month: month, username: un, avg_score: a.avg, trip_count: a.n });
+      });
+      return eduInsertTargets(rows);
+    }).then(function (ins) { if (ins) eduReload(); })
+      .catch(function () { delete EDU_ADM.ensured[month]; });
+  }
+
+  function eduThumb(v, locked) {
+    return '<span class="eduth' + (locked ? ' lk' : '') + '"' + (locked ? '' : ' data-eduplay="' + esc(v.id) + '" role="button" tabindex="0" aria-label="' + esc(v.title) + ' 보기"') + '>' +
+      '<img src="https://img.youtube.com/vi/' + encodeURIComponent(v.youtube_id) + '/hqdefault.jpg" alt="" loading="lazy">' +
+      (locked ? '<i>🔒</i>' : '<b>' + ic('play', 14) + '</b>') + '</span>';
+  }
   function viewEdu() {
     if (!LOADED) return head('안전교육') + skeleton();
-    var key = eduMonthKey(), mine = myName();
-    var myProg = {};
-    EDUP.forEach(function (p) { if (p.username === mine) myProg[p.video_id] = p; });
+    var key = eduNowKey(), me = myName(), pct = eduPctOf(me), months = eduTargetMonths(me);
+    var ob = eduObligations(months, pct);
     var round = EDUV.filter(function (v) { return v.month === key; });
-    var done = round.filter(function (v) { return myProg[v.id] && myProg[v.id].completed_at; }).length;
-    var amTarget = EDUT.some(function (t) { return t.month === key && t.username === mine; });
+    var done = round.filter(function (v) { return (pct[v.id] || 0) >= 100; }).length;
+    var amTarget = !!months[key];
+    var carry = ob.filter(function (v) { return v.month !== key; }).length;
+    var clean = !ob.length && (amTarget ? round.length > 0 : true);
 
-    var h = head('안전교육', esc(key) + ' 회차 · 시청 기간 ' + esc(cycleSpan(CYC.y, CYC.m)));
-    var verdict = !round.length ? '이번 회차 영상이 아직 없습니다'
-      : done >= round.length ? '<em>이수를 마치셨습니다</em>'
-        : amTarget ? '아직 <em>' + (round.length - done) + '편</em> 남았습니다'
-          : '의무 대상이 아닙니다';
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' +
-      (done >= round.length && round.length ? ' style="background:var(--ok)"' : '') + '></span>' +
+    var h = head('안전교육', esc(key) + ' 회차 · 시청 기간 ' + eduOpenLabel(key) + '~' + eduDeadlineLabel(key) + ' · ' + eduDday(key));
+    var verdict = ob.length ? '의무 교육 <em>' + ob.length + '편</em>이 남았습니다'
+      : amTarget && !round.length ? '이번 회차 영상이 아직 없습니다'
+        : amTarget ? '<em>이수를 마치셨습니다</em>'
+          : '의무 대상이 아닙니다 · 자율 학습으로 볼 수 있습니다';
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' + (clean ? ' style="background:var(--ok)"' : '') + '></span>' +
       esc(key) + ' 회차</div>' +
-      '<p class="verdict' + (done >= round.length ? ' clean' : '') + '">' + verdict + '</p>' +
+      '<p class="verdict' + (clean ? ' clean' : '') + '">' + verdict + '</p>' +
       '<div class="facts">' +
-      '<div class="fact"><div class="k">내 이수</div><div class="v">' + done +
-      '<small> / ' + round.length + '</small></div><div class="sub">' +
-      (amTarget ? '의무 대상입니다' : '의무 대상 아님') + '</div></div>' +
-      '<div class="fact"><div class="k">전체 영상</div><div class="v">' + EDUV.length +
-      '<small>편</small></div></div></div></div>';
+      '<div class="fact"><div class="k">이번 회차 내 이수</div><div class="v">' + done + '<small> / ' + round.length + '편</small></div>' +
+      '<div class="sub">' + (amTarget ? '의무 대상입니다' : '의무 대상 아님') + '</div></div>' +
+      '<div class="fact"><div class="k">남은 의무</div><div class="v' + (ob.length ? ' alert' : '') + '">' + ob.length + '<small>편</small></div>' +
+      '<div class="sub">' + (ob.length ? (carry ? '이월 ' + carry + '편 포함 · ' : '') + '가장 급한 마감 ' + eduDday(ob[0].month) : '남은 것 없음') + '</div></div>' +
+      '<div class="fact"><div class="k">전체 영상</div><div class="v">' + EDUV.length + '<small>편</small></div></div>' +
+      '</div></div>';
 
-    h += sect('영상', EDUV.length + '편', '', EDUV.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>회차</th><th>제목</th><th>내 진도</th><th class="n"></th></tr></thead><tbody>' +
-      EDUV.map(function (v) {
-        var p = myProg[v.id];
-        var st = p && p.completed_at ? '<span class="st ok">이수</span>'
-          : p ? '<span class="st warn">' + (p.progress_pct || 0) + '%</span>'
-            : '<span class="st dim">미시청</span>';
-        return '<tr><td class="dim">' + esc(v.month) + '</td>' +
-          '<td><span class="lead">' + esc(v.title) + '</span>' +
-          (v.description ? '<div class="dim" style="font-size:11.5px">' + esc(v.description) + '</div>' : '') + '</td>' +
-          '<td>' + st + '</td>' +
-          '<td class="n"><a class="btn sm" target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=' +
-          esc(v.youtube_id) + '">' + ic('play', 12) + '보기</a></td></tr>';
-      }).join('') + '</tbody></table></div></div>' : blank('등록된 영상이 없습니다.', null, 'play'));
-
-    h += '<section class="sect"><div class="panel" style="padding:16px 20px;display:flex;gap:12px;align-items:flex-start">' +
-      '<span style="color:var(--warn);margin-top:2px">' + ic('alert', 16) + '</span>' +
-      '<div style="font-size:12.5px;color:var(--ink-3);line-height:1.75">' +
-      '<b style="color:var(--ink-2)">여기서는 보기만 됩니다.</b> 웹 시청을 이수로 인정하려면 서버가 시청 구간을 ' +
-      '검증해야 하는데 아직 만들지 않았습니다. <b style="color:var(--ink-2)">이수는 앱에서 해 주세요.</b>' +
-      '</div></div></section>';
+    if (!EDUV.length) return h + blank('등록된 교육 영상이 없습니다.', null, 'play');
+    var by = {}, keys = [];
+    EDUV.forEach(function (v) { if (!by[v.month]) { by[v.month] = []; keys.push(v.month); } by[v.month].push(v); });
+    keys.sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0; });
+    keys.forEach(function (mo) {
+      var open = eduIsOpen(mo), yy = eduYm(mo);
+      var sub = open ? '시청기간 ' + eduOpenLabel(mo) + '~' + eduDeadlineLabel(mo) + ' · ' + eduDday(mo)
+        : '🔒 공개예정 · ' + eduOpenLabel(mo) + ' 공개';
+      h += sect(yy.y + '년 ' + pad(yy.m) + '월 회차', '<span class="' + (open ? '' : 'edusoon') + '">' + esc(sub) + '</span>', '',
+        '<div class="panel edulist">' + by[mo].map(function (v) {
+          var p = pct[v.id] || 0, ok = p >= 100;
+          var badge = !open ? '<span class="edutag soon">공개예정</span>'
+            : months[v.month] && !ok ? '<span class="edutag must">의무</span>' : '';
+          return '<div class="eduv' + (open ? '' : ' lk') + '" data-eduvid="' + esc(v.id) + '">' + eduThumb(v, !open) +
+            '<div class="edubd"><div class="edut">' + badge + '<span class="lead">' + esc(v.title) + '</span></div>' +
+            (v.description ? '<div class="edud">' + esc(v.description) + '</div>' : '') +
+            (open ? '<div class="track' + (ok ? ' ok' : '') + '"><i style="width:' + Math.max(0, Math.min(100, p)) + '%"></i></div>' +
+              '<div class="edup' + (ok ? ' ok' : '') + '">' + (ok ? '✅ 시청 완료' : p + '%') + '</div>'
+              : '<div class="edup">' + eduOpenLabel(v.month) + '부터 시청할 수 있습니다</div>') +
+            '</div>' +
+            (open ? '<button class="btn sm" data-eduplay="' + esc(v.id) + '">' + ic('play', 12) + (ok ? '다시 보기' : p > 0 ? '이어 보기' : '보기') + '</button>' : '') +
+            '</div>';
+        }).join('') + '</div>');
+    });
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;color:var(--ink-600);line-height:1.75">' +
+      '· 앞으로 건너뛰기와 배속 변경은 불가합니다<br>· 되감기는 자유이며, 나갔다 와도 이어서 볼 수 있습니다<br>' +
+      '· 앱과 웹의 진도는 함께 쌓입니다(어느 쪽에서 봐도 같은 기록)</div></section>';
     return h;
   }
+
+  /* ── 시청 창 — 앱 EducationWatchScreen 과 같은 흐름 ──
+     유튜브 IFrame API 로 창 안에서 틀고, 가드(EduGuard)가 0.25초마다 위치를 본다. 저장은 가드가 부른다
+     (5초마다 1%p 이상 늘었을 때 · 일시정지 · 끝 · 창 닫기 · 다른 탭으로 감). 웹은 앱 WebView 와 달리
+     리퍼러 문제가 없어서 YT.Player 가 iframe 을 직접 만들게 둔다. */
+  var EDUW = null;          // 지금 열린 시청 창
+  var YT_WAIT = null;
+  function eduYtApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+    if (YT_WAIT) return YT_WAIT;
+    YT_WAIT = new Promise(function (ok, no) {
+      var prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (typeof prev === 'function') { try { prev(); } catch (e) { } }
+        ok(window.YT);
+      };
+      var s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api'; s.async = true;
+      s.onerror = function () { YT_WAIT = null; no(new Error('youtube api')); };
+      document.head.appendChild(s);
+    });
+    return YT_WAIT;
+  }
+  function eduMsg(t) { var m = $('eduMsg'); if (m) m.textContent = t; }
+  function eduPaintPct(W) {
+    if (W !== EDUW) return;
+    var p = Math.max(0, Math.min(100, W.pct)), ok = p >= 100;
+    var a = $('eduPct'); if (a) { a.textContent = p + '%'; a.className = ok ? 'ok' : ''; }
+    var b = $('eduBar'); if (b) { b.style.width = p + '%'; b.parentNode.classList.toggle('ok', ok); }
+  }
+  function eduOpenWatch(id) {
+    var v = EDUV.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!v) { toast('영상 정보를 찾을 수 없습니다.', true); return; }
+    if (!eduIsOpen(v.month)) { toast(eduOpenLabel(v.month) + '부터 시청할 수 있습니다.', true); return; }
+    eduStop();
+    openPanel(v.title, v.month + ' 회차 · 마감 ' + eduDeadlineLabel(v.month) + ' · ' + eduDday(v.month),
+      '<div class="eduplayer"><div id="eduYt"></div></div>' +
+      '<div class="edustat"><b id="eduPct"></b><div class="edusb"><div class="track"><i id="eduBar"></i></div>' +
+      '<div id="eduMsg" class="dim">영상을 불러오는 중…</div></div></div>' +
+      '<div class="fhint">· 앞으로 건너뛰기와 배속 변경은 불가합니다<br>· 되감기는 자유이며, 나갔다 와도 이어서 볼 수 있습니다</div>' +
+      '<div id="eduCongrats" hidden></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>닫기</button>', true);
+    // 창을 연 뒤에 시청 상태를 만든다(openPanel 은 열려 있던 시청 창을 멈춘다).
+    var me = myName();
+    var row = EDUP.filter(function (p) { return p.username === me && String(p.video_id) === String(v.id); })[0];
+    var W = EDUW = { v: v, start: row ? Number(row.progress_pct) || 0 : 0, sec: row ? Number(row.watch_seconds) || 0 : 0,
+      pct: 0, player: null, guard: null, ticker: null, q: Promise.resolve(), gone: false };
+    W.pct = W.start;
+    eduPaintPct(W);
+    // ★ 시작값은 창을 열 때마다 서버에서 새로 받는다(앱 EducationWatchScreen 과 같다, 2026-10-14 검증로봇).
+    //   페이지를 연 뒤 앱에서 다 본 영상을 웹에서 다시 열면, 페이지가 받아 둔 옛 값(0%)으로 시작해
+    //   서버의 100%·이수를 낮은 값으로 덮었다. 못 받으면 열 수는 있되 받아 둔 값 그대로.
+    var fresh = apiRetry('/rest/v1/edu_progress?username=eq.' + encodeURIComponent(me) + '&video_id=eq.' +
+      encodeURIComponent(v.id) + '&select=*')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rows) {
+        var f = rows && rows[0];
+        if (!f || W !== EDUW) return;
+        var fp = Number(f.progress_pct) || 0, fs = Number(f.watch_seconds) || 0;
+        if (fp > W.start) W.start = fp;
+        if (fs > W.sec) W.sec = fs;
+        if (W.start > W.pct) W.pct = W.start;
+        eduLocalRow({ username: me, video_id: v.id, progress_pct: W.start, watch_seconds: W.sec,
+          updated_at: f.updated_at || null, completed_at: f.completed_at || null });
+        eduPaintPct(W);
+      }, function () { });
+    Promise.all([eduYtApi(), fresh]).then(function (res) {
+      var YT = res[0];
+      if (W !== EDUW || !$('eduYt')) return;
+      W.player = new YT.Player('eduYt', {
+        videoId: v.youtube_id, width: '100%', height: '100%',
+        playerVars: { playsinline: 1, rel: 0, controls: 1, fs: 1, origin: location.origin },
+        events: {
+          onReady: function () {
+            if (W !== EDUW) return;
+            W.guard = window.EduGuard.create({
+              player: W.player,
+              states: { PLAYING: YT.PlayerState.PLAYING, PAUSED: YT.PlayerState.PAUSED, ENDED: YT.PlayerState.ENDED },
+              savedSeconds: W.sec,
+              now: function () { return Date.now(); },
+              onSave: function (p, s) { eduSave(W, p, s); },
+              onBlockedSeek: function () { if (W === EDUW) eduMsg('⛔ 앞으로 건너뛰기는 불가합니다'); }
+            });
+            if (W.sec > 3) W.player.seekTo(W.sec, true);
+            W.ticker = setInterval(function () { if (W.guard) W.guard.tick(); }, 250);
+            eduMsg(W.sec > 3 ? '이전 위치에서 재개합니다 · ▶ 재생을 누르세요' : '▶ 재생을 눌러 시작하세요');
+          },
+          onStateChange: function (e) {
+            if (W !== EDUW) return;
+            if (e.data === 3) eduMsg('버퍼링 중…');
+            else if (e.data === 1) eduMsg('재생 중 · 자동 저장');
+            else if (e.data === 2) eduMsg('일시정지');
+            if (W.guard) W.guard.onStateChange(e.data);
+          },
+          onPlaybackRateChange: function () { if (W.guard) W.guard.onRateChange(); },
+          onError: function (e) { if (W === EDUW) eduMsg('⚠️ 영상 로드 오류(' + e.data + ') — 네트워크 확인 후 재시도'); }
+        }
+      });
+    }, function () { if (W === EDUW) eduMsg('⚠️ 영상 로드 오류(-1) — 네트워크 확인 후 재시도'); });
+  }
+  /** 가드가 부르는 저장. 앱처럼 서버 시작값 미만이면 보내지 않고, 처음 100% 일 때만 completed_at 을 싣는다.
+   *  저장은 한 줄로 세운다 — 앞 저장이 끝난 뒤에 '처음 100%' 를 판단해야 completed_at 이 두 번 안 간다. */
+  function eduSave(W, p, s) {
+    if (p > W.pct) W.pct = p;
+    if (s > W.sec) W.sec = s;
+    eduPaintPct(W);
+    // 페이지를 떠나는 중이면 줄을 서지 않고 바로 보낸다 — 앞 저장이 덜 끝났으면 keepalive 가 아예 안 나갔다(검증로봇).
+    var tail = W.gone ? Promise.resolve() : W.q;
+    W.q = tail.then(function () {
+      if (p < W.start) return null;                         // 단조증가 이중 안전(앱과 같다)
+      var first = p >= 100 && W.start < 100, iso = new Date().toISOString();
+      var row = { username: myName(), video_id: W.v.id, progress_pct: Math.max(0, Math.min(100, p)),
+        watch_seconds: Math.max(0, s), updated_at: iso };
+      if (first) row.completed_at = iso;
+      return apiRetry('/rest/v1/edu_progress?on_conflict=username,video_id', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([row]), keepalive: !!W.gone
+      }).then(function (r) {
+        if (!r.ok) { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했습니다 — 네트워크 확인 후 다시 재생해 주세요'); return; }
+        eduLocalRow(row);
+        if (first) { W.start = 100; eduCongrats(W); }
+        if (W === EDUW) eduMsg(p >= 100 ? '✅ 시청 완료!' : '재생 중 · 자동 저장');
+      });
+    }).catch(function () { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했습니다 — 네트워크 확인 후 다시 재생해 주세요'); });
+  }
+  /** 저장이 된 값을 화면 자료(EDUP)에도 넣는다 — 다시 받지 않아도 목록 %·메뉴 숫자가 맞게. */
+  function eduLocalRow(row) {
+    var hit = EDUP.filter(function (x) { return x.username === row.username && String(x.video_id) === String(row.video_id); })[0];
+    if (!hit) { hit = { username: row.username, video_id: row.video_id, completed_at: null }; EDUP.push(hit); }
+    hit.progress_pct = row.progress_pct; hit.watch_seconds = row.watch_seconds; hit.updated_at = row.updated_at;
+    if (row.completed_at) hit.completed_at = row.completed_at;
+    paintPills();
+  }
+  /** 수료 축하 — 처음 100% 때 한 번(앱 EduCongratsDialog). 스크린샷 증빙용으로 제목·일시를 남긴다. */
+  function eduCongrats(W) {
+    toastOk('수료 완료! ' + W.v.title);
+    var c = $('eduCongrats');
+    if (!c || W !== EDUW) return;
+    var d = kd(Date.now());
+    c.innerHTML = '<div class="educg" role="status"><div class="e">🎉</div><div class="t">수료 완료!</div>' +
+      '<div class="n">' + esc(W.v.title) + '</div>' +
+      '<div class="dim">' + d.getUTCFullYear() + '.' + pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate()) + ' ' +
+      pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' 시청 완료</div>' +
+      '<button class="btn pri sm" data-educg>확인</button></div>';
+    c.hidden = false;
+  }
+  /** 창을 닫을 때 — 앱 EduPlayerPause 와 같다(일시정지 + 지금 위치 저장). 저장이 끝나면 목록을 다시 그린다. */
+  function eduStop() {
+    var W = EDUW;
+    if (!W) return;
+    EDUW = null;
+    if (W.ticker) clearInterval(W.ticker);
+    try { if (W.player && W.player.pauseVideo) W.player.pauseVideo(); } catch (e) { }
+    if (W.guard) W.guard.maybeSave();
+    try { if (W.player && W.player.destroy) W.player.destroy(); } catch (e) { }
+    W.q.then(function () { if (VIEW === 'edu' && !$('panel').classList.contains('open')) render(); });
+  }
+  // 다른 탭·앱으로 가면 멈추고 저장(앱의 ON_PAUSE). 페이지를 떠날 때는 keepalive 로 마지막 위치를 보낸다.
+  document.addEventListener('visibilitychange', function () {
+    var W = EDUW;
+    if (!document.hidden || !W) return;
+    try { if (W.player && W.player.pauseVideo) W.player.pauseVideo(); } catch (e) { }
+    if (W.guard) W.guard.maybeSave();
+  });
+  window.addEventListener('pagehide', function () {
+    var W = EDUW;
+    if (W && W.guard) { W.gone = true; W.guard.maybeSave(); }
+  });
 
   /* ══════════════════ 정산 ══════════════════ */
   function viewSettle() {
@@ -6011,49 +6481,181 @@
     return h;
   }
 
+  /* ══════════════════ 교육 관리(관리자) — 앱 EduAdminScreen 과 같은 두 탭(2026-10-14) ══════════════════
+     ① 영상 관리: 회차(YYYY-MM)별 유튜브 영상 등록·수정·삭제(삭제 = deleted 표시, 시청 이력은 남는다)
+     ② 시청 현황: 고른 회차의 대상 / 수료 / 미수료 · 전체 평균 진행률 · 사람별 진행(영상별 %·이월 건수)
+     쓰기는 서버 규칙 edu_videos_app_insert/update(관리자만)를 그대로 탄다. */
   function viewEduAdm() {
     if (!LOADED) return head('교육 관리') + skeleton();
-    var key = eduMonthKey();
-    var tg = EDUT.filter(function (t) { return t.month === key; });
-    var vids = EDUV.filter(function (v) { return v.month === key; });
-    var doneBy = {};
-    EDUP.forEach(function (p) {
-      if (!p.completed_at) return;
-      var v = EDUV.filter(function (x) { return x.id === p.video_id; })[0];
-      if (v && v.month === key) doneBy[p.username] = (doneBy[p.username] || 0) + 1;
+    setTimeout(eduEnsureMonth, 0);            // 이번 회차 대상자 스냅샷(아직 없는 사람만) — 앱이 이 화면을 열 때와 같다
+    var cur = eduNowKey();
+    if (!EDU_ADM.month) EDU_ADM.month = cur;
+    var h = head('교육 관리', esc(cur) + ' 회차 · 시청 ' + eduOpenLabel(cur) + '~' + eduDeadlineLabel(cur) + ' · ' + eduDday(cur));
+    h += '<div class="bar"><div class="seg" role="group" aria-label="교육 관리">' +
+      [['videos', '영상 관리', EDUV.length], ['status', '시청 현황', null]].map(function (t) {
+        var on = EDU_ADM.tab === t[0];
+        return '<button class="' + (on ? 'on' : '') + '" data-eatab="' + t[0] + '" aria-pressed="' + on + '">' + t[1] +
+          (t[2] != null ? ' <span class="c">' + n0(t[2]) + '</span>' : '') + '</button>';
+      }).join('') + '</div></div>';
+    return h + (EDU_ADM.tab === 'status' ? eduAdmStatus() : eduAdmVideos());
+  }
+  function eduAdmVideos() {
+    var add = '<button class="btn pri sm" data-eduadd>＋ 영상 등록</button>';
+    if (!EDUV.length) return sect('영상', '0편', add, blank('등록된 교육 영상이 없습니다.', '「＋ 영상 등록」으로 회차마다 유튜브 링크를 올려 주세요.', 'play'));
+    return sect('영상', EDUV.length + '편', add, '<div class="panel"><div class="scroll" data-rows><table id="eduVT"><thead><tr>' +
+      '<th>회차</th><th>제목</th><th class="n"></th></tr></thead><tbody>' +
+      EDUV.map(function (v) {
+        return '<tr data-eduvrow="' + esc(v.id) + '"><td class="dim" style="white-space:nowrap">' + esc(v.month) + ' 회차' +
+          '<div style="font-size:12px">공개 ' + eduOpenLabel(v.month) + ' · 마감 ' + eduDeadlineLabel(v.month) + '</div></td>' +
+          '<td><span class="lead">' + esc(v.title) + '</span>' +
+          '<div class="dim" style="font-size:12px;word-break:break-all">youtube.com/watch?v=' + esc(v.youtube_id) + '</div>' +
+          (v.description ? '<div class="dim" style="font-size:12px">' + esc(v.description) + '</div>' : '') + '</td>' +
+          '<td class="n" style="white-space:nowrap"><button class="btn sm" data-eduedit="' + esc(v.id) + '">수정</button> ' +
+          '<button class="btn sm" data-edudel="' + esc(v.id) + '" style="color:var(--red)">삭제</button></td></tr>';
+      }).join('') + '</tbody></table></div></div>');
+  }
+  /** 영상 등록·수정 창. v 가 없으면 등록(대상 회차 기본 = 이번 회차). 앱 VideoFormDialog 와 같은 칸·같은 검사. */
+  function eduVideoForm(v) {
+    var row = function (lab, inner, hint) {
+      return '<div class="frow"><label class="flab">' + lab + '</label><div class="fbody">' + inner +
+        (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>';
+    };
+    openPanel(v ? '영상 수정' : '영상 등록', v ? v.month + ' 회차' : '',
+      '<div class="form">' +
+      row('제목', '<input class="inp" id="evTitle" autocomplete="off" value="' + esc(v ? v.title : '') + '">') +
+      row('YouTube 링크', '<input class="inp" id="evLink" autocomplete="off" inputmode="url" placeholder="https://youtu.be/xxxxx" value="' +
+        esc(v ? 'https://youtu.be/' + v.youtube_id : '') + '">', 'youtu.be · youtube.com/watch?v= · shorts · 11자 ID 모두 됩니다') +
+      row('대상 회차', '<input class="inp" id="evMonth" autocomplete="off" placeholder="YYYY-MM" value="' + esc(v ? v.month : eduNowKey()) + '">',
+        'YYYY-MM · 그달 21일 공개, 다음 달 20일 마감') +
+      row('설명', '<textarea class="inp" id="evDesc" rows="3" placeholder="(선택)">' + esc(v ? v.description || '' : '') + '</textarea>') +
+      '</div><div id="evErr" class="anote" style="color:var(--red)" role="alert"></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnEduSave"' + (v ? ' data-id="' + esc(v.id) + '"' : '') + '>저장</button>');
+  }
+  function eduSaveVideo(id) {
+    var t = ($('evTitle') || {}).value || '', link = ($('evLink') || {}).value || '';
+    var month = ($('evMonth') || {}).value || '', desc = ($('evDesc') || {}).value || '';
+    var yid = parseYoutubeId(link);
+    var bad = !t.trim() ? '제목을 입력하세요' : yid == null ? '유효한 YouTube 링크가 아닙니다'
+      : !/^\d{4}-\d{2}$/.test(month) ? '대상월은 YYYY-MM 형식입니다' : '';
+    var e = $('evErr');
+    if (bad) { if (e) e.textContent = bad; return; }
+    if (e) e.textContent = '';
+    var btn = $('btnEduSave'); if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+    var req = id
+      ? apiRetry('/rest/v1/edu_videos?id=eq.' + encodeURIComponent(id), {
+        method: 'PATCH', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ title: t.trim(), youtube_id: yid, description: desc.trim(), month: month })
+      })
+      : apiRetry('/rest/v1/edu_videos', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ month: month, title: t.trim(), youtube_id: yid, description: desc.trim(), created_by: myName() })
+      });
+    eduAdmWrite(req, id ? '영상을 고쳤습니다.' : '영상을 등록했습니다.', !!id, btn, '저장');
+  }
+  /** 쓰기 결과 처리 — PATCH 는 고친 줄이 돌아와야 성공(서버 규칙에 걸리면 0줄 200 이 온다). */
+  function eduAdmWrite(req, okMsg, needRow, btn, label) {
+    req.then(function (r) {
+      return (needRow && r.ok ? r.json() : Promise.resolve(null)).then(function (j) {
+        return r.ok && (!needRow || (Array.isArray(j) && j.length > 0));
+      });
+    }).then(function (ok) {
+      if (!ok) {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+        toast('저장하지 못했습니다. 관리자 권한과 네트워크를 확인해 주세요.', true); return;
+      }
+      closePanel(); toastOk(okMsg); eduReload();
+    }).catch(function () {
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+      toast('저장하지 못했습니다. 네트워크를 확인해 주세요.', true);
     });
-    // 영상을 아직 안 올린 회차에서는 이수 여부를 따질 수 없다. 예전에는
-    //   full=0 이 되어 "12명이 아직 안 들었습니다" 라는 거짓 경보가 났다.
-    var full = tg.filter(function (t) { return vids.length > 0 && (doneBy[t.username] || 0) >= vids.length; }).length;
-    var left = vids.length ? tg.length - full : 0;
+  }
+  function eduDelAsk(v) {
+    openPanel('영상 삭제', v.month + ' 회차',
+      '<div class="anote">"' + esc(v.title) + '" 을(를) 삭제할까요?<br>시청 이력은 보존되며 목록·의무에서만 제외됩니다.</div>',
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnEduDelGo" data-id="' + esc(v.id) + '">삭제</button>');
+  }
+  function eduDelVideo(id) {
+    var btn = $('btnEduDelGo'); if (btn) { btn.disabled = true; btn.textContent = '삭제 중…'; }
+    eduAdmWrite(apiRetry('/rest/v1/edu_videos?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted: true })
+    }), '영상을 삭제했습니다.', true, btn, '삭제');
+  }
+  /** 고른 회차의 사람별 집계 — 앱 StatusTab 과 같은 계산(정수 나눗셈·정렬까지). */
+  function eduAdmStats(sel) {
+    var vids = EDUV.filter(function (v) { return v.month === sel && !v.deleted; });
+    var pctBy = {};
+    EDUP.forEach(function (p) { (pctBy[p.username] = pctBy[p.username] || {})[p.video_id] = Number(p.progress_pct) || 0; });
+    var stats = EDUT.filter(function (t) { return t.month === sel; })
+      .sort(function (a, b) { return a.username < b.username ? -1 : a.username > b.username ? 1 : 0; })
+      .map(function (tg) {
+        var my = pctBy[tg.username] || {};
+        var per = vids.map(function (v) { return { v: v, p: my[v.id] || 0 }; });
+        var avg = per.length ? Math.floor(per.reduce(function (a, x) { return a + x.p; }, 0) / per.length) : 0;
+        // ★ 영상이 0개인 회차는 '수료' 로 세지 않는다(앱 2026-10-01 수정과 같다).
+        var done = per.length > 0 && eduMonthDone(sel, my);
+        var carry = eduObligations(eduTargetMonths(tg.username), my).filter(function (v) { return v.month !== sel; }).length;
+        return { t: tg, avg: avg, done: done, carry: carry, per: per };
+      });
+    // 미수료 먼저, 그 안에서 진행률 낮은 순(관리자가 챙길 사람이 위로)
+    stats.sort(function (a, b) { return (a.done - b.done) || (a.avg - b.avg); });
+    return { vids: vids, stats: stats };
+  }
+  function eduBar(p) {
+    var ok = p >= 100;
+    return '<span class="edumini"><span class="track' + (ok ? ' ok' : '') + '"><i style="width:' + Math.max(0, Math.min(100, p)) + '%"></i></span>' +
+      '<b class="' + (ok ? 'ok' : '') + '">' + p + '%</b></span>';
+  }
+  function eduAdmStatus() {
+    var sel = EDU_ADM.month || eduNowKey();
+    var ms = {};
+    EDUV.forEach(function (v) { ms[v.month] = 1; }); EDUT.forEach(function (t) { ms[t.month] = 1; });
+    var months = Object.keys(ms).sort().reverse();
+    if (months.indexOf(sel) < 0) months.unshift(sel);
+    var S = eduAdmStats(sel), st = S.stats, vids = S.vids;
+    var doneN = st.filter(function (x) { return x.done; }).length;
+    var overall = st.length ? Math.floor(st.reduce(function (a, x) { return a + x.avg; }, 0) / st.length) : 0;
+    var left = st.length - doneN;
 
-    var h = head('교육 관리', esc(key) + ' 회차');
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' +
-      (left ? '' : ' style="background:var(--ok)"') + '></span>' + esc(key) + ' 회차 이수</div>' +
-      '<p class="verdict' + (left ? '' : ' clean') + '">' +
-      (!tg.length ? '의무 대상자가 아직 없습니다'
-        : left ? '<em>' + left + '명</em>이 아직 안 들었습니다' : '<em>전원 이수</em>했습니다') + '</p>' +
+    var pick = '<label class="field edumo"><select class="inp" id="eduAdmMonth" aria-label="회차">' + months.map(function (m) {
+      return '<option value="' + esc(m) + '"' + (m === sel ? ' selected' : '') + '>' + esc(m) + ' 회차</option>';
+    }).join('') + '</select></label>';
+    var note = !vids.length
+      ? '<div class="eduwarn" role="alert">⚠ 이 회차에 등록된 영상이 없습니다 — 「영상 관리」에서 ' + esc(sel) + ' 로 등록해 주세요</div>'
+      : '<div class="dim" style="font-size:12px;margin-bottom:12px">영상 ' + vids.length + '개 · 직전 평가기간(21~20일) 평균 ' + EDU_THRESHOLD + '점 미만 대상</div>';
+    var h = '<div class="bar">' + pick + '</div>' + note;
+    var clean = st.length > 0 && vids.length > 0 && !left;
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' + (clean ? ' style="background:var(--ok)"' : '') + '></span>' +
+      esc(sel) + ' 회차 시청 현황</div>' +
+      '<p class="verdict' + (clean ? ' clean' : '') + '">' +
+      (!st.length ? '이 달의 교육 대상자가 없습니다' : !vids.length ? '영상이 없어 수료를 따질 수 없습니다'
+        : left ? '<em>' + left + '명</em>이 아직 수료하지 않았습니다' : '<em>전원 수료</em>했습니다') + '</p>' +
       '<div class="facts">' +
-      '<div class="fact"><div class="k">의무 대상</div><div class="v">' + tg.length + '<small>명</small></div></div>' +
-      '<div class="fact"><div class="k">이수 완료</div><div class="v">' + full + '<small>명</small></div></div>' +
-      '<div class="fact"><div class="k">이번 회차 영상</div><div class="v">' + vids.length + '<small>편</small></div></div>' +
-      '</div></div>';
-
-    if (!tg.length) return h + blank('대상자 명단이 없습니다.', '앱 교육 관리에서 회차를 시작하면 만들어집니다.', 'cap');
-
-    h += sect('대상자', tg.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>소속</th><th>이름</th><th class="n">안전점수</th><th class="n">운행</th><th>이수</th></tr></thead><tbody>' +
-      tg.slice().sort(function (a, b) { return (doneBy[a.username] || 0) - (doneBy[b.username] || 0); })
-        .map(function (t) {
-          var u = USERS[t.username] || {}, d = doneBy[t.username] || 0;
-          var ok = vids.length > 0 && d >= vids.length;
-          return '<tr' + (ok ? '' : ' class="flagged"') + '>' +
-            orgCell(t.username) + '<td><span class="lead">' + esc(u.name || t.username) + '</span></td>' +
-            '<td class="n">' + (t.avg_score == null ? '—' : n0(t.avg_score)) + '</td>' +
-            '<td class="n">' + n0(t.trip_count) + '</td>' +
-            '<td>' + (ok ? '<span class="st ok">완료</span>'
-              : '<span class="st warn">' + d + ' / ' + vids.length + '</span>') + '</td></tr>';
-        }).join('') + '</tbody></table></div></div>');
+      '<div class="fact"><div class="k">대상</div><div class="v" id="eduNT">' + st.length + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">수료</div><div class="v" id="eduND" style="color:var(--ok)">' + doneN + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">미수료</div><div class="v' + (left ? ' alert' : '') + '" id="eduNL">' + left + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">전체 평균 진행률</div><div class="v" id="eduNA">' + overall + '<small>%</small></div>' +
+      (st.length && vids.length ? '<div class="sub">수료율 ' + Math.floor(doneN * 100 / st.length) + '%</div>' : '') + '</div>' +
+      '</div><div class="track' + (overall >= 100 ? ' ok' : '') + '"><i style="width:' + Math.min(100, overall) + '%"></i></div></div>';
+    if (!st.length) return h + blank('이 달의 교육 대상자가 없습니다.', '직전 평가기간 평균 ' + EDU_THRESHOLD + '점 미만인 직원이 대상이 됩니다.', 'cap');
+    h += sect('대상자', st.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table id="eduST"><thead><tr>' +
+      '<th>소속</th><th>이름</th><th class="n">전월</th><th>진행률</th><th>상태</th><th>영상별</th></tr></thead><tbody>' +
+      st.map(function (x) {
+        var u = USERS[x.t.username] || {};
+        var badge = !x.per.length ? '<span class="st dim">영상 없음</span>'
+          : x.done ? '<span class="st ok">수료</span>' : '<span class="st bad">미수료</span>';
+        return '<tr data-eduu="' + esc(x.t.username) + '"' + (x.done ? '' : ' class="flagged"') + '>' +
+          orgCell(x.t.username) + '<td><span class="lead">' + esc(u.name || x.t.username) + '</span></td>' +
+          '<td class="n"' + (x.t.avg_score < 70 ? ' style="color:var(--red)"' : '') + '>' + n0(x.t.avg_score) + '점</td>' +
+          '<td>' + eduBar(x.avg) + '</td>' +
+          '<td style="white-space:nowrap">' + badge + (x.carry > 0 ? ' <span class="edutag carry">이월 ' + x.carry + '건</span>' : '') + '</td>' +
+          '<td>' + x.per.map(function (pv) {
+            var ok = pv.p >= 100;
+            return '<div class="eduvl' + (ok ? ' ok' : '') + '"><span>' + (ok ? '✅' : '▸') + '</span><span class="t">' + esc(pv.v.title) +
+              '</span><b>' + pv.p + '%</b></div>';
+          }).join('') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>');
     return h;
   }
 
@@ -6842,6 +7444,8 @@
   }
   function closePanel() {
     CLOSE_ASK = null; APPR_BACK = null; SUBMIT.token = null; SUBMIT.send = null;
+    // 안전교육 시청 창이면 멈추고 지금 위치를 저장한다(앱이 화면을 나갈 때와 같다, 2026-10-14).
+    if (EDUW) eduStop();
     if (!$('panel').classList.contains('open')) { PANEL_FROM = null; return; }
     // 영수증 올리기 창을 닫으면 그 목록은 끝난 것이다. 돌고 있던 파일 읽기·AI 판독이 닫힌 창을 위해 계속 돌지 않게
     // 목록을 새 객체로 바꾼다(읽기·판독은 자기 목록이 바뀐 것을 보고 멈춘다). 서버로 올리는 중이면 건드리지 않는다.
@@ -7226,6 +7830,21 @@
     }
     if (e.target.closest('#btnDiscard')) { closePanel(); return; }
     if (e.target.closest('[data-close]')) { askClose(); return; }
+    /* ── 안전교육(2026-10-14) — 시청 창 · 교육 관리 ── */
+    if ((el = e.target.closest('[data-eduplay]'))) { eduOpenWatch(el.dataset.eduplay); return; }
+    if ((el = e.target.closest('[data-educg]'))) { var cg = $('eduCongrats'); if (cg) { cg.hidden = true; cg.innerHTML = ''; } return; }
+    if ((el = e.target.closest('[data-eatab]'))) { EDU_ADM.tab = el.dataset.eatab === 'status' ? 'status' : 'videos'; render(); return; }
+    if (e.target.closest('[data-eduadd]')) { eduVideoForm(null); return; }
+    if ((el = e.target.closest('[data-eduedit]'))) {
+      var ev0 = EDUV.filter(function (x) { return String(x.id) === el.dataset.eduedit; })[0];
+      if (ev0) eduVideoForm(ev0); return;
+    }
+    if ((el = e.target.closest('[data-edudel]'))) {
+      var ev1 = EDUV.filter(function (x) { return String(x.id) === el.dataset.edudel; })[0];
+      if (ev1) eduDelAsk(ev1); return;
+    }
+    if ((el = e.target.closest('#btnEduSave'))) { eduSaveVideo(el.dataset.id || ''); return; }
+    if ((el = e.target.closest('#btnEduDelGo'))) { eduDelVideo(el.dataset.id); return; }
     /* ── 기간 고르기 ── */
     if (e.target.closest('#cycBtn')) { openCyclePop(); return; }
     if (e.target.closest('#cycPrev')) { stepCycle(-1); return; }
@@ -7705,6 +8324,7 @@
   });
   // 결재함 그 밖의 건 — 상신일 칸은 고르면 바로 다시 그린다(2026-10-14)
   document.addEventListener('change', function (e) {
+    if (e.target.id === 'eduAdmMonth') { EDU_ADM.month = e.target.value || ''; render(); return; }
     if (e.target.id === 'ibD1' || e.target.id === 'ibD2') {
       if (e.target.id === 'ibD1') INBOX_D1 = e.target.value || ''; else INBOX_D2 = e.target.value || '';
       // 날짜로 찾으면 다른 달 것도 보여야 한다 — 기간 고정을 푼다
@@ -7762,7 +8382,7 @@
     }
     // tabindex 만 주면 눌리지 않는다 — Enter·Space 를 클릭으로 바꿔 준다.
     if ((e.key === 'Enter' || e.key === ' ') &&
-        e.target.matches && e.target.matches('a[data-v],tr.clk,tr[data-person],tr[data-car]')) {
+        e.target.matches && e.target.matches('a[data-v],tr.clk,tr[data-person],tr[data-car],span[data-eduplay]')) {
       e.preventDefault(); e.target.click(); return;
     }
     if (e.key === 'Escape') {
@@ -7806,6 +8426,8 @@
     location.replace('work.html' + (n ? '?next=' + encodeURIComponent(n) : ''));
   }
   function signOut(e) {
+    // 보던 안전교육 영상의 마지막 위치를 토큰이 지워지기 전에 저장한다(2026-10-14 검증로봇).
+    if (EDUW) { EDUW.gone = true; eduStop(); }
     // 서버의 갱신 토큰도 끊는다(2026-10-06). 응답을 기다리지 않는다.
     var at = ss(K_AT);
     if (at) { try { fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at }, keepalive: true }).catch(function () { }); } catch (e) { } }
@@ -8147,6 +8769,8 @@
   /** 옆 패널을 연다(제목·부제는 글자 그대로, 본문·아랫줄은 HTML). */
   function openPanel(title, sub, bodyHtml, footHtml, wide) {
     CLOSE_ASK = null;
+    if (EDUW) eduStop();          // 시청 창 위에 다른 창을 띄우면 영상은 멈추고 위치를 저장한다
+
     // 결재 확인 창 위에 다른 내용(결재 문서·검증 결과)을 띄우는 것이면 돌아올 곳과 적던 의견을 맡아 둔다.
     var go0 = $('btnApprGo');
     if (go0 && $('panel').classList.contains('open')) {
@@ -8181,6 +8805,9 @@
       // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
       BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes, liveSign: liveSign,
       autoLine: autoLine, lineAt: lineAt, apprHint: APPR_HINT, canApprove: canApprove,
+      // 관리자가 지정한 결재선(2026-10-14) — 조직도 화면(drv-org.js)이 같은 계산으로 보이고 고친다
+      APPR_BOXES: APPR_BOXES, effLine: effLine, applyOverride: applyOverride, lineOverride: lineOverride,
+      lineOvOk: function () { return LINE_OV_OK; }, fetchLineOv: fetchLineOv, setLineOv: setLineOv, orgLabel: orgLabel,
       state: function () {
         return {
           ME: ME, VIEW: VIEW, CYC: CYC, CYCKEY: CYCKEY(), LOADED: LOADED,
