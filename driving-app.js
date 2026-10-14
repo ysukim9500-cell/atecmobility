@@ -2962,7 +2962,19 @@
 
     // 예전에는 40건에서 말없이 잘랐다(건수는 전체로 적어 놓고). 이제는 상태로 좁히고, 넘치면 넘친다고 말한다.
     var st = INBOX_F;
-    var shown = others.filter(function (a) { return st === 'all' || a.status === st; });
+    // ── 그 밖의 건 거르기(2026-10-14 사용자, 세 결재함 공통) ──
+    //   기본은 위에서 고른 기간(몇월분) 것만. 「전체 기간」·상신일(시작~끝)·상신한 사람 이름으로도 찾는다. 상태 칩은 맨 마지막.
+    var cyk = CYCKEY(), q = INBOX_Q.replace(/\s+/g, '');
+    var dayOf = function (a) { var t = Date.parse(a.submitted_at || ''); return isFinite(t) ? new Date(t + 9 * 3600e3).toISOString().slice(0, 10) : ''; };
+    var base = others.filter(function (a) {
+      if (!INBOX_ALLCYC && a.cycle !== cyk) return false;
+      if (q && String(nameOf(a.username) || '').replace(/\s+/g, '').indexOf(q) < 0) return false;
+      var d = dayOf(a);
+      if (INBOX_D1 && (!d || d < INBOX_D1)) return false;
+      if (INBOX_D2 && (!d || d > INBOX_D2)) return false;
+      return true;
+    });
+    var shown = base.filter(function (a) { return st === 'all' || a.status === st; });
     var CAP = 80;
     // 카드에 붙는 검증 요약·결재 문서 버튼은 고정본에서 온다 — 보이는 건만 한 번에 물어본다.
     // 번호는 종류마다 따로 매긴다 — 운행일지 것은 운행일지 모듈에, 개인경비 것은 개인경비 모듈에 묻는다.
@@ -2997,18 +3009,31 @@
         '<div class="panel">' + SP.ndMine.map(apprCard).join('') + '</div>');
     }
     if (others.length) {
-      var cnt = function (k) { return others.filter(function (a) { return a.status === k; }).length; };
+      var cnt = function (k) { return base.filter(function (a) { return a.status === k; }).length; };
       var chips = '<div class="seg">' +
-        [['all', '전체', others.length], ['submitted', '결재 중', cnt('submitted')], ['approved', '완료', cnt('approved')],
+        [['all', '전체', base.length], ['submitted', '결재 중', cnt('submitted')], ['approved', '완료', cnt('approved')],
           ['rejected', '반려', cnt('rejected')], ['withdrawn', '회수', cnt('withdrawn')]]
           .filter(function (c) { return c[0] === 'all' || c[2] > 0; })
           .map(function (c) {
             return '<button class="' + (st === c[0] ? 'on' : '') + '" aria-pressed="' + (st === c[0] ? 'true' : 'false') + '" data-inboxf="' + c[0] + '">' + c[1] +
               ' <span class="c">' + n0(c[2]) + '</span></button>';
           }).join('') + '</div>';
-      h += sect('그 밖의 건', shown.length + '건', chips,
+      var filtered = INBOX_ALLCYC || q || INBOX_D1 || INBOX_D2;
+      var fbar = '<div class="bar ibflt">' +
+        '<div class="seg" role="group" aria-label="기간">' +
+          '<button class="' + (!INBOX_ALLCYC ? 'on' : '') + '" aria-pressed="' + (!INBOX_ALLCYC) + '" data-ibcyc="0">' + esc(cycleName(CYC.y, CYC.m)) + '</button>' +
+          '<button class="' + (INBOX_ALLCYC ? 'on' : '') + '" aria-pressed="' + (!!INBOX_ALLCYC) + '" data-ibcyc="1">전체 기간</button></div>' +
+        '<label class="field">' + ic('search', 14) +
+          '<input id="ibQ" aria-label="상신한 사람 이름" placeholder="상신한 사람 이름" value="' + esc(INBOX_Q) + '"></label>' +
+        '<label class="field ibdate"><span class="dim">상신일</span>' +
+          '<input type="date" id="ibD1" aria-label="상신일 시작" value="' + esc(INBOX_D1) + '">' +
+          '<span class="dim">~</span><input type="date" id="ibD2" aria-label="상신일 끝" value="' + esc(INBOX_D2) + '"></label>' +
+        (filtered ? '<button class="btn sm" data-ibreset>' + ic('close', 12) + '조건 지우기</button>' : '') +
+        '</div>';
+      h += sect('그 밖의 건', shown.length + '건', chips, fbar +
         '<div class="panel">' + (shown.length ? shown.slice(0, CAP).map(apprCard).join('')
-          : '<div class="blank"><div class="t">해당하는 건이 없습니다.</div></div>') + '</div>' +
+          : '<div class="blank"><div class="t">해당하는 건이 없습니다.</div>' +
+            (!INBOX_ALLCYC ? '<div class="d">다른 달 문서는 「전체 기간」을 눌러 보세요.</div>' : '') + '</div>') + '</div>' +
         (shown.length > CAP ? '<div class="fhint" style="margin-top:8px">최근 ' + CAP + '건만 보입니다. 위에서 상태로 좁혀 보세요(전체 ' +
           n0(shown.length) + '건).</div>' : ''));
     }
@@ -3236,6 +3261,7 @@
     openNotePop(false);
     if (!noDriving() || e.sys !== 'd') NAV_MODE = e.sys;          // 운전 안 하는 사람도 개인경비·법인카드 갈래는 오간다
     INBOX_F = 'all';
+    INBOX_ALLCYC = true;   // 알림 문서가 다른 달 것이어도 결재함에 보이게(2026-10-14 기간 거르기)
     NOTE.focus = (e.kind || 'd') + ':' + e.id;
     if (VIEW === 'inbox') render(); else go('inbox');
     paintBell();
@@ -3257,6 +3283,8 @@
   }
   /** 결재함 '그 밖의 건' 상태 필터. */
   var INBOX_F = 'all';
+  /** 그 밖의 건 — 전체 기간 보기 · 상신한 사람 이름 · 상신일 시작/끝(YYYY-MM-DD, 한국 날짜). 기본은 고른 기간만(2026-10-14). */
+  var INBOX_ALLCYC = false, INBOX_Q = '', INBOX_D1 = '', INBOX_D2 = '';
   function apprCard(a) {
     var st = apprStatusText(a);
     var s = a.snapshot || {};
@@ -7246,6 +7274,12 @@
     if ((el = e.target.closest('[data-evcat]'))) { EVF.cat = el.dataset.evcat; EVF.touched = true; render(); return; }
     if (e.target.closest('[data-fclear]')) { clearFilters(); FILT.purp = ''; render(); return; }   // 「조건 지우기」는 목적까지 비운다
     if ((el = e.target.closest('[data-inboxf]'))) { INBOX_F = el.dataset.inboxf; render(); return; }
+    if ((el = e.target.closest('[data-ibcyc]'))) {
+      INBOX_ALLCYC = el.dataset.ibcyc === '1';
+      if (!INBOX_ALLCYC) { INBOX_D1 = ''; INBOX_D2 = ''; }   // 고른 달로 돌아가면 날짜 조건은 지운다
+      render(); return;
+    }
+    if (e.target.closest('[data-ibreset]')) { INBOX_ALLCYC = false; INBOX_Q = ''; INBOX_D1 = ''; INBOX_D2 = ''; INBOX_F = 'all'; render(); return; }
     // PDF 미리보기 — 창에서 고른 목적을 먼저 반영한다. PDF 는 이어서 drv-verify.js 가 만든다.
     if (e.target.closest('[data-pdf]')) {
       if (document.querySelector('#panel.open input[name="ppurp"]')) {
@@ -7661,13 +7695,22 @@
   //   복원할 수 없어, 천천히 치는 사람은 글자가 깨진다.
   var IME = false;
   document.addEventListener('compositionstart', function (e) {
-    if (e.target.id === 'qBox') { IME = true; clearTimeout(window.__q); }
+    if (e.target.id === 'qBox' || e.target.id === 'ibQ') { IME = true; clearTimeout(window.__q); }
   });
   document.addEventListener('compositionend', function (e) {
-    if (e.target.id !== 'qBox') return;
+    if (e.target.id !== 'qBox' && e.target.id !== 'ibQ') return;
     IME = false;
-    FILT.q = e.target.value;
+    if (e.target.id === 'ibQ') INBOX_Q = e.target.value; else FILT.q = e.target.value;
     queueSearch(e.target);
+  });
+  // 결재함 그 밖의 건 — 상신일 칸은 고르면 바로 다시 그린다(2026-10-14)
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'ibD1' || e.target.id === 'ibD2') {
+      if (e.target.id === 'ibD1') INBOX_D1 = e.target.value || ''; else INBOX_D2 = e.target.value || '';
+      // 날짜로 찾으면 다른 달 것도 보여야 한다 — 기간 고정을 푼다
+      if (INBOX_D1 || INBOX_D2) INBOX_ALLCYC = true;
+      render();
+    }
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'permQ') { PERMQ = e.target.value; permFilter(); return; }
@@ -7687,6 +7730,7 @@
       tfPaintSum();
       return;
     }
+    if (e.target.id === 'ibQ') { INBOX_Q = e.target.value; if (!IME) queueSearch(e.target); return; }
     if (e.target.id !== 'qBox') return;
     FILT.q = e.target.value;
     if (IME) return;                       // 조합이 끝나면 compositionend 가 부른다
@@ -7694,10 +7738,11 @@
   });
   function queueSearch(box) {
     clearTimeout(window.__q);
+    var id = box.id;
     window.__q = setTimeout(function () {
       var pos = box.selectionStart;
       render();
-      var b = $('qBox'); if (b) { b.focus(); b.setSelectionRange(pos, pos); }
+      var b = $(id); if (b) { b.focus(); b.setSelectionRange(pos, pos); }
     }, 200);
   }
   document.addEventListener('keydown', function (e) {

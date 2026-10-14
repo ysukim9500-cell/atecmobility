@@ -919,6 +919,9 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
   font-weight:400;min-width:0}
 .field input{width:152px}
 .field input::placeholder{color:var(--ink-400)}
+.ibflt .ibdate{gap:6px}
+.ibflt .ibdate input{width:auto;min-width:0;font-family:inherit}
+@media (max-width:480px){.ibflt .field{width:100%}.ibflt .field input{flex:1;width:auto}.ibflt .ibdate input{flex:1}}
 
 .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:var(--r-xs);
   border:1px solid var(--ink-200);background:var(--surface);color:var(--ink-700);font-size:12.5px;
