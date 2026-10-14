@@ -179,17 +179,20 @@
         return '<tr><td><span class="lead">' + esc(o.name) + '</span>' + (o.outsourced ? ' <span class="kind">외주</span>' : '') + '</td>' +
           '<td>' + esc(o.rank || '—') + '</td>' +
           '<td>' + (o.role ? '<span class="kind biz">' + esc(o.role) + '</span>' : '<span class="dim">—</span>') + '</td>' +
-          '<td class="el dim" title="' + esc([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + '">' +
-          esc([o.team, o.unit].filter(Boolean).join(' › ') || o.division) + '</td>' +
+          // 소속은 자르지 않는다(2026-10-14 사용자 「잘 안 보인다」) — 팀 / 센터·파트 두 줄.
+          '<td class="oplace"><b>' + esc(o.team || o.division) + '</b>' + (o.unit ? '<small>' + esc(o.unit) + '</small>' : '') + '</td>' +
           '<td class="el" title="' + esc(o.duty || '') + '">' + esc(o.duty || '') + '</td>' +
           '<td>' + acct + '</td>' +
           // 이 사람이 상신할 때 미리 채워질 결재선(계정이 있는 사람만 — 없으면 상신을 못 한다)
           (function () {
             if (!(o.username && S.PEOPLE[o.username])) return '<td class="dim">—</td>';
             var ln = lineOf(o), lt = lineText(ln.steps), why = ln.notes.map(function (n) { return n.t; }).join(' / ');
-            return '<td class="el" data-oline="' + esc(o.username) + '" title="' + esc([lt, why].filter(Boolean).join(' · ')) + '">' +
-              (lt ? esc(lt) : '<span class="dim">비움</span>') +
-              (ln.notes.length ? ' <span class="st warn" title="' + esc(why) + '">' + ln.notes.length + '칸 직접</span>' : '') + '</td>';
+            // 결재선도 자르지 않는다(2026-10-14) — 결재자 한 사람씩 한 줄: 「칸 이름  이름」.
+            return '<td class="olinec" data-oline="' + esc(o.username) + '" title="' + esc([lt, why].filter(Boolean).join(' · ')) + '">' +
+              (ln.steps.length ? '<ol>' + ln.steps.map(function (s) {
+                return '<li><em>' + esc(s.box) + '</em><b>' + esc(C.nameOf(s.approver)) + '</b></li>';
+              }).join('') + '</ol>' : '<span class="dim">비움</span>') +
+              (ln.notes.length ? '<span class="st warn" title="' + esc(why) + '">' + ln.notes.length + '칸 직접</span>' : '') + '</td>';
           })() +
           // 「내리기」는 고치기 창 안에 있다 — 줄마다 두면 표가 넘쳐 잘리고, 「고치기」 옆이라 잘못 누르기 쉽다.
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-oedit="' + o.id + '" aria-label="' +

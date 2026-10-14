@@ -509,6 +509,16 @@ table.evup tbody tr:first-child td{border-top:0}
 .orgwrap{display:grid;grid-template-columns:232px minmax(0,1fr);gap:16px;align-items:start}
 .omain tbody td,.omain thead th{padding-left:11px;padding-right:11px}
 .omain td.el{max-width:150px}
+/* 소속·결재선은 자르지 않고 줄을 나눠 다 보인다(2026-10-14) */
+.omain td.oplace{min-width:130px;line-height:1.4}
+.omain td.oplace b{display:block;font-weight:600;color:var(--ink-800)}
+.omain td.oplace small{display:block;margin-top:2px;font-size:12.5px;color:var(--ink-600)}
+.omain td.olinec{min-width:150px}
+.omain td.olinec ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.omain td.olinec li{display:flex;align-items:baseline;gap:6px;white-space:nowrap;line-height:1.35}
+.omain td.olinec li em{font-style:normal;font-size:11.5px;color:var(--ink-600);min-width:60px}
+.omain td.olinec li b{font-weight:600;color:var(--ink-900)}
+.omain td.olinec .st{display:table;margin-top:5px}
 .otree{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:6px;
   position:sticky;top:calc(var(--head) + 14px);max-height:calc(100dvh - var(--head) - 40px);overflow:auto}
 .onode{display:flex;align-items:center;gap:7px;width:100%;height:32px;padding:0 9px;border:0;border-radius:var(--r-xs);

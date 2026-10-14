@@ -325,7 +325,6 @@ footer .wrap{font-size:13px}
     <div class="lw">
       <a class="brand" href="#" aria-label="업무 결재 포털 처음으로"><img src="brand/atec-lockup.png" alt="ATEC 에이텍모빌리티"><span class="bar"></span><span class="nm">업무 결재 포털</span></a>
       <span class="sp"></span>
-      <a class="lnk" href="#systems">사용 안내</a>
       <button class="lnk" type="button" data-open="signup">회원가입</button>
     </div>
   </header>
@@ -374,43 +373,6 @@ footer .wrap{font-size:13px}
       </section>
     </div>
   </main>
-
-  <section class="sec" id="systems">
-    <div class="wrap">
-      <div class="eyebrow">INTEGRATED SYSTEMS</div>
-      <h2>하나의 로그인, 세 개의 결재 시스템</h2>
-      <p class="sub">권한에 따라 필요한 시스템만 보입니다. 새 시스템은 같은 계정으로 바로 이어서 씁니다.</p>
-      <div class="cards">
-        <article class="card">
-          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
-          <h3>운행일지 (ATEC DRIVING)</h3>
-          <p>앱으로 기록한 업무 운행을 기간마다 마감합니다. 영수증·통행료를 정리하고 Gemini 검증을 거쳐 결재를 올립니다.</p>
-        </article>
-        <article class="card">
-          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
-          <h3>개인경비 지출결의</h3>
-          <p>소모품비·식비·기타비용 영수증을 올리면 Gemini 가 금액·사용처를 읽어 채웁니다. 20일~19일 기간마다 검증을 거쳐 같은 결재함으로 올립니다.</p>
-        </article>
-        <article class="card">
-          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 9.5h18M7 15h4"/></svg></span>
-          <h3>법인카드 지출결의</h3>
-          <p>ERP 에서 받은 내 법인카드 승인내역 엑셀을 올리면 0원·취소 줄을 빼고 들어옵니다. 줄마다 구분·사용목적만 적어 매달 같은 결재함으로 올립니다.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec soft">
-    <div class="wrap">
-      <div class="eyebrow">HOW IT WORKS</div>
-      <h2>가입부터 결재까지 세 단계</h2>
-      <div class="steps">
-        <div><div class="k">STEP 01</div><h3>가입 신청</h3><p>운행일지 앱을 이미 쓰고 있다면 그 아이디로 바로 로그인하세요. 처음이면 회원가입을 신청합니다.</p></div>
-        <div><div class="k">STEP 02</div><h3>관리자 승인</h3><p>관리자가 승인하면 로그인할 수 있습니다. 승인 전에는 포털·앱 모두 로그인되지 않습니다.</p></div>
-        <div><div class="k">STEP 03</div><h3>시스템 선택</h3><p>로그인한 뒤 쓸 시스템을 고릅니다. 시스템을 옮겨 다녀도 다시 로그인하지 않습니다.</p></div>
-      </div>
-    </div>
-  </section>
 
   <footer><div class="wrap"><span>ATEC 에이텍모빌리티 · 업무 결재 포털</span><span class="sp"></span><span>정도 · 혁신 · 협업</span></div></footer>
 </div>
@@ -480,7 +442,7 @@ footer .wrap{font-size:13px}
         <label class="fld"><span>이름 <em>*</em></span><input class="inp" id="suName" autocomplete="name" maxlength="30" required></label>
         <label class="fld"><span>직급</span><input class="inp" id="suPos" maxlength="30" placeholder="예) 책임"></label>
       </div>
-      <label class="fld"><span>부서</span><input class="inp" id="suDept" maxlength="60" placeholder="예) 수도권버스지원팀"></label>
+      <label class="fld"><span>부서 <small>조직도의 팀</small></span><select class="inp" id="suDept"><option value="">부서 목록을 불러오는 중…</option></select></label>
       <label class="fld"><span>회사 메일 <small>(팀즈 결재 알림을 받을 주소)</small></span>
         <input class="inp" id="suMail" type="email" autocomplete="email" maxlength="80" placeholder="아이디@atecmobility.com"></label>
       <p class="hint">차량번호는 받지 않습니다 — 운전하시는 분은 승인 뒤 <b>운행일지 앱 › 차량 관리</b>에서 차량을 추가하세요.</p>
@@ -525,6 +487,45 @@ footer .wrap{font-size:13px}
     var v = $('vSignup');
     v.classList.add('open');
     var f = v.querySelector('input'); if (f) setTimeout(function () { f.focus(); }, 30);
+    loadDepts();
+  }
+  /* 회원가입 「부서」 — 조직도의 사업부·팀 이름으로만 고른다(2026-10-14 사용자). 목록을 못 받으면 예전처럼 직접 쓰는 칸. */
+  var deptState = 0;   // 0 아직 · 1 받는 중 · 2 받음
+  function loadDepts() {
+    if (deptState) return;
+    deptState = 1;
+    post('/functions/v1/driving-auth', { action: 'org_teams' }).then(function (res) {
+      var gs = res.ok && res.j && res.j.ok && res.j.groups;
+      if (!gs || !gs.length) throw new Error('empty');
+      var sel = $('suDept'), keep = sel.value;
+      if (sel.tagName !== 'SELECT') {   // 지난번에 못 받아 직접 쓰는 칸이 됐던 경우
+        var s2 = document.createElement('select'); s2.className = 'inp'; s2.id = 'suDept';
+        sel.parentNode.replaceChild(s2, sel); sel = s2;
+      }
+      sel.textContent = '';
+      var opt = function (parent, value, label) {
+        var o = document.createElement('option'); o.value = value; o.textContent = label; parent.appendChild(o);
+      };
+      opt(sel, '', '부서를 고르세요');
+      gs.forEach(function (g) {
+        var og = document.createElement('optgroup'); og.label = g.division;
+        if (g.direct || !g.teams.length) opt(og, g.division, g.teams.length ? g.division + ' (직속)' : g.division);
+        g.teams.forEach(function (t) { opt(og, t, t); });
+        sel.appendChild(og);
+      });
+      opt(sel, '', '목록에 없음 — 승인 때 관리자가 맞춥니다');
+      sel.value = keep;
+      deptState = 2;
+    }).catch(function () {
+      // 못 받으면 직접 쓰는 칸으로 되돌린다(가입 자체는 막지 않는다). 다음에 창을 열 때 다시 받아 본다.
+      var sel = $('suDept');
+      if (sel.tagName === 'SELECT') {
+        var inp = document.createElement('input');
+        inp.className = 'inp'; inp.id = 'suDept'; inp.maxLength = 60; inp.placeholder = '예) 수도권버스지원팀';
+        sel.parentNode.replaceChild(inp, sel);
+      }
+      deptState = 0;
+    });
   }
   function focusLogin() {
     var c = $('loginCard'); if (!c) return;
