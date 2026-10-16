@@ -117,7 +117,8 @@
     var s = cur(kind, a);
     if (s === undefined) { want(kind, [a.id]); return ''; }
     if (!s || down(kind)) return '';
-    var key = esc(kind + ':' + a.id), who = esc(C.nameOf(a.username) + ' · ' + String(a.cycle || ''));
+    var key = esc(kind + ':' + a.id), cy = String(a.cycle || '').split('-'),
+      who = esc(C.nameOf(a.username) + ' · ' + (cy.length === 2 ? C.cycleName(+cy[0], +cy[1]) : String(a.cycle || '')));   // 다른 창과 같은 「2026년 9월분」(2026-10-15)
     if (!s.n) {
       return '<button type="button" class="prb none" data-prhist="' + key + '" data-prwho="' + who + '" title="아직 아무도 출력하지 않았습니다 — 눌러서 출력 기록 보기">미출력</button>';
     }

@@ -1,7 +1,7 @@
 <!--
   ATEC 운행일지 — 이 파일의 원본은 ACTs-ATECmobility/web/driving-v2.html 이다.
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
-  같이 올라가야 하는 것: driving-app.js · drv-verify.js · drv-prints.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
+  같이 올라가야 하는 것: money-rule.js · driving-app.js · drv-verify.js · drv-prints.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
                          card-rules.js · card-erp.js · card-sheet.js · drv-card.js (법인카드)
                          vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF / xlsx.full.min.js · LICENSE-SheetJS.txt — 카드 엑셀)
                          brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
@@ -266,8 +266,8 @@ body.showlogin #login{display:grid}
 /* ═════════════════ 뼈대 ═════════════════ */
 #app{display:none}
 header.top{
-  position:sticky;top:0;z-index:50;height:var(--head);background:rgba(255,255,255,.9);
-  backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);
+  position:sticky;top:0;z-index:50;height:var(--head);background:var(--surface);
+  /* 불투명(2026-10-16 3차) — 반투명이면 내릴 때 뒤 글자·단추가 비쳤다 */
   border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:14px;padding:0 20px}
 .sp{flex:1}
 
@@ -284,6 +284,7 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
    예전에는 투명한 <select> 하나였다. 앞뒤로 넘기려면 목록을 열어 훑어야 했고,
    여러 주기를 한꺼번에 볼 수도 없었다. */
 .cyc{position:relative;display:inline-flex;align-items:center;gap:4px}
+#cycleBox.nocyc{display:none}   /* 기간과 상관없는 화면 — 내 계정·조직도·권한 관리·교육 관리·안전교육(2026-10-15 2차) */
 .cyc .cycle{font-family:inherit}
 .cyc .cycle:focus-visible,.cycnav:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .cyc.multi .cycle{border-color:var(--ink-600);background:var(--ink-50)}
@@ -433,9 +434,19 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .prb.done{color:var(--ok);border-color:#BFE3D3;background:var(--ok-50)}
 .prline{margin-top:4px}
 table.prhist tr.old td{color:var(--ink-500)}
+/* 출력 기록은 오른쪽 좁은 창(468px) 안 — 표 최소 폭(660px) 때문에 「형식」 칸이 밀려났다(2026-10-15) */
+.scroll table.prhist{min-width:0}
+/* 승인·반려 창(오른쪽 좁은 창)의 결재 요약은 두 칸씩 — 네 칸이면 「전월 대비」 글자가 겹쳤다(2026-10-15) */
+#panel .abgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#panel .abf:nth-child(3){border-left:0}
+#panel .abf:nth-child(n+3){border-top:1px solid var(--ink-100)}
+#panel .abf b{white-space:normal}
 /* 결재 문서 미리보기(2026-10-12) — 「결재 문서 PDF」와 같은 PDF 를 쪽마다 그림으로, 카드 아래 세로로 */
 .apv{margin-top:12px;padding-top:10px;border-top:1px dashed var(--ink-200);min-width:0;max-width:100%}
 .apvbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* 2026-10-15 2차: 「문서 펼치기」·「크게 보기」·「결재 문서 PDF」 셋 → 「문서 보기」(펼친 쪽을 누르면 크게) + 「PDF 받기」 둘 */
+.apvhint{font-size:12px}
+.apv:not(.open) .apvhint{display:none}
 .apvpages{margin-top:10px;display:flex;flex-direction:column;gap:10px;min-width:0;max-width:820px}
 .apvpages[hidden]{display:none}
 .apvpg{display:block;width:100%;max-width:100%;padding:0;margin:0;border:1px solid var(--ink-200);border-radius:6px;background:#fff;
@@ -467,7 +478,9 @@ table.prhist tr.old td{color:var(--ink-500)}
 .abf b small{font-size:11.5px;font-weight:600;color:var(--ink-500);margin-left:1px}
 .abf b.up{color:var(--red-700)} .abf b.down{color:var(--ok)} .abf b.dimv{color:var(--ink-300)}
 .abf .sub{font-size:11.5px;color:var(--ink-400);line-height:1.45}
+.abf .sub.abwarn{color:var(--warn)}
 .abchk{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--ink-100)}
+.abchk:empty{display:none}   /* 딱지가 없으면 빈 띠를 남기지 않는다(2026-10-16 6차 — 법인카드 초록 요약 아래 빈 줄) */
 .abchk .ck{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--ink-200);color:var(--ink-600);background:var(--surface)}
 .abchk .ck.ok{color:var(--ok);border-color:#BFE3D3;background:var(--ok-50)}
 .abchk .ck.warn{color:var(--warn);border-color:#F0E2C4;background:var(--warn-50)}
@@ -507,7 +520,7 @@ table.evup tbody tr:first-child td{border-top:0}
 
 /* ── 조직도 · 결재선 ── */
 .orgwrap{display:grid;grid-template-columns:232px minmax(0,1fr);gap:16px;align-items:start}
-.omain tbody td,.omain thead th{padding-left:11px;padding-right:11px}
+.omain tbody td,.omain thead th{padding-left:8px;padding-right:8px}   /* 1280폭에서 「고치기」 칸까지 들어오게(2026-10-16 4차) */
 .omain td.el{max-width:150px}
 /* 소속·결재선은 자르지 않고 줄을 나눠 다 보인다(2026-10-14) */
 .omain td.oplace{min-width:130px;line-height:1.4}
@@ -570,7 +583,7 @@ table.evup tbody tr:first-child td{border-top:0}
 .otile .t{font-size:13px;font-weight:700;color:var(--ink-900)} .otile .d{font-size:11.5px;color:var(--ink-500);line-height:1.45}
 .otile.warn{border-color:#F0E2C4;background:var(--warn-50)} .otile.warn b{color:var(--warn)}
 .otile.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
-.omail{font-size:11px;color:var(--ink-400);margin-top:2px} .omail.miss{color:var(--warn);font-weight:600}
+.omail{font-size:11px;color:var(--ink-400);margin-top:2px;white-space:normal;overflow-wrap:anywhere;max-width:15em}   /* 회사 메일이 길어도 표가 넘치지 않게 @ 앞에서 줄바꿈(2026-10-16 4차) */ .omail.miss{color:var(--warn);font-weight:600}
 @media (max-width:720px){.otiles{grid-template-columns:1fr}}
 .ocard{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px}
 .ohd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -646,7 +659,8 @@ aside a.on .stepn:not(.done):not(.now){border-color:var(--red);color:var(--red-7
 /* 지금 할 단계 — 크게, 깜빡이며(2026-10-06) */
 aside a.step{height:42px;font-size:14px}
 aside a.step .stepn{flex-basis:22px;width:22px;height:22px;font-size:11.5px}
-aside a.step.isnow{font-weight:700;color:var(--red-700);animation:navnow 1.8s ease-in-out infinite}
+/* 2026-10-15 2차: 지금 할 단계는 숫자 동그라미만 칠한다(빨간 동그라미·고리) — 줄 바탕·글자색은 지금 화면(.on)에만.
+   예전에는 결재함·내 계정·관리 화면에 있어도 「① 운행 기록」 줄이 분홍으로 깜빡여 메뉴 두 곳에 불이 들어왔다. */
 aside a.step.isnow .stepn{animation:ringnow 1.8s ease-out infinite}
 @keyframes navnow{0%,100%{background:transparent}50%{background:var(--red-50)}}
 @keyframes ringnow{0%{box-shadow:0 0 0 0 rgba(215,0,81,.55)}70%{box-shadow:0 0 0 8px rgba(215,0,81,0)}100%{box-shadow:0 0 0 0 rgba(215,0,81,0)}}
@@ -772,6 +786,7 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .nowbtns .btn{justify-content:center}
 .btn.big{height:46px;padding:0 22px;font-size:14.5px;font-weight:700}
 .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.cards3.one{grid-template-columns:minmax(0,1fr);max-width:420px}   /* 상신 뒤 — 「내가 결재할 것」 한 장만(2026-10-15 2차) */
 .cardx{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px;min-width:0}
 .cardx .k{font-size:12px;color:var(--ink-500)}
 .cardx .v{margin-top:4px;font-size:24px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
@@ -781,6 +796,13 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .cardx .rows div{display:flex;gap:8px}.cardx .rows div span{flex:1}
 .cardx .rows b{color:var(--ink-800);font-weight:500}
 .cardx .lk{display:inline-block;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--red);background:none;border:0;padding:0;cursor:pointer;font-family:inherit}
+.stable button.plink{background:none;border:0;padding:0;font:inherit;font-weight:600;color:inherit;text-align:left;cursor:pointer;min-height:28px}   /* 현황 표 이름(2026-10-15 2차) */
+.stable button.plink:hover,.stable button.plink:focus-visible{text-decoration:underline}
+/* 현황 표가 PC 칸 안에 들어오게(2026-10-16 3차) — 거리는 운행 아래 작게, 단추(결과 보기·다시 검증·인쇄)는 줄을 바꿔 쌓는다 */
+.stable .skm{font-size:11.5px;margin-top:1px;white-space:nowrap}
+.stable td.sact{white-space:normal;min-width:150px}
+.stable td.sact .btn{margin:2px 0 2px 4px}
+.stable td.sact > *{white-space:nowrap}
 /* 같은 단계로 묶인 화면 사이의 탭 */
 .vtabs{display:flex;gap:4px;margin:-10px 0 20px;border-bottom:1px solid var(--ink-200)}
 .vtabs button{border:0;background:none;font:inherit;font-size:13.5px;padding:9px 14px;color:var(--ink-500);cursor:pointer;
@@ -795,6 +817,8 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .evs b{font-weight:700;color:var(--ink-800)}
 .evs span{font-size:12px}
 .evs.done{color:var(--ok);border-color:#BFE3D4} .evs.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+/* 지나왔지만 확인할 날이 남은 차례(2026-10-16 3차) — ✓ 대신 ! */
+.evs.done.left{color:var(--warn);border-color:var(--ink-200)} .evs.done.left i{background:var(--warn);border-color:var(--warn)}
 .evs.now{border-color:var(--red);background:var(--red-50);color:var(--red-700)}
 .evs.now b{color:var(--red-700)} .evs.now i{background:var(--red);border-color:var(--red);color:#fff;animation:ringnow 1.8s ease-out infinite}
 .evs:hover{border-color:var(--ink-400)}
@@ -832,6 +856,10 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .track i{display:block;height:100%;border-radius:99px;background:var(--red);
   transition:width .8s var(--ease)}
 .track.done i{background:var(--ink-400)}
+/* 관리 현황 — 결재 완료(초록) + 결재 중(주황) 비율 막대(2026-10-16 3차) */
+.track.apv2{display:flex}
+.track.apv2 i{border-radius:0;background:var(--ok)}
+.track.apv2 i.mid{background:var(--warn)}
 .facts{display:flex;flex-wrap:wrap;gap:0 38px;margin-top:22px}
 .fact{padding-top:2px}
 .fact .k{font-size:12px;color:var(--ink-600);font-weight:400}
@@ -942,6 +970,7 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .btn:disabled{opacity:.55;cursor:default}
 .btn:hover{border-color:var(--ink-400);background:var(--sunken);color:var(--ink-900)}
 .btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.btn.warnb{border-color:var(--warn);color:var(--warn);font-weight:600}   /* 확인할 것이 남은 보조 단추(「운행에 직접 맞추기 (N)」) — 빨간 주 단추와 겹치지 않게(2026-10-16 3차) */
 .btn.pri:hover{background:var(--red-700);border-color:var(--red-700)}
 .btn.sm{height:29px;padding:0 11px;font-size:11.5px}
 
@@ -976,9 +1005,13 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 /* 창을 열면 창 자체에 포커스를 준다(Tab 이 창 안에서 시작하게). 창 테두리에 포커스 선은 그리지 않는다. */
 #panel .sheet:focus,#panel .sheet:focus-visible{outline:none}
 #panel .pb{flex:1;overflow-y:auto;padding:6px 20px 20px}
-#panel .pf{padding:14px 20px;border-top:1px solid var(--ink-200);display:flex;gap:9px;align-items:center}
+#panel .pf{padding:14px 20px;border-top:1px solid var(--ink-200);display:flex;gap:9px;align-items:center;flex-wrap:wrap;row-gap:8px}
 /* 좁은 화면에서는 아랫줄 버튼이 넷까지 온다(← 결재 화면으로 · 닫기 · 내려받기 · 열기) — 넘치면 다음 줄로 내린다. */
 @media (max-width:900px){ #panel .pf{flex-wrap:wrap;row-gap:8px;justify-content:flex-end} }
+/* 상신 되묻기(「그래도 상신」, 2026-10-16 3차) — 경고 글은 한 줄 전체(예전에는 inline-flex 라 글 조각마다 좁은 기둥이 됐다), 단추는 그 아래 오른쪽 */
+#panel .pf .subwarn{display:block;flex:1 0 100%;white-space:normal;position:relative;padding-left:12px;line-height:1.55;font-size:13px}
+#panel .pf .subwarn::before{position:absolute;left:0;top:.6em;width:6px;height:6px}
+#panel .pf .subwarn + .btn{margin-left:auto}
 .kv{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--ink-100);font-size:13px}
 .kv:last-child{border-bottom:0}
 .kv .k{flex:0 0 86px;color:var(--ink-400);font-size:12.5px}
@@ -1038,10 +1071,11 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 .ag-cell:last-child{border-right:0}
 .ag-h{display:block;padding:6px 2px;background:var(--ink-100);border-bottom:1px solid var(--ink-700);font-size:12px;font-weight:500;
   color:var(--ink-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ag-b{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:62px;padding:6px 4px}
+.ag-b{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:62px;padding:24px 4px 6px}   /* 위 24px 는 × 자리(20px) — 이름을 덮지 않게(2026-10-16 3차) */
 .ag-b b{font-size:13px;font-weight:500;color:var(--ink-900);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ag-b small{font-size:11px;color:var(--ink-600)}
-.ag-cell.empty{cursor:pointer}
+.ag-cell.empty,.ag-cell.set{cursor:pointer}
+.ag-cell.set:hover .ag-b{background:var(--ink-50)}
 .ag-cell.empty .ag-b,.ag-cell.slash .ag-b{background:linear-gradient(to top right,transparent calc(50% - .6px),var(--ink-400) calc(50% - .6px),
   var(--ink-400) calc(50% + .6px),transparent calc(50% + .6px))}
 .ag-pick{font-size:11px;color:var(--ink-600);background:var(--surface);padding:1px 5px;border-radius:4px}
@@ -1067,7 +1101,7 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
   /* 「센터·파트장」은 한 줄에 안 들어간다 — 가운뎃점 뒤에서 두 줄로, 모든 칸 머리를 두 줄 높이로 맞춘다 */
   .ag-h{font-size:11px;padding:3px 1px;white-space:normal;word-break:keep-all;line-height:1.25;min-height:calc(2.5em + 6px);
     display:flex;align-items:center;justify-content:center}
-  .ag-b{min-height:58px;padding:14px 2px 6px}
+  .ag-b{min-height:62px;padding:19px 2px 6px}
   .ag-b b{font-size:12px}
   .ag-b small{font-size:10.5px}
   .ag-pick{display:none;font-size:10.5px;padding:1px 3px}
@@ -1165,7 +1199,8 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
   display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--ink-200);
   border-radius:999px;cursor:pointer;font-size:12.5px;color:var(--ink-600);transition:var(--t);user-select:none}
 .radio:hover{border-color:var(--ink-400)}
-.radio input{position:absolute;opacity:0;width:0;height:0}
+/* 동그라미는 투명하게 칩 전체를 덮는다 — 0×0 이면 손으로 더듬는 화면 읽기(폰)·점검 도구가 고르기를 못 찾았다(2026-10-16 5차) */
+.radio input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;border-radius:inherit}
 .radio:has(input:checked){background:var(--ink-900);border-color:var(--ink-900);color:#fff;font-weight:500}
 .radio:has(input:focus-visible){outline:2px solid var(--red);outline-offset:2px}
 
@@ -1221,7 +1256,20 @@ tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,
 .mtable td.mtrips{font-size:12.5px;line-height:1.55;color:var(--ink-700,#3A4146)}
 .mtable .mtrip .mt{display:inline-block;min-width:40px;font-weight:600;color:var(--ink-900);font-variant-numeric:tabular-nums}
 .mtable tr.flagged td{background:var(--red-50)}
+/* 주차·통행료 맞춰보기(규칙 v3) — 줄·운행을 누르면 그 운행 고치기 창 */
+.mtable tr.mclick{cursor:pointer} .mtable tr.mclick:hover td{background:var(--ink-50)} .mtable tr.mclick.flagged:hover td{background:var(--red-50)}
+.mtable button.mtrip{display:block;width:100%;border:0;background:none;padding:2px 0;font:inherit;color:inherit;text-align:left;cursor:pointer;min-height:24px}
+.mtable button.mtrip:hover .mp,.mtable button.mtrip:focus-visible .mp{text-decoration:underline}
+.mres.warn{color:var(--warn)}
+/* 한 줄 요약 + 자세히 보기(2026-10-15 2차) — 접으면 문제 있는 날(flagged)만 보인다 */
+.mtable.fold tr.mok{display:none}
+.mbox .mfoldb{margin-left:6px;vertical-align:baseline}
+.mbox .mhow{margin-top:6px;color:var(--ink-700,#3A4146)}
+.mbox .mrule{margin-top:6px;color:var(--ink-500)}
 .mtable .mai{font-size:11.5px;color:var(--red-700);margin-top:2px;white-space:normal}
+/* 기간 경계에 걸친 이은 영수증(2026-10-17) — 금액은 그대로, 문구만 */
+.mtable .mxl,.evxl{font-size:11.5px;color:var(--warn);margin-top:2px;white-space:normal;line-height:1.4}
+.hpnote .xlitem{display:block;margin-top:6px}
 .mres{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-500);white-space:nowrap}
 .mres.ok{color:var(--ok)} .mres.bad{color:var(--red-700)}
 .mcompare{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--ink-100)}
@@ -1234,6 +1282,10 @@ tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,
 .hpnote svg{margin-top:2px;flex:none;color:var(--ink-400)}
 .hpnote b{color:var(--ink-900);font-weight:500}
 .hpnote > span{flex:1;min-width:0}
+/* 통행료 미확정 운행 단추(2026-10-16 6차) — 누르면 운행 고치기 */
+.hpnote .unklist{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.hpnote .unklist .btn{align-self:auto;max-width:100%;white-space:normal;text-align:left}
+.hpnote .unklist .dim{align-self:center;font-size:12px}
 .hpnote .btn,.hpnote .iconbtn{flex:none;align-self:center}
 .hpnote .iconbtn{width:29px;height:29px;border-color:transparent;background:none}
 .hpnote.ok{background:var(--ok-50);border-color:#BFE3D3;color:var(--ok)}
@@ -1241,6 +1293,10 @@ tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,
 .hpnote.warn{background:var(--warn-50);border-color:#F0E2C4;color:var(--warn)}
 .hpnote.warn svg{color:var(--warn)}
 .hpnote.warn b{color:var(--warn)}
+/* 공지 띠(2026-10-15 2차 「통행료·주차비 영수증 필수」) — 닫을 수 있음 */
+.hpnote.notice{background:var(--surface);border-color:var(--red);border-left-width:4px;margin-bottom:12px}
+.hpnote.notice svg{color:var(--red)}
+.hpnote.notice b{font-weight:700;color:var(--red-700)}
 
 .hpact{display:flex;align-items:center;gap:14px;justify-content:flex-end;margin-top:13px;
   font-size:12.5px}
@@ -1540,6 +1596,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .btn.sm{height:38px}
   .aact .btn{height:40px}
   .ag-x{width:28px;height:28px}
+  .ag-b{padding-top:32px}   /* × 를 28px 로 키운 폭 — 이름이 × 아래에서 시작하게(2026-10-16 3차) */
   #nav .navsys a.navback{height:40px}
   .cpq{height:36px}
   .cycnav{min-width:24px}
@@ -1594,6 +1651,8 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .evs{min-width:0}
   .evsact > .btn{flex:1 1 calc(50% - 4px);justify-content:center}
   .evsact > span[style*="flex:1"]{display:none}
+  /* 빨간 단추가 셋 겹쳐 보이던 것(2026-10-16 3차) — 영수증 올리기는 한 줄 전체, 「운행에 직접 맞추기」는 빨갛게 하지 않는다 */
+  .evsact > .btn[data-evupcat]{flex-basis:100%}
   /* 영수증 올리기 창 — 창 안에 또 스크롤(52vh)이 있어 두 번 밀어야 했다. 파일을 고른 뒤엔 끌어 놓기 상자를 줄인다 */
   #xList .scroll[data-rows]{max-height:none !important}
   #xDrop:has(+ #xList > .panel){padding:14px 16px}
@@ -1734,6 +1793,37 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .eduv > .btn{margin-left:auto}
   .edustat > b{font-size:26px;min-width:64px}
 }
+/* ── 휴대폰 폭 표 넘침(2026-10-16 3차) ──
+   table.rcard — 결재 완료 출력·권한 관리(승인) 등 처리 단추가 끝 칸에 있는 표: 옆으로 밀지 않고 줄마다 한 덩어리로.
+     칸은 이어서 흐르고(소속 · 이름 · 날짜 · 금액), 결재선 같은 긴 칸(td.el)은 한 줄, 처리 단추 칸(td.ract)은 맨 아래 한 줄 전체.
+   table.mday — 2단계 주차·통행료 맞춰보기 표: 날짜·결과 / 운행 / 운행 금액·영수증·정산 금액 세 줄. */
+@media (max-width:720px){
+  .scroll table.rcard,.scroll table.mday{min-width:0;width:100%}
+  table.rcard thead,table.mday thead{display:none}
+  table.rcard,table.rcard tbody,table.rcard tfoot,table.mday,table.mday tbody{display:block;width:100%}
+  table.rcard tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:11px 14px;border-top:1px solid var(--ink-100)}
+  table.rcard tbody tr:first-child{border-top:0}
+  .scroll table.rcard td,.scroll table.rcard td:first-child{display:block;border:0 !important;padding:0 !important;min-width:0;max-width:100%;
+    white-space:normal;position:static !important;background:none !important;box-shadow:none}
+  table.rcard td:empty{display:none}
+  table.rcard td.n{text-align:left}
+  table.rcard td.el{flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  table.rcard td.ract{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;white-space:normal !important;padding-top:4px !important}
+  table.rcard td[data-l]::before{content:attr(data-l) " ";color:var(--ink-500);font-size:11.5px;font-weight:400}
+  table.rcard tr.ogrp{padding:8px 14px;background:var(--sunken)}
+  table.rcard tr.ogrp td{flex:1 1 100%}
+  table.rcard tr.ogrp td>div{position:static;max-width:none}
+  table.rcard tfoot tr{justify-content:space-between}
+  table.mday tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 10px;padding:10px 12px;border-top:1px solid var(--ink-100)}
+  .scroll table.mday td,.scroll table.mday td:first-child{display:block;border:0;padding:0;min-width:0;position:static;background:none}
+  table.mday td:nth-child(1){grid-column:1;grid-row:1;font-weight:600}
+  table.mday tbody tr.flagged{box-shadow:inset 3px 0 0 var(--red)}
+  table.mday tbody tr.flagged td:first-child{box-shadow:none}
+  table.mday td:nth-child(6){grid-column:2 / 4;grid-row:1;text-align:right}
+  table.mday td:nth-child(2){grid-column:1 / -1;grid-row:2}
+  table.mday td.n{text-align:left;white-space:normal}
+  table.mday td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--ink-500);font-weight:400}
+}
 </style>
 </head>
 <body>
@@ -1812,7 +1902,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   <header class="top">
     <button class="iconbtn" id="burger" aria-label="메뉴 열기">
       <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button>
-    <button class="appname" id="appLogo" data-v="close" aria-label="마감 현황으로">
+    <button class="appname" id="appLogo" data-v="close" aria-label="이번 달 마감으로">
       <img class="logo-mark" src="brand/atec-driving.png" alt="ATEC Driving">
       <img class="logo-mark tiny" src="brand/atec-mark.png" alt="ATEC">
     </button>
@@ -1885,10 +1975,9 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
       <div class="admsec adm dadm">결재·마감</div>
-      <a tabindex="0" role="button" data-v="a_close" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>마감 현황</a>
-      <a tabindex="0" role="button" data-v="a_verify" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증 현황</a>
+      <!-- 2026-10-15 2차: 「마감 현황」·「검증 현황」·「정산」 → 「현황」 한 화면(예전 주소 #/a_close·#/a_verify·#/a_settle 은 현황으로 돌아간다) -->
+      <a tabindex="0" role="button" data-v="a_status" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>현황</a>
       <a tabindex="0" role="button" data-v="a_final" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
-      <a tabindex="0" role="button" data-v="a_settle" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>정산</a>
       <div class="admsec adm dadm">기록</div>
       <a tabindex="0" role="button" data-v="a_trips" data-alt="a_check,a_evid,a_hipass" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행·영수증 기록</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
@@ -1936,6 +2025,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 
 <script src="hipass.js"></script>
 <script src="xlsx.js"></script>
+<script src="money-rule.js"></script>
 <!-- 확장 모듈은 본체보다 먼저 싣는다(DrvExtQ 에 올려 두면 본체가 붙인다). PDF 도구·글꼴은 쓸 때 받는다. -->
 <script src="sheetpdf.js"></script>
 <script src="drv-verify.js"></script>

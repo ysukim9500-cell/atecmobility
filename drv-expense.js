@@ -235,7 +235,9 @@
     return m ? '<span class="st ' + m[1] + '">' + m[0] + '</span>' : '';
   }
 
-  /** 결재 띠 — 상태 · 진행 막대 · 회수. 이번 달 경비·검증 화면 위에. */
+  /** 결재 띠 — 상태 · 진행 막대 · 회수. 이번 달 경비·검증 화면 위에(상신한 본인 화면).
+   *  ★ 2026-10-15 화면 정리: 본인 화면에서는 결재자용 요약 표(brief — 청구 금액·전월 대비·검증 딱지·불일치 목록)를 빼고
+   *  검증 딱지 · PDF·엑셀 단추만 둔다(같은 불일치가 띠·표·검증 칸에 다섯 번 나오던 것). 결재함 카드는 그대로 요약 표를 보인다. */
   function apprStrip(a) {
     var st = C.apprStatusText(a);
     var canWithdraw = a && a.status === 'submitted' && !(a.steps || []).some(function (x) { return x.result; });
@@ -244,45 +246,53 @@
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind x">개인경비</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
       (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 상신하면 결재함으로 갑니다.</div>') +
-      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a) + (C.apvSlot ? C.apvSlot('expense', a) : '') : '') +
+      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a, true) + (C.apvSlot ? C.apvSlot('expense', a) : '') : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 경비를 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
+      // 반려·회수 뒤 — 어디서 다시 상신하는지(운행일지 띠와 같게, 2026-10-16 3차). 검증·상신 화면이 아니면 그리 가는 길도.
+      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote afix">고친 뒤 「검증·상신」에서 다시 상신합니다.' +
+        (C.state().VIEW !== 'x_verify' ? ' <button class="btn pri sm" data-v="x_verify">고쳐서 다시 상신 →</button>' : '') + '</div>' : '') +
       '</div></section>';
   }
 
   /* ══════════════════ 이번 달 경비 ══════════════════ */
   var XDAY = '';            // 달력에서 고른 날('YYYY-MM-DD'), '' = 기간 전체
+  /** 화면 제목 — 지금 기간이면 「이번 달 경비」, 지난(또는 다음) 기간을 볼 때는 「경비 내역」(기간은 제목 아래 줄에, 2026-10-15). */
+  function monthTitle() { return C.cmpCycle(C.state().CYC, xCurrent()) === 0 ? '이번 달 경비' : '경비 내역'; }
   function viewMonth() {
-    var S = C.state();
-    if (!S.LOADED) return C.head('이번 달 경비') + C.skeleton();
-    if (C.isMulti()) return C.singleOnly('이번 달 경비', '개인경비');
+    var S = C.state(), title = monthTitle();
+    if (!S.LOADED) return C.head(title) + C.skeleton();
+    if (C.isMulti()) return C.singleOnly(title, '개인경비');
     var rows = itemsFor(false);
-    if (!rows || rows.err) return notReady('이번 달 경비', rows);
+    if (!rows || rows.err) return notReady(title, rows);
     var cyc = S.CYCKEY, r = xRangeKey(cyc), a = myX(cyc), locked = lockedFor(me(), cyc);
     var T = sums(rows);
-    var h = head('이번 달 경비', '영수증 한 장이 한 줄입니다');
+    var h = head(title, '영수증 한 장이 한 줄입니다');
     h += apprStrip(a);
+    // ★ 2026-10-15: 「영수증 올리기」는 요약 칸의 빨간 단추 하나만(내역 머리·빈 칸에도 있던 것을 뺐다).
+    //   달력에서 날을 고르면 이 단추가 「MM.DD 영수증 올리기」로 바뀌고 그 날짜를 미리 채운다.
+    var upLabel = XDAY ? XDAY.slice(5).replace('-', '.') + ' 영수증 올리기' : '영수증 올리기';
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (a && a.status === 'approved' ? ' ok' : '') + '"></span>' +
       esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · ' + esc(xSpan(S.CYC.y, S.CYC.m)) + ' · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.all) + '</p><div class="facts">' +
       CATS.map(function (c) { return fact(c, won(T.by[c].sum), n0(T.by[c].n) + '건'); }).join('') +
       fact('식비 기준 초과', n0(T.meal) + '<small>건</small>', '1인 1끼 13,000원 — 알리기만', false) +
       '</div>' +
-      (locked ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-xup="">' + ic('receipt', 14) + '영수증 올리기</button>' +
+      (locked ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-xup="' + esc(XDAY) + '">' + ic('receipt', 14) + esc(upLabel) + '</button>' +
         (rows.length ? '<button class="btn" data-v="x_verify">검증·상신으로 ' + ic('chev', 13) + '</button>' : '') + '</div>') +
       '</div>';
-    if (locked) h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' + (a && a.status === 'approved' ? '결재가 끝난 기간입니다.' : '결재 중인 기간입니다.') +
-      '</b> 경비를 더하거나 고칠 수 없습니다.' + (a && a.status === 'approved' ? ' 고칠 것이 있으면 관리자에게 「정정 열기」를 요청하세요.' : '') + '</span></div>';
+    // 결재 중 안내는 위 결재 띠에 이미 있다(회수 방법까지) — 여기서는 결재가 끝난 기간만 말한다(2026-10-15, 같은 안내 두 번)
+    if (locked && a && a.status === 'approved') h += '<div class="hpnote">' + ic('check', 16) + '<span><b>결재가 끝난 기간입니다.</b> 경비를 더하거나 고칠 수 없습니다. ' +
+      '고칠 것이 있으면 관리자에게 「정정 열기」를 요청하세요.</span></div>';
 
     h += C.sect('달력', XDAY ? esc(XDAY.slice(5).replace('-', '.')) + ' 고름' : '날을 누르면 그날 것만', XDAY ? '<button class="btn sm" data-xday="">기간 전체 보기</button>' : '', calHtml(rows, r));
 
     var shown = XDAY ? rows.filter(function (it) { return C.ymd(it.date_millis) === XDAY; }) : rows;
-    h += C.sect('내역', shown.length === rows.length ? n0(rows.length) + '건' : n0(shown.length) + ' / ' + n0(rows.length) + '건',
-      locked ? '' : '<button class="btn pri sm" data-xup="' + esc(XDAY) + '">' + ic('receipt', 13) + (XDAY ? XDAY.slice(5).replace('-', '.') + ' 영수증 올리기' : '영수증 올리기') + '</button>',
+    h += C.sect('내역', shown.length === rows.length ? n0(rows.length) + '건' : n0(shown.length) + ' / ' + n0(rows.length) + '건', '',
       rows.length ? listHtml(shown, { mine: true, locked: locked })
         : '<div class="panel"><div class="blank"><div class="ico">' + ic('receipt', 21) + '</div><div class="t">이 기간에 올린 경비가 없습니다.</div>' +
-          '<div class="d">영수증 사진이나 스캔 PDF 를 올리면 ' + C.gemTag('Gemini') + ' 가 금액·사용처를 읽고 구분·사용내역을 추천합니다.<br>앱(「개인경비」)에서 올린 것도 여기에 모입니다.</div>' +
-          (locked ? '' : '<div style="margin-top:16px"><button class="btn pri" data-xup="">' + ic('receipt', 14) + '영수증 올리기</button></div>') + '</div></div>');
+          (locked ? '' : '<div class="d">위 「영수증 올리기」로 영수증 사진이나 스캔 PDF 를 올리면 ' + C.gemTag('Gemini') + ' 가 금액·사용처를 읽고 구분·사용내역을 추천합니다.<br>앱(「개인경비」)에서 올린 것도 여기에 모입니다.</div>') +
+          '</div></div>');
     h += '<div class="anote">구분은 <b>소모품비 · 식비 · 기타비용</b>입니다. 식비는 1인 1끼 <b>13,000원</b> 기준 — 넘으면 표시만 합니다 ' +
       '(사용내역에 「3명」·「외 2명」을 적으면 1인당으로 봅니다). 사진 없는 줄은 만들 수 없습니다.</div>';
     return h;
@@ -511,7 +521,7 @@
       XUP.items.map(function (it, i) {
         var pg = XUP.pages[it.page] || {}, first = it.page !== prev; prev = it.page;
         var src = (it.crop && it.crop.url) || pg.url;
-        var thumb = '<a href="' + src + '" target="_blank" rel="noopener" aria-label="' + (i + 1) + '번째 줄 사진 크게 보기"><img src="' + src + '" alt=""></a>' +
+        var thumb = '<a href="' + src + '" target="_blank" rel="noopener" aria-label="' + (i + 1) + '번째 줄 사진 크게"><img src="' + src + '" alt=""></a>' +
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
           return '<tr data-xrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
@@ -529,7 +539,7 @@
           '<input class="inp" data-xnote maxlength="200" style="width:100%;margin-top:6px" placeholder="비고(선택)" value="' + esc(it.note) + '"' + lab('비고') + '>' +
           (it.hint ? '<div class="evhint">' + (it.ai ? C.gemTag() + ' ' : '') + esc(it.hint) + '</div>'
             : it.ai ? '<div class="evhint ok">' + C.gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '') +
-          (mealOver({ category: it.cat, amount: it.amt, usage: it.usage }) ? '<div class="evhint">' + mealTag({ category: it.cat, amount: it.amt, usage: it.usage }) + '</div>' : '') + '</td>' +
+          '<div class="evhint xmh"' + (mealOver({ category: it.cat, amount: it.amt, usage: it.usage }) ? '>' + mealTag({ category: it.cat, amount: it.amt, usage: it.usage }) : ' hidden>') + '</div></td>' +
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-xaddrow="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-xrm="' + i + '">빼기</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
@@ -657,8 +667,10 @@
     var r = xRangeKey(C.state().CYCKEY);
     var frow = function (lab, id2, body, hint) { return '<div class="frow"><label class="flab" for="' + id2 + '">' + lab + '</label><div class="fbody">' + body + (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>'; };
     C.openPanel('경비 고치기', C.md(it.date_millis) + ' · ' + (it.category || '') + ' · ' + won(it.amount),
-      '<div class="xephoto">' + (it.photo_path ? '<a target="_blank" rel="noopener" href="' + esc(C.photoUrl(it.photo_path)) + '"><img id="xePh" alt="영수증 사진" src="' + esc(C.photoUrl(it.photo_path)) + '"></a>' : '') +
-      '<label class="btn sm" style="margin-top:8px">사진 바꾸기<input type="file" id="xePhFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" class="sr"></label></div>' +
+      '<div class="xephoto">' + (it.photo_path ? '<a target="_blank" rel="noopener" aria-label="영수증 사진 크게(새 탭)" title="영수증 사진 크게(새 탭)" href="' + esc(C.photoUrl(it.photo_path)) + '"><img id="xePh" alt="영수증 사진" src="' + esc(C.photoUrl(it.photo_path)) + '"></a>' : '') +
+      // 「사진 바꾸기」는 진짜 단추(화면 읽기·키보드에 단추로 잡힘) — 숨은 파일 칸을 대신 연다(2026-10-16 6차: label 안 1px 파일 칸이라 단추로 안 잡혔다)
+      '<button type="button" class="btn sm" id="xePhBtn" style="margin-top:8px">사진 바꾸기</button>' +
+      '<input type="file" id="xePhFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" hidden tabindex="-1" aria-hidden="true"></div>' +
       '<div class="form">' +
       frow('구분', 'xeCat', '<select class="inp" id="xeCat" style="max-width:200px">' + CATS.map(function (c) { return '<option' + (it.category === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>') +
       frow('날짜', 'xeDate', '<input class="inp" type="date" id="xeDate" style="max-width:200px" value="' + C.ymd(it.date_millis) + '" min="' + C.ymd(r.lo) + '" max="' + C.ymd(r.hi - 1) + '">', '이 기간(' + esc(xSpanKey(C.state().CYCKEY)) + ') 안의 날만 됩니다.') +
@@ -835,11 +847,11 @@
     var S = C.state(), x = ITEMS[itemKey(false, S.CYCKEY)], rows = ((x && x.rows) || []).filter(function (r) { return ref.indexOf(String(r.id)) >= 0; });
     if (rows.length === 1) { openEdit(rows[0].id); return; }
     if (!rows.length) { C.toast('가리키는 줄을 찾지 못했습니다. 「다시 검증하기」를 눌러 주세요.', true); return; }
-    C.openPanel('바로 고치기 — ' + it.title, '고친 뒤 「다시 검증하기」를 눌러 주세요',
+    C.openPanel('바로 고치기 — ' + it.title, '고친 뒤 검증·상신 화면에서 ① 「검증하기」를 다시 눌러 주세요',
       '<div class="anote">' + esc(it.detail || '') + '</div><div class="fixl">' + rows.map(function (r) {
-        return '<div class="fixi">' + (r.photo_path ? '<a class="fixph" target="_blank" rel="noopener" href="' + esc(C.photoUrl(r.photo_path)) + '"><img alt="" loading="lazy" src="' + esc(C.photoUrl(r.photo_path)) + '"></a>' : '<span class="fixph none">사진 없음</span>') +
+        return '<div class="fixi">' + (r.photo_path ? '<a class="fixph" target="_blank" rel="noopener" aria-label="' + esc(C.md(r.date_millis) + ' ' + (r.category || '') + ' ' + n0(r.amount) + '원 영수증 사진 크게') + '" href="' + esc(C.photoUrl(r.photo_path)) + '"><img alt="" loading="lazy" src="' + esc(C.photoUrl(r.photo_path)) + '"></a>' : '<span class="fixph none">사진 없음</span>') +
           '<div class="fixt"><b>' + C.md(r.date_millis) + ' ' + esc(r.category) + ' ' + n0(r.amount) + '원</b><div class="dim">' + esc([r.merchant, r.usage].filter(Boolean).join(' · ')) + '</div></div>' +
-          '<button class="btn sm pri" data-xedit="' + r.id + '">고치기</button></div>';
+          '<button class="btn sm" data-xedit="' + r.id + '">고치기</button></div>';
       }).join('') + '</div>', '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
   }
   function viewVerify() {
@@ -848,11 +860,12 @@
     if (C.isMulti()) return C.singleOnly('검증·상신', '개인경비 검증');
     var rows = itemsFor(false);
     if (!rows || rows.err) return notReady('검증·상신', rows);
-    var u = me(), cyc = S.CYCKEY, k = vkey(u, cyc);
+    var u = me(), cyc = S.CYCKEY, k = vkey(u, cyc), a = myX(cyc);
+    var locked = a && (a.status === 'submitted' || a.status === 'approved');
+    if (locked) return lockedVerify(rows, a);
     var h = head('검증·상신', '상신하기 전에 영수증과 입력값이 맞는지 살펴봅니다');
     if (VROWS[k] === undefined) { fetchLatest(u, cyc).then(function () { if (C.state().VIEW === 'x_verify') C.render(); }); return h + C.skeleton(); }
-    var row = VROWS[k], busy = VRUN.busy && VRUN.who === k, a = myX(cyc);
-    var locked = a && (a.status === 'submitted' || a.status === 'approved');
+    var row = VROWS[k], busy = VRUN.busy && VRUN.who === k;
     var s = (row && row.summary) || {}, items = (row && row.result && row.result.items) || [];
     VITEMS = [];
     var verdict, clean = '';
@@ -881,9 +894,9 @@
           busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
       card(2, 'PDF 미리보기', row && fresh ? '결재자에게 갈 지출 명세·영수증을 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-xpdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>') +
-      card(3, '결재 상신', !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+      card(3, '상신', !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
         canSubmit ? '<button class="btn big' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit" data-kind="expense"' + (stage === 3 && !busy ? '' : ' disabled') + '>' +
-          (a && a.status === 'rejected' ? '다시 상신' : '결재 상신') + '</button>' : '') + '</ol>';
+          (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '') + '</ol>';
     h += apprStrip(a);
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
       (row ? '마지막 검증 ' + esc(C.vx.whenText(row.created_at)) : '검증 전') + ' · 경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all) + '</div>' +
@@ -891,11 +904,10 @@
       (row ? '<div class="facts">' + fact('불일치', n0(s.bad), '금액·영수증이 서로 다름', s.bad > 0) + fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '식비 기준 초과 등 — 알리기만') +
         '<div class="fact"><div class="k">사진 판독 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'Gemini 가 읽은 영수증' : 'Gemini 미설정 — 규칙 검증만') + '</div></div></div>' : '') +
-      (locked ? '<div class="vact">' + C.vx.gemBtn('data-xvrun' + (VRUN.busy ? ' disabled' : ''), busy ? (VRUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') +
-        '<button class="btn" data-xpdf="">' + ic('dl', 14) + '결재 문서 PDF</button></div>' : steps) + '</div>';
+      steps + '</div>';
     if (row) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
-      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, !locked));
+      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, true));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('scan', 21) + '</div><div class="t">위 ① 「검증하기」를 누르면 이번 기간 경비를 살펴봅니다.</div>' +
@@ -903,6 +915,37 @@
         '맞지 않는 곳이 있어도 상신은 할 수 있습니다 — 결재자가 같이 봅니다.</div></div></div>';
     }
     h += '<div class="anote">금액은 입력한 값으로만 더합니다. ' + C.vx.gemBadge('Gemini') + ' 는 <b>입력값과 다른 곳을 표시</b>만 하고 값은 바꾸지 않습니다.</div>';
+    return h;
+  }
+  /** 결재 중·결재 완료 기간의 검증·상신 화면(2026-10-15 화면 정리) — 다시 검증하지 않는다.
+   *  상신 때 굳힌 검증 결과(expense_frozen.verify)만 보이고, 문서는 위 결재 띠의 PDF·엑셀 단추로 본다
+   *  (예전: 「아직 검증하지 않았습니다」·없는 ① 단추 안내·한 번도 안 한 「다시 검증하기」·띠와 같은 PDF 단추가 또 하나). */
+  function lockedVerify(rows, a) {
+    var h = head('검증·상신', a.status === 'approved' ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다');
+    h += apprStrip(a);
+    var f = FZSUM[fzKey(a)], v = f && f.verify, s = (v && v.summary) || {};
+    // 잠긴 기간엔 다시 검증하지 않는다 — 굳힌 결과 글에 남은 「다시 검증하면 …」 안내는 떼고 보인다
+    var items = ((v && (v.items || (v.result && v.result.items))) || []).map(function (i) {
+      return /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: String(i.detail).replace(/\s*[—-]?\s*다시 검증하면[^.。]*[.。]?\s*$/, '') }) : i;
+    });
+    var verdict, clean = '';
+    if (f === undefined) verdict = FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했습니다 — 잠시 뒤 다시 열어 주세요' : '상신 때 검증 결과를 불러오는 중…';
+    else if (!v) verdict = '상신 때 검증 결과가 없습니다';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었습니다';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었습니다'; clean = ' wait'; }
+    else { verdict = '<em>이상 없었습니다</em>'; clean = ' clean'; }
+    var at = v && (v.ran_at || v.created_at || (f && f.frozen_at));
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && !s.bad ? ' ok' : '') + '"></span>' +
+      '상신 때 검증 결과' + (at ? ' · ' + esc(C.vx.whenText(at)) : '') + ' · 경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all) + '</div>' +
+      '<p class="verdict' + clean + '">' + verdict + '</p></div>';
+    if (v) {
+      var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
+      VITEMS = [];
+      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, false));
+      if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
+    }
+    h += '<div class="anote">' + (a.status === 'approved' ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않습니다. ' +
+      '결재 문서는 위 결재 띠의 PDF 단추로 봅니다.</div>';
     return h;
   }
   /** 상신 창이 「상신」을 누른 직후 부른다 — 검증을 돌려 요약을 돌려준다(실패하면 null, 상신은 막지 않음). */
@@ -947,12 +990,12 @@
     var p = personOf(u, fz);
     // 결재란 — 세 문서 공통(C.docBoxes · C.boxLabels): 칸 이름은 그 건의 칸 모양(예전 건 v1 · 새 건 v2, 2026-10-14)
     //   담당 칸 — 상신 전(·반려·회수 뒤) 본인 문서면 지금 내 서명(운행일지 boxesOf 와 같게, 2026-10-14)
-    var boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null, u);
+    var filed = !!fz, boxes = C.docBoxes(a, p.name, C.liveSign ? C.liveSign(u) : null, u, filed);   // filed — 고정본이면 반려·회수 뒤에도 상신 때 결재란 그대로(2026-10-16 6차)
     var its = docItems(rows);
     return {
       meta: { name: p.name, cycleName: cycName(cyc) + ' 개인경비', mark: mark, docNo: docNo },
-      person: p, periodLabel: periodLabel(cyc), periodText: periodText(cyc), boxes: boxes, boxLabels: C.boxLabels(a), items: its, verify: verify,
-      sheets: [{ boxes: boxes, boxLabels: C.boxLabels(a) }]   // fillSigns 가 결재란 서명을 여기에 채운다(같은 객체)
+      person: p, periodLabel: periodLabel(cyc), periodText: periodText(cyc), boxes: boxes, boxLabels: C.boxLabels(a, filed), items: its, verify: verify,
+      sheets: [{ boxes: boxes, boxLabels: C.boxLabels(a, filed) }]   // fillSigns 가 결재란 서명을 여기에 채운다(같은 객체)
     };
   }
   function vOf(v) { return v ? { ranAt: C.vx.whenText(v.ran_at || v.created_at), ai: !!v.ai, summary: v.summary || {}, items: v.items || (v.result && v.result.items) || [] } : null; }
@@ -964,7 +1007,7 @@
     var nImg = d.items.filter(function (i) { return i.path; }).length;
     return {
       doc: { sheets: d.sheets, scans: [], photos: [] }, nImg: nImg, verify: d.verify, title: o.title, sub: o.sub, file: o.file,
-      note: o.note, expect: o.expect, expectName: o.expectName, okKey: o.okKey || '', okAttr: 'data-xpdfok', meta: d.meta,
+      note: o.note, expect: o.expect, expectName: o.expectName, okKey: o.okKey || '', again: !!o.again, okAttr: 'data-xpdfok', meta: d.meta,
       // 명세가 길면 2장 이상 — 실제로 그린 쪽 수(sheetpdf totals[0].pages)로 적는다.
       stat: function (res) { var t = (res && res.totals && res.totals[0]) || {}; return '지출 명세 ' + n0(t.pages || 1) + '장 · ' + n0(d.items.length) + '건'; },
       build: function (lib, loadImage) {
@@ -983,11 +1026,13 @@
       var d = xDoc(u, cyc, rows, null, null, vOf(VROWS[k]), 'preview', '상신 전 미리보기 · ' + now + ' 출력');
       showPdf(d, { title: 'PDF 미리보기 — 개인경비', sub: d.person.name + ' · ' + cycName(cyc) + ' (' + xSpanKey(cyc) + ')',
         file: '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + cyc + '_미리보기.pdf',
-        expect: sums(rows).all, expectName: '화면 합계', okKey: k });
+        expect: sums(rows).all, expectName: '화면 합계', okKey: k, again: !!(a && (a.status === 'rejected' || a.status === 'withdrawn')) });
     };
     if (VROWS[k] === undefined) fetchLatest(u, cyc).then(go); else go();
   }
   var FZ = {}, FZSUM = {}, FZFAIL = {}, FZASK = '';
+  var FZWAIT = [];                      // 고정본 요약을 기다리는 쪽(결재 창 다시 그리기)
+  function fzFlush() { var w = FZWAIT; FZWAIT = []; w.forEach(function (f) { try { f(); } catch (e) { } }); }
   function fzKey(a) { return a.id + '|' + (a.submitted_at || ''); }
   function fetchFrozen(a) {
     var k = fzKey(a);
@@ -1270,7 +1315,7 @@
   }
 
   /* ══════════════════ 결재함 카드 · 결재 요약 ══════════════════ */
-  function wantSums(ids) {
+  function wantSums(ids, done) {
     var now = Date.now(), need = [];
     (ids || []).forEach(function (id) {
       var a = apprById(id); if (!a) return;
@@ -1279,6 +1324,7 @@
       need.push(a);
     });
     if (!need.length) return;
+    if (done) FZWAIT.push(done);          // 다 받으면(실패해도) 알려 준다 — 결재 창(관리자 반려 등)이 「불러오는 중」에 멈추지 않게(2026-10-16 3차)
     var s = need.map(fzKey).join(',');
     if (FZASK === s) return;
     FZASK = s;
@@ -1289,21 +1335,25 @@
         need.forEach(function (a) { FZSUM[fzKey(a)] = by[a.id] || null; });
         FZASK = '';
         if (C.state().VIEW === view) C.render();
-      }).catch(function () { need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = ''; });
+        fzFlush();
+      }).catch(function () { need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = ''; fzFlush(); });
   }
   function byLine(sn) {
     var by = sn.by || {};
     return CATS.map(function (c) { var x = by[c] || {}; return c.replace('비용', '') + ' ' + won(x.sum || 0); }).join(' · ');
   }
+  /** 지금 내가 결재할 차례인 건인가(요약 문구용). */
+  function myTurn(a) { var me = (C.state().ME || {}).username; return !!me && (a.steps || []).some(function (s) { return s.seq === a.cur_seq && s.approver === me; }); }
   /** 결재 요약(결재 중) + 검증 딱지 · 문서 단추. 운행일지 apprBrief 와 같은 모양. */
-  function extra(a) {
+  /** own = 상신한 본인의 이번 달 경비·검증 화면(결재 띠) — 결재자용 요약 표(brief)는 결재함에서만(2026-10-15). */
+  function extra(a, own) {
     if (!a) return '';
     var f = FZSUM[fzKey(a)], done = a.status === 'approved', live = a.status === 'submitted' || done;
     var chip = f && f.verify ? '<button class="vchip" data-xfzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' + C.vx.sumChip(f.verify.summary) + '</button>' : '';
     if (done && C.prints) chip += C.prints.badge('expense', a);         // 출력 딱지(2026-10-14)
-    return brief(a, f) + '<div class="aext">' + chip + '<span style="flex:1"></span>' +
-      '<button class="btn sm" data-xfzpdf="' + a.id + '">' + ic('dl', 13) + (done ? '결재 완료본 PDF' : live ? '결재 문서 PDF' : '상신했던 문서 PDF') + '</button>' +
-      (done ? '<button class="btn sm" data-xfzxlsx="' + a.id + '">결재 완료본 엑셀</button>' : '') + '</div>';
+    return (own ? '' : brief(a, f)) + '<div class="aext">' + chip + '<span style="flex:1"></span>' +
+      '<button class="btn sm" data-xfzpdf="' + a.id + '">' + ic('dl', 13) + 'PDF 받기</button>' +
+      (done ? '<button class="btn sm" data-xfzxlsx="' + a.id + '">' + ic('dl', 13) + '엑셀 받기</button>' : '') + '</div>';
   }
   function brief(a, f) {
     if (!a || a.status !== 'submitted') return '';
@@ -1322,17 +1372,19 @@
     var items = ((v && (v.items || (v.result && v.result.items))) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
     var checks = [];
     if (vs) {
-      checks.push(vs.bad ? ['bad', '검증 불일치 ' + n0(vs.bad) + '건'] : vs.warn ? ['warn', '검증 확인 필요 ' + n0(vs.warn) + '건'] : ['ok', '검증 이상 없음']);
+      // 2026-10-15 2차: 칩 「검증 불일치 N건」은 뺀다 — 띠(판정)와 검증 딱지(알약)에 이미 있다
       if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
-    } else if (f === undefined) checks.push(['warn', '검증 결과를 불러오는 중…']);
+    } else if (f === undefined) { if (!FZFAIL[fzKey(a)]) checks.push(['warn', '검증 결과를 불러오는 중…']); }   // 못 받았으면 그 줄은 없앤다(판정 띠가 말한다)
     else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
     checks.push(s.meal_over ? ['warn', '식비 1인 13,000원 초과 ' + n0(s.meal_over) + '건(알림)'] : ['ok', '식비 기준 안']);
     if (bigJump) checks.push(['warn', '전월보다 크게 늘었습니다']);
-    var nBad = checks.filter(function (c) { return c[0] === 'bad'; }).length, nWarn = checks.filter(function (c) { return c[0] === 'warn'; }).length;
-    var verdict = !vs ? ['warn', '검증 결과를 아직 받지 못했습니다 — 결재 문서를 열어 확인해 주세요']
-      : nBad ? ['bad', '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요']
-      : nWarn ? ['warn', '대체로 정상입니다 — 아래 확인 항목만 살펴봐 주세요']
-      : ['ok', '금액·검증 모두 이상 없습니다 — 문서를 열지 않고 승인하셔도 됩니다'];
+    var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
+      nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length;
+    var asApprover = a.username !== (C.state().ME || {}).username;   // 결재하는 분 — 상신자 할 일(고치세요)은 보이지 않는다
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했습니다' : f === undefined ? '검증 결과를 불러오는 중입니다' : '검증 결과를 아직 받지 못했습니다') + ' — 아래 「PDF 받기」로 문서를 열어 확인해 주세요']
+      : nBad ? ['bad', asApprover ? '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요' : '검증에서 맞지 않는 곳이 있습니다 — 결재하는 분이 문서에서 함께 봅니다']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
+      : nWarn ? ['warn', '대체로 정상입니다 — ' + C.vx.warnTail(items, vs, asApprover)]
+      : ['ok', '금액·검증 모두 이상 없습니다' + (myTurn(a) ? ' — 문서를 열지 않고 승인하셔도 됩니다' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
     return '<div class="abrief ' + verdict[0] + '"><div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
       '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + esc(byLine(s)) + '</span></div>' +
@@ -1341,8 +1393,9 @@
       '<div class="abf"><span class="k">식비 기준 초과</span><b>' + n0(s.meal_over || 0) + '<small>건</small></b><span class="sub">1인 1끼 13,000원 — 알리기만</span></div>' +
       '</div><div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
-        return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
-      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 아래 「검증」을 눌러 전부 보기</li>' : '') + '</ul>' : '') + '</div>';
+        return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
+      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 「검증」 딱지를 눌러 전부 보기</li>' : '') +
+        (asApprover ? '<li class="more">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') + '</div>';
   }
   function sumHtml(a) {
     var s = a.snapshot || {};
@@ -1384,15 +1437,12 @@
     rows = rows.filter(function (it) { return C.orgMatch(it.username); });
     var by = peopleOf(rows), list = Object.keys(by).filter(function (u) { return C.orgMatch(u); }).map(function (u) { var x = by[u]; x.a = xApprOf(u, S.CYCKEY); return x; });
     var T = sums(rows);
-    var cnt = function (f) { return list.filter(f).length; };
-    var nDone = cnt(function (x) { return x.a && x.a.status === 'approved'; }), nGo = cnt(function (x) { return x.a && x.a.status === 'submitted'; });
-    var nBack = cnt(function (x) { return x.a && (x.a.status === 'rejected' || x.a.status === 'withdrawn'); }), nNot = cnt(function (x) { return !x.a && x.n > 0; });
-    var h = head('개인경비 현황', '직원별 상신·결재 상태');
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (nGo || nBack || nNot ? '' : ' ok') + '"></span>경비가 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
-      '<p class="verdict">' + won(T.all) + '</p><div class="facts">' +
-      fact('결재 완료', n0(nDone) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(nGo) + '<small>명</small>', '결재자 차례를 기다리는 중', nGo > 0) +
-      fact('반려·회수', n0(nBack) + '<small>명</small>', '고쳐서 다시 올려야 함', nBack > 0) + fact('상신 안 함', n0(nNot) + '<small>명</small>', '이번 기간 경비가 있는데 상신 전', nNot > 0) +
-      '</div><div class="facts" style="margin-top:10px">' + CATS.map(function (c) { return fact(c, won(T.by[c].sum), n0(T.by[c].n) + '건'); }).join('') +
+    // 2026-10-15 2차(관리자 메뉴 원칙): 현황은 금액·구분·팀만. 결재 상태 네 칸·챙겨야 할 사람·PDF·관리자 반려·정정 열기는 「결재 완료 출력」에만.
+    //   (예전에는 두 화면이 같은 결재 상태 칸과 반려·정정 단추를 되풀이했다 — 군더더기 검토 상 9)
+    var h = head('개인경비 현황', '직원별 금액·구분·팀');
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>경비가 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
+      '<p class="verdict">' + won(T.all) + '</p>' +
+      '<div class="facts">' + CATS.map(function (c) { return fact(c, won(T.by[c].sum), n0(T.by[c].n) + '건'); }).join('') +
       fact('식비 기준 초과', n0(T.meal) + '<small>건</small>', '1인 13,000원 — 알리기만') + '</div></div>';
     // 팀별 합계 카드 — 누르면 그 팀으로 좁힌다(운행일지 관리와 같은 모양)
     var tb = {}, tl = [], byUnit = false;
@@ -1410,34 +1460,18 @@
           '<span class="tm">' + n0(g.n) + '명 · ' + n0(g.cnt) + '건</span></button>';
       }).join('') + '</div></section>';
     }
-    var order = function (x) { return !x.a ? (x.n ? 0 : 5) : x.a.status === 'rejected' || x.a.status === 'withdrawn' ? 1 : x.a.status === 'submitted' ? 2 : 3; };
-    list.sort(function (x, y) { return order(x) - order(y) || y.sum - x.sum; });
+    list.sort(function (x, y) { return y.sum - x.sum; });
     h += C.sect('직원별', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th>' +
-      '<th class="n">건수</th><th class="n">금액</th><th>식비 기준</th><th>결재</th><th></th></tr></thead><tbody>' +
+      '<th class="n">건수</th><th class="n">금액</th><th>식비 기준</th><th></th></tr></thead><tbody>' +
       C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
-        return C.orgGroupRow(g, 7, '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
-          var a = x.a;
+        return C.orgGroupRow(g, 6, '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
           return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="n">' + n0(x.n) + '</td>' +
             '<td class="n total">' + n0(x.sum) + '</td><td>' + (x.meal ? '<span class="st warn">초과 ' + n0(x.meal) + '건</span>' : '<span class="dim">—</span>') + '</td>' +
-            '<td>' + stChip(a) + '</td><td class="n" style="white-space:nowrap">' +
-            (x.n ? '<button class="btn sm" data-xperson="' + esc(x.u) + '">내역</button> ' : '') +
-            (a && (a.status === 'submitted' || a.status === 'approved') ? '<button class="btn sm" data-xfzpdf="' + a.id + '">PDF</button> ' : '') +
-            (a && a.status === 'submitted' ? '<button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '" title="결재가 멈췄을 때 관리자 권한으로 반려합니다">관리자 반려</button>' : '') +
-            (a && a.status === 'approved' ? '<button class="btn sm" data-appr="reopen" data-kind="expense" data-id="' + a.id + '" title="결재 완료 건을 정정하도록 다시 엽니다">정정 열기</button>' : '') + '</td></tr>';
+            '<td class="n" style="white-space:nowrap">' +
+            (x.n ? '<button class="btn sm" data-xperson="' + esc(x.u) + '">내역</button>' : '') + '</td></tr>';
         }).join('');
       }).join('') + '</tbody></table></div></div>' : C.blank('이 기간에 경비가 있는 사람이 없습니다.', null, 'users'));
-    var todo = list.filter(function (x) { return x.n > 0 && (!x.a || x.a.status === 'rejected' || x.a.status === 'withdrawn'); });
-    if (todo.length) {
-      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 경비</th></tr></thead><tbody>' +
-        C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
-          return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
-            return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td>' + (x.a ? stChip(x.a) : '<span class="st warn">상신 전</span>') + '</td>' +
-              '<td class="n">' + n0(x.n) + '건 · ' + won(x.sum) + '</td></tr>';
-          }).join('');
-        }).join('') + '</tbody></table></div></div>');
-    }
-    h += '<div class="anote"><b>관리자 반려</b>는 결재자가 자리에 없어 결재가 멈췄을 때만 씁니다. <b>정정 열기</b>는 결재가 끝난 뒤 고칠 것이 생겼을 때 씁니다 — ' +
-      '잠금이 풀려 직원이 고쳐 다시 상신하고, 그때의 결재 완료본은 이력에 남습니다.</div>';
+    h += '<div class="anote">결재 상태·결재 완료본 받기·관리자 반려·정정 열기는 「결재 완료 출력」에서 합니다.</div>';
     return h;
   }
   /** 직원 현황(개인경비) — 등록된 모든 직원의 이번 기간 경비. 운행일지 직원 현황(운행·거리·유지비)과 따로 둔다(2026-10-08).
@@ -1507,7 +1541,7 @@
     }).join('') + '</div>' +
       '<label class="field"><select id="xWho" aria-label="사람"><option value="">사람 전체</option>' + whoOpts.map(function (u) { return '<option value="' + esc(u) + '"' + (XL.who === u ? ' selected' : '') + '>' + esc(C.nameOf(u)) + '</option>'; }).join('') + '</select></label>' +
       '<button class="btn sm' + (XL.meal ? ' pri' : '') + '" data-xmeal aria-pressed="' + XL.meal + '">식비 기준 초과만 ' + n0(scoped.filter(mealOver).length) + '</button>' +
-      '<span style="flex:1"></span><button class="btn sm" data-xcsv>' + ic('dl', 13) + 'CSV 내려받기</button></div>';
+      '<span style="flex:1"></span><button class="btn sm" data-xcsv>' + ic('dl', 13) + '목록 CSV</button></div>';
     var total = rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0);
     var sorted = rows.slice().sort(function (a, b) { return Number(a.date_millis) - Number(b.date_millis) || a.id - b.id; });
     h += C.sect('내역', n0(rows.length) + '건 · ' + won(total), '', rows.length ? '<div class="panel"><div class="scroll tall" data-rows><table class="xtab"><thead><tr>' +
@@ -1571,33 +1605,33 @@
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(xSpanKey(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
-      fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 올려야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 경비가 있는데 상신 전', notYet.length > 0) + '</div></div>';
+      fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 상신해야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 경비가 있는데 상신 전', notYet.length > 0) + '</div></div>';
     var tools = done.length ? '<label class="finall"><input type="checkbox" id="xFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
       '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-xfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-xfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('expense') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
-      : done.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
+      : done.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
       '<th>결재 완료</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
       C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
         return C.orgGroupRow(g, 8, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') + g.list.map(function (a) {
-          var line = (a.steps || []).map(function (s) { return (s.name || C.nameOf(s.approver)) + '(' + (s.box || '') + ')'; }).join(' → ');
+          var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
           return '<tr><td><input type="checkbox" data-xfinsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.closed_at ? esc(C.vx.whenText(a.closed_at)) : '—') +
             (C.prints ? '<div class="prline">' + C.prints.badge('expense', a) + '</div>' : '') + '</td>' +
-            '<td class="n">' + n0((a.snapshot || {}).n) + '</td><td class="n total">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
-            '<td class="n" style="white-space:nowrap"><button class="btn sm" data-xfzpdf="' + a.id + '">PDF</button> <button class="btn sm" data-xfzxlsx="' + a.id + '">엑셀</button> ' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
+            '<td class="n ract" style="white-space:nowrap"><button class="btn sm" data-xfzpdf="' + a.id + '">PDF</button> <button class="btn sm" data-xfzxlsx="' + a.id + '">엑셀</button> ' +
             '<button class="btn sm" data-appr="reopen" data-kind="expense" data-id="' + a.id + '">정정 열기</button></td></tr>';
         }).join('');
       }).join('') + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
         going.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
           return '<tr>' + C.orgCell(a.username) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.submitted_at ? esc(C.vx.whenText(a.submitted_at)) : '') + '</td>' +
-            '<td class="n">' + n0((a.snapshot || {}).cost) + '</td><td>' + esc((cur.name || C.nameOf(cur.approver || '')) + (cur.box ? ' (' + cur.box + ')' : '')) + '</td>' +
-            '<td class="n"><button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '">관리자 반려</button></td></tr>';
+            '<td class="n">' + n0((a.snapshot || {}).cost) + '</td><td>' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+            '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '">관리자 반려</button></td></tr>';
         }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
@@ -1707,6 +1741,7 @@
     var el;
     // 묶어 받기 창의 「닫기」 — 돌던 묶음을 바로 멈춘다(Esc·바깥 누르기는 다음 사람으로 넘어갈 때 alive() 가 멈춘다).
     if (FINJOB && e.target.closest('[data-close]') && $('xFinNote')) { FINJOB = null; setTimeout(function () { C.render(); }, 0); }
+    if (e.target.closest('#xePhBtn')) { var pf = $('xePhFile'); if (pf) pf.click(); return; }
     if ((el = e.target.closest('[data-xup]'))) { openUpload(el.dataset.xup || ''); return; }
     if ((el = e.target.closest('[data-xday]'))) {
       // 다시 그리면 누른 단추가 새로 생긴다 — 키보드로 누르던 그 날로 포커스를 돌려준다(「기간 전체 보기」면 고르던 날로).
@@ -1744,14 +1779,15 @@
       setPreviewed(el.dataset.xpdfok, true);
       C.closePanel();
       if (C.state().VIEW !== 'x_verify') C.go('x_verify'); else C.render();
-      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (er) { } } }, 60);
+      // 이름대로 바로 상신 창을 연다(2026-10-15 매뉴얼 로봇: 창만 닫혀 한 번 더 눌러야 했다). 아직 못 누르는 상태면 그 단추로 데려간다.
+      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } catch (er) { } } }, 60);
       return;
     }
     if ((el = e.target.closest('[data-xfzpdf]'))) { pdfFrozen(el.dataset.xfzpdf); return; }
     if ((el = e.target.closest('[data-xfzxlsx]'))) { xlsxFrozen(el.dataset.xfzxlsx); return; }
     if ((el = e.target.closest('[data-xfzverify]'))) {
       var a = apprById(el.dataset.xfzverify), f = a && FZSUM[fzKey(a)];
-      if (f && f.verify) C.vx.showItems(C.nameOf(a.username) + ' 개인경비 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify);
+      if (f && f.verify) C.vx.showItems(C.nameOf(a.username) + ' 개인경비 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify, a.username !== C.myName());
       return;
     }
     if ((el = e.target.closest('[data-xcat]'))) { XL.cat = el.dataset.xcat; C.render(); return; }
@@ -1765,6 +1801,13 @@
   document.addEventListener('change', function (e) {
     var t = e.target;
     if (t.id === 'xFile') { addFiles(t.files); t.value = ''; return; }
+    // 올리기 창 줄 — 구분·금액·사용내역을 바꾸면 식비 13,000원 초과 표시를 그 자리에서 다시(2026-10-15: 구분을 바꿔도 남아 있었다)
+    if (t.matches && t.matches('[data-xrow] [data-xucat], [data-xrow] [data-xamt], [data-xrow] [data-xuse]') && XUP) {
+      readRows();
+      var tr = t.closest('[data-xrow]'), it0 = XUP.items[+tr.dataset.xrow], mh = tr.querySelector('.xmh');
+      if (it0 && mh) { var o = { category: it0.cat, amount: it0.amt, usage: it0.usage }; mh.innerHTML = mealOver(o) ? mealTag(o) : ''; mh.hidden = !mealOver(o); }
+      return;
+    }
     if (t.id === 'xWho') { XL.who = t.value; C.render(); var w = $('xWho'); if (w) w.focus(); return; }
     if (t.id === 'xePhFile') {
       var f = t.files && t.files[0]; t.value = '';
@@ -1807,7 +1850,7 @@
       if (T.meal) warn.push('식비 1인 13,000원 초과 ' + n0(T.meal) + '건(알림만, 결재자가 봅니다)');
       var noUse = rows.filter(function (it) { return !String(it.usage || '').trim(); }).length;
       if (noUse) warn.push('사용내역이 빈 줄 ' + n0(noUse) + '건');
-      return { title: C.cycleName(S.CYC.y, S.CYC.m) + ' 개인경비 결재 상신', sub: xSpan(S.CYC.y, S.CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.all), warn: warn };
+      return { title: C.cycleName(S.CYC.y, S.CYC.m) + ' 개인경비 상신', sub: xSpan(S.CYC.y, S.CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.all), warn: warn };
     },
     rangeHi: function () { var S = C.state(); return xRange(S.CYC.y, S.CYC.m).hi; },
     beforeSubmit: beforeSubmit,

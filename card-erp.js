@@ -18,6 +18,10 @@
 
   var HEAD = { s: 'S', card: '법인카드', owner: '소유자', date: '승인일자', time: '승인시간', merchant: '가맹점',
     amount: '승인금액', biz: '업종', bizNo: '사업자등록번호', supply: '공급가액', vat: '부가세', no: '승인번호', kind: '구분' };
+  // 다른 이름 — ERP 내려받기 설정이 바뀌어 머리글 이름이 조금 달라도 찾는다(2026-10-15 사용자: 열 순서·이름은 첫 줄로 정한다).
+  //   여전히 「글자 그대로」 맞춘다(포함 검색은 하지 않는다 — 「가맹점」이 「가맹점전화번호」를 집지 않게).
+  var ALIAS = { card: ['법인카드번호', '카드번호'], owner: ['소유자명', '사용자'], date: ['승인일', '거래일자', '이용일자'],
+    time: ['승인시각', '거래시간', '이용시간'], merchant: ['가맹점명'], amount: ['승인액', '이용금액', '거래금액'], no: ['승인No', '승인NO'] };
   var NEED = ['card', 'date', 'no', 'merchant', 'amount'];
   var CARD_RE = /^\d{4}-[\d*]{4}-[\d*]{4}-\d{4}$/;          // 머리글 S 가 없을 때 쓰는 줄 알아보기(가운데 가린 번호도)
   var REASON = {
@@ -114,12 +118,15 @@
 
   function findHeader(tx) {
     for (var r = 0; r < Math.min(tx.length, 40); r++) {
-      var row = tx[r] || [], cols = {};
+      var row = tx[r] || [], cols = {}, t;
+      // 원래 이름을 먼저(줄 어디에 있든), 없을 때만 다른 이름 — 둘 다 있는 파일에서 다른 이름 칸을 집지 않게
       for (var c = 0; c < row.length; c++) {
-        var t = norm(row[c]);
-        for (var k in HEAD) {
-          if (cols[k] == null && (t === HEAD[k] || (k === 's' && t.toUpperCase() === 'S'))) cols[k] = c;
-        }
+        t = norm(row[c]);
+        for (var k in HEAD) if (cols[k] == null && (t === HEAD[k] || (k === 's' && t.toUpperCase() === 'S'))) cols[k] = c;
+      }
+      for (var c2 = 0; c2 < row.length; c2++) {
+        t = norm(row[c2]);
+        for (var k2 in ALIAS) if (cols[k2] == null && ALIAS[k2].indexOf(t) >= 0) cols[k2] = c2;
       }
       if (NEED.every(function (k) { return cols[k] != null; })) return { row: r, cols: cols };
     }
