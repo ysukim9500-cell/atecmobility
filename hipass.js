@@ -256,6 +256,11 @@
       } else if (Number(cur) === e.sum && e.trip.toll_source === '하이패스 영수증') {
         e.kind = 'same';                // 이미 하이패스로 맞춘 값이다. 다시 쓸 필요가 없다.
         e.diff = 0; e.pick = false;
+      } else if (e.trip.toll_hipass != null && e.trip.toll_hipass !== '' && Number(e.trip.toll_hipass) === e.sum) {
+        // 이 금액으로 이미 하이패스 대조를 했고, 그 뒤 사람이 운행 통행료를 고쳤다(예: 하이패스 1,100 + 따로 낸 영수증 2,100 → 3,200).
+        //   하이패스 몫은 따로 남아 있어(toll_hipass, 2026-10-17) 다시 확정하면 고친 금액만 1,100 으로 되돌린다 — 손대지 않는다.
+        e.kind = 'same';
+        e.diff = 0; e.pick = false;
       } else if (Number(cur) === e.sum) {
         // ★ 금액은 같지만 아직 '하이패스 영수증'으로 확정되지 않았다(직접 입력·자동 계산).
         //   확정해 두어야 검증 R06(영수증 없는 직접 입력 통행료)이 풀린다(2026-10-07 검증로봇 R12 —

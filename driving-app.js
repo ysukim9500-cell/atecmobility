@@ -654,7 +654,8 @@
     var r = viewRange();
     var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
       'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
-      'toll_cost,toll_status,toll_source,toll_revision,parking_cost,is_manual,' +
+      // toll_hipass: 하이패스 이용내역 PDF 로 맞춘 금액(금액 규칙 v3 하이패스 몫 — 운행 금액을 고쳐도 남는다, 2026-10-17)
+      'toll_cost,toll_status,toll_source,toll_revision,toll_hipass,parking_cost,is_manual,' +
       'overspeed_count,rapid_accel_count,rapid_decel_count,max_speed_kmh,' +
       // ★ 이 셋이 빠지면 점수가 실제보다 높게 나온다(앱 SafetyScore 와 갈린다).
       'school_zone_overspeed_count,sustained_overspeed_count,harsh_corner_count';
@@ -5589,7 +5590,7 @@
     var MM = moneyOf(myName(), cycleRange(CYC.y, CYC.m))['통행료'], left = {};
     MM.days.forEach(function (d) {
       if (!d.hp || !d.hp.length) return;
-      var a = d.hp.map(function (t) { return Math.round(d.amt[t.id] || 0); });
+      var a = d.hp.map(function (t) { return Math.round((d.ha && d.ha[t.id]) || d.amt[t.id] || 0); });   // 하이패스로 맞춘 금액(toll_hipass — 운행 금액을 고쳐도 남는다)
       (d.dup || []).forEach(function (e) { var i = a.indexOf(Math.round(Number(e.amount) || 0)); if (i >= 0) a.splice(i, 1); });   // 이미 짝지은 영수증 몫은 뺀다
       left[d.day] = a;
     });
@@ -7426,7 +7427,8 @@ window.EduGuard = {
         id: e.trip.id, amount: e.sum,
         note: '카드 ' + (g.card4 || '?') + ' · ' + (g.plate || ''),
         lines: e.lines.map(function (r) {
-          return { at: r.atText, office: r.office, amount: r.amount, page: r.page };
+          // 입구 영업소·차종도 보낸다 — 서버 toll_evidence_json.lines 에 입구·출구·차종·금액이 남아 통행료 추정 개선에 쓴다(2026-10-17)
+          return { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
         }),
       };
     });
@@ -7443,7 +7445,7 @@ window.EduGuard = {
         // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다.
         (res.j.rows || []).forEach(function (row) {
           var t = ALL_TRIPS.filter(function (x) { return x.id === row.id; })[0];
-          if (t) { t.toll_cost = row.toll_cost; t.toll_status = row.toll_status; t.toll_source = row.toll_source; }
+          if (t) { t.toll_cost = row.toll_cost; t.toll_status = row.toll_status; t.toll_source = row.toll_source; if ('toll_hipass' in row) t.toll_hipass = row.toll_hipass; }
         });
         AUDIT = null;
         TRIP_CACHE = {};
@@ -7745,7 +7747,7 @@ window.EduGuard = {
       '<label class="radio"><input type="radio" name="cToll" value="amount"><span>금액 입력</span></label>' +
       '<label class="radio"><input type="radio" name="cToll" value="unknown"><span>모름</span></label></div>' +
       '<div style="margin-top:9px" id="cTollBox" hidden><input class="inp num" id="cToll" inputmode="numeric" placeholder="0"><span class="unit">원</span></div>',
-      '<span id="cTollHint">「모름」은 나중에 자동 계산·하이패스 대조로 채웁니다</span>');
+      '<span id="cTollHint">「모름」은 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다</span>');
     h += '</div><div class="anote">수기로 넣은 운행은 <b>수기</b> 표시가 붙습니다. 주행거리는 계기판 차이로 계산됩니다.</div>';
 
     $('pBody').innerHTML = h;
@@ -7883,9 +7885,9 @@ window.EduGuard = {
     var pick = (document.querySelector('input[name="cToll"]:checked') || {}).value || '';
     var rt = CF.route, toll = rt && rt.toll > 0 ? rt.toll : 0;
     var head = pick === 'none' ? '통행료가 없는 운행으로 넣습니다(0원). ' + RCP_FILL['통행료']
-      : pick === 'unknown' ? '「모름」은 0원으로 잡히고, 나중에 자동 계산·하이패스 대조로 채웁니다(영수증이 있으면 영수증 금액).'
+      : pick === 'unknown' ? '「모름」은 0원으로 잡히고, 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다(영수증이 있으면 영수증 금액).'
         : pick === 'amount' ? '1 ~ 200,000원 · 통행료 영수증도 올려 주세요(검증에서 대조합니다).'
-          : '「모름」은 나중에 자동 계산·하이패스 대조로 채웁니다';
+          : '「모름」은 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다';
     var route = !rt ? '' : toll
       ? ' 카카오 길찾기 예상 통행료 <b>' + n0(toll) + '원</b>' + (pick === 'amount' && String($('cToll').value || '').replace(/[^\d]/g, '') === String(toll) ? ''
         : ' <button type="button" class="btn sm" id="cTollUse">이 금액 넣기</button>')
