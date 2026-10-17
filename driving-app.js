@@ -938,8 +938,9 @@
   /* ── 영수증 단계 안의 순서 ── */
   var EV_SUBS = ['주차', '통행료', '주유', '계기판'];
   var EV_SUB_DESC = {
-    '주차': '주차 영수증을 올립니다. 운행에 적은 주차비는 그날 영수증과 대조하고, 주차비가 없는 날은 영수증 금액이 그 운행에 들어갑니다(두 번 더하지 않습니다).',
-    '통행료': '통행료 영수증을 올립니다. 자동 계산 통행료도 그날 영수증과 대조합니다(하이패스 이용내역 PDF로 맞춘 것은 영수증으로 칩니다). 날짜로 운행에 안 맞는 영수증은 「운행에 직접 맞추기」로 잇습니다.',
+    // 웹 8차(2026-10-17 「직원들이 잘 모를 것 같은데… 좀 쉽게」) — 맨 위 한 줄은 할 일만
+    '주차': '주차비를 낸 날마다 영수증이 하나 있으면 됩니다 — 주차 영수증 사진을 올리세요. 운행에 주차비를 안 적은 날은 영수증 금액이 그 운행에 들어갑니다.',
+    '통행료': '통행료를 낸 날마다 증빙이 하나 있으면 됩니다 — 영수증 사진을 올리거나, 하이패스 이용내역 PDF(한 달치)를 한 번에 올리세요.',
     '주유': '주유 영수증은 증빙용입니다. 유류비는 거리 × 단가로 따로 계산됩니다.',
     '계기판': '월초·월말 계기판 사진을 올립니다. 운행 기록의 계기판 숫자와 맞는지 확인하는 데 씁니다.'
   };
@@ -993,10 +994,24 @@
       '<div class="evsh"><span class="evsn">' + (cur + 1) + ' / 4</span><b>' + esc(name) + '</b>' +
       '<span class="dim">' + esc(EV_SUB_DESC[name]) + '</span></div>';
     if (name === '주차' || name === '통행료') body += noticeBand();      // 공지 띠(2026-10-15 2차)
-    // 2026-10-15 사용자: 큰 카드 둘(하이패스 PDF 대조 · 통행료 직접 채우기)을 뺀다 — 모두 영수증 올리기 + 운행에 직접 맞추기로 한다
-    //   (실사용: 10월분 직접 채우기 0건 · 하이패스 대조 2건). 하이패스 대조는 쓰는 분이 있어 작은 글자 링크로만 남긴다.
+    var canUp = !cycleLocked(myName()) && !isMulti();
+    // 웹 8차(2026-10-17 사용자 「직원들이 잘 모를 것 같은데… 좀 쉽게 할 수 없나?」) — 주차·통행료는 할 일을 맨 위 단추로.
+    //   통행료: 같은 크기 단추 둘(영수증 사진 · 하이패스 이용내역 PDF — 둘 중 하나면 된다). 하이패스 단추는 바로 파일을 고르고
+    //   하이패스 화면에서 읽은 결과·「확정하기」를 보인다(예전 「하이패스 PDF로 대조」 작은 단추 → 빈 화면 → 파일 고르기).
+    //   「다른 운행에 붙이기」 큰 단추는 내리고, 운행 없는 날 줄에만 작은 「다른 운행에 붙이기」(아래 evMatchHtml).
+    if ((name === '주차' || name === '통행료') && canUp) {
+      body += '<div class="evpick' + (name === '통행료' ? ' two' : '') + '">' +
+        '<div class="evpk"><button class="btn pri" data-evupcat="' + esc(name) + '">' + ic('receipt', 15) +
+          (name === '통행료' ? '영수증 사진 올리기' : '주차 영수증 올리기') + '</button>' +
+          '<span class="dim">' + (name === '통행료' ? '통행료 영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다' : '영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다') + '</span></div>' +
+        (name === '통행료'
+          ? '<div class="evpk"><label class="btn pri" data-hpquick>' + ic('ticket', 15) + '하이패스 이용내역 PDF 올리기' +
+              '<input type="file" id="hpQuick" accept="application/pdf,.pdf" multiple class="sr"></label>' +
+              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역 › PDF 로 받은 한 달치 파일 — 통과 시각으로 운행을 찾아 그날 통행료 증빙이 됩니다(그날 영수증 사진은 따로 안 올려도 되고, 올려도 한 번만 셉니다)</span></div>'
+          : '') +
+        '</div>';
+    }
     if (name === '통행료') {
-      body += '<div class="dim" style="margin-top:10px;font-size:12.5px">한국도로공사 하이패스 이용내역 PDF가 있으면 <button type="button" class="btn sm" data-v="hipass" style="margin-left:4px">하이패스 PDF로 대조</button></div>';
       // 통행료 미확정 — 자동 계산이 안 된 업무 운행(예전 「통행료 채우기」 화면 대신 한 줄로, 2026-10-15)
       //   2026-10-16 6차: 「모름」 운행은 맞춰보기 표(그날 금액·영수증이 있는 날만)에 줄이 없어 「운행을 눌러」 고칠 곳이 안 보였다 —
       //   그 운행들을 여기 단추로 바로 보인다(누르면 운행 고치기 창). 결재 중·완료 기간은 고칠 수 없다고만 적는다.
@@ -1005,7 +1020,7 @@
         var unkSorted = unk.slice().sort(function (x, y) { return x.start_time - y.start_time; });
         body += '<div class="hpnote" data-tollunk style="margin-top:12px">' + ic('ticket', 15) + '<span><b>통행료 미확정 ' + n0(unk.length) + '건</b> — ' +
           (unkLock ? lockWhy(myName()) + ' 고칠 수 없습니다. 이 운행들의 통행료는 0원으로 정산됩니다.'
-            : '자동 계산이 안 된 업무 운행입니다. 통행료를 냈으면 영수증을 올리세요(그날 운행 금액이 없으면 영수증 금액이 들어갑니다). ' +
+            : '자동 계산이 안 된 업무 운행입니다. 통행료를 냈으면 영수증 사진이나 하이패스 이용내역 PDF를 올리세요(그날 운행 금액이 없으면 영수증 금액이 들어갑니다). ' +
               '안 냈으면 아래 운행을 눌러 통행료 「없음」으로 고치면 됩니다.' +
               '<span class="unklist">' + unkSorted.slice(0, 12).map(function (t) {
                 return '<button type="button" class="btn sm" data-edit="' + t.id + '" title="이 운행 고치기">' + esc(md(t.start_time) + ' ' + hm(t.start_time)) +
@@ -1014,18 +1029,16 @@
           '</span></div>';
       }
     }
-    // 주차·통행료: 날짜로 운행에 안 맞는 영수증을 본인이 운행을 골라 직접 잇는다(2026-10-07).
-    var canLink = (name === '주차' || name === '통행료') && !cycleLocked(myName()) && !isMulti();
-    var unm = canLink ? evUnmatched(name).length : 0;
+    // 주차·통행료: 날짜로 운행에 안 맞는 영수증을 본인이 운행을 골라 직접 잇는다(2026-10-07) — 웹 8차부터 그 줄의 「다른 운행에 붙이기」(evMatchHtml).
     // 「운행 없는 영수증」 경고는 따로 띠를 두지 않고 맞춰보기 맨 위 한 줄 요약에 넣는다(2026-10-15 2차 —
     //   경고 띠와 초록 「모두 맞습니다」가 같은 영수증에 함께 보이던 것 정리).
     body += evMatchHtml(name);
     // 같은 창(openEvUpload)을 여는 단추는 이 카드 하나 — 내역 머리 「영수증 올리기」는 뺐다(2026-10-15 2차 「똑같은 내용 아니야? 버튼??」).
     //   계기판은 검증 화면(drv-verify.js)과 같은 이름 「계기판 사진 올리기」.
+    var upHere = canUp && name !== '주차' && name !== '통행료';       // 주차·통행료는 위 「할 일」 단추(웹 8차)
     body += '<div class="evsact">' +
-      (cycleLocked(myName()) || isMulti() ? '' : '<button class="btn pri" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) +
+      (!upHere ? '' : '<button class="btn pri" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) +
         (name === '계기판' ? '계기판 사진 올리기' : esc(name) + ' 영수증 올리기') + '</button>') +
-      (canLink ? '<button class="btn' + (unm ? ' warnb' : '') + '" data-evlink="' + esc(name) + '">' + ic('scan', 13) + '운행에 직접 맞추기' + (unm ? ' (' + n0(unm) + ')' : '') + '</button>' : '') +
       '<span style="flex:1"></span>' +
       (cur > 0 ? '<button class="btn" data-evsubmove="-1">← ' + esc(EV_SUBS[cur - 1]) + '</button>' : '') +
       (cur < 3 ? '<button class="btn pri cta" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
@@ -1108,9 +1121,18 @@
         '영수증 날짜와 이은 운행의 기간이 다릅니다. 금액은 그대로 두니 직접 판단해 주세요.' +
         XL.here.concat(XL.there).slice(0, 5).map(function (x) { return '<span class="xlitem">' + esc(x.say) + '</span>'; }).join('') +
         (XL.here.length + XL.there.length > 5 ? '<span class="xlitem dim">외 ' + n0(XL.here.length + XL.there.length - 5) + '장</span>' : '') + '</span></div>';
-      var word = cat === '주차' ? '주차비' : '통행료';
+      var word = cat === '주차' ? '주차비' : '통행료', isToll = cat === '통행료';
       var warnR = function (t) { return '<span class="mres warn">' + esc(t) + '</span>'; };
+      // 운행 없는 날 영수증 → 그 줄에만 작은 「다른 운행에 붙이기」(웹 8차 — 예전 큰 「다른 운행에 붙이기」 단추)
+      var canLink = !cycleLocked(me) && !isMulti();
       // 그날 업무 운행 — 시각 · 방문처 · 그 운행의 금액. 줄마다 눌러서 그 운행 고치기 창(수기로 고치기).
+      // 영수증 칸 — 하이패스 이용내역(그 자체가 증빙, 2026-10-15)과 올린 영수증을 한 덩이로 읽히게(웹 8차):
+      //   「하이패스 500원 (+ 같은 영수증 사진)」 · 「하이패스 500원 + 영수증 700원」 · 「1,100원 (2장)」 · 「없음」
+      var rcpt = function (d) {
+        var U = d.R - (d.D || 0);
+        if (d.H) return '하이패스 ' + won(d.H) + (U ? ' + 영수증 ' + won(U) : '') + (d.D ? ' <span class="dim">(+ 같은 영수증 사진)</span>' : '');
+        return d.R ? won(d.R) + (d.ev.length > 1 ? ' <span class="dim">(' + d.ev.length + '장)</span>' : '') : '<span class="dim">없음</span>';
+      };
       var tripsTxt = function (d) {
         if (!d.trips.length) return '<span class="dim">그날 업무 운행 없음</span>';
         var pick = d.trips.filter(function (t) { return d.amt[t.id] > 0 || d.fill[t.id] > 0; });
@@ -1123,7 +1145,7 @@
         }).join('');
         return show + (pick.length > 3 ? '<div class="dim">외 ' + (pick.length - 3) + '건</div>' : '');
       };
-      var nBad = 0, nNoTrip = 0, nHpDup = 0, nOld = 0;
+      var nBad = 0, nNoTrip = 0, nOld = 0, nOk = 0;
       var rows = MC.days.map(function (d) {
         var aiNote = [];
         d.ev.forEach(function (e) {
@@ -1133,10 +1155,14 @@
         });
         // 「10월분부터」(2026-10-15 추가 결정) — 09-21 전 날은 금액만 보이고 결과(영수증 없음·금액 다름·운행 없는 영수증)는 내지 않는다
         if (!d.show) aiNote = [];
-        var res = !d.show ? '<span class="dim">10월분 전 — 대조 안 함</span>'
-          : d.st === 'no_receipt' ? bad('영수증 없음') : d.st === 'mismatch' ? bad(d.hpDup ? '금액 다름 · 하이패스와 같은 영수증?' : '금액 다름')
-          : d.st === 'no_trip' ? warnR('운행 없는 영수증(정산 제외)') : d.st === 'filled' ? ok('영수증으로 채움')
-          : ok(d.H > 0 && d.H === d.T ? '일치(하이패스 내역)' : '일치');
+        // 결과 글은 할 일이 보이게(웹 8차, 2026-10-17 「직원이 쉽게」)
+        var res = !d.show ? '<span class="dim">10월분 전 — 확인 안 함</span>'
+          : d.st === 'no_receipt' ? bad(isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
+          : d.st === 'mismatch' ? bad('금액 다름 — 운행 금액이나 영수증을 확인')
+          : d.st === 'no_trip' ? warnR('운행 없는 날 — 정산에서 빠짐') +
+            (canLink && d.ev.length ? ' <button type="button" class="btn sm mlinkb" data-evlink="' + esc(cat) + '" data-evlinkid="' + esc(String(d.ev[0].id)) + '">다른 운행에 붙이기</button>' : '')
+          : d.st === 'filled' ? ok('맞음 · 영수증 금액을 넣음')
+          : ok('맞음');
         if (aiNote.length) res += ' ' + bad('사진 금액과 다름');
         if (d.st === 'no_trip' && d.show) XL.here.forEach(function (x) {
           if (d.ev.indexOf(x.e) >= 0) res += '<div class="mxl" title="' + esc(x.say) + '">' + esc(md(x.t.start_time)) + ' 운행(' + cycleOfMs(Number(x.t.start_time)).m + '월분)에 이음 · 어느 기간에도 정산 안 됨</div>';
@@ -1144,8 +1170,8 @@
         var isBad = d.show && (d.st === 'no_receipt' || d.st === 'mismatch' || aiNote.length > 0);
         if (isBad) nBad++;
         if (d.show && d.st === 'no_trip') nNoTrip++;
-        if (d.show && d.hpDup) nHpDup++;
         if (!d.show) nOld++;
+        if (d.show && (d.st === 'match' || d.st === 'filled') && !aiNote.length) nOk++;
         var tgt = d.target;
         var flag = isBad || (d.show && d.st === 'no_trip');
         return '<tr class="' + (flag ? 'flagged' : 'mok') + (tgt ? ' mclick' : '') + '"' +
@@ -1153,9 +1179,7 @@
           '<td style="white-space:nowrap">' + esc(dn(d.day)) + '</td>' +
           '<td class="mtrips">' + tripsTxt(d) + '</td>' +
           '<td class="n" data-l="운행 금액">' + (d.T ? won(d.T) : '<span class="dim">없음</span>') + '</td>' +
-          '<td class="n" data-l="영수증">' + (d.R ? won(d.R) + (d.ev.length > 1 ? ' <span class="dim">(' + d.ev.length + '장)</span>' : '') : (d.H ? '' : '<span class="dim">없음</span>')) +
-            // 하이패스 PDF 대조로 맞춘 통행료 — 그 자체가 영수증(2026-10-15 추가 결정)
-            (d.H ? '<div class="dim">하이패스 내역 ' + won(d.H) + '</div>' : '') +
+          '<td class="n" data-l="영수증">' + rcpt(d) +
             (aiNote.length ? '<div class="mai">' + esc(aiNote.join(', ')) + '</div>' : '') + '</td>' +
           '<td class="n" data-l="정산 금액"><b>' + won(d.settle) + '</b></td><td>' + res + '</td></tr>';
       }).join('');
@@ -1165,25 +1189,47 @@
       var fold = MFOLD[cat] !== false, nFlag = nBad + nNoTrip;
       var fillTrips = Object.keys(MC.byTrip).filter(function (id) { return MC.byTrip[id].fill > 0; }).length;
       var parts = [];
-      if (fillTrips) parts.push('영수증 금액으로 채운 운행 <em>' + n0(fillTrips) + '건</em>');
+      if (fillTrips) parts.push('영수증 금액을 넣은 운행 <em>' + n0(fillTrips) + '건</em>');
       if (nBad) parts.push('확인할 날 <em>' + n0(nBad) + '일</em>');
-      if (MS.noTripShowN) parts.push('운행 없는 영수증 <em>' + n0(MS.noTripShowN) + '장</em>(정산 제외)');
-      if (!nBad && !MS.noTripShowN) parts.push(fillTrips ? '나머지는 모두 맞습니다' : '운행 금액과 영수증이 모두 맞습니다');
+      if (MS.noTripShowN) parts.push('운행 없는 날 영수증 <em>' + n0(MS.noTripShowN) + '장</em>(정산에서 빠짐)');
+      if (!nBad && !MS.noTripShowN) parts.push(fillTrips ? '나머지는 모두 맞습니다' : (isToll ? '통행료 증빙이 모두 맞습니다' : '주차비 영수증이 모두 맞습니다'));
+      // 할 일 — 동사로(웹 8차)
       var how = [];
-      if (MS.none) how.push('「영수증 없음」은 영수증을 올리거나, 실제로 안 냈으면 그 운행의 ' + word + '를 「없음」으로 고쳐 주세요');
-      if (MS.diff) how.push('「금액 다름」은 운행 금액을 고치거나(줄을 눌러 수기로) 영수증 금액을 확인해 주세요 — 정산에는 운행 금액이 들어갑니다');
-      if (nHpDup) how.push('하이패스 이용내역으로 맞춘 통행료에 같은 영수증을 또 올렸으면 그 영수증을 지우세요');
-      if (nNoTrip) how.push('「운행 없는 영수증」은 정산에서 뺐습니다 — 그날 운행을 넣거나(운행 추가), 다른 날 운행이면 「운행에 직접 맞추기」, 아니면 영수증을 지워 주세요');
-      var rule = '정산에는 <b>운행 금액</b>이 들어가고 영수증과 대조합니다(자동 계산 통행료도 영수증이 있어야 합니다 — 하이패스 이용내역 PDF로 맞춘 것은 영수증으로 칩니다). ' +
-        '운행 금액이 없는 날은 <b>영수증 금액</b>이 그 운행에 들어갑니다(두 번 더하지 않습니다). 줄을 누르면 그 운행을 고칠 수 있습니다.' +
-        (nOld ? ' 10월분(09.21) 전 날은 대조하지 않습니다(금액은 같게 셉니다).' : '');
+      if (MS.none) how.push(isToll ? '「영수증 없음」 날은 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요(실제로 안 냈으면 그 줄을 눌러 통행료를 「없음」으로)'
+        : '「영수증 없음」 날은 영수증 사진을 올려 주세요(실제로 안 냈으면 그 줄을 눌러 주차비를 「없음」으로)');
+      if (MS.diff) how.push('「금액 다름」 날은 그 줄을 눌러 운행 금액을 고치거나, 아래 내역에서 영수증 금액을 확인해 주세요 — 고치기 전까지는 운행 금액으로 정산됩니다');
+      // 하이패스와 다른 금액 영수증이 함께 있는 날 — 둘 중 무엇을 할지 콕 집어(2026-10-17 모르는 로봇 「3,200원으로 고쳐야 하나, 지워야 하나」)
+      MC.days.filter(function (d) { return d.show && d.st === 'mismatch' && d.H > 0 && d.R - (d.D || 0) > 0; }).slice(0, 3).forEach(function (d) {
+        var U = d.R - (d.D || 0);
+        how.push(dn(d.day) + '은 하이패스 ' + won(d.H) + ' 말고 영수증 ' + won(U) + '이 더 있습니다 — 같은 통행료를 잘못 올린 것이면 아래 내역에서 그 영수증을 지우고, ' +
+          '그날 다른 통행료였으면 그 줄을 눌러 운행 금액을 ' + won(d.H + U) + '으로 고쳐 주세요');
+      });
+      if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
+      var rule = '증빙이 있는 날은 「맞음」입니다. 정산에는 <b>운행 금액</b>이 들어가고 영수증은 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
+        '운행에 ' + word + '를 안 적은 날은 <b>영수증 금액</b>이 그 운행에 들어갑니다.' +
+        (isToll ? ' 하이패스 이용내역 PDF로 맞춘 통행료는 그 자체가 증빙이고, 같은 금액의 영수증 사진을 또 올려도 한 번만 셉니다.' : '') +
+        ' 줄을 누르면 그 운행을 고칠 수 있습니다.' +
+        (nOld ? ' 10월분(09.21) 전 날은 확인하지 않습니다(금액은 같게 셉니다).' : '');
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
         (fold ? '자세히 보기 (' + n0(MC.days.length) + '일)' : '접기') + '</button>';
       var table = '<div class="scroll"' + (fold && !nFlag ? ' hidden' : '') + '><table class="mtable mday' + (fold ? ' fold' : '') + '"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행 금액</th>' +
-        '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
+        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었습니다 — 「자세히 보기」로 볼 수 있습니다.</div>' : '');
       return box(!nBad && !nNoTrip, parts.join(' · '),
-        '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) + ' · 영수증 ' + won(MS.R) +
-          (MS.fill ? ' (그 중 ' + won(MS.fill) + '은 영수증으로 채움)' : '') + ' ' + foldBtn +
+        // 올린 영수증 합이 정산과 왜 다른지 한 마디(2026-10-17 모르는 로봇 「영수증 7,500원인데 정산 4,400원 — 잘못 들어간 줄」)
+        '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) +
+          // 하이패스 이용내역으로 맞춘 금액도 증빙으로 보이게(모르는 로봇 3회차 — 「올린 영수증 1,100원」만 보여 나머지가 증빙 없는 것처럼 읽혔다)
+          (function () { var h = MC.days.reduce(function (x, d) { return x + (d.H || 0); }, 0); return h ? ' · 하이패스 ' + won(h) : ''; })() +
+          ' · 올린 영수증 ' + won(MS.R) +
+          (function () {
+            var why = [];
+            if (MS.fill) why.push(won(MS.fill) + '은 운행에 넣음');
+            if (MS.noTrip) why.push('운행 없는 날 ' + won(MS.noTrip) + '은 빠짐');
+            var dupAmt = MC.days.reduce(function (a, d) { return a + (d.D || 0); }, 0);
+            if (dupAmt) why.push('하이패스와 같은 통행료 ' + won(dupAmt) + '은 한 번만 셈');
+            return why.length ? ' (' + why.join(' · ') + ')' : '';
+          })() + ' ' + foldBtn +
           (how.length ? '<div class="mhow">' + how.join('. ') + '.</div>' : '') +
           (fold ? '' : '<div class="mrule">' + rule + '</div>'),
         table) + xlHtml;
@@ -5072,8 +5118,8 @@
     };
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>주차·통행료 영수증</div>' +
       '<p class="verdict">' + won(settle) + '</p><div class="facts">' +
-      fct('주차', won((by['주차'] || {}).sum || 0), n0((by['주차'] || {}).n || 0) + '건 · 운행 금액과 대조') +
-      fct('통행료', won((by['통행료'] || {}).sum || 0), n0((by['통행료'] || {}).n || 0) + '건 · 운행 금액과 대조') +
+      fct('주차', won((by['주차'] || {}).sum || 0), n0((by['주차'] || {}).n || 0) + '건 · 올린 영수증') +
+      fct('통행료', won((by['통행료'] || {}).sum || 0), n0((by['통행료'] || {}).n || 0) + '건 · 올린 영수증') +
       fct('주유', won((by['주유'] || {}).sum || 0), n0((by['주유'] || {}).n || 0) + '건 · 증빙용(유류비는 거리×단가)') +
       fct('계기판', n0((by['계기판'] || {}).n || 0) + '<small>장</small>', '운행 계기판 확인용') +
       '</div></div>';
@@ -5533,6 +5579,31 @@
     });
   }
 
+  /**
+   * 영수증 올리기 창 — 통행료 줄의 날짜·금액이 그날 하이패스 이용내역으로 이미 증빙된 통행료와 같으면 알려 준다(웹 8차, 2026-10-17).
+   * 막지는 않는다 — 올려도 같은 통행료의 두 번째 증빙으로 한 번만 센다(money-rule.js hpPair). 위 줄부터 하이패스 금액을 하나씩 쓴다.
+   */
+  function evHpNotes() {
+    var rowsEl = document.querySelectorAll('#evList [data-evrow]');
+    if (!rowsEl.length || !myName()) return;
+    var MM = moneyOf(myName(), cycleRange(CYC.y, CYC.m))['통행료'], left = {};
+    MM.days.forEach(function (d) {
+      if (!d.hp || !d.hp.length) return;
+      var a = d.hp.map(function (t) { return Math.round(d.amt[t.id] || 0); });
+      (d.dup || []).forEach(function (e) { var i = a.indexOf(Math.round(Number(e.amount) || 0)); if (i >= 0) a.splice(i, 1); });   // 이미 짝지은 영수증 몫은 뺀다
+      left[d.day] = a;
+    });
+    Array.prototype.forEach.call(rowsEl, function (tr) {
+      var box = tr.querySelector('[data-evhp]'); if (!box) return;
+      var g = function (sel) { var el = tr.querySelector(sel); return el ? el.value : ''; };
+      var amt = Math.round(Number(String(g('[data-evamt]')).replace(/[^\d]/g, '')) || 0), day = g('[data-evdate]');
+      var pool = g('[data-evcatsel]') === '통행료' && amt > 0 ? left[day] : null, i = pool ? pool.indexOf(amt) : -1;
+      if (i >= 0) pool.splice(i, 1);
+      box.hidden = i < 0;
+      box.textContent = i < 0 ? '' : '이 날 통행료는 하이패스 이용내역으로 이미 증빙됐습니다 — 같은 통행료면 안 올려도 됩니다(올려도 한 번만 셉니다).';
+    });
+  }
+
   function paintEvList() {
     var box = $('evList'); if (!box) return;
     var n = EVUP.items.length;
@@ -5581,7 +5652,8 @@
           '<td><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
           esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' +
           (it.hint ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(it.hint) + '</div>'
-            : (it.ai ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) + '</td>' +
+            : (it.ai ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) +
+          '<div class="evhint hpdup" data-evhp hidden></div></td>' +
           '<td class="n" style="white-space:nowrap">' +
           '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
@@ -5589,6 +5661,7 @@
       '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
       n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · 영수증 ' + n0(n) + '건' +
       (running ? ' · <b class="gemtxt">Gemini 가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
+    evHpNotes();
     if (b) {
       b.disabled = running > 0;
       // 읽는 동안은 Gemini 색으로 돌며 빛이 지나간다(검증 버튼과 같은 모양).
@@ -7132,9 +7205,9 @@ window.EduGuard = {
 
   function viewHipass() {
     if (!LOADED) return head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조') + skeleton();
-    var h = head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조',
+    var h = head(isAll() ? '하이패스 대조 (전체)' : '하이패스 이용내역',
       isAll() ? '영수증 PDF 를 읽어 전 직원 통행료를 확정합니다'
-              : '영수증 PDF 를 읽어 내 통행료를 확정합니다');
+              : '하이패스 이용내역 PDF를 읽어 통과 시각으로 운행을 찾고, 확정하면 그날 통행료 증빙이 됩니다');
     if (isMulti()) return singleOnly(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조', '하이패스 대조');
 
     // ★ 개인 화면에서 내 주기가 결재 완료면 서버가 전부 튕긴다. 먼저 말한다.
@@ -7153,8 +7226,8 @@ window.EduGuard = {
 
     h += '<div class="drop" id="hpDrop">' +
       '<div class="dico">' + ic('receipt', 22) + '</div>' +
-      '<div class="dt">영수증 PDF 를 여기에 끌어다 놓으세요</div>' +
-      '<div class="dd">한국도로공사 하이패스 이용내역 · 여러 개도 됩니다</div>' +
+      '<div class="dt">하이패스 이용내역 PDF를 여기에 끌어다 놓으세요</div>' +
+      '<div class="dd">한국도로공사 하이패스 누리집 › 이용내역 › PDF · 여러 개도 됩니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="hpFile" accept="application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>';
@@ -7214,11 +7287,14 @@ window.EduGuard = {
                 (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
           h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '">' +
             '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
+            ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + ' 운행 확정하기') + '"' +
             (e.pick ? ' checked' : '') +
             (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></td>' +
             '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
-            (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') + '</td>' +
+            (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
+            // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
+            (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있습니다 — 확정해도 한 번만 셉니다</div>' : '') + '</td>' +
             '<td>' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
             '<td class="n lead">' + n0(e.sum) + '</td>' +
             '<td class="n">' + diff + '</td>' +
@@ -7261,12 +7337,27 @@ window.EduGuard = {
     return h;
   }
 
+  /** 그 운행 날에 금액이 같은 통행료 영수증(올린 것)이 있는가 — 하이패스 표의 안내 한 줄(웹 8차). */
+  function hpSamePhoto(t, amt) {
+    var day = ymd(t.start_time);
+    return EVID.some(function (e) {
+      return e.username === t.username && e.category === '통행료' && Math.round(Number(e.amount) || 0) === Math.round(Number(amt) || 0) &&
+        (e.trip_id != null ? String(e.trip_id) === String(t.id) : ymd(Number(e.date_millis)) === day);
+    });
+  }
+
   function hpFiles(files) {
     // ★ 운행을 다 못 받은 상태로 대조하면 "맞는 운행이 없습니다" 가 되고,
     //   로드가 끝나도 다시 맞추지 않아 PDF 를 또 올려야 했다.
     if (!LOADED) { toast('운행을 불러오는 중입니다. 잠시 뒤에 올려 주세요.'); return; }
     if (!files || !files.length) return;
     if (!window.Hipass) { toast('영수증 해독기를 불러오지 못했습니다.', true); return; }
+    // 사진만 골랐으면 읽지 말고 어디로 올리는지 알려 준다(웹 8차)
+    if (!Array.prototype.some.call(files, function (f) { return /pdf/i.test(f.type || '') || /pdf$/i.test(f.name || ''); })) {
+      HP.noteBad = true; HP.groups = [];
+      HP.note = '사진 파일입니다. 여기는 하이패스 이용내역 PDF만 받습니다 — 영수증 사진은 「← 통행료로 돌아가기」를 눌러 「영수증 사진 올리기」로 올려 주세요.';
+      render(); return;
+    }
     HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…'; render();
     var recs = [], done = 0, bad = 0;
     Array.prototype.forEach.call(files, function (f) {
@@ -7287,7 +7378,9 @@ window.EduGuard = {
           HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
           HP.noteBad = !!bad;
-          HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '');
+          // 다음에 할 일까지 한 줄로(웹 8차 — 「확정하기」를 눌러야 증빙이 된다는 것을 몰랐다)
+          HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') +
+            (isAll() ? '' : ' 아래 운행이 맞으면 「확정하기」를 누르세요 — 확정하면 그날 통행료 증빙이 되고 통행료 차례로 돌아갑니다.');
           render();
         });
     });
@@ -8526,7 +8619,7 @@ window.EduGuard = {
     // 검증 항목 R02(통행료 미확정)·R13(운행 없는 영수증) → 영수증 › 그 차례로(2026-10-15)
     if ((el = e.target.closest('[data-evstep]'))) { var si = EV_SUBS.indexOf(el.dataset.evstep); setEvSub(si < 0 ? 0 : si); closePanel(); go('evid'); return; }
     if ((el = e.target.closest('[data-mfold]'))) { var mfc = el.dataset.mfold; MFOLD[mfc] = MFOLD[mfc] === false; render(); return; }
-    if ((el = e.target.closest('[data-evlink]'))) { openEvLink(el.dataset.evlink); return; }
+    if ((el = e.target.closest('[data-evlink]'))) { openEvLink(el.dataset.evlink, el.dataset.evlinkid); return; }
     if (e.target.closest('#btnEvLinkSave')) { saveEvLink(); return; }
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
     // ★ 인쇄 버튼은 직원 행(data-person) 안에 들어 있다. 같은 핸들러 안에서
@@ -8844,6 +8937,7 @@ window.EduGuard = {
     }
   });
   document.addEventListener('change', function (e) {
+    if (e.target.closest && e.target.closest('#evList [data-evrow]')) evHpNotes();   // 구분·날짜를 바꾸면 하이패스 안내도 다시(웹 8차)
     if (e.target.id === 'signFile') {
       var f = e.target.files && e.target.files[0];
       e.target.value = '';
@@ -8870,6 +8964,15 @@ window.EduGuard = {
     }
     if (e.target.id === 'selCar') { FILT.car = e.target.value; renderKeepFocus('selCar'); return; }
     if (e.target.id === 'hpFile') { hpFiles(e.target.files); return; }
+    // 통행료 차례의 「하이패스 이용내역 PDF 올리기」(웹 8차) — 고르자마자 하이패스 화면으로 가서 읽은 결과를 보인다
+    if (e.target.id === 'hpQuick') {
+      var hq = Array.prototype.slice.call(e.target.files || []), isPdf = function (f) { return /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name); };
+      var hpdf = hq.filter(isPdf), hpic = hq.filter(function (f) { return !isPdf(f); });
+      // 사진을 여기로 골랐으면 영수증 올리기 창으로 넘긴다(2026-10-17 모르는 로봇 — 사진이 하이패스 칸으로 들어가 「읽지 못한 파일」)
+      if (!hpdf.length && hpic.length) { openEvUpload('통행료'); evAddFiles(hpic); toast('사진이라 영수증 올리기 창으로 옮겼습니다 — 하이패스 단추는 이용내역 PDF만 받습니다.'); return; }
+      if (hpdf.length) { go('hipass'); hpFiles(hpdf); if (hpic.length) toast('사진 ' + hpic.length + '장은 빼고 PDF만 읽습니다 — 영수증 사진은 「영수증 사진 올리기」로 올려 주세요.', true); }
+      return;
+    }
     if (e.target.id === 'evFile') { evAddFiles(e.target.files); e.target.value = ''; return; }
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
       var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
@@ -8919,6 +9022,7 @@ window.EduGuard = {
     }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('#evList [data-evrow]')) evHpNotes();
     if (e.target.id === 'permQ') { PERMQ = e.target.value; permFilter(); return; }
     if (e.target.id === 'apprQ') {
       // 창 전체를 다시 그리면 커서가 튀고 한글 조합이 끊긴다 — 후보 목록만 바꾼다.
@@ -9185,7 +9289,7 @@ window.EduGuard = {
   function xlinkHereText(e, t) {
     var tm = cycleOfMs(Number(t.start_time)).m + '월분', em = cycleOfMs(Number(e.date_millis)).m + '월분';
     return '이 영수증(' + md(e.date_millis) + ' ' + (e.category || '') + ' ' + n0(e.amount) + '원)은 ' + md(t.start_time) + ' 운행(' + tm + ')에 이어져 있지만 ' +
-      '영수증 날짜는 ' + em + '이라 어느 기간에도 정산되지 않습니다. 넣으려면 「운행에 직접 맞추기」로 이번 기간 운행에 다시 잇거나, ' +
+      '영수증 날짜는 ' + em + '이라 어느 기간에도 정산되지 않습니다. 넣으려면 「다른 운행에 붙이기」로 이번 기간 운행에 다시 잇거나, ' +
       tm + '이 아직 상신 전이면 그쪽에서 확인하세요.';
   }
   /** 이 기간 운행에 이었는데 영수증 날짜가 다른 기간인 영수증 — 운행 기간 쪽 문구(영수증 기간에 그날 운행이 있는지는 여기서 모른다). */
@@ -9193,7 +9297,7 @@ window.EduGuard = {
     var em = cycleOfMs(Number(e.date_millis)).m + '월분';
     return md(t.start_time) + ' 운행에 이은 ' + (e.category || '') + ' 영수증 ' + n0(e.amount) + '원은 영수증 날짜(' + md(e.date_millis) + ')가 ' + em +
       '이라 이 기간 정산에 들어가지 않습니다. ' + em + '에 그날 업무 운행이 없으면 어느 기간에도 정산되지 않으니, ' + em +
-      '에서 「운행에 직접 맞추기」로 그 기간 운행에 다시 잇거나 확인하세요.';
+      '에서 「다른 운행에 붙이기」로 그 기간 운행에 다시 잇거나 확인하세요.';
   }
   /**
    * 한 사람 · 한 기간(r)의 경계 영수증. here = 이 기간 영수증인데 이은 운행이 다른 기간이라 「운행 없는 영수증」이 된 것(표시하는 날만 —
@@ -9307,8 +9411,8 @@ window.EduGuard = {
       loadAll();
     });
   }
-  /** 「운행에 직접 맞추기」 창 — 이번 주기 내 영수증(주차·통행료)마다 어느 운행 것인지 고른다. */
-  function openEvLink(cat) {
+  /** 「다른 운행에 붙이기」 창 — 이번 주기 내 영수증(주차·통행료)마다 어느 운행 것인지 고른다. */
+  function openEvLink(cat, focusId) {
     var me = myName(), r = cycleRange(CYC.y, CYC.m);
     var evs = EVID.filter(function (e) {
       var d = Number(e.date_millis);
@@ -9355,18 +9459,21 @@ window.EduGuard = {
           return '<option value="' + t.id + '"' + (String(e.trip_id || '') === String(t.id) ? ' selected' : '') + '>' + esc(tripLabel(t)) + '</option>';
         }).join('') + '</optgroup>';
       }).join('');
-      return '<tr' + (bad[e.id] ? ' class="flagged"' : '') + '><td style="white-space:nowrap"><span class="lead">' + esc(dayName(e.date_millis)) + '</span>' +
-        (hm(e.date_millis) !== '00:00' ? ' <span class="dim">' + esc(hm(e.date_millis)) + '</span>' : '') + (bad[e.id] ? '<div><span class="st warn">' + (xt ? '다른 기간 운행에 이어짐' : '맞는 운행 없음') + '</span></div>' : '') + '</td>' +
+      return '<tr' + (bad[e.id] ? ' class="flagged"' : '') + ' data-evlinkrow="' + esc(String(e.id)) + '"><td style="white-space:nowrap"><span class="lead">' + esc(dayName(e.date_millis)) + '</span>' +
+        (hm(e.date_millis) !== '00:00' ? ' <span class="dim">' + esc(hm(e.date_millis)) + '</span>' : '') + (bad[e.id] ? '<div><span class="st warn">' + (xt ? '다른 기간 운행에 이어짐' : '그날 업무 운행 없음') + '</span></div>' : '') + '</td>' +
         '<td class="n" style="white-space:nowrap">' + n0(e.amount) + '원</td>' +
         '<td style="width:100%"><select class="inp" data-evlinksel="' + e.id + '" data-was="' + esc(String(e.trip_id || '')) + '" style="min-width:260px">' + opts + '</select></td></tr>';
     }).join('');
-    openPanel(cat + ' 영수증을 운행에 맞추기', cycleName(CYC.y, CYC.m) + ' · ' + n0(evs.length) + '건',
-      '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 자동으로 붙습니다. 수기 운행의 시각이 다르거나 ' +
-      '자정을 넘겨 결제해 날짜가 안 맞으면, 여기서 <b>어느 운행의 영수증인지</b> 골라 주세요. 엑셀·검증이 고른 운행의 날로 맞춥니다. ' +
-      '영수증 날짜는 바뀌지 않습니다.</div>' +
+    openPanel(cat + ' 영수증을 다른 운행에 붙이기', cycleName(CYC.y, CYC.m) + ' · ' + n0(evs.length) + '건',
+      '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 저절로 붙습니다. 자정을 넘겨 결제했거나 수기 운행의 날짜가 달라 ' +
+      '「그날 업무 운행 없음」이면, 운행 칸에서 <b>어느 운행의 영수증인지</b> 골라 저장하세요(영수증 날짜는 바뀌지 않습니다). ' +
+      '맞는 운행이 아예 없으면 1단계에서 운행을 넣거나, 잘못 올린 영수증이면 영수증 내역에서 지우세요.</div>' +
       '<div class="panel" style="margin-top:12px"><div class="scroll"><table><thead><tr><th>영수증 날짜</th><th class="n">금액</th><th>운행</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnEvLinkSave">저장</button>', true);
+    // 표의 그 줄 「다른 운행에 붙이기」로 열었으면 그 영수증 줄을 보이게(웹 8차)
+    var fr = focusId != null && document.querySelector('[data-evlinkrow="' + String(focusId).replace(/[^0-9A-Za-z_-]/g, '') + '"]');
+    if (fr) { fr.classList.add('evlfocus'); try { fr.scrollIntoView({ block: 'center' }); } catch (e) { } var sel = fr.querySelector('select'); if (sel) sel.focus({ preventScroll: true }); }
   }
   function saveEvLink() {
     var sels = [].slice.call(document.querySelectorAll('[data-evlinksel]')).filter(function (s) { return s.value !== s.dataset.was; });

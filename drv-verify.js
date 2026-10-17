@@ -200,7 +200,7 @@
       var refs = it.refs || {}, nRef = (refs.trips || []).length + (refs.evid || []).length;
       var go = '';
       // 통행료 미확정(R02)·운행 없는 영수증(R13)은 2단계 영수증 › 그 차례로(「통행료 채우기」 화면은 없앴다 — 2026-10-15).
-      //   R13 은 그 차례에 「운행에 직접 맞추기」·운행 추가 안내가 있다.
+      //   R13 은 그 차례에 「다른 운행에 붙이기」(그 줄)·운행 추가 안내가 있다.
       if (links && it.code === 'R02') go = '<button class="btn sm vgo" data-evstep="통행료">통행료 차례로' + ic('chev', 12) + '</button>';
       else if (links && it.code === 'R13') { var sc = r13Cat(it); go = '<button class="btn sm vgo" data-evstep="' + sc + '">' + sc + ' 차례로' + ic('chev', 12) + '</button>'; }
       // 주유 영수증·계기판 사진이 모자란 것은 고칠 기록이 아니라 올릴 것이 없는 것 — 영수증 화면으로 보낸다.

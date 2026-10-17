@@ -837,6 +837,18 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .tchoice span{font-size:12.5px;color:var(--ink-500);line-height:1.6}
 .tchoice em{font-style:normal;color:var(--ok);font-weight:700}
 .evsact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+/* 웹 8차(2026-10-17) — 주차·통행료 차례의 「할 일」 단추: 통행료는 같은 크기 둘(영수증 사진 · 하이패스 이용내역 PDF) */
+.evpick{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:12px 0 4px}
+.evpick.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.evpk{display:flex;flex-direction:column;gap:6px;min-width:0}
+.evpk > .btn{width:100%;justify-content:center;min-height:44px;font-size:14.5px}
+.evpk > .dim{font-size:12.5px;line-height:1.5}
+@media (max-width:720px){.evpick.two{grid-template-columns:minmax(0,1fr)}}
+.mtable .mlinkb{margin-top:6px}
+.mbox .mfoldnote{padding:8px 16px 12px;font-size:12.5px}
+.hpphoto{font-size:11.5px;color:var(--ok);margin-top:2px;white-space:normal}
+.evhint.hpdup{color:var(--ok)}
+tr.evlfocus td{background:var(--warn-50)}
 @media (max-width:900px){.tollpick{grid-template-columns:1fr}.evsarrow{display:none}}
 /* 단계를 옮길 때 — 다음은 오른쪽에서, 이전은 왼쪽에서 밀려 들어온다 */
 .stepfx.fwd{animation:slidefwd .38s var(--ease)}
@@ -1820,6 +1832,9 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   table.mday tbody tr.flagged{box-shadow:inset 3px 0 0 var(--red)}
   table.mday tbody tr.flagged td:first-child{box-shadow:none}
   table.mday td:nth-child(6){grid-column:2 / 4;grid-row:1;text-align:right}
+  table.mday td:nth-child(6){white-space:normal}
+  table.mday td:nth-child(6) .mres{white-space:normal;justify-content:flex-end;text-align:right}   /* 웹 8차 결과 글이 길어졌다(할 일까지) — 폰에서 줄바꿈 */
+  table.mday td:nth-child(6) .mlinkb{display:flex;margin:6px 0 0 auto}   /* 웹 8차 「다른 운행에 붙이기」 — 폰에서 잘리지 않게 다음 줄 */
   table.mday td:nth-child(2){grid-column:1 / -1;grid-row:2}
   table.mday td.n{text-align:left;white-space:normal}
   table.mday td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--ink-500);font-weight:400}

@@ -16,7 +16,10 @@
 
    추가 결정(2026-10-15 사용자, 같은 날 — 정본 「추가 결정」 · 서버 HIPASS_SOURCE · MONEY_V3_FROM 과 같다)
      · 「하이패스 PDF 인정」: 통행료 출처 「하이패스 영수증」(하이패스 PDF 대조로 맞춘 운행)의 금액 H 는 그 자체가 영수증이다.
-       상태 판정만 R + H 로 한다(정산 금액·채우기는 그대로). 같은 영수증을 또 올렸으면 R + H = 2배 → 금액 다름(d.hpDup).
+       상태 판정만 H + (R − D) 로 한다(정산 금액·채우기는 그대로).
+     · 「같은 통행료를 두 가지로 증빙」(2026-10-17 사용자 「직원들이 잘 모를 것 같은데… 좀 쉽게」): 올린 통행료 영수증 중 그날 하이패스 출처 운행
+       통행료와 금액이 같은 것은 같은 통행료의 두 번째 증빙으로 짝지어(hpPair) R 에 다시 세지 않는다(D = 그 합, d.dup = 그 영수증).
+       하이패스 500 + 영수증 500 → 일치 · 하이패스 500 + 영수증 700 → 금액 다름. 서버 driving-calc.ts hpPair 와 같은 순서·같은 답.
      · 「10월분부터」: 표시(영수증 없음·금액 다름·운행 없는 영수증)는 2026-09-21(KST) 이후 날만(d.show).
        금액 계산은 모든 날 같다 — sum.none·diff·ok·bad·noTripShowN 은 표시용이라 d.show 인 날만 센다.
 
@@ -65,6 +68,25 @@
   function isBiz(t) { return (t.purpose || '') === BUSINESS && !t.deleted_at; }
 
   /**
+   * 「같은 통행료를 두 가지로 증빙」(2026-10-17) — 하이패스 출처 운행 hp[{ id, a }] 와 올린 영수증 ev[{ id, a, link }] 를 금액이 같으면 짝짓는다.
+   *   ① trip_id 로 그 하이패스 운행에 이은 영수증이 먼저 ② 나머지는 영수증 id 순으로 금액이 같은 첫 하이패스 운행(시각 순)과. 하이패스 하나에 영수증 하나.
+   * 서버 driving-calc.ts hpPair 와 같다. 돌려주는 것: 짝지은 영수증 id 목록.
+   */
+  function hpPair(hp, ev) {
+    var used = {}, out = [];
+    var list = ev.slice().sort(function (x, y) { return Number(x.id) - Number(y.id); });
+    var take = function (e, ok) {
+      for (var i = 0; i < hp.length; i++) {
+        if (!used[i] && Math.round(hp[i].a) === Math.round(e.a) && ok(hp[i])) { used[i] = 1; out.push(e.id); return true; }
+      }
+      return false;
+    };
+    var left = list.filter(function (e) { return !(e.link && take(e, function (h) { return String(h.id) === String(e.link.id); })); });
+    left.forEach(function (e) { take(e, function () { return true; }); });
+    return out;
+  }
+
+  /**
    * 한 사람의 v3 결과.
    * @param o.trips  그 사람의 운행(이 기간 · 지워진 것 제외). 목적은 섞여도 된다 — 업무 운행만 금액에 쓰고,
    *                 다른 목적 운행은 「이은 영수증의 날」을 정하는 데만 쓴다.
@@ -76,8 +98,9 @@
    *   Cat = { days: [Day…날짜순], byTrip: { 운행id: { amt, fill } }, sum }
    *   Day = { day, T, R, H, settle, st: 'no_receipt'|'match'|'mismatch'|'filled'|'no_trip', trips: [그날 업무 운행 시각순], ev: [영수증],
    *           amt: { 운행id: 운행 금액 }, fill: { 운행id: 영수증으로 채운 금액 }, target: 대표 운행(표를 누르면 여는 운행),
-   *           show: 표시하는 날(2026-09-21 이후 — 「10월분부터」), hpDup: 하이패스로 맞춘 날에 영수증을 또 올려 금액 다름 }
-   *     H = 그날 「하이패스 영수증」 출처 운행의 통행료(영수증으로 친다 — 상태는 R + H 로 판정, 주차는 늘 0)
+   *           show: 표시하는 날(2026-09-21 이후 — 「10월분부터」), D, dup: [하이패스와 같은 통행료로 짝지은 영수증], hp: [하이패스 출처 운행] }
+   *     H = 그날 「하이패스 영수증」 출처 운행의 통행료(영수증으로 친다 — 상태는 H + R − D 로 판정, 주차는 늘 0)
+   *     D = 올린 영수증 중 하이패스 운행과 금액이 같아 짝지은 것의 합(같은 통행료의 두 번째 증빙 — 다시 세지 않는다)
    *   sum = { T, R, settle, fill, fillN, evN, noTrip, noTripN, noTripShowN, none, diff, ok, fillDays, bad }
    *     fill/fillN = 영수증으로 채운 금액·장수(결재 요약 ev_* · ev_n) · noTrip/noTripN = 정산에서 뺀 영수증(모든 날 — 금액)
    *     evN = 업무 운행이 있는 날에 붙은 영수증 장수 · none/diff/ok = R06/R10/일치 날 수 · bad = none + diff
@@ -106,14 +129,14 @@
     var out = {};
     CATS.forEach(function (cat) {
       var days = {};
-      var slot = function (k) { return days[k] || (days[k] = { day: k, T: 0, R: 0, H: 0, settle: 0, st: '', trips: [], ev: [], amt: {}, fill: {}, target: null, show: k >= FROM, hpDup: false }); };
+      var slot = function (k) { return days[k] || (days[k] = { day: k, T: 0, R: 0, H: 0, settle: 0, st: '', trips: [], ev: [], amt: {}, fill: {}, target: null, show: k >= FROM, D: 0, dup: [], hp: [] }); };
       biz.forEach(function (t) {
         var d = slot(day(Number(t.start_time))), a = tripAmt(cat, t, o);
         d.trips.push(t);
         if (a > 0) {
           d.T += a; d.amt[t.id] = a;
           // 「하이패스 PDF 인정」(2026-10-15) — 하이패스 PDF 대조로 맞춘 통행료는 영수증이 있는 것으로 본다
-          if (cat === '통행료' && (t.toll_source || '') === HIPASS_SOURCE) d.H += a;
+          if (cat === '통행료' && (t.toll_source || '') === HIPASS_SOURCE) { d.H += a; d.hp.push(t); }
         }
       });
       (o.evid || []).forEach(function (e) {
@@ -132,11 +155,16 @@
       });
       list.forEach(function (d) {
         var has = d.trips.length > 0;
+        // 하이패스와 같은 통행료로 짝지은 영수증(2026-10-17) — 상태 판정에서만 R 에 다시 세지 않는다
+        if (d.hp.length) {
+          var ids = hpPair(d.hp.map(function (t) { return { id: t.id, a: d.amt[t.id] || 0 }; }),
+            d.ev.map(function (x) { return { id: x.e.id, a: x.a, link: x.t }; }));
+          d.ev.forEach(function (x) { if (ids.some(function (i) { return String(i) === String(x.e.id); })) { d.D += x.a; d.dup.push(x.e); } });
+        }
         if (d.T > 0) {
           d.settle = d.T;
-          var RR = d.R + d.H;                              // 하이패스 PDF 대조분은 영수증으로 친다(서버 RR 과 같다)
+          var RR = d.H + d.R - d.D;                        // 하이패스 PDF 대조분은 영수증으로 친다 + 같은 통행료 영수증은 한 번만(서버 RR 과 같다)
           d.st = RR === 0 ? 'no_receipt' : (Math.round(d.T) === Math.round(RR) ? 'match' : 'mismatch');
-          d.hpDup = d.st === 'mismatch' && d.H > 0 && d.R > 0;
         } else if (has) {
           d.settle = d.R; d.st = 'filled';
           // 이은 영수증 → 그 운행 줄(업무 운행일 때). 나머지 → 그날 첫 업무 운행 줄.
@@ -178,6 +206,6 @@
   /** 결과 글자(표·검증 공통). */
   var LABEL = { no_receipt: '영수증 없음', mismatch: '금액 다름', match: '일치', filled: '영수증으로 채움', no_trip: '운행 없는 영수증(정산 제외)' };
 
-  return { compute: compute, tollOf: tollOf, tripAmt: tripAmt, ymdK: ymdK, LABEL: LABEL, TOLL_MAX: TOLL_MAX, BUSINESS: BUSINESS,
+  return { compute: compute, hpPair: hpPair, tollOf: tollOf, tripAmt: tripAmt, ymdK: ymdK, LABEL: LABEL, TOLL_MAX: TOLL_MAX, BUSINESS: BUSINESS,
     HIPASS_SOURCE: HIPASS_SOURCE, FROM: FROM, VERSION: 3 };
 });
