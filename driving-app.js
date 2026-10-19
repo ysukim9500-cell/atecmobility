@@ -993,7 +993,10 @@
     }).join('') + '</div>';
     var body = '<div class="evsubcard' + (EVSUB_FX ? ' stepfx ' + EVSUB_FX : '') + '">' +
       '<div class="evsh"><span class="evsn">' + (cur + 1) + ' / 4</span><b>' + esc(name) + '</b>' +
-      '<span class="dim">' + esc(EV_SUB_DESC[name]) + '</span></div>';
+      '<span class="dim">' + esc(EV_SUB_DESC[name]) + '</span>' +
+      // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
+      ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + esc(name) + ' 영수증 ' + n0(by[name].n) + '건 보기·지우기 ↓</button>' : '') +
+      '</div>';
     if (name === '주차' || name === '통행료') body += noticeBand();      // 공지 띠(2026-10-15 2차)
     var canUp = !cycleLocked(myName()) && !isMulti();
     // 웹 8차(2026-10-17 사용자 「직원들이 잘 모를 것 같은데… 좀 쉽게 할 수 없나?」) — 주차·통행료는 할 일을 맨 위 단추로.
@@ -1198,12 +1201,12 @@
       var how = [];
       if (MS.none) how.push(isToll ? '「영수증 없음」 날은 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요(실제로 안 냈으면 그 줄을 눌러 통행료를 「없음」으로)'
         : '「영수증 없음」 날은 영수증 사진을 올려 주세요(실제로 안 냈으면 그 줄을 눌러 주차비를 「없음」으로)');
-      if (MS.diff) how.push('「금액 다름」 날은 그 줄을 눌러 운행 금액을 고치거나, 아래 내역에서 영수증 금액을 확인해 주세요 — 고치기 전까지는 운행 금액으로 정산됩니다');
-      // 하이패스와 다른 금액 영수증이 함께 있는 날 — 둘 중 무엇을 할지 콕 집어(2026-10-17 모르는 로봇 「3,200원으로 고쳐야 하나, 지워야 하나」)
-      MC.days.filter(function (d) { return d.show && d.st === 'mismatch' && d.H > 0 && d.R - (d.D || 0) > 0; }).slice(0, 3).forEach(function (d) {
-        var U = d.R - (d.D || 0);
-        how.push(dn(d.day) + '은 하이패스 ' + won(d.H) + ' 말고 영수증 ' + won(U) + '이 더 있습니다 — 같은 통행료를 잘못 올린 것이면 아래 내역에서 그 영수증을 지우고, ' +
-          '그날 다른 통행료였으면 그 줄을 눌러 운행 금액을 ' + won(d.H + U) + '으로 고쳐 주세요');
+      if (MS.diff) how.push('「금액 다름」 날은 운행 금액과 증빙(하이패스 이용내역·영수증)이 다릅니다 — 줄을 누르면 그 운행을, 아래 내역에서 영수증을 고칠 수 있고, 고치기 전까지는 운행 금액으로 정산됩니다');
+      // 금액 다름인 날 — 하루 단위 차이와 상황만(2026-10-19 버그 사냥 B2·B7·B8). 특정 운행 금액(「X원으로 고쳐」)은 제안하지 않는다 —
+      //   그대로 따르면 두 번 정산될 수 있다. 문구는 money-rule.js adviceOf(서버 driving-verify R10 과 같은 글자).
+      MC.days.filter(function (d) { return d.show && d.st === 'mismatch'; }).slice(0, 3).forEach(function (d) {
+        var a = window.MoneyRule.adviceOf(d, cat);
+        if (a) how.push(dn(d.day) + ' ' + a.head + ': ' + a.tips.join(' / '));
       });
       if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
       var rule = '증빙이 있는 날은 「맞음」입니다. 정산에는 <b>운행 금액</b>이 들어가고 영수증은 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
@@ -3737,35 +3740,71 @@
     var kattr = kd ? ' data-kind="' + esc(kindOf(a)) + '"' : '';
     // 검증 요약 · 결재 문서(고정본) — drv-verify.js(운행일지) · drv-expense.js(개인경비)가 채운다.
     var ext = kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '');
-    return '<div class="acard' + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc((kindOf(a) || 'd') + ':' + a.id) + '">' +
+    // ── 얇은 카드(2026-10-19 사용자 「한 건 한 건이 너무 두꺼워서 내리기 힘든데」) ──
+    //   ① 머리 줄: 딱지 · 이름 · 기간 · 상태 · 건수·금액 (내 차례면 오른쪽 끝에 반려·승인)
+    //   ② 한 줄: 진행 줄 + 검증 딱지 · 출력 딱지 · 단추들(PDF 받기 · 엑셀 받기 · 정정 열기 · 승인 취소·반려 · 문서 보기 · 자세히)
+    //   큰 판정 상자(띠 + 숫자 4칸 + 딱지)는 그 밖의 건이면 「자세히」를 눌러야 펼친다. 내 차례는 판정 한 줄 + 숫자 한 줄로 늘 보이고,
+    //   확인 항목 목록만 「확인 항목 N건」으로 접는다(「영수증 없음」 R06 은 결재선 모두가 보게 접지 않는다 — 2026-10-16 사용자).
+    //   모듈(drv-verify·drv-expense·drv-card)이 만든 조각은 그대로 쓴다 — 판정 상자(.abrief)와 단추 줄(.aext)로 나눠 자리만 옮긴다.
+    var akey = (kindOf(a) || 'd') + ':' + a.id;
+    var ai = ext.indexOf('<div class="aext"');
+    var brief = ai > 0 ? ext.slice(0, ai) : ai < 0 ? ext : '', tail = ai >= 0 ? ext.slice(ai) : '';
+    if (brief && brief.indexOf('<div class="abrief') !== 0) { tail = brief + tail; brief = ''; }
+    var nItems = (brief.match(/<li class="(?:bad|warn)"/g) || []).length;
+    var longSt = st.t.length > 34;
+    var det = !!ACARD_DET[akey];
+    // 자세히: 그 밖의 건은 판정 상자·긴 반려 사유, 내 차례는 확인 항목이 있을 때만
+    var detWhat = canAct ? (nItems ? '확인 항목 ' + n0(nItems) + '건' : '') : (brief || longSt ? '자세히' : '');
+    var detBtn = detWhat ? '<button type="button" class="btn sm adetbtn" data-adet aria-expanded="' + det + '">' +
+      (det ? (canAct ? '확인 항목 접기' : '접기') : detWhat) + ic('chev', 12) + '</button>' : '';
+    var recallTip = '다음 분이 결재하기 전이라 승인을 취소할 수 있습니다.';
+    var acts =
+      // 방금 승인한 건 — 다음 분이 결재하기 전이면 승인을 거두고 반려로 돌려보낸다(2026-10-19). 안내는 단추 풀이(title·화면 읽기)로
+      (canRecall(a) ? '<button class="btn sm" data-appr="recall_reject" data-id="' + a.id + '"' + kattr + ' title="' + recallTip + '"' +
+        ' aria-describedby="arc-' + esc(akey.replace(':', '-')) + '">승인 취소·반려</button>' +
+        '<span class="sr arecall" id="arc-' + esc(akey.replace(':', '-')) + '">' + recallTip + '</span>' : '') +
+      // 반려·회수된 내 건 — 고칠 화면으로 바로(2026-10-15 매뉴얼 로봇: 결재함 카드에 갈 길이 없었다)
+      (canFix ? '<button class="btn pri sm" data-fixgo="' + esc(kd ? (kd.mode || 'x') + '_month' : 'close') + '" data-fixcyc="' + esc(a.cycle) + '">고쳐서 다시 상신 →</button>' : '') +
+      (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
+      (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '"' + kattr + '>회수</button>' : '');
+    return '<div class="acard cmp' + (canAct ? ' turn' : '') + (det ? ' det' : '') + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc(akey) + '">' +
       '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' ' + (kd.mode || 'x') : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
       // 개인경비는 기간이 20일~19일이라 달 이름만으로는 헷갈린다 — 범위를 같이 적는다(kd.cycLabel).
       '<span class="acyc">' + esc(kd && kd.cycLabel ? kd.cycLabel(a) : cy.length === 2 ? cycleName(+cy[0], +cy[1]) : a.cycle + '분') + '</span>' +
-      '<span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
+      // 긴 반려 사유는 한 줄로 줄이고(끝 「…」) 「자세히」에서 전부 — 마우스를 올려도 전부 보인다
+      '<span class="st ' + st.cls + (longSt ? ' along' : '') + '"' + (longSt ? ' title="' + esc(st.t) + '"' : '') + '>' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +
       (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
         : (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '')) +
+      // 「자세히」(판정 상자·긴 사유) / 「확인 항목 N건」 — 머리 줄 오른쪽(아래 줄은 단추가 많아 넘쳤다)
+      detBtn +
+      // 내 차례 — 반려·승인을 머리 줄 오른쪽에(카드를 내리지 않고 누른다)
+      (canAct ? '<span class="aact ahact"><button class="btn sm" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
+        '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></span>' : '') +
       '</div>' +
-      apprTrack(a) + ext +
-      (canAct || canWithdraw || canReopen(a) || canFix || canRecall(a)
-        ? '<div class="aact">' +
-          // 방금 승인한 건 — 다음 분이 결재하기 전이면 승인을 거두고 반려로 돌려보낸다(2026-10-19)
-          (canRecall(a) ? '<span class="fhint arecall">다음 분이 결재하기 전이라 승인을 취소할 수 있습니다.</span>' +
-            '<button class="btn sm" data-appr="recall_reject" data-id="' + a.id + '"' + kattr + '>승인 취소·반려</button>' : '') +
-          // 반려·회수된 내 건 — 고칠 화면으로 바로(2026-10-15 매뉴얼 로봇: 결재함 카드에 갈 길이 없었다)
-          (canFix ? '<button class="btn pri sm" data-fixgo="' + esc(kd ? (kd.mode || 'x') + '_month' : 'close') + '" data-fixcyc="' + esc(a.cycle) + '">고쳐서 다시 상신 →</button>' : '') +
-          (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
-          (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '"' + kattr + '>회수</button>' : '') +
-          (canAct ? '<button class="btn sm" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
-            '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button>' : '') +
-          '</div>'
-        : '') +
-      // 결재 문서 미리보기 — 승인·반려 단추 아래(쪽이 길어도 단추가 밀려나지 않게). 「결재 문서 PDF」 단추가 있는 카드에만.
+      '<div class="acrow">' + apprTrack(a) + '<span class="asp"></span>' + tail +
+      (acts ? '<span class="aact">' + acts + '</span>' : '') +
+      // 결재 문서 미리보기 — 「문서 보기」는 이 줄에, 펼친 쪽은 카드 맨 아래 한 줄 전체로. 「결재 문서 PDF」 단추가 있는 카드에만.
       apvIfPdf(kindOf(a), a, ext) +
-      '</div>';
+      (longSt ? '<div class="adst">' + esc(st.t) + '</div>' : '') +
+      brief +
+      '</div></div>';
   }
+  /** 결재 카드 「자세히」를 펼친 카드(종류:id) — 화면을 다시 그려도 그대로. 새로고침하면 잊는다. */
+  var ACARD_DET = {};
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-adet]');
+    var c = b && b.closest('.acard');
+    if (!c) return;
+    var on = !c.classList.contains('det'), turn = c.classList.contains('turn');
+    c.classList.toggle('det', on);
+    ACARD_DET[c.dataset.akey] = on;
+    b.setAttribute('aria-expanded', String(on));
+    var n = (c.querySelectorAll('.abitems li.bad,.abitems li.warn') || []).length;
+    b.innerHTML = (on ? (turn ? '확인 항목 접기' : '접기') : (turn ? '확인 항목 ' + n0(n) + '건' : '자세히')) + ic('chev', 12);
+  });
   /** 모듈이 그린 줄에 그 종류의 「결재 문서 PDF」 단추가 있을 때만 미리보기 자리(고정본이 없는 옛 건 등은 빠진다). */
   function apvIfPdf(kind, a, html) {
     var at = APV_PDFATTR[kind || ''];
@@ -3778,7 +3817,7 @@
        · 화면에 들어올 때만(IntersectionObserver) · 한 번만 — 결재 건(종류·id·상태·상신·완료 시각) 별로 그림을 맡아 둔다.
          화면을 다시 그려도(render) 맡아 둔 그림을 바로 다시 붙인다.
        · 한 번에 하나씩 만든다(APV.MAX) — 결재함에 카드가 많아도 한꺼번에 PDF 를 만들지 않는다.
-       · 내 차례 카드는 펼쳐서, 나머지는 「문서 펼치기」로. 누른 것은 카드마다 sessionStorage 에 남긴다.
+       · 모두 접은 채로 시작해 「문서 보기」로 편다(2026-10-19 — 예전에는 내 차례 카드를 펼쳐서 시작). 누른 것은 카드마다 sessionStorage 에 남긴다.
        · 실패해도 카드는 그대로 — 짧은 안내만. 서버에서 더 받는 것은 단추가 받는 그 고정본뿐이다(RLS 그대로). */
   var APV = { cache: {}, q: [], busy: 0, io: null, MAX: 1 };
   var APV_FAIL = '미리보기를 만들지 못했습니다 — 「PDF 받기」로 열어 보세요';
@@ -3792,7 +3831,8 @@
   function apvSlot(kind, a) {
     if (!a || a.status === 'draft' || !apvProv(kind) || (kind && !APV_PDFATTR[kind])) return '';
     var sv = apvSaved(kind, a.id);
-    var open = sv === '1' || sv === '0' ? sv === '1' : inbox().indexOf(a) >= 0;
+    // 내 차례 카드도 접은 채로 시작한다(2026-10-19 사용자 「한 건 한 건이 너무 두꺼워서」) — 펼친 것은 카드마다 기억
+    var open = sv === '1';
     return '<div class="apv' + (open ? ' open' : '') + '" data-apv="' + esc(apvKey(kind, a)) + '" data-apvk="' + esc(kind || '') + '" data-apvid="' + esc(a.id) + '">' +
       '<div class="apvbar"><button type="button" class="btn sm" data-apvtog aria-expanded="' + open + '">' + (open ? '문서 접기' : '문서 보기') + '</button>' +
       '<span class="dim apvhint">쪽을 누르면 크게 봅니다</span></div>' +
@@ -3850,7 +3890,9 @@
     }
     var kind = el.dataset.apvk, id = el.dataset.apvid;
     // 카드 폭에 맞춰 그린다(화소 비율 반영, 2배까지). 화면 폭이 바뀌어도 그림은 폭에 맞춰 줄고 는다.
-    var cssW = Math.min(1000, Math.max(280, el.clientWidth || 600));
+    //   결재함 얇은 카드(2026-10-19)는 자리(.apv)가 상자 없이 줄에 녹아 있어 폭이 0 이다 — 쪽 상자 폭을 먼저 본다.
+    var pbox = el.querySelector('.apvpages');
+    var cssW = Math.min(1000, Math.max(280, (pbox && pbox.clientWidth) || el.clientWidth || 600));
     var job = APV.cache[key] = {};
     job.p = new Promise(function (ok) {
       job.task = function () {
@@ -4042,6 +4084,7 @@
       more();
     });
     apvMount();
+    mselSync();             // 여러 줄 골라 지우기 — 고른 칸·띠를 다시 맞춘다(2026-10-19)
   }
   /** 하이패스 대조 — 고른 건수·합계와 확정 버튼만 제자리에서 고쳐 쓴다. */
   function paintHpCount() {
@@ -5192,6 +5235,14 @@
       (isAll() ? whoSelectHtml(all.map(function (e) { return e.username; })) : '') + '</div>';
 
     var sumShown = rows.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    // 여러 줄 골라 지우기(2026-10-19) — 내가 올린 줄이 보일 때만 고르기 칸. 못 지우는 줄(잠긴 기간·다른 분 것)은 막고 까닭을 단다.
+    var selOn = rows.some(function (e) { return e.username === mine; });
+    var evWhyNot = function (e) {
+      return e.username !== mine ? '다른 분이 올린 영수증은 지울 수 없습니다'
+        : evLocked(e) ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없습니다' : '';
+    };
+    var thDate = thSort('날짜', 'date', 'ev', -1);
+    if (selOn) thDate = thDate.replace(/^<th class="/, '<th class="mselth ').replace(/^(<th[^>]*>)/, function (m) { return m + mselAll('ev'); });
     // 기간 경계에 걸친 이은 영수증(이은 운행이 다른 기간이라 어느 기간에도 정산 안 됨) — 줄에 문구만(2026-10-17 사용자, 금액은 그대로)
     var XLH = {};
     if (!isMulti()) {
@@ -5202,13 +5253,16 @@
     // 날짜 칸을 치는 동안 입력 칸을 갈아 끼우지 않게, 날짜에 따라 바뀌는 곳(건수 · 표)만 따로 표시해 둔다(paintBelow).
     h += sect('내역', '<span data-live="evcnt">' + (rows.length === all.length ? rows.length + '건' : rows.length + ' / ' + all.length + '건') + '</span>', upBtn,
       bar + '<div id="belowF">' + (rows.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      thSort('날짜', 'date', 'ev', -1) + (isAll() ? thSort('소속 · 이름', 'who', 'ev', 1) : '') +
+      thDate + (isAll() ? thSort('소속 · 이름', 'who', 'ev', 1) : '') +
       thSort('구분', 'cat', 'ev', 1) + '<th>차량</th>' +
       thSort('금액', 'amount', 'ev', -1, true) + '<th>메모</th><th></th></tr></thead><tbody>' +
       rows.map(function (e) {
         var canDel = e.username === mine && !evLocked(e);
         var xl = XLH[e.id];
-        return '<tr' + (xl ? ' data-evxl="' + esc(e.id) + '"' : '') + '><td><span class="lead">' + md(e.date_millis) + '</span>' +
+        var line = md(e.date_millis) + ' ' + (e.category || '기타') + ' ' + n0(e.amount) + '원' + (isAll() && e.username !== mine ? ' ' + nameOf(e.username) : '');
+        return '<tr' + (xl ? ' data-evxl="' + esc(e.id) + '"' : '') + '><td' + (selOn ? ' class="mseltd"' : '') + '>' +
+          (selOn ? mselBox('ev', { id: String(e.id), amt: e.amount, line: line, why: evWhyNot(e) }) : '') +
+          '<span class="lead">' + md(e.date_millis) + '</span>' +
           (xl ? '<div class="evxl" title="' + esc(xl.say) + '">' + esc(md(xl.t.start_time)) + ' 운행(' + cycleOfMs(Number(xl.t.start_time)).m + '월분)에 이음 · 어느 기간에도 정산 안 됨</div>' : '') + '</td>' +
           (isAll() ? whoCell(e.username) : '') +
           '<td><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
@@ -5224,7 +5278,8 @@
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') +
           '</td></tr>';
       }).join('') + '</tbody><tfoot><tr><td colspan="' + (isAll() ? 4 : 3) + '">보이는 ' + n0(rows.length) +
-      '건 합계</td><td class="n total">' + n0(sumShown) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
+      '건 합계</td><td class="n total">' + n0(sumShown) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>' +
+        (selOn ? mselBar('ev') : '')
         : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 영수증이 없습니다.</div>' +
           '<div style="margin-top:12px"><button class="btn sm" data-fclear>조건 지우기</button></div></div></div>') + '</div>');
     return h;
@@ -5840,14 +5895,14 @@
     $('panel').classList.add('open');
   }
 
-  function runEvDelete(id) {
-    var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
-    if (!e) return;
-    var btn = $('btnEvDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
+  /** 지운 영수증 id — 여러 장을 한 번에 지울 때 아직 다시 받지 않은 목록(ALL_EVID)에 남은 줄을 「남은 줄」로 세지 않게. */
+  var EV_GONE = {};
+  /** 영수증 한 장 지우기 — 한 건 지우기·여러 장 지우기가 같은 길(기록 → A4 원본 → 사진). 결과: 사진·원본 파일까지 지웠는가(true/false). */
+  function evDelOne(e) {
     // 기록을 먼저 지운다. 파일만 남는 것이 기록만 남는 것보다 덜 위험하다.
     // 지운 줄을 돌려받아 실제로 지워졌는지 본다 — 서버 규칙이 막으면 0줄이 지워져도 200 이 와서
     // "지웠습니다"라고 거짓으로 말했다(2026-10-06 검증로봇 2: 다른 탭에서 상신한 직후 등).
-    apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(e.id),
+    return apiRetry('/rest/v1/evidences?id=eq.' + encodeURIComponent(e.id),
       { method: 'DELETE', headers: { Prefer: 'return=representation' } })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
@@ -5858,10 +5913,12 @@
         });
       })
       .then(function () {
+        EV_GONE[String(e.id)] = 1;
         // A4 스캔 원본은 여러 영수증이 함께 가리킨다. 이 줄이 마지막이었으면 원본도 지운다 —
         // 안 그러면 잘못 올린 A4 한 장이 화면에서 지울 길 없이 남는다(버킷이 공개라 주소로 열린다).
+        //   여러 장을 한 번에 지울 때는 방금 지운 줄(EV_GONE)을 남은 줄로 세지 않는다 — 같은 A4 의 영수증을 다 지워도 원본이 남던 것.
         var scanLeft = e.scan_path && ALL_EVID.some(function (x) {
-          return x.scan_path === e.scan_path && String(x.id) !== String(e.id);
+          return x.scan_path === e.scan_path && String(x.id) !== String(e.id) && !EV_GONE[String(x.id)];
         });
         var scanP = (e.scan_path && !scanLeft)
           ? apiRetry('/storage/v1/object/evidence/' + e.scan_path, { method: 'DELETE' })
@@ -5872,17 +5929,175 @@
         return apiRetry('/storage/v1/object/evidence/' + e.photo_path, { method: 'DELETE' })
           .then(function (r2) { return r2.ok; }, function () { return false; })
           .then(function (ok1) { return scanP.then(function (ok2) { return ok1 && ok2; }); });
-      })
+      });
+  }
+  function evDelWhy(err) {
+    var m = err && String(err.message || '');
+    return m.indexOf('지워지지 않았습니다') === 0 ? m : '지우지 못했습니다. 잠시 뒤 다시 해 보세요.';
+  }
+  function runEvDelete(id) {
+    var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!e) return;
+    var btn = $('btnEvDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
+    evDelOne(e)
       .then(function (fileGone) {
         closePanel(); AUDIT = null; loadAll();
         toastOk('지웠습니다.', fileGone ? null : '기록은 지웠지만 사진 파일은 남았습니다.');
       })
       .catch(function (err) {
         if (btn) { btn.disabled = false; btn.textContent = '지우기'; }
-        var m = err && String(err.message || '');
-        toast(m.indexOf('지워지지 않았습니다') === 0 ? m : '지우지 못했습니다. 잠시 뒤 다시 해 보세요.', true);
+        toast(evDelWhy(err), true);
       });
   }
+
+  /* ══════════════════ 여러 줄 골라 지우기(2026-10-19 사용자 「하나씩 지워야 하는데 너무 힘드네. 선택 항목을 넣으면」) ══════════════════
+     내역 표 공통 — 운행일지 영수증·통행료(2단계)·관리 영수증 · 개인경비 내역 · 법인카드 내역(drv-expense·drv-card 가 C.msel* 로 같이 쓴다).
+       · 줄 첫 칸 안에 고르기 칸 · 표 머리(폰에서 머리가 숨는 표는 표 위 한 줄)에 「보이는 줄 모두 고르기」
+       · 고르면 표 아래 띠 「선택 N건 · ₩합계 [선택 풀기] [선택 지우기]」 — 화면 아래에 붙어 따라온다(긴 표를 다시 내리지 않게)
+       · 확인 창 하나(지울 목록 날짜·구분·금액) → 한 건 지우기와 같은 길로 하나씩(「지우는 중… 3/7」) → 끝나면 알림 하나(실패가 섞이면 몇 건·왜)
+       · 지울 수 없는 줄(잠긴 기간·다른 분 것)은 고르기 칸을 막고 까닭을 칸 풀이(title·화면 읽기)로
+     고른 것은 화면을 다시 그려도 남고, 보이지 않게 된 줄(거르기·지워짐)은 고른 것에서 빠진다. */
+  var MSEL = {};
+  function mselG(grp) { return MSEL[grp] || (MSEL[grp] = { ids: {}, meta: {}, def: null, busy: false }); }
+  /** def: { noun:'영수증', note:'사진도 함께 지워집니다.', del:function(id)→Promise(false = 파일은 남음), why:function(err)→문구, done:function(nOk) } */
+  function mselDef(grp, def) { mselG(grp).def = def; }
+  /** 표 머리 첫 칸 안에 넣는 「모두 고르기」. */
+  function mselAll(grp) {
+    return '<label class="mselhit" title="보이는 줄 모두 고르기"><input type="checkbox" data-mselall="' + esc(grp) + '" aria-label="보이는 줄 모두 고르기"></label>';
+  }
+  /** 표 위 한 줄 「보이는 줄 모두 고르기」 — 폰에서 표 머리가 숨는 표(개인경비·법인카드)만. cls = 그 표 이름(CSS 가 폭에 따라 보임). */
+  function mselAllLine(grp, cls) {
+    return '<div class="mselallm ' + esc(cls || '') + '"><label class="mselhit wide"><input type="checkbox" data-mselall="' + esc(grp) + '">' +
+      '<span>보이는 줄 모두 고르기</span></label></div>';
+  }
+  /** 줄 첫 칸 안에 넣는 고르기 칸. o: { id, amt, line:'09.30 통행료 1,000원', why:'못 고르는 까닭'(있으면 막음) } */
+  function mselBox(grp, o) {
+    var on = !o.why && !!mselG(grp).ids[o.id];
+    return '<label class="mselhit"' + (o.why ? ' title="' + esc(o.why) + '"' : '') + '><input type="checkbox" data-msel="' + esc(grp) + '" value="' + esc(o.id) + '"' +
+      ' data-amt="' + (Number(o.amt) || 0) + '" data-line="' + esc(o.line) + '"' + (on ? ' checked' : '') +
+      (o.why ? ' disabled aria-label="' + esc(o.line + ' — ' + o.why) + '"' : ' aria-label="' + esc(o.line + ' 고르기') + '"') + '></label>';
+  }
+  /** 표 아래 띠 자리(고르면 보인다). */
+  function mselBar(grp) {
+    return '<div class="mselbar" data-mselbar="' + esc(grp) + '" role="region" aria-label="고른 줄" hidden>' +
+      '<span class="mselt" aria-live="polite"></span><span class="sp"></span>' +
+      '<button type="button" class="btn sm" data-mselclear="' + esc(grp) + '">선택 풀기</button>' +
+      '<button type="button" class="btn sm pri" data-mseldel="' + esc(grp) + '">선택 지우기</button></div>';
+  }
+  function mselBoxes(grp) { return Array.prototype.slice.call(document.querySelectorAll('input[data-msel="' + grp + '"]')); }
+  /** 고른 상태를 화면에 맞춘다 — 칸 체크 · 모두 고르기(일부면 반쯤) · 띠 · 고른 줄 색. 그린 뒤(afterPaint)와 고를 때마다. */
+  function mselSync() {
+    Object.keys(MSEL).forEach(function (grp) {
+      var g = MSEL[grp], live = {}, n = 0, sum = 0, nOk = 0;
+      mselBoxes(grp).forEach(function (b) {
+        if (b.disabled) return;
+        nOk++; live[b.value] = b;
+        b.checked = !!g.ids[b.value];
+        var tr = b.closest('tr'); if (tr) tr.classList.toggle('msel-on', b.checked);
+        if (b.checked) g.meta[b.value] = { line: b.dataset.line, amt: Number(b.dataset.amt) || 0 };
+      });
+      // 표가 아직 없으면(다시 받는 중 · 다른 화면) 고른 것을 버리지 않는다 — 다시 그려진 표에서 그대로 이어진다
+      var any = mselBoxes(grp).length > 0;
+      if (!g.busy && any) Object.keys(g.ids).forEach(function (id) { if (!live[id]) delete g.ids[id]; });
+      Object.keys(g.ids).forEach(function (id) { n++; sum += (g.meta[id] || {}).amt || 0; });
+      Array.prototype.forEach.call(document.querySelectorAll('input[data-mselall="' + grp + '"]'), function (a) {
+        a.disabled = !nOk; a.checked = nOk > 0 && n === nOk; a.indeterminate = n > 0 && n < nOk;
+        var lab = a.closest('label'); if (lab) lab.title = nOk ? '보이는 줄 모두 고르기' : '고를 수 있는 줄이 없습니다';
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-mselbar="' + grp + '"]'), function (bar) {
+        bar.hidden = !n;
+        var t = bar.querySelector('.mselt');
+        if (t) t.innerHTML = '선택 <b>' + n0(n) + '건</b> · ' + won(sum);
+      });
+    });
+  }
+  document.addEventListener('change', function (e) {
+    var b = e.target;
+    if (!b || !b.matches) return;
+    if (b.matches('input[data-msel]')) {
+      var g = mselG(b.dataset.msel);
+      if (b.checked) g.ids[b.value] = 1; else delete g.ids[b.value];
+      mselSync();
+    } else if (b.matches('input[data-mselall]')) {
+      var grp = b.dataset.mselall, g2 = mselG(grp), on = b.checked;
+      mselBoxes(grp).forEach(function (x) { if (!x.disabled) { if (on) g2.ids[x.value] = 1; else delete g2.ids[x.value]; } });
+      mselSync();
+    }
+  });
+  // 차례 카드 「○○ 영수증 N건 보기·지우기 ↓」 — 아래 「내역」 표로
+  document.addEventListener('click', function (e) {
+    var j = e.target.closest && e.target.closest('[data-evjump]');
+    if (!j) return;
+    var to = $('belowF'); if (!to) return;
+    var sec = to.closest('section') || to;
+    try { sec.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); } catch (er) { sec.scrollIntoView(); }
+    var f = to.querySelector('input[data-msel]:not(:disabled),[data-evdel]'); if (f) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (er) { } }, 350);
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-mselclear],[data-mseldel],#btnMselGo');
+    if (!t) return;
+    if (t.id === 'btnMselGo') { mselRun(t.dataset.grp); return; }
+    if (t.hasAttribute('data-mselclear')) { mselG(t.dataset.mselclear).ids = {}; mselSync(); return; }
+    mselAsk(t.dataset.mseldel);
+  });
+  /** 확인 창 — 지울 목록(날짜·구분·금액)과 합계. */
+  function mselAsk(grp) {
+    var g = mselG(grp), def = g.def, ids = Object.keys(g.ids);
+    if (!def || !ids.length || g.busy) return;
+    var sum = ids.reduce(function (s, id) { return s + ((g.meta[id] || {}).amt || 0); }, 0);
+    openPanel(def.noun + ' ' + n0(ids.length) + '건 지우기', '합계 ' + won(sum),
+      '<div class="anote" style="margin-top:0">고른 ' + n0(ids.length) + '건을 지웁니다. 되돌릴 수 없습니다.' + (def.note ? ' ' + esc(def.note) : '') + '</div>' +
+      '<ul class="mselist">' + ids.map(function (id) { return '<li data-mselid="' + esc(id) + '">' + esc((g.meta[id] || {}).line || id) + '</li>'; }).join('') + '</ul>' +
+      '<div class="mselprog" aria-live="polite"></div>',
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn pri" id="btnMselGo" data-grp="' + esc(grp) + '">' + n0(ids.length) + '건 지우기</button>');
+  }
+  /** 하나씩 차례로 지운다(한 건 지우기와 같은 길 — def.del). 실패한 것은 고른 채로 남긴다. */
+  function mselRun(grp) {
+    var g = mselG(grp), def = g.def, ids = Object.keys(g.ids);
+    if (!def || !ids.length || g.busy) return;
+    g.busy = true;
+    var btn = $('btnMselGo'), cl = document.querySelector('#pFoot [data-close]'), prog = document.querySelector('.mselprog');
+    if (btn) btn.disabled = true;
+    if (cl) cl.disabled = true;
+    var ok = 0, warn = 0, bad = [], i = 0;
+    var mark = function (id, cls) { var li = document.querySelector('.mselist li[data-mselid="' + id + '"]'); if (li) li.className = cls; };
+    (function next() {
+      if (i >= ids.length) return finish();
+      var id = ids[i++];
+      if (btn) btn.textContent = '지우는 중… ' + i + '/' + ids.length;
+      if (prog) prog.textContent = ids.length + '건 중 ' + i + '번째를 지우는 중입니다.';
+      mark(id, 'now');
+      Promise.resolve().then(function () { return def.del(id); })
+        .then(function (r) { ok++; if (r === false) warn++; delete g.ids[id]; mark(id, 'done'); },
+          function (err) { bad.push({ id: id, why: def.why ? def.why(err) : String((err && err.message) || err) }); mark(id, 'bad'); })
+        .then(next);
+    })();
+    function finish() {
+      g.busy = false;
+      closePanel();
+      var msg = !bad.length ? n0(ok) + '건을 지웠습니다.'
+        : n0(ids.length) + '건 중 ' + n0(ok) + '건을 지웠습니다. ' + n0(bad.length) + '건(' +
+          bad.slice(0, 3).map(function (x) { return (g.meta[x.id] || {}).line || x.id; }).join(', ') + (bad.length > 3 ? ' 외' : '') +
+          ')은 지우지 못했습니다 — ' + String(bad[0].why).replace(/[.\s]+$/, '') + '. 못 지운 줄은 고른 채로 남겨 두었습니다.';
+      if (!bad.length && warn) msg += ' 사진 파일 ' + n0(warn) + '개는 남았습니다.';
+      toast(msg, !!bad.length);
+      if (def.done) def.done(ok); else render();
+    }
+  }
+  mselDef('ev', {
+    noun: '영수증', note: '사진도 함께 지워집니다.',
+    del: function (id) {
+      var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
+      if (!e) return Promise.reject(new Error('이미 없는 줄입니다'));
+      return evDelOne(e);
+    },
+    // 여러 건 알림은 줄 이름이 이미 길다 — 까닭만 짧게
+    why: function (err) {
+      return String((err && err.message) || '').indexOf('지워지지 않았습니다') === 0 ? '이 기간이 상신됐거나 권한이 없을 수 있습니다' : '잠시 뒤 다시 해 보세요';
+    },
+    done: function () { AUDIT = null; loadAll(); }
+  });
 
 
   /* ══════════════════ 안전교육 ══════════════════ */
@@ -9727,7 +9942,9 @@ window.EduGuard = {
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
       addCycle: addCycle, cmpCycle: cmpCycle, currentCycle: currentCycle, kd: kd,
       usesDriving: usesDriving, noDriving: noDriving,
-      apvSlot: apvSlot
+      apvSlot: apvSlot,
+      // 여러 줄 골라 지우기(2026-10-19) — 개인경비·법인카드 내역 표도 같은 모양·같은 확인 창
+      mselDef: mselDef, mselAll: mselAll, mselAllLine: mselAllLine, mselBox: mselBox, mselBar: mselBar, mselSync: mselSync
     };
     (window.DrvExtQ || []).forEach(function (make) {
       var x;

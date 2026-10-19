@@ -827,6 +827,9 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .evsh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .evsh b{font-size:17px;color:var(--ink-900)}
 .evsh .dim{font-size:13px;flex-basis:100%}
+.evsh .evjump{order:-1;margin-left:auto;align-self:center}   /* 「○○ 영수증 N건 보기·지우기 ↓」 — 제목 줄 오른쪽(2026-10-19) */
+.evsh .evsn{order:-3} .evsh b{order:-2}
+@media screen and (max-width:900px){.evsh .evjump.btn.sm{min-height:44px;height:44px}}
 .evsn{font-size:12px;font-weight:700;color:var(--red);letter-spacing:.04em}
 .tollpick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .tchoice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px 18px;border:1.5px solid var(--ink-200);
@@ -1072,6 +1075,91 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 /* 승인 취소·반려 안내(2026-10-19) — 단추 왼쪽, 좁으면 줄을 바꿔 단추 위로 */
 .aact{flex-wrap:wrap;align-items:center}
 .aact .arecall{flex:1 1 180px;margin:0;align-self:center}
+/* ── 얇은 결재 카드(2026-10-19 사용자 「한 건 한 건이 너무 두꺼워서 내리기 힘든데」) ──
+   머리 줄 + 한 줄(진행 줄 · 검증 딱지 · 단추 · 문서 보기 · 자세히). 판정 상자는 그 밖의 건이면 「자세히」에서, 내 차례는 얇게. */
+.acard.cmp{padding:11px 20px 12px}
+.acard.cmp .ahd{gap:6px 10px;margin-bottom:0;min-height:30px}
+.acard.cmp .ahd>.st.along{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(100%,460px);flex:0 1 auto}
+.acard.cmp .ahact{margin:0 0 0 4px;flex-wrap:nowrap;gap:6px}
+.acard.cmp .acrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:7px;min-width:0}
+.acard.cmp .acrow .aprog{margin-top:0;flex:0 1 auto;min-width:0}
+.acard.cmp .acrow .asp{flex:1 1 0;min-width:0}
+.acard.cmp .acrow>.aext,.acard.cmp .acrow>.aact,.acard.cmp .acrow>.apv,.acard.cmp .acrow>.apv>.apvbar{display:contents}
+.acard.cmp .acrow>.aext>span[style*="flex:1"]{display:none}
+.acard.cmp .acrow>.aext>span.dim{flex:1 1 220px}
+.acard.cmp .acrow>.aact{margin:0}
+.acard.cmp .acrow .apvhint{display:none}
+.acard.cmp .acrow .apvpages{order:99;flex:0 0 100%;margin-top:4px}
+.acard.cmp .adetbtn svg{transform:rotate(90deg);transition:transform .15s}
+.acard.cmp.det .adetbtn svg{transform:rotate(-90deg)}
+.acard.cmp .adst{order:97;flex:0 0 100%;display:none;font-size:12.5px;line-height:1.6;color:var(--red-700);background:var(--red-50);
+  border-radius:var(--r-xs);padding:8px 12px;overflow-wrap:anywhere}
+.acard.cmp.det .adst{display:block}
+.acard.cmp .acrow>.abrief{order:98;flex:0 0 100%;margin-top:4px;min-width:0}
+.acard.cmp:not(.turn):not(.det) .acrow>.abrief{display:none}
+/* 내 차례 — 판정 한 줄 + 숫자 한 줄(청구 ₩ · 운행/영수증 · 전월 대비 …) + 딱지. 확인 항목은 「확인 항목 N건」으로(영수증 없음 R06 은 늘 보임) */
+.acard.turn .acrow>.abrief .abv{padding:7px 12px;font-size:13px;gap:8px}
+.acard.turn .acrow>.abrief .abi{width:19px;height:19px;font-size:11px}
+.acard.turn .acrow>.abrief .abgrid{display:flex;flex-wrap:wrap;gap:3px 18px;padding:7px 12px}
+.acard.turn .acrow>.abrief .abf{display:inline-flex;flex-direction:row;align-items:baseline;gap:6px;padding:0;border:0;min-width:0}
+.acard.turn .acrow>.abrief .abf b{font-size:13.5px;white-space:nowrap}
+.acard.turn .acrow>.abrief .abf .sub{display:none}
+.acard.turn .acrow>.abrief .abf .sub.abwarn{display:inline;font-size:12px}
+.acard.turn .acrow>.abrief .abchk{padding:6px 12px;gap:5px}
+.acard.turn .acrow>.abrief .abchk .ck{padding:2px 8px}
+.acard.turn .acrow>.abrief .abitems{padding:2px 12px 8px 28px}
+.acard.turn:not(.det) .abitems li:not([data-norcp]){display:none}
+.acard.turn:not(.det) .abitems:not(:has(li[data-norcp])){display:none}
+/* ── 여러 줄 골라 지우기(2026-10-19) — 줄 첫 칸 안 고르기 칸 · 표 아래 띠(화면 아래에 붙어 따라옴) · 확인 창 목록 ── */
+.mselhit{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:28px;min-height:28px;margin:-4px 6px -4px -4px;
+  vertical-align:middle;cursor:pointer;border-radius:6px}
+.mselhit input{width:17px;height:17px;margin:0;cursor:pointer;accent-color:var(--red)}
+.mselhit input:disabled{cursor:not-allowed;opacity:.45}
+.mselhit:has(input:disabled){cursor:not-allowed}
+.mselhit:has(input:focus-visible){outline:2px solid var(--red);outline-offset:1px}
+th.mselth{white-space:nowrap}
+th.mselth>.mselhit,th.mselth>button{vertical-align:middle}
+tr.msel-on td{background:var(--red-50)}
+.mselallm{display:none;margin:0 0 8px}
+.mselhit.wide{margin:0;padding:0 12px 0 10px;min-height:44px;border:1px solid var(--ink-200);border-radius:var(--r-xs);background:var(--surface);
+  font-size:13.5px;color:var(--ink-700);font-weight:600}
+.mselbar{position:sticky;bottom:12px;z-index:6;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:10px;padding:10px 14px;
+  background:var(--ink-900);color:#fff;border-radius:var(--r-sm);box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.mselbar[hidden]{display:none}
+.mselbar .mselt{font-size:13.5px}
+.mselbar .mselt b{font-weight:800}
+.mselbar .sp{flex:1}
+.mselbar .btn:not(.pri){background:transparent;border-color:rgba(255,255,255,.45);color:#fff}
+.mselist{margin:10px 0 0;padding:0;list-style:none;max-height:min(46vh,360px);overflow:auto;border:1px solid var(--ink-200);border-radius:var(--r-xs)}
+.mselist li{padding:8px 12px;border-top:1px solid var(--ink-100);font-size:13.5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.mselist li:first-child{border-top:0}
+.mselist li.now{background:var(--warn-50)}
+.mselist li.done{color:var(--ink-400);text-decoration:line-through}
+.mselist li.bad{color:var(--red-700);background:var(--red-50)}
+.mselist li.bad::after{content:" — 못 지움";font-weight:600}
+.mselprog{margin-top:8px;font-size:12.5px;color:var(--ink-500);min-height:1em}
+@media screen and (max-width:900px){
+  .mselhit{min-width:44px;min-height:44px;margin:-10px 2px -10px -12px}
+  .mselhit input{width:20px;height:20px}
+  .mselhit.wide{margin:0}
+  .mselallm.xtab{display:block}
+  .mselbar{bottom:8px;padding:8px 10px}
+  .mselbar .btn.sm{min-height:44px;height:44px}
+  .mselbar .mselt{flex:1 1 100%}
+  .mselbar .sp{display:none}
+  .mselbar .btn{flex:1 1 0;justify-content:center}
+}
+@media (max-width:720px){ .mselallm.ctab{display:block} }
+@media screen and (max-width:900px){
+  .acard.cmp{padding:12px 16px 14px}
+  .acard.cmp .acrow .btn,.acard.cmp .ahd .btn{min-height:44px;height:44px}
+  .acard.cmp .vchip{min-height:44px}
+  .acard.cmp .acrow .aprog{flex:1 1 100%}
+  .acard.cmp .acrow .asp{display:none}
+  .acard.cmp .ahd>.st.along{max-width:100%}
+  .acard.cmp .ahact{flex:1 1 100%;justify-content:flex-end;margin:4px 0 0}
+  .acard.cmp .ahact .btn{flex:1 1 0;justify-content:center;max-width:180px}
+}
 
 /* 상신 창 */
 .aline-list{border-top:1px solid var(--ink-100);margin-top:4px}

@@ -332,8 +332,10 @@
   function listHtml(rows, opt) {
     opt = opt || {};
     var cols = 7 + (opt.who ? 1 : 0);
-    var h = '<div class="panel"><div class="scroll" data-rows><table class="xtab"><thead><tr>' +
-      '<th>날짜</th>' + (opt.who ? '<th>소속 · 이름</th>' : '') + '<th>사용처</th><th class="n">금액</th><th>사용내역</th><th>비고</th><th>사진</th><th></th></tr></thead><tbody>';
+    // 여러 줄 골라 지우기(2026-10-19) — 내 내역 표에만. 잠긴 기간·다른 분 줄은 고르기 칸을 막고 까닭을 단다.
+    var sel = !!opt.mine && rows.length > 0 && !!C.mselBox;
+    var h = (sel ? C.mselAllLine('x', 'xtab') : '') + '<div class="panel"><div class="scroll" data-rows><table class="xtab"><thead><tr>' +
+      '<th' + (sel ? ' class="mselth">' + C.mselAll('x') : '>') + '날짜</th>' +(opt.who ? '<th>소속 · 이름</th>' : '') + '<th>사용처</th><th class="n">금액</th><th>사용내역</th><th>비고</th><th>사진</th><th></th></tr></thead><tbody>';
     var total = 0;
     CATS.forEach(function (cat) {
       var list = rows.filter(function (it) { return (CATS.indexOf(it.category) < 0 ? '기타비용' : it.category) === cat; });
@@ -343,7 +345,10 @@
       h += '<tr class="ogrp xsec"><td colspan="' + cols + '"><div><b>&lt;' + esc(cat) + '&gt;</b><span class="on">' + n0(list.length) + '건</span></div></td></tr>';
       list.forEach(function (it) {
         var can = opt.mine && !opt.locked && it.username === me();
-        h += '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td><span class="lead">' + C.md(it.date_millis) + '</span></td>' +
+        var selBox = sel ? C.mselBox('x', { id: String(it.id), amt: it.amount,
+          line: C.md(it.date_millis) + ' ' + (it.category || '기타비용') + ' ' + n0(it.amount) + '원' + (it.merchant ? ' ' + it.merchant : ''),
+          why: can ? '' : it.username !== me() ? '다른 분 경비는 지울 수 없습니다' : '결재 중이거나 결재가 끝난 기간이라 지울 수 없습니다' }) : '';
+        h += '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td>' + selBox + '<span class="lead">' + C.md(it.date_millis) + '</span></td>' +
           (opt.who ? C.orgCell(it.username) : '') +
           '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
           // 폰 카드에서는 금액(.xamt)과 식비 초과 표시(.xmealw)를 따로 놓는다(초과 표시가 금액 칸을 넓혀 왼쪽이 눌리던 것, 2026-10-08)
@@ -355,7 +360,7 @@
       });
       h += '<tr class="xsub"><td colspan="' + (opt.who ? 3 : 2) + '">' + esc(cat) + ' 소계</td><td class="n total">' + n0(sum) + '</td><td colspan="4"></td></tr>';
     });
-    h += '</tbody><tfoot><tr><td colspan="' + (opt.who ? 3 : 2) + '">합계 ' + n0(rows.length) + '건</td><td class="n total">' + n0(total) + '</td><td colspan="4"></td></tr></tfoot></table></div></div>';
+    h += '</tbody><tfoot><tr><td colspan="' + (opt.who ? 3 : 2) + '">합계 ' + n0(rows.length) + '건</td><td class="n total">' + n0(total) + '</td><td colspan="4"></td></tr></tfoot></table></div></div>' + (sel ? C.mselBar('x') : '');
     return h;
   }
 
@@ -734,13 +739,25 @@
       '<div class="dim" style="font-size:13px;margin-top:8px">' + esc([it.merchant, it.usage].filter(Boolean).join(' · ')) + '</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXDelGo" data-id="' + it.id + '">지우기</button>');
   }
-  function runDel(id) {
-    var it = findItem(id), S = C.state(); if (!it) return;
-    var btn = $('btnXDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
-    rest('/rest/v1/expense_items?id=eq.' + encodeURIComponent(it.id), { method: 'DELETE', headers: { Prefer: 'return=representation' } })
+  /** 한 줄 지우기 — 한 건 지우기·여러 줄 지우기(C.msel)가 같은 길. */
+  function delOne(it) {
+    return rest('/rest/v1/expense_items?id=eq.' + encodeURIComponent(it.id), { method: 'DELETE', headers: { Prefer: 'return=representation' } })
       .then(function (rows) {
         if (!Array.isArray(rows) || !rows.length) throw new Error('EXPENSE_LOCKED');
         // 사진은 지우지 않는다 — 예전에 상신했던 문서(고정본)가 그 사진을 가리킬 수 있다(지우면 그 문서의 증빙이 빈다).
+      });
+  }
+  if (C.mselDef) C.mselDef('x', {
+    noun: '경비', note: '',
+    del: function (id) { var it = findItem(id); return it ? delOne(it) : Promise.reject(new Error('이미 없는 줄입니다')); },
+    why: function (e) { return /이미 없는/.test(String((e && e.message) || '')) ? '이미 없는 줄입니다' : why(e); },
+    done: function () { var S = C.state(); dropItems(S.CYCKEY); loadItems(S.CYCKEY, false, true).then(function () { C.render(); }); }
+  });
+  function runDel(id) {
+    var it = findItem(id), S = C.state(); if (!it) return;
+    var btn = $('btnXDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
+    delOne(it)
+      .then(function () {
         dropItems(S.CYCKEY); C.closePanel(); C.toast('지웠습니다.');
         loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
       }).catch(function (e) {

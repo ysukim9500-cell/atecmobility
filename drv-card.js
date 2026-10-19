@@ -269,10 +269,12 @@
     return h;
   }
   function tableHtml(rows, locked, hist) {
-    return '<div class="panel"><div class="scroll tall cscroll" data-rows><table class="ctab"><thead><tr><th class="n">순번</th><th>승인일</th><th>시간</th><th>가맹점</th><th>업종</th>' +
+    // 여러 줄 골라 지우기(2026-10-19) — 순번 칸 안에 고르기 칸. 잠긴 기간이면 막고 까닭을 단다.
+    var sel = rows.length > 0 && !!C.mselBox;
+    return (sel ? C.mselAllLine('c', 'ctab') : '') + '<div class="panel"><div class="scroll tall cscroll" data-rows><table class="ctab"><thead><tr><th class="n' + (sel ? ' mselth">' + C.mselAll('c') : '">') + '순번</th><th>승인일</th><th>시간</th><th>가맹점</th><th>업종</th>' +
       '<th class="n">승인금액</th><th>구분</th><th>사용목적</th><th>비고</th><th></th></tr></thead><tbody>' +
       rows.map(function (it, i) { return rowHtml(it, i, locked, hist); }).join('') +
-      '</tbody><tfoot><tr><td colspan="5">합계 ' + n0(rows.length) + '건</td><td class="n total">' + n0(R.totals(rows).cost) + '</td><td colspan="4"></td></tr></tfoot></table></div></div>';
+      '</tbody><tfoot><tr><td colspan="5">합계 ' + n0(rows.length) + '건</td><td class="n total">' + n0(R.totals(rows).cost) + '</td><td colspan="4"></td></tr></tfoot></table></div></div>' + (sel ? C.mselBar('c') : '');
   }
   function rowHtml(it, i, locked, hist) {
     var sg = !locked && !String(it.category || '').trim() ? R.suggest(it, hist) : null;
@@ -284,7 +286,9 @@
         (f === 'purpose' ? ' style="min-width:180px"' : '') + '>';
     };
     return '<tr data-crow="' + it.id + '"' + (MISSING[it.id] ? ' class="cmiss"' : '') + '>' +
-      '<td class="n" data-l="순번">' + (i + 1) + '</td>' +
+      '<td class="n" data-l="순번">' + (C.mselBox ? C.mselBox('c', { id: String(it.id), amt: it.amount,
+        line: String(it.appr_date || '').slice(5).replace('-', '.') + ' ' + (it.merchant || '카드') + ' ' + n0(it.amount) + '원',
+        why: locked ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없습니다' : '' }) : '') + (i + 1) + '</td>' +
       '<td data-l="승인일">' + esc(String(it.appr_date || '').slice(5).replace('-', '.')) + '</td>' +
       '<td class="dim" data-l="시간">' + esc(String(it.appr_time || '').slice(0, 5)) + '</td>' +
       // 「파일에 없는 줄」 표시는 가맹점 아래 줄에 — 가맹점 옆에 붙이면 칸이 넓어져 맨 끝 「지우기」가 표 밖으로 밀렸다(2026-10-15)
@@ -495,13 +499,25 @@
       '<div class="anote" style="margin-top:0">ERP 파일에 다시 들어 있으면 다음에 올릴 때 다시 들어옵니다(그때 구분·사용목적은 새로 적어야 합니다).</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCDelGo" data-id="' + esc(String(it.id)) + '">지우기</button>');
   }
-  function runDel(id) {
-    var b = $('btnCDelGo'); if (b) { b.disabled = true; b.textContent = '지우는 중…'; }
-    rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=representation' } })
+  /** 한 줄 지우기 — 한 건 지우기·여러 줄 지우기(C.msel)가 같은 길. */
+  function delOne(id) {
+    return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=representation' } })
       .then(function (rows) {
         if (!rows || !rows.length) throw new Error('지워지지 않았습니다(권한 또는 잠금)');
         delete MISSING[id];
         Object.keys(FAILED).forEach(function (k) { if (k.split('|')[0] === String(id)) delete FAILED[k]; });
+      });
+  }
+  if (C.mselDef) C.mselDef('c', {
+    noun: '카드 내역', note: 'ERP 파일에 다시 들어 있으면 다음에 올릴 때 다시 들어옵니다(그때 구분·사용목적은 새로 적어야 합니다).',
+    del: function (id) { return findMine(id) ? delOne(id) : Promise.reject(new Error('이미 없는 줄입니다')); },
+    why: function (e) { return failMsg('지우지 못했습니다', e, why(e)); },
+    done: function () { var S = C.state(); dropItems(S.CYCKEY); loadItems(S.CYCKEY, false, true).then(function () { C.render(); }); }
+  });
+  function runDel(id) {
+    var b = $('btnCDelGo'); if (b) { b.disabled = true; b.textContent = '지우는 중…'; }
+    delOne(id)
+      .then(function () {
         C.closePanel(); C.toast('지웠습니다.');
         var S = C.state(); dropItems(S.CYCKEY);
         return loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
