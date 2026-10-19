@@ -34,6 +34,14 @@
   function n0(n) { return n == null ? '—' : Math.round(Number(n)).toLocaleString('ko-KR'); }
   function won(n) { return n == null ? '—' : '₩' + Math.round(Number(n)).toLocaleString('ko-KR'); }
   function km(n) { return n == null ? '—' : (Math.round(Number(n) * 10) / 10).toLocaleString('ko-KR'); }
+  /** 결재 건 요약(고정본 snapshot)의 운행 — 금액은 업무 운행만이라 업무를 먼저(2026-10-20, 마감 화면 「업무 운행 N건(전체 M건)」과 같은 말).
+   *  고정본에 업무 운행 건수(biz_trips)가 없으면(지금 서버) 업무 거리와 전체 건수만 — 없는 수를 지어내지 않는다. */
+  function snapTrips(s) {
+    if (!s || s.trips == null) return '';
+    if (s.biz_km == null) return '운행 ' + n0(s.trips) + '건 · ' + km(s.km) + ' km';
+    if (s.biz_trips != null) return '업무 운행 ' + n0(s.biz_trips) + '건 · ' + km(s.biz_km) + ' km' + (+s.biz_trips !== +s.trips ? ' (전체 ' + n0(s.trips) + '건)' : '');
+    return '업무 운행 ' + km(s.biz_km) + ' km (전체 ' + n0(s.trips) + '건)';
+  }
   function pad(n) { return String(n).padStart(2, '0'); }
   function kd(ms) { return new Date(Number(ms) + KST); }
   function md(ms) { var d = kd(ms); return pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate()); }
@@ -2339,10 +2347,23 @@
     var top = r.bottom + 4 + ph > H - 8 && r.top - 4 - ph >= 8 ? r.top - 4 - ph : r.bottom + 4;
     p.style.left = Math.round(left) + 'px'; p.style.top = Math.round(top) + 'px';
   }
+  /** 열 때 아래 공간이 모자라면 화면을 조금 올려 아래로 열 자리를 만든다(2026-10-20 폰 마무리 — 위로 열리면 찾기 칸을 덮었다).
+   *  더 내릴 데가 없을 때만 kmenuPlace 가 위로 연다. */
+  function kmenuRoom(d) {
+    var s = d.querySelector('summary'), p = d.querySelector('.kpop'); if (!s || !p) return;
+    p.style.left = '0px'; p.style.top = '0px';          // kmenuPlace 와 같은 자리에서 잰다(제자리면 폭이 좁아 높이가 달랐다)
+    var r = s.getBoundingClientRect(), H = window.innerHeight, need = r.bottom + 4 + p.offsetHeight - (H - 8) + 1;
+    if (need <= 0) return;
+    var se = document.scrollingElement || document.documentElement, can = se.scrollHeight - H - (window.pageYOffset || se.scrollTop);
+    // 단추가 머리 줄 밑으로 숨지 않을 만큼만(머리 줄 아래 8px 위로는 올리지 않는다)
+    var hd = document.querySelector('header.top'), top = hd ? hd.getBoundingClientRect().bottom : 0;
+    var by = Math.min(need, can, r.top - top - 8);
+    if (by > 0) { try { window.scrollTo({ top: (window.pageYOffset || se.scrollTop) + by, behavior: 'instant' }); } catch (er) { window.scrollTo(0, (window.pageYOffset || se.scrollTop) + by); } }
+  }
   document.addEventListener('toggle', function (e) {
     var d = e.target;
     if (!d || !d.classList || !d.classList.contains('kmenu') || !d.open) return;
-    kmenuCloseAll(d); kmenuPlace(d);
+    kmenuCloseAll(d); kmenuRoom(d); kmenuPlace(d);
     var f = d.querySelector('.kitem'); if (f) try { f.focus(); } catch (er) { }
   }, true);
   document.addEventListener('click', function (e) {
@@ -3301,7 +3322,7 @@
     if (kd && kd.cycName) cname = kd.cycName(a);
     var kv = function (k, v) { return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; };
     var sumHtml = kd ? (kd.sumHtml ? kd.sumHtml(a) : '') : s.trips != null
-      ? kv('운행', '<b>' + n0(s.trips) + '건</b> · ' + km(s.km) + ' km (업무 ' + km(s.biz_km) + ' km)') +
+      ? kv('운행', esc(snapTrips(s))) +
         kv('유류비', won(s.fuel)) +
         kv('통행료', won(s.toll) + (s.toll_unknown ? ' <span class="st warn">미확정 ' + n0(s.toll_unknown) + '건은 0원</span>' : '') +
           (s.ev_toll ? ' <span class="dim">영수증 ' + won(s.ev_toll) + ' 포함</span>' : '')) +
@@ -3864,7 +3885,8 @@
       '<span class="st ' + st.cls + (longSt ? ' along' : '') + '"' + (longSt ? ' title="' + esc(st.t) + '"' : '') + '>' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +
       (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
-        : (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '')) +
+        : // 머리 줄은 좁다 — 업무 거리 · 금액만, 전체 건수는 마우스를 올리면(2026-10-20)
+        (s.trips != null ? '<span class="asum" title="' + esc(snapTrips(s)) + '">' + (s.biz_km != null ? '업무 ' + km(s.biz_km) + ' km' : n0(s.trips) + '건 · ' + km(s.km) + ' km') + ' · ' + won(s.cost) + '</span>' : '')) +
       // 「자세히」(판정 상자·긴 사유) / 「확인 항목 N건」 — 머리 줄 오른쪽(아래 줄은 단추가 많아 넘쳤다)
       detBtn +
       // 내 차례 — 반려·승인을 머리 줄 오른쪽에(카드를 내리지 않고 누른다)
@@ -4691,12 +4713,12 @@
     rows.forEach(function (x) {
       var p = orgPath(x.u), k = byUnit ? (p.unit || '(파트 없음)') : p.div + '|' + p.team;
       if (!by[k]) { by[k] = { k: k, p: p, label: byUnit ? (p.unit || '팀 직속') : orgName(p), sub: byUnit ? orgName(p) : p.div, rank: orgRank(p), n: 0, cost: 0, unk: 0, trips: 0 }; out.push(by[k]); }
-      var g = by[k]; g.n++; g.cost += x.cost || 0; g.unk += x.unk || 0; g.trips += x.n || 0;
+      var g = by[k]; g.n++; g.cost += x.cost || 0; g.unk += x.unk || 0; g.trips += x.biz || 0;   // 업무 운행(2026-10-20 — 마감 화면과 같은 말)
     });
     if (out.length < 2 && !byUnit) return '';
     return teamBars(out.map(function (g) {
       return { attr: byUnit ? (g.p.unit ? ' data-orgunit="' + esc(g.p.unit) + '"' : '') : ' data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"',
-        label: g.label, sub: g.sub, value: g.cost, meta: n0(g.n) + '명 · 운행 ' + n0(g.trips) + '건', unk: g.unk };
+        label: g.label, sub: g.sub, value: g.cost, meta: n0(g.n) + '명 · 업무 운행 ' + n0(g.trips) + '건', unk: g.unk };
     }));
   }
   /** 팀별 합계(2026-10-19 사용성 2차 #13) — 운행일지·개인경비·법인카드 관리가 같이 쓴다.
@@ -4819,7 +4841,7 @@
       // 결재 상태 숫자는 위 큰 제목 한 줄이 말한다(예전에는 숫자 칸에 한 번 더, 분류도 달랐다 — 2026-10-19). 여기는 검증·금액만.
       // 불일치와 확인 필요를 나눠 센다(2026-10-19 사용성 2차 — 「불일치 0명」인데 표에는 「확인 1」이 붙은 사람이 있어 헷갈렸다)
       fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했습니다' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
-      (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', '불일치는 없고 사람이 한 번 볼 것만 있음') : '') +
+      (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', c.vwarn ? '불일치는 없고 사람이 한 번 볼 것만 있음' : '') : '') +   // 0명이면 설명 없음(2026-10-20)
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
         (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) +
       '</div></div>';
@@ -4863,7 +4885,7 @@
       return '<span class="st ' + L[1] + '" title="' + esc(x.a ? apprStatusText(x.a).t : '아직 상신하지 않았습니다') + '">' + esc(L[0]) + '</span>';
     };
     var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable stable mc"><thead><tr>' +
-      '<th>파트·센터</th><th>이름</th><th>상신</th><th>검증</th><th class="n">운행</th>' +
+      '<th>파트·센터</th><th>이름</th><th>상신</th><th>검증</th><th class="n bz" title="업무 운행 건수·거리(괄호는 출퇴근 등을 더한 전체 건수)">업무 운행</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th><th class="n">합계</th><th class="n" title="통행료 미확정(0원으로 정산)">미확정</th><th></th></tr></thead><tbody>';
     var row = function (x) {
       var u = USERS[x.u] || {};
@@ -4871,7 +4893,8 @@
         '<td class="m1"><button type="button" class="plink lead" data-person="' + esc(x.u) + '" title="' + esc(u.name || x.u) + ' 님 운행 기록 보기">' + esc(u.name || x.u) + '</button></td>' +
         '<td class="m1">' + stCell(x) + '</td>' +
         '<td class="m2" style="white-space:nowrap">' + (V ? V.chip(x.u) : '<span class="dim">…</span>') + '</td>' +
-        '<td class="n" data-l="운행">' + n0(x.n) + '건<div class="dim skm">' + km(x.km) + ' km</div></td>' +
+        // 금액은 업무 운행만이라 건수·거리도 업무 운행으로 — 「업무 운행 N건 · X km (전체 M건)」(2026-10-20, 마감 화면과 같은 말)
+        '<td class="n bz" data-l="업무 운행">' + n0(x.biz) + '건<div class="dim skm">' + km(x.bizKm) + ' km</div>' + (x.biz !== x.n ? '<div class="dim skm skt">(전체 ' + n0(x.n) + '건)</div>' : '') + '</td>' +
         '<td class="n mx">' + n0(x.fuel) + '</td><td class="n mx">' + n0(x.toll) + '</td>' +
         '<td class="n mx">' + (x.park ? n0(x.park) : '—') + '</td>' +
         '<td class="n total mr">' + n0(x.cost) + '</td>' +
@@ -4888,7 +4911,7 @@
       g.list.forEach(function (x) { h += row(x); });
     });
     h += '</tbody><tfoot><tr><td colspan="4">' + n0(rows.length) + '명 합계</td>' +
-      '<td class="n">' + n0(sum(rows, 'n')) + '건<div class="dim skm">' + km(sum(rows, 'km')) + ' km</div></td>' +
+      '<td class="n bz">' + n0(sum(rows, 'biz')) + '건<div class="dim skm">' + km(sum(rows, 'bizKm')) + ' km</div>' + (sum(rows, 'biz') !== sum(rows, 'n') ? '<div class="dim skm skt">(전체 ' + n0(sum(rows, 'n')) + '건)</div>' : '') + '</td>' +
       '<td class="n">' + n0(sum(rows, 'fuel')) + '</td><td class="n">' + n0(sum(rows, 'toll')) + '</td>' +
       '<td class="n">' + n0(sum(rows, 'park')) + '</td><td class="n total">' + n0(sum(rows, 'cost')) + '</td>' +
       '<td class="n">' + (sum(rows, 'unk') ? n0(sum(rows, 'unk')) + '건' : '—') + '</td><td></td></tr></tfoot>';
@@ -5402,7 +5425,9 @@
     }
     // 날짜 칸을 치는 동안 입력 칸을 갈아 끼우지 않게, 날짜에 따라 바뀌는 곳(건수 · 표)만 따로 표시해 둔다(paintBelow).
     h += sect('내역', '<span data-live="evcnt">' + (rows.length === all.length ? rows.length + '건' : rows.length + ' / ' + all.length + '건') + '</span>', upBtn,
-      bar + '<div id="belowF">' + (rows.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+      // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-20 폰 마무리: 금액·사진·지우기 칸이 오른쪽에서 잘렸다).
+      //   1줄: 고르기·날짜 · 구분 … 금액 / 2줄: 메모 · 차량 / 3줄: 사진·원본·지우기. 표 머리가 정렬 칩이 되므로 「모두 고르기」는 표 위 한 줄.
+      bar + '<div id="belowF">' + (rows.length ? (selOn ? mselAllLine('ev', 'evtab') : '') + '<div class="panel"><div class="scroll" data-rows><table class="mc evtab"><thead><tr>' +
       thDate + (isAll() ? thSort('소속 · 이름', 'who', 'ev', 1) : '') +
       thSort('구분', 'cat', 'ev', 1) + '<th>차량</th>' +
       thSort('금액', 'amount', 'ev', -1, true) + '<th>메모</th><th></th></tr></thead><tbody>' +
@@ -5410,16 +5435,16 @@
         var canDel = e.username === mine && !evLocked(e);
         var xl = XLH[e.id];
         var line = md(e.date_millis) + ' ' + (e.category || '기타') + ' ' + n0(e.amount) + '원' + (isAll() && e.username !== mine ? ' ' + nameOf(e.username) : '');
-        return '<tr' + (xl ? ' data-evxl="' + esc(e.id) + '"' : '') + '><td' + (selOn ? ' class="mseltd"' : '') + '>' +
+        return '<tr' + (xl ? ' data-evxl="' + esc(e.id) + '"' : '') + '><td class="m1' + (selOn ? ' mseltd' : '') + '">' +
           (selOn ? mselBox('ev', { id: String(e.id), amt: e.amount, line: line, why: evWhyNot(e) }) : '') +
           '<span class="lead">' + md(e.date_millis) + '</span>' +
           (xl ? '<div class="evxl" title="' + esc(xl.say) + '">' + esc(md(xl.t.start_time)) + ' 운행(' + cycleOfMs(Number(xl.t.start_time)).m + '월분)에 이음 · 어느 기간에도 정산 안 됨</div>' : '') + '</td>' +
-          (isAll() ? whoCell(e.username) : '') +
-          '<td><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
-          '<td class="dim">' + esc(e.vehicle_plate || '—') + '</td>' +
-          '<td class="n total">' + n0(e.amount) + '</td>' +
-          '<td class="el" title="' + esc(e.memo || '') + '">' + esc(e.memo || '') + '</td>' +
-          '<td class="n" style="white-space:nowrap">' + (e.photo_path
+          (isAll() ? whoCell(e.username).replace('<td class="whoc">', '<td class="whoc m1">') : '') +
+          '<td class="m1"><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
+          '<td class="dim' + (e.vehicle_plate ? '' : ' mx') + '">' + esc(e.vehicle_plate || '—') + '</td>' +
+          '<td class="n total mr" data-u="원">' + n0(e.amount) + '</td>' +
+          '<td class="el m2' + (e.memo ? '' : ' mx') + '" title="' + esc(e.memo || '') + '">' + esc(e.memo || '') + '</td>' +
+          '<td class="n mact" style="white-space:nowrap">' + (e.photo_path
             ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>'
             : '<span class="dim" style="font-size:11.5px">사진 없음</span>') +
           (e.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="스캔한 A4 원본" href="' +
@@ -5880,27 +5905,27 @@
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
           return '<tr data-evrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
-            '<td colspan="4"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">Gemini</b> 가 이 장에서 영수증을 읽는 중…</span>' +
+            '<td colspan="4" class="evg"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">Gemini</b> 가 이 장에서 영수증을 읽는 중…</span>' +
             '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
-            '<td class="n"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
+            '<td class="n evx"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
         }
         return '<tr data-evrow="' + i + '" class="' + (first ? 'pgfirst' : '') + (it.ai ? ' evai' : '') + '">' +
           '<td class="evth">' + thumb + '</td>' +
-          '<td><select class="inp' + (it.cat ? '' : ' need') + '" data-evcatsel style="width:108px" aria-label="' + (i + 1) + '번째 구분">' +
+          '<td class="evc"><select class="inp' + (it.cat ? '' : ' need') + '" data-evcatsel style="width:108px" aria-label="' + (i + 1) + '번째 구분">' +
           '<option value="">구분 고르기</option>' +
           EV_CATS.map(function (c) {
             return '<option value="' + c + '"' + (it.cat === c ? ' selected' : '') + '>' + c + '</option>';
           }).join('') + '</select></td>' +
-          '<td><input class="inp' + (it.date ? '' : ' need') + '" type="date" data-evdate style="width:148px" value="' + esc(it.date) +
+          '<td class="evd"><input class="inp' + (it.date ? '' : ' need') + '" type="date" data-evdate style="width:148px" value="' + esc(it.date) +
           '" min="' + ymd(EVUP.lo) + '" max="' + ymd(EVUP.hi - 1) + '" aria-label="' + (i + 1) + '번째 날짜"></td>' +
-          '<td class="n"><input class="inp num" data-evamt inputmode="numeric" style="width:100px" ' +
+          '<td class="n eva" data-l="금액"><input class="inp num" data-evamt inputmode="numeric" style="width:100px" ' +
           'placeholder="원" aria-label="' + (i + 1) + '번째 금액" value="' + esc(it.amt ? n0(it.amt) : '') + '"></td>' +
-          '<td><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
+          '<td class="evm"><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
           esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' +
           (it.hint ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(it.hint) + '</div>'
             : (it.ai ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) +
           '<div class="evhint hpdup" data-evhp hidden></div></td>' +
-          '<td class="n" style="white-space:nowrap">' +
+          '<td class="n evx" style="white-space:nowrap">' +
           '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
@@ -7689,9 +7714,14 @@ window.EduGuard = {
           ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐습니다.</div>' +
           '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같습니다. 맨 아래 「← 통행료로 돌아가기」로 돌아가세요.</div></div></div>';   // 돌아가는 단추는 맨 아래 하나(2026-10-15 2차)
       } else {
-        h += '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+        var allOn = todo.length && todo.every(function (x) { return x.pick || x.locked; });
+        // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-20 폰 마무리: 차이 칸이 오른쪽에서 잘렸다).
+        //   표 머리가 숨으므로 「전부 고르기」는 표 위 한 줄(같은 data-hpall — 같은 처리기).
+        h += '<div class="mselallm hptab"><label class="mselhit wide"><input type="checkbox" data-hpall="' + gi + '"' + (allOn ? ' checked' : '') + '>' +
+          '<span>이 카드의 운행 전부 고르기</span></label></div>' +
+          '<div class="panel"><div class="scroll" data-rows><table class="mc hptab"><thead><tr>' +
           '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"' +
-          (todo.length && todo.every(function (x) { return x.pick || x.locked; }) ? ' checked' : '') +
+          (allOn ? ' checked' : '') +
           ' aria-label="이 카드의 운행 전부 고르기"></th>' +
           '<th>운행</th><th>지금 값</th><th class="n">영수증</th><th class="n">차이</th><th>영수증 내역</th>' +
           '</tr></thead><tbody>';
@@ -7707,19 +7737,19 @@ window.EduGuard = {
               : '<b style="color:' + (e.diff > 0 ? 'var(--ok)' : 'var(--red)') + '">' +
                 (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
           h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '">' +
-            '<td><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
+            '<td class="m1 hpck"><label class="mselhit"><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
             ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + ' 운행 확정하기') + '"' +
             (e.pick ? ' checked' : '') +
-            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></td>' +
-            '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
+            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></label></td>' +
+            '<td class="m1 hpwhen"><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
             (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
             // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
             (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있습니다 — 확정해도 한 번만 셉니다</div>' : '') + '</td>' +
-            '<td>' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
-            '<td class="n lead">' + n0(e.sum) + '</td>' +
-            '<td class="n">' + diff + '</td>' +
-            '<td class="el dim" title="' + esc(e.lines.map(function (r) {
+            '<td data-l="지금">' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
+            '<td class="n lead mr" data-u="원">' + n0(e.sum) + '</td>' +
+            '<td class="n" data-l="차이">' + diff + '</td>' +
+            '<td class="el dim m2" title="' + esc(e.lines.map(function (r) {
               return r.atText + ' ' + r.office + ' ' + n0(r.amount);
             }).join(' / ')) + '">' +
             esc(e.lines.map(function (r) { return r.office + ' ' + n0(r.amount); }).join(' · ')) + '</td></tr>';
@@ -10103,7 +10133,7 @@ window.EduGuard = {
      결재 카드에 끼울 조각과 상신 직전에 돌릴 일을 받는다. 없으면 없는 대로 돈다. */
   (function () {
     var C = {
-      $: $, SB: SB, esc: esc, ic: ic, n0: n0, won: won, km: km, pad: pad, md: md, hm: hm, ymd: ymd,
+      $: $, SB: SB, esc: esc, ic: ic, n0: n0, won: won, km: km, pad: pad, md: md, hm: hm, ymd: ymd, snapTrips: snapTrips,
       toast: toast, toastOk: toastOk, apiRetry: apiRetry, fetchAll: fetchAll,
       head: head, sect: sect, blank: blank, skeleton: skeleton,
       nameOf: nameOf, personOf: personOf, myName: myName,

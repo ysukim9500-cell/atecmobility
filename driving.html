@@ -496,6 +496,8 @@ table.prhist tr.old td{color:var(--ink-500)}
 .abf b.up{color:var(--red-700)} .abf b.down{color:var(--ok)} .abf b.dimv{color:var(--ink-300)}
 .abf .sub{font-size:11.5px;color:var(--ink-400);line-height:1.45}
 .abf .sub.abwarn{color:var(--warn)}
+/* 한글 낱말 안에서 줄을 바꾸지 않는다 — 승인 취소·반려 창 등에서 「주차비」가 「주 / 차비」로 갈렸다(2026-10-20). 띄어쓰기 없는 긴 글은 그래도 줄바꿈 */
+.abf .sub,.kv,.anote{word-break:keep-all;overflow-wrap:anywhere}
 .abchk{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--ink-100)}
 .abchk:empty{display:none}   /* 딱지가 없으면 빈 띠를 남기지 않는다(2026-10-16 6차 — 법인카드 초록 요약 아래 빈 줄) */
 .abchk .ck{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--ink-200);color:var(--ink-600);background:var(--surface)}
@@ -864,6 +866,8 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .stable button.plink:hover,.stable button.plink:focus-visible{text-decoration:underline}
 /* 현황 표가 PC 칸 안에 들어오게(2026-10-16 3차) — 거리는 운행 아래 작게, 단추(결과 보기·다시 검증·인쇄)는 줄을 바꿔 쌓는다 */
 .stable .skm{font-size:11.5px;margin-top:1px;white-space:nowrap}
+.stable .skm.skt{font-size:11px;letter-spacing:-.02em}
+@media (min-width:601px){.stable th.bz,.stable td.bz{padding-left:6px;padding-right:8px}}   /* 「(전체 N건)」 — 1280 에서 표가 칸을 넘지 않게(2026-10-20) */
 /* 2026-10-19 사용성 2차 #9: 단추는 한 줄 고정 자리 두 칸(검증 · 인쇄), 결과 보기는 검증 칸 딱지(.vchip) */
 .stable td.sact{white-space:nowrap;padding-left:4px}
 .stable .sacts{display:inline-grid;grid-template-columns:84px 54px;gap:4px;justify-content:end;vertical-align:middle}
@@ -2037,6 +2041,35 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   table.mc tfoot td{display:none !important}
   table.mc tfoot td:first-child,table.mc tfoot td.total{display:block !important;font-weight:600;color:var(--ink-900)}
   table.mc .stable td.sact,table.stable.mc td.sact{white-space:nowrap}
+  /* 2026-10-20 폰 마무리 — 영수증 「내역」(evtab)·하이패스(hptab)도 두 줄 카드. 고르기 칸은 첫 칸 안, 「모두 고르기」는 표 위 한 줄 */
+  .mselallm.evtab,.mselallm.hptab{display:block}
+  table.mc thead th .mselhit{display:none}
+  table.mc tbody tr.msel-on{background:var(--red-50)}
+  table.mc td .evxl{white-space:normal}
+  .scroll table.mc.hptab td.hpwhen{flex:1 1 0;white-space:normal}
+  .scroll table.mc.hptab td.hpwhen .lead{font-size:14px;color:var(--ink-900)}
+  .scroll table.mc.hptab td.m2{white-space:normal;overflow:visible}
+}
+/* 영수증 올리기 창(evup) — 폰에서는 옆으로 밀지 않고 줄마다 카드(2026-10-20 폰 마무리: 금액 칸이 오른쪽에서 잘렸다).
+   사진 왼쪽 · 오른쪽 위 구분|날짜 · 그 아래 금액|＋·빼기 · 맨 아래 메모. */
+@media screen and (max-width:600px){
+  .scroll table.evup{min-width:0;width:100%}
+  table.evup,table.evup tbody{display:block}
+  table.evup thead{display:none}
+  table.evup tbody tr{display:grid;grid-template-columns:52px minmax(0,.85fr) minmax(0,1.15fr);gap:8px;align-items:center;padding:12px;border-top:1px solid var(--ink-100)}
+  table.evup tbody tr:first-child{border-top:0}
+  table.evup tbody tr.pgfirst{border-top-color:var(--ink-200)}
+  table.evup td,table.evup td:first-child{display:block;padding:0 !important;border:0 !important;min-width:0}
+  table.evup td.evth{grid-column:1;grid-row:1 / span 3;align-self:start;width:auto}
+  table.evup td.evc{grid-column:2;grid-row:1}
+  table.evup td.evd{grid-column:3;grid-row:1}
+  table.evup td.eva{grid-column:2;grid-row:2;display:flex;align-items:center;gap:6px;text-align:left}
+  table.evup td.eva::before{content:attr(data-l);flex:none;font-size:12px;color:var(--ink-500)}
+  table.evup td.evx{grid-column:3;grid-row:2;display:flex;justify-content:flex-end;align-items:center;gap:6px}
+  table.evup td.evm{grid-column:2 / -1;grid-row:3}
+  table.evup td.evg{grid-column:2 / -1;grid-row:1}
+  table.evup tr.evwait td.evx{grid-column:2 / -1;grid-row:2}
+  table.evup td .inp{width:100% !important;max-width:none;min-width:0}
 }
 /* ── 휴대폰 폭 표 넘침(2026-10-16 3차) ──
    table.rcard — 결재 완료 출력·권한 관리(승인) 등 처리 단추가 끝 칸에 있는 표: 옆으로 밀지 않고 줄마다 한 덩어리로.

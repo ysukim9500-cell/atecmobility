@@ -714,7 +714,10 @@
       '<div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
       '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">유류비 ' + won(s.fuel) + ' · 통행료 ' + won(s.toll) + ' · 주차비 ' + won(s.parking) + '</span></div>' +
-      '<div class="abf"><span class="k">운행</span><b>' + n0(s.trips) + '<small>건</small> · ' + C.km(s.km) + '<small>km</small></b><span class="sub">업무 ' + C.km(s.biz_km) + ' km</span></div>' +
+      // 운행은 업무 운행을 먼저(2026-10-20 — 금액이 업무 운행만이라). 고정본에 업무 건수가 없으면 업무 거리 · 전체 건수
+      (s.biz_km != null && s.biz_trips == null
+        ? '<div class="abf"><span class="k">업무 운행</span><b>' + C.km(s.biz_km) + '<small>km</small></b><span class="sub">전체 운행 ' + n0(s.trips) + '건 · ' + C.km(s.km) + ' km</span></div>'
+        : '<div class="abf"><span class="k">운행</span><b>' + esc(C.snapTrips ? C.snapTrips(s) : n0(s.trips) + '건') + '</b></div>') +
       cmp +
       // 금액 규칙 v3(version 3) — ev_* 는 운행 금액이 없는 날 영수증으로 채운 금액, no_trip_* 는 운행 없는 날이라 정산에서 뺀 영수증.
       //   예전(version 2)은 영수증을 모두 더한 금액이라 문구가 다르다.
