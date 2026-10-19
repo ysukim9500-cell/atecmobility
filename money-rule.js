@@ -83,7 +83,7 @@
    *   ① trip_id 로 그 하이패스 운행에 이은 영수증이 먼저 ② 나머지는 영수증 id 순으로 금액이 같은 첫 하이패스 운행(시각 순)과. 하이패스 하나에 영수증 하나.
    * 서버 driving-calc.ts hpPair 와 같다. 돌려주는 것: 짝지은 영수증 id 목록.
    */
-  function hpPair(hp, ev) {
+  function hpPair(hp, ev, other) {
     var used = {}, out = [];
     var list = ev.slice().sort(function (x, y) { return Number(x.id) - Number(y.id); });
     var take = function (e, ok) {
@@ -94,6 +94,38 @@
     };
     var left = list.filter(function (e) { return !(e.link && take(e, function (h) { return String(h.id) === String(e.link.id); })); });
     left.forEach(function (e) { take(e, function () { return true; }); });
+    // ③ 한 운행에 톨게이트를 여러 번 지나면 하이패스는 운행 하나에 합계(3,800)로, 영수증은 톨게이트마다(1,800 + 2,000) 올라온다(2026-10-19 실제 사례).
+    //    짝 못 지은 하이패스마다 남은 영수증 2장 이상을 더해 금액이 같으면 같은 통행료로 짝짓는다 — 그 운행에 이은 영수증부터, 다음 이은 데 없는 영수증.
+    //    영수증 id 순 · 비트마스크 오름차순으로 처음 맞는 묶음(서버 driving-calc.ts hpPair 와 같은 답). 12장 넘게 남으면 앞 12장만 본다.
+    var paired = {};
+    out.forEach(function (id) { paired[String(id)] = 1; });
+    // 다른 운행(하이패스 아닌 몫) 금액과 꼭 같은 영수증은 그 운행 것으로 먼저 떼어 둔다(묶음에 끌려가지 않게) — 이은 것부터, 다음 이은 데 없는 것.
+    var held = {};
+    (other || []).forEach(function (o) {
+      var pick = function (ok) { for (var i = 0; i < list.length; i++) { var e = list[i]; if (!paired[String(e.id)] && !held[String(e.id)] && Math.round(e.a) === Math.round(o.a) && ok(e)) { held[String(e.id)] = 1; return true; } } return false; };
+      pick(function (e) { return e.link && String(e.link.id) === String(o.id); }) || pick(function (e) { return !e.link; });
+    });
+    for (var h = 0; h < hp.length; h++) {
+      if (used[h]) continue;
+      var target = Math.round(hp[h].a);
+      var pools = [
+        list.filter(function (e) { return !paired[String(e.id)] && !held[String(e.id)] && e.link && String(e.link.id) === String(hp[h].id); }),
+        list.filter(function (e) { return !paired[String(e.id)] && !held[String(e.id)] && !e.link; }),
+      ];
+      for (var p = 0; p < pools.length; p++) {
+        var pool = pools[p].slice(0, 12), hit = 0;
+        for (var m = 1; m < (1 << pool.length) && !hit; m++) {
+          var n = 0, sum = 0;
+          for (var b = 0; b < pool.length; b++) if (m & (1 << b)) { n++; sum += Math.round(pool[b].a); }
+          if (n >= 2 && sum === target) hit = m;
+        }
+        if (hit) {
+          used[h] = 1;
+          for (var k = 0; k < pool.length; k++) if (hit & (1 << k)) { paired[String(pool[k].id)] = 1; out.push(pool[k].id); }
+          break;
+        }
+      }
+    }
     return out;
   }
 
@@ -172,7 +204,8 @@
         // 하이패스와 같은 통행료로 짝지은 영수증(2026-10-17) — 상태 판정에서만 R 에 다시 세지 않는다
         if (d.hp.length) {
           var ids = hpPair(d.hp.map(function (t) { return { id: t.id, a: d.ha[t.id] || 0 }; }),
-            d.ev.map(function (x) { return { id: x.e.id, a: x.a, link: x.t }; }));
+            d.ev.map(function (x) { return { id: x.e.id, a: x.a, link: x.t }; }),
+            d.trips.map(function (t) { return { id: t.id, a: (d.amt[t.id] || 0) - (d.ha[t.id] || 0) }; }).filter(function (o) { return o.a > 0; }));
           d.ev.forEach(function (x) { if (ids.some(function (i) { return String(i) === String(x.e.id); })) { d.D += x.a; d.dup.push(x.e); } });
         }
         if (d.T > 0) {
