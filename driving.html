@@ -273,6 +273,8 @@ body.showlogin #login{display:grid}
 
 /* ═════════════════ 뼈대 ═════════════════ */
 #app{display:none}
+/* 칸으로 옮겨 갈 때(포커스·찾기·바로 가기) 고정 머리 줄 밑에 숨지 않게(2026-10-19 — 폰에서 권한 관리 직원 찾기 칸이 반쯤 가렸다) */
+html{scroll-padding-top:calc(var(--head) + 12px)}
 header.top{
   position:sticky;top:0;z-index:50;height:var(--head);background:var(--surface);
   /* 불투명(2026-10-16 3차) — 반투명이면 내릴 때 뒤 글자·단추가 비쳤다 */
@@ -1085,8 +1087,8 @@ tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 #panel.open{display:block}
 /* 가림막이 좌측 레일까지 덮어, 패널이 열린 채 메뉴를 누르면 첫 클릭은 패널만
    닫히고 화면은 안 바뀌었다(두 번 눌러야 이동). 레일(248px)을 비켜 둔다. */
-#panel .veil{position:absolute;inset:0 0 0 var(--rail);background:rgba(29,37,43,.36);animation:fade .2s}
-@media (max-width:900px){ #panel .veil{inset:0} }
+/* 옆 창을 열면 왼쪽 메뉴까지 어둡게 — 폰과 같은 겹침(2026-10-19, 예전엔 PC 에서 메뉴만 밝게 남아 눌러도 되는 것처럼 보였다) */
+#panel .veil{position:absolute;inset:0;background:rgba(29,37,43,.36);animation:fade .2s}
 #panel .sheet{position:absolute;top:0;right:0;bottom:0;width:min(468px,100%);background:var(--surface);border-radius:0;
   box-shadow:var(--pop);display:flex;flex-direction:column;animation:slide .28s var(--ease)}
 @keyframes slide{from{transform:translateX(26px);opacity:.55}to{transform:none;opacity:1}}

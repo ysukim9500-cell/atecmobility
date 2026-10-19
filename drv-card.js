@@ -1354,11 +1354,14 @@
     // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로). 고른 수·전체 선택·묶어 받기도 보이는 줄만.
     var shown = C.prints ? done.filter(function (a) { return C.prints.keep('card', a); }) : done;
     var nSel = shown.filter(function (a) { return FINSEL[a.id]; }).length;
+    var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
     var h = head('법인카드 결재 완료 출력', '결재가 끝난 지출결의서를 모아 출력합니다');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
-      fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
-      fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 상신해야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 달 카드 내역이 있는데 상신 전', notYet.length > 0) + '</div></div>';
+      // 분류는 운행일지 결재 완료 출력과 같은 셋(결재 중·반려·미상신, 결재 완료는 위 큰 제목) — 회수는 다시 올리기 전까지 미상신(2026-10-19)
+      fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
+      fact('반려', n0(nRej) + '<small>명</small>', '고쳐서 다시 상신해야 함', nRej > 0) +
+      fact('미상신', n0(notYet.length + nWd) + '<small>명</small>', nWd ? '이번 달 카드 내역이 있는데 상신 전(회수 ' + n0(nWd) + '명 포함)' : '이번 달 카드 내역이 있는데 상신 전', notYet.length + nWd > 0) + '</div></div>';
     var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('card') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
@@ -1391,12 +1394,12 @@
         }).join(''); }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
-      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '회수' }; }).concat(notYet.map(function (u) { return { u: u, st: '상신 전' }; }));
+      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)' }; }).concat(notYet.map(function (u) { return { u: u, st: '미상신' }; }));
       h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 달 카드</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
             var p = by[x.u] || { n: 0, sum: 0 };
-            return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td><span class="st ' + (x.st === '상신 전' ? 'warn' : 'bad') + '">' + esc(x.st) + '</span></td>' +
+            return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td><span class="st ' + (x.st === '반려' ? 'bad' : 'warn') + '">' + esc(x.st) + '</span></td>' +
               '<td class="n">' + n0(p.n) + '건 · ' + won(p.sum) + '</td></tr>';
           }).join('');
         }).join('') + '</tbody></table></div></div>');

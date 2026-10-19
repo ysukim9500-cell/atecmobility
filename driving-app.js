@@ -972,6 +972,8 @@
     go('evid');
     if (msg) toast(msg);
   }
+  /** 내 이 기간이 결재 중·결재 완료라 영수증을 올리거나 고칠 수 없는가(여러 기간 보기는 따로 막는다). */
+  function myCycLocked() { return !isMulti() && !!myName() && cycleLocked(myName()); }
   /** 영수증 화면 위 — 주차 → 통행료 → 주유 → 계기판 차례와 지금 차례의 할 일. */
   function evSubHtml(by, unk) {
     var cur = evSub(), name = EV_SUBS[cur];
@@ -993,7 +995,8 @@
     }).join('') + '</div>';
     var body = '<div class="evsubcard' + (EVSUB_FX ? ' stepfx ' + EVSUB_FX : '') + '">' +
       '<div class="evsh"><span class="evsn">' + (cur + 1) + ' / 4</span><b>' + esc(name) + '</b>' +
-      '<span class="dim">' + esc(EV_SUB_DESC[name]) + '</span>' +
+      // 결재 중·결재 완료 기간은 「올리세요」 대신 올릴 수 없다는 말(2026-10-19 마지막 검증 — 잠긴 기간에도 할 일 문구가 나왔다)
+      '<span class="dim">' + esc(myCycLocked() ? lockWhy(myName()) + ' 이 기간에는 영수증을 올리거나 지울 수 없습니다 — 아래는 확인만 하세요.' : EV_SUB_DESC[name]) + '</span>' +
       // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
       ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + esc(name) + ' 영수증 ' + n0(by[name].n) + '건 보기·지우기 ↓</button>' : '') +
       '</div>';
@@ -1164,7 +1167,7 @@
         if (!d.show) aiNote = [];
         // 결과 글은 할 일이 보이게(웹 8차, 2026-10-17 「직원이 쉽게」)
         var res = !d.show ? '<span class="dim">10월분 전 — 확인 안 함</span>'
-          : d.st === 'no_receipt' ? bad(isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
+          : d.st === 'no_receipt' ? bad(myCycLocked() ? '영수증 없음' : isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
           : d.st === 'mismatch' ? bad('금액 다름 — 운행 금액이나 영수증을 확인')
           : d.st === 'no_trip' ? warnR('운행 없는 날 — 정산에서 빠짐') +
             (canLink && d.ev.length ? ' <button type="button" class="btn sm mlinkb" data-evlink="' + esc(cat) + '" data-evlinkid="' + esc(String(d.ev[0].id)) + '">다른 운행에 붙이기</button>' : '')
@@ -1212,6 +1215,8 @@
         if (a) how.push(dn(d.day) + ' ' + a.head + ': ' + a.tips.join(' / '));
       });
       if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
+      // 결재 중·결재 완료 기간 — 고칠 수 없으니 할 일 대신 한 줄(2026-10-19 마지막 검증)
+      if (myCycLocked() && how.length) how = [lockWhy(me) + ' 이 기간에는 영수증·운행을 고칠 수 없습니다. 고쳐야 하면 결재하는 분에게 반려를 요청하세요'];
       var rule = '증빙이 있는 날은 「맞음」입니다. 정산에는 <b>운행 금액</b>이 들어가고 영수증은 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
         '운행에 ' + word + '를 안 적은 날은 <b>영수증 금액</b>이 그 운행에 들어갑니다.' +
         (isToll ? ' 하이패스 이용내역 PDF로 맞춘 통행료는 그 자체가 증빙이고, 같은 금액의 영수증 사진을 또 올려도 한 번만 셉니다.' : '') +
@@ -2142,7 +2147,8 @@
     $('pTitle').textContent = ok ? '가입 승인' : '가입 거절';
     $('pSub').textContent = (x.name || '') + ' (' + u + ')';
     var oo = ok ? signupOrgOptions(x) : null;
-    $('pBody').innerHTML = '<div class="form"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
+    // 창 맨 위 구분선은 머리 줄 밑줄과 겹쳐 빈 줄처럼 보였다(내 계정과 같게 뺀다, 2026-10-19)
+    $('pBody').innerHTML = '<div class="form" style="border-top:0;margin-top:0"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
       (ok ? '승인' : '거절') + '</b>합니다.' +
       (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다.' +
           (x.uses_driving === false ? ' <b>업무용 차량을 운전하지 않는 분</b>이라 개인경비·결재함만 보입니다.' : '')
@@ -2403,7 +2409,7 @@
     $('pTitle').textContent = kind === 'admin' ? (enabled ? '관리자 지정' : '관리자 해제')
       : kind === 'mgr' ? (enabled ? '권한 주기 허용' : '권한 주기 해제') : '비밀번호 초기화';
     $('pSub').textContent = nm + ' (' + target + ')';
-    var body = '<div class="form">';
+    var body = '<div class="form" style="border-top:0;margin-top:0">';   // 창 맨 위 빈 구분선 없음(2026-10-19, 내 계정과 같게)
     if (kind === 'pw') {
       body += '<div class="frow"><label class="flab" for="rsNew">새 비밀번호</label><div class="fbody">' +
         '<input class="inp" type="text" id="rsNew" autocomplete="off" placeholder="4자 이상">' +
@@ -6669,7 +6675,9 @@ window.EduGuard = {
       h += '<section class="sect"><button class="issue sv-warn" data-issue="unk" style="border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surface)">' +
         '<span class="ico">' + ic('ticket', 17) + '</span>' +
         '<span class="bd"><span class="t">통행료 미확정 ' + n0(T.unk) + '건이 0원으로 정산됩니다</span>' +
-        '<span class="d">통행료를 낸 운행이면 「2 영수증·통행료」에서 영수증을 올리세요 — 그날 운행 금액이 없으면 영수증 금액이 합계에 들어갑니다.</span></span>' +
+        '<span class="d">' + (!isAll() && myCycLocked()
+          ? lockWhy(myName()) + ' 이 기간에는 영수증을 올릴 수 없습니다. 고쳐야 하면 결재하는 분에게 반려를 요청하세요.'
+          : '통행료를 낸 운행이면 「2 영수증·통행료」에서 영수증을 올리세요 — 그날 운행 금액이 없으면 영수증 금액이 합계에 들어갑니다.') + '</span></span>' +
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
