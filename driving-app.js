@@ -1008,7 +1008,7 @@
         (name === '통행료'
           ? '<div class="evpk"><label class="btn pri" data-hpquick>' + ic('ticket', 15) + '하이패스 이용내역 PDF 올리기' +
               '<input type="file" id="hpQuick" accept="application/pdf,.pdf" multiple class="sr"></label>' +
-              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역 › PDF 로 받은 한 달치 파일 — 통과 시각으로 운행을 찾아 그날 통행료 증빙이 됩니다(그날 영수증 사진은 따로 안 올려도 되고, 올려도 한 번만 셉니다)</span></div>'
+              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역 › PDF 로 받은 한 달치 파일 — 통과 시각으로 운행을 찾아 그날 통행료 증빙이 됩니다(그날 영수증 사진은 따로 안 올려도 되고, 올려도 한 번만 셉니다). 하이패스 홈페이지 영수증 출력 화면을 PDF 로 저장한 것도 됩니다.</span></div>'
           : '') +
         '</div>';
     }
@@ -7268,7 +7268,7 @@ window.EduGuard = {
     h += '<div class="drop" id="hpDrop">' +
       '<div class="dico">' + ic('receipt', 22) + '</div>' +
       '<div class="dt">하이패스 이용내역 PDF를 여기에 끌어다 놓으세요</div>' +
-      '<div class="dd">한국도로공사 하이패스 누리집 › 이용내역 › PDF · 여러 개도 됩니다</div>' +
+      '<div class="dd">한국도로공사 하이패스 누리집 › 이용내역 › PDF · 영수증 출력 화면을 PDF 로 저장한 것도 됩니다 · 여러 개도 됩니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="hpFile" accept="application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>';
@@ -7403,7 +7403,7 @@ window.EduGuard = {
     var recs = [], done = 0, bad = 0, warns = [];
     Array.prototype.forEach.call(files, function (f) {
       f.arrayBuffer().then(function (buf) {
-        return window.Hipass.parsePdf(buf);
+        return window.Hipass.parsePdf(buf, { pdfjs: loadPdfJs });   // 「영수증 출력」 화면을 인쇄해 저장한 PDF 는 pdf.js 로 읽는다
       }).then(function (rs) {
         recs = recs.concat(rs || []); if (rs && rs.warning) warns.push(rs.warning);
       }).catch(function (e) { bad++; console.error(f.name, e); })

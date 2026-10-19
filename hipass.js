@@ -8,6 +8,7 @@
  *    · 한 페이지에 영수증이 4열 × N행 격자
  *    · 본문이 Flate 로 압축돼 있고, 글자는 CID(Type0) 라 ToUnicode 표를 풀어야 읽힌다
  *    · 글자 하나하나가 `1 0 0 1 x y Tm ... (코드)Tj` 로 따로 찍힌다
+ *  하이패스 홈페이지 「영수증 출력」 화면을 브라우저로 인쇄해 저장한 PDF 도 읽는다(parsePrint — pdf.js 글자 추출)
  *  ═════════════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
@@ -71,8 +72,158 @@
     return out;
   }
 
-  /** PDF 바이트 → 영수증 레코드 배열 */
-  async function parsePdf(buf) {
+  /** PDF 바이트 → 영수증 레코드 배열
+   *  ① 한국도로공사가 내려주는 PDF(아래 parseDirect) 를 먼저 읽고,
+   *  ② 못 읽으면 하이패스 홈페이지 「영수증 출력」 화면을 브라우저로 인쇄해 저장한 PDF 로 보고
+   *     pdf.js 글자 추출(parsePrint)로 읽는다(2026-10-19).
+   *  opts.pdfjs: pdf.js 모듈(또는 그것을 주는 Promise·함수). 없으면 window.__pdfjs.
+   *  돌려주는 배열에 .how('direct'|'print') · .total({n,sum} 파일에 적힌 합계) · .warning(합계가 안 맞을 때 안내) 이 붙는다. */
+  async function parsePdf(buf, opts) {
+    var copy = new Uint8Array(buf).slice();   // pdf.js 가 버퍼를 넘겨받아(분리) 비우므로 따로 둔다
+    var firstErr = null, recs = null;
+    try { recs = await parseDirect(buf); } catch (e) { firstErr = e; }
+    if (recs && recs.length) { recs.how = 'direct'; return recs; }
+    var pdfjs = null;
+    try { pdfjs = await getPdfjs(opts); } catch (e) { pdfjs = null; }
+    if (!pdfjs) { if (firstErr) throw firstErr; return recs || []; }
+    var p;
+    try { p = await parsePrint(copy, pdfjs); } catch (e) { if (firstErr) throw firstErr; throw e; }
+    if (!p.length && firstErr) throw firstErr;
+    return p;
+  }
+
+  async function getPdfjs(opts) {
+    var src = (opts && opts.pdfjs) || global.__pdfjs || null;
+    if (typeof src === 'function') src = src();
+    return src ? await src : null;
+  }
+
+  /* ── 인쇄 PDF(하이패스 홈페이지 「영수증 출력」 → 크롬 인쇄 → PDF로 저장) ──────────
+   *  영수증이 3열(또는 4열) 격자로 놓이고, 칸마다
+   *    하이패스는 / 빠르고 편리합니다 / 영수증 / 회사 영업소 / TEL / 사업자번호 / 2026년10월12일 07시35분 /
+   *    (입구영업소 : ○○) / 1 종  800 원(카드) / KEC 800 원 / 공급가액·부가세 / 카드사 / 카드번호 / 영수증 번호
+   *  맨 아래 「총 N 건 / M 원」.
+   *  「영수증」 머리 글자를 칸의 기준점으로 삼아 글자를 x(가까운 열)·y(그 위 가장 가까운 머리)로 묶는다. */
+  async function parsePrint(u8, pdfjs) {
+    var doc = await pdfjs.getDocument({ data: u8, isEvalSupported: false }).promise;
+    var recs = [], total = null;
+    try {
+      for (var pn = 1; pn <= doc.numPages; pn++) {
+        var page = await doc.getPage(pn);
+        var tc = await page.getTextContent();
+        var items = [];
+        tc.items.forEach(function (it) {
+          var t = String(it.str || '');
+          if (!t.trim() || !it.transform) return;
+          var h = Math.abs(it.height || it.transform[3] || 8) || 8;
+          items.push({ x: it.transform[4], y: it.transform[5], w: it.width || 0, h: h, t: t, cx: it.transform[4] + (it.width || 0) / 2 });
+        });
+        if (!items.length) continue;
+
+        // 쪽 전체 글줄 — 「총 N 건 / M 원」 찾기
+        var tot = linesOf(items).map(function (l) { return l.t.replace(/\s/g, ''); }).join('\n')
+          .match(/총(\d+)건\/([\d,]+)원/);
+        if (tot) total = { n: (total ? total.n : 0) + +tot[1], sum: (total ? total.sum : 0) + +tot[2].replace(/,/g, '') };
+
+        var heads = items.filter(function (i) { return i.t.replace(/\s/g, '') === '영수증'; });
+        if (!heads.length) heads = items.filter(function (i) { return /하이패스는/.test(i.t); });
+        if (!heads.length) continue;
+
+        // 열 = 머리 글자 가운데 x 를 묶은 것
+        var cols = [];
+        heads.slice().sort(function (a, b) { return a.cx - b.cx; }).forEach(function (hd) {
+          var c = cols[cols.length - 1];
+          if (c && Math.abs(hd.cx - c.x) < 30) c.heads.push(hd);
+          else cols.push({ x: hd.cx, heads: [hd] });
+        });
+        var cells = new Map();
+        items.forEach(function (it) {
+          var col = null, best = Infinity;
+          cols.forEach(function (c) { var d = Math.abs(it.cx - c.x); if (d < best) { best = d; col = c; } });
+          // 그 열에서, 글자보다 위(머리 높이 4배까지 여유 — 머리 위 「하이패스는」 두 줄)인 머리 중 가장 아래 것
+          var own = null;
+          col.heads.forEach(function (hd) {
+            if (hd.y + hd.h * 4 >= it.y && (!own || hd.y < own.y)) own = hd;
+          });
+          if (!own) return;
+          if (!cells.has(own)) cells.set(own, []);
+          cells.get(own).push(it);
+        });
+
+        heads.forEach(function (hd) {
+          var arr = cells.get(hd); if (!arr) return;
+          var lines = linesOf(arr).map(function (l) { return l.t; });
+          var ns = lines.map(function (l) { return l.replace(/\s/g, ''); });
+          var j = ns.join('\n');
+          var dt = j.match(/(\d{4})년(\d{1,2})월(\d{1,2})일(\d{1,2})시(\d{1,2})분/);
+          if (!dt) return;
+          var p2 = function (v) { return ('0' + v).slice(-2); };
+          var ymd = dt[1] + '-' + p2(dt[2]) + '-' + p2(dt[3]), hm = p2(dt[4]) + ':' + p2(dt[5]);
+          var amt = j.match(/([\d,]+)원\(카드\)/) || j.match(/\d종([\d,]+)원/);
+          var cls = j.match(/(\d)종/);
+          var card = j.match(/[\d*]{4}-[\d*]{2}\*\*-\*{4}-(\d{4})/) || j.match(/[\d*]{4}-[\d*]{4}-[\d*]{4}-(\d{4})/);
+          var entry = j.match(/입구영업소:([^\n]+)/);
+          var hi = ns.indexOf('영수증');
+          var oline = hi >= 0 ? (lines[hi + 1] || '') : '';
+          if (/입구영업소|TEL|사업자/.test(oline)) oline = '';
+          var toks = oline.trim().split(/\s+/).filter(Boolean);
+          recs.push({
+            page: pn,
+            at: Date.parse(ymd + 'T' + hm + ':00+09:00'),
+            atText: ymd + ' ' + hm,
+            office: toks.length ? toks[toks.length - 1] : '',
+            entryOffice: entry ? entry[1] : null,
+            carClass: cls ? +cls[1] : null,
+            amount: amt ? +amt[1].replace(/,/g, '') : null,
+            card4: card ? card[1] : null
+          });
+        });
+      }
+    } finally { try { doc.destroy(); } catch (e) { /* 무시 */ } }
+
+    recs = dedupe(recs);
+    recs.how = 'print';
+    if (total) {
+      recs.total = total;
+      var sum = recs.reduce(function (a, r) { return a + r.amount; }, 0);
+      if (total.n !== recs.length || total.sum !== sum) {
+        recs.warning = '파일 맨 아래 「총 ' + total.n + '건 / ' + won(total.sum) + '」과 읽은 영수증(' + recs.length + '건 / ' +
+          won(sum) + ')이 다릅니다. 빠진 영수증이 없는지 확인해 주세요.';
+      }
+    }
+    return recs;
+  }
+
+  function won(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; }
+
+  /** 글자 조각 → 글줄(위에서 아래로). y 가 2.5 안쪽이면 같은 줄(「1 종」과 「800 원(카드)」은 1.5 쯤 어긋난다). */
+  function linesOf(items) {
+    var arr = items.slice().sort(function (a, b) { return b.y - a.y || a.x - b.x; }), out = [];
+    arr.forEach(function (it) {
+      var l = out[out.length - 1];
+      if (l && Math.abs(l.y - it.y) <= 2.5) l.items.push(it);
+      else out.push({ y: it.y, items: [it] });
+    });
+    return out.map(function (l) {
+      return { y: l.y, t: l.items.sort(function (a, b) { return a.x - b.x; }).map(function (i) { return i.t; }).join(' ') };
+    });
+  }
+
+  // 같은 영수증이 두 번 잡히는 일이 없도록 (시각+금액+영업소)로 중복 제거
+  function dedupe(recs) {
+    var seen = new Set();
+    recs = recs.filter(function (r) {
+      if (r.amount == null || !r.at) return false;
+      var k = r.at + '|' + r.amount + '|' + r.office;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    recs.sort(function (a, b) { return a.at - b.at; });
+    return recs;
+  }
+
+  /** 한국도로공사 직접 PDF(CID 글자 + 글자마다 Tm/Tj, 4열 격자) */
+  async function parseDirect(buf) {
     var u8 = new Uint8Array(buf), s = latin1(u8);
 
     /* 1) 모든 스트림 풀기 */
@@ -170,16 +321,7 @@
       });
     });
 
-    // 같은 영수증이 두 번 잡히는 일이 없도록 (시각+금액+영업소)로 중복 제거
-    var seen = new Set();
-    recs = recs.filter(function (r) {
-      if (r.amount == null || !r.at) return false;
-      var k = r.at + '|' + r.amount + '|' + r.office;
-      if (seen.has(k)) return false;
-      seen.add(k); return true;
-    });
-    recs.sort(function (a, b) { return a.at - b.at; });
-    return recs;
+    return dedupe(recs);
   }
 
   /**
