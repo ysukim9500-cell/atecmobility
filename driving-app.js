@@ -1348,7 +1348,8 @@
     var steps = [
       { v: 'trips', t: '운행 기록', n: fixBad,
         sub: !my.length ? '운행 없음' : fixBad ? '고칠 것 ' + n0(fixBad) + '건'
-          : fix ? '확인 ' + n0(fix) + '건 · ' + n0(my.length) + '건' : n0(my.length) + '건 · ' + km(kmSum) + ' km' },
+          // 「지금 할 일 · 6건」이 할 일 6개로 읽혔다(2026-10-19 로봇) — 「운행 6건」
+          : fix ? '확인 ' + n0(fix) + '건 · 운행 ' + n0(my.length) + '건' : '운행 ' + n0(my.length) + '건 · ' + km(kmSum) + ' km' },
       { v: 'evid', t: '영수증·통행료', n: unk,
         sub: (ev.length ? '영수증 ' + n0(ev.length) + '장' : '영수증 없음') + (unk ? ' · 통행료 미확정 ' + n0(unk) : '') },
       { v: 'verify', t: '검증·상신', n: 0,
@@ -1654,7 +1655,7 @@
 
   function safeTripTable(rows) {
     if (!rows.length) return blank('평가한 운행이 없습니다.', null, 'list');
-    return '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+    return '<div class="panel"><div class="scroll" data-rows><table class="mc"><thead><tr>' +
       '<th>날짜</th><th class="n">점수</th><th>구간</th><th>방문처</th><th class="n">과속</th>' +
       '<th class="n">급가감속</th><th class="n">최고</th></tr></thead><tbody>' +
       rows.map(function (t) {
@@ -1662,14 +1663,14 @@
         // 운행일지 표와 같은 규칙 — 방문처가 비면 도착지로 대신한다.
         var place = t.visit_place || t.end_address || '';
         return '<tr class="clk" tabindex="0" data-trip="' + esc(t.id) + '">' +
-          '<td><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
+          '<td class="m1"><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
           hm(t.start_time) + (isNightTrip(t.start_time) ? ' 야간' : '') + '</span></td>' +
-          '<td class="n total">' + n0(sc) + ' <span class="st ' + g[2] + '">' + g[1] + '</span></td>' +
-          '<td class="dim">' + esc(dong(t.start_address)) + ' → ' + esc(dong(t.end_address)) + '</td>' +
-          '<td class="el" title="' + esc(place) + '">' + esc(place) + '</td>' +
-          '<td class="n">' + (Number(t.overspeed_count) || 0) + '</td>' +
-          '<td class="n">' + ((Number(t.rapid_accel_count) || 0) + (Number(t.rapid_decel_count) || 0)) + '</td>' +
-          '<td class="n dim">' + n0(t.max_speed_kmh) + '</td></tr>';
+          '<td class="n total mr">' + n0(sc) + ' <span class="st ' + g[2] + '">' + g[1] + '</span></td>' +
+          '<td class="dim m2">' + esc(dong(t.start_address)) + ' → ' + esc(dong(t.end_address)) + '</td>' +
+          '<td class="el mx" title="' + esc(place) + '">' + esc(place) + '</td>' +
+          '<td class="n" data-l="과속">' + (Number(t.overspeed_count) || 0) + '</td>' +
+          '<td class="n" data-l="급가감속">' + ((Number(t.rapid_accel_count) || 0) + (Number(t.rapid_decel_count) || 0)) + '</td>' +
+          '<td class="n dim" data-l="최고" data-u="km/h">' + n0(t.max_speed_kmh) + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
   }
 
@@ -2287,19 +2288,21 @@
           '<td>' + (u === ACCT.master ? '<span class="st bad">마스터</span>'
             : MGRS.indexOf(u) >= 0 ? '<span class="st bad">권한 주는 관리자</span>'
             : x.is_admin ? '<span class="st bad">관리자</span>' : '<span class="dim">일반</span>') + '</td>' +
-          // 운전함 / 운전 안 함(개인경비·결재만) — 누르면 바꾼다(관리자 RPC).
-          '<td style="white-space:nowrap">' + (x.uses_driving === false
-            ? '<span class="st dim">운전 안 함</span> <button class="btn sm" data-drvset="' + esc(u) + '" data-on="1">운전함으로</button>'
-            : '<span class="st ok">운전함</span> <button class="btn sm" data-drvset="' + esc(u) + '" data-on="0">운전 안 함으로</button>') + '</td>' +
+          // 운전함 / 운전 안 함(개인경비·결재만) — 바꾸기는 줄 끝 「⋯」 메뉴에(2026-10-19 사용성 2차 #14).
+          '<td style="white-space:nowrap">' + (x.uses_driving === false ? '<span class="st dim">운전 안 함</span>' : '<span class="st ok">운전함</span>') + '</td>' +
           '<td class="n ract" style="white-space:nowrap">' +
-          // 본인 · 마스터 · (마스터가 아니면) 다른 권한 주는 관리자는 바꿀 수 없다(서버가 거부한다). 버튼을 아예 안 보인다.
-          (u === myName() ? '<span class="dim">본인 계정</span>'
-            : u === ACCT.master || (!master && MGRS.indexOf(u) >= 0) ? '<span class="dim">바꿀 수 없음</span>'
-            : '<button class="btn sm" data-perm="' + esc(u) + '" data-on="' + (x.is_admin ? '0' : '1') + '">' +
-              (x.is_admin ? '관리자 해제' : '관리자 지정') + '</button> ' +
-              (master ? '<button class="btn sm" data-permmgr="' + esc(u) + '" data-on="' + (MGRS.indexOf(u) >= 0 ? '0' : '1') + '">' +
-                (MGRS.indexOf(u) >= 0 ? '권한 주기 해제' : '권한 주기 허용') + '</button> ' : '') +
-              '<button class="btn sm" data-pwreset="' + esc(u) + '">비밀번호 초기화</button>') +
+          // 본인 · 마스터 · (마스터가 아니면) 다른 권한 주는 관리자는 권한·비밀번호를 바꿀 수 없다(서버가 거부한다). 그 항목을 아예 안 보인다.
+          (function () {
+            var fixed = u === myName() ? '본인 계정' : u === ACCT.master || (!master && MGRS.indexOf(u) >= 0) ? '바꿀 수 없음' : '';
+            var it = [];
+            if (!fixed) {
+              it.push(['data-perm="' + esc(u) + '" data-on="' + (x.is_admin ? '0' : '1') + '"', x.is_admin ? '관리자 해제' : '관리자 지정']);
+              if (master) it.push(['data-permmgr="' + esc(u) + '" data-on="' + (MGRS.indexOf(u) >= 0 ? '0' : '1') + '"', MGRS.indexOf(u) >= 0 ? '권한 주기 해제' : '권한 주기 허용']);
+              it.push(['data-pwreset="' + esc(u) + '"', '비밀번호 초기화', true]);
+            }
+            it.push(['data-drvset="' + esc(u) + '" data-on="' + (x.uses_driving === false ? '1' : '0') + '"', x.uses_driving === false ? '운전함으로 바꾸기' : '운전 안 함으로 바꾸기']);
+            return (fixed ? '<span class="dim kfix">' + fixed + '</span>' : '') + kmenu((x.name || u) + ' 님 작업', it);
+          })() +
           '</td></tr>';
       }).join('') + '<tr class="permnone" hidden><td colspan="6"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없습니다.</div>' +
         '<div class="d">이름 두 글자, 아이디 일부, 「대전센터」 같은 소속으로도 찾을 수 있습니다.</div></div></td></tr>' +
@@ -2307,6 +2310,63 @@
     setTimeout(permFilter, 0);              // 그린 뒤 지금 찾기·거르기를 적용
     return h;
   }
+  /** 「⋯」 메뉴(2026-10-19 사용성 2차 #14) — 줄마다 단추 서너 개 대신 하나. items = [[속성 문자열, 글자, 위험?], …].
+   *  <details> 라 키보드(Enter·Space)로 열리고, 안의 단추는 원래 data-* 를 그대로 가져 같은 처리기가 받는다.
+   *  창은 화면 기준(fixed)으로 띄운다 — 표의 스크롤 칸(.scroll) 안에서 잘리지 않게. */
+  function kmenu(label, items) {
+    if (!items.length) return '';
+    return '<details class="kmenu"><summary class="btn sm kbtn" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+      '<span aria-hidden="true">⋯</span></summary><div class="kpop" role="menu" aria-label="' + esc(label) + '">' +
+      items.map(function (it) {
+        return '<button type="button" role="menuitem" class="kitem' + (it[2] ? ' danger' : '') + '" ' + it[0] + '>' + esc(it[1]) + '</button>';
+      }).join('') + '</div></details>';
+  }
+  function kmenuCloseAll(except) {
+    Array.prototype.forEach.call(document.querySelectorAll('details.kmenu[open]'), function (d) { if (d !== except) d.open = false; });
+  }
+  function kmenuPlace(d) {
+    var s = d.querySelector('summary'), p = d.querySelector('.kpop'); if (!s || !p) return;
+    var r = s.getBoundingClientRect(), W = document.documentElement.clientWidth, H = window.innerHeight;
+    p.style.left = '0px'; p.style.top = '0px';
+    var pw = p.offsetWidth, ph = p.offsetHeight;
+    var left = Math.max(8, Math.min(r.right - pw, W - pw - 8));
+    var top = r.bottom + 4 + ph > H - 8 && r.top - 4 - ph >= 8 ? r.top - 4 - ph : r.bottom + 4;
+    p.style.left = Math.round(left) + 'px'; p.style.top = Math.round(top) + 'px';
+  }
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d || !d.classList || !d.classList.contains('kmenu') || !d.open) return;
+    kmenuCloseAll(d); kmenuPlace(d);
+    var f = d.querySelector('.kitem'); if (f) try { f.focus(); } catch (er) { }
+  }, true);
+  document.addEventListener('click', function (e) {
+    var d = e.target.closest && e.target.closest('details.kmenu');
+    if (!d) { kmenuCloseAll(null); return; }
+    // 메뉴 안 항목을 누르면 닫는다(그 항목의 일은 원래 처리기가 한다)
+    if (e.target.closest('.kitem')) setTimeout(function () { d.open = false; }, 0);
+  });
+  document.addEventListener('keydown', function (e) {
+    var d = document.querySelector('details.kmenu[open]'); if (!d) return;
+    if (e.key === 'Escape') { d.open = false; var s = d.querySelector('summary'); if (s) s.focus(); e.stopPropagation(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      var it = Array.prototype.slice.call(d.querySelectorAll('.kitem')), i = it.indexOf(document.activeElement);
+      if (!it.length) return;
+      e.preventDefault();
+      it[(i + (e.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length].focus();
+    }
+  }, true);
+  // 굴리면 닫지 않고 단추를 따라 옮긴다 — 누르는 순간 화면이 단추로 굴러가면(폰·자동 스크롤) 열리자마자 닫혀 「메뉴가 안 나온다」가 됐다
+  //   (2026-10-19 로봇). 단추가 화면 밖으로 나가면 그때 닫는다.
+  var kmenuFollow = function (e) {
+    if (e && e.target && e.target.closest && e.target.closest('.kpop')) return;
+    Array.prototype.forEach.call(document.querySelectorAll('details.kmenu[open]'), function (d) {
+      var s = d.querySelector('summary'), r = s && s.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > window.innerHeight || !r.width) d.open = false; else kmenuPlace(d);
+    });
+  };
+  window.addEventListener('scroll', kmenuFollow, true);
+  window.addEventListener('resize', kmenuFollow);
+
   /** 권한 관리 찾기어·거르기(다시 그려도 남는다). */
   var PERMQ = '', PERMF = '';
   /** 표 줄을 감추고 보이며, 맞은 글자에 형광펜. 표를 다시 그리지 않는다. */
@@ -4628,22 +4688,42 @@
       var g = by[k]; g.n++; g.cost += x.cost || 0; g.unk += x.unk || 0; g.trips += x.n || 0;
     });
     if (out.length < 2 && !byUnit) return '';
-    var max = out.reduce(function (a, g) { return Math.max(a, g.cost); }, 1);
-    out.sort(function (a, b) { return b.cost - a.cost; });
-    return '<div class="tcards">' + out.map(function (g) {
-      var attr = byUnit ? (g.p.unit ? ' data-orgunit="' + esc(g.p.unit) + '"' : '') : ' data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"';
-      return '<button class="tcard"' + attr + (attr ? '' : ' disabled') + '><span class="tl">' + esc(g.label) + '</span>' +
+    return teamBars(out.map(function (g) {
+      return { attr: byUnit ? (g.p.unit ? ' data-orgunit="' + esc(g.p.unit) + '"' : '') : ' data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"',
+        label: g.label, sub: g.sub, value: g.cost, meta: n0(g.n) + '명 · 운행 ' + n0(g.trips) + '건', unk: g.unk };
+    }));
+  }
+  /** 팀별 합계(2026-10-19 사용성 2차 #13) — 운행일지·개인경비·법인카드 관리가 같이 쓴다.
+   *  groups = [{ attr(누르면 좁히는 data-*), label, sub, value(원), meta(글), unk(미확정 수) }].
+   *  막대 = 전체 중 그 팀 몫(「전체의 N%」). 팀이 셋 이하면 카드 대신 표 줄(팀 · 금액 · 막대 · 미확정)로. */
+  function teamBars(groups) {
+    var list = groups.slice().sort(function (a, b) { return b.value - a.value; });
+    var tot = list.reduce(function (a, g) { return a + (g.value || 0); }, 0);
+    var pct = function (g) { return tot > 0 ? Math.round(g.value / tot * 100) : 0; };
+    var bar = function (g) {
+      return '<span class="tbar" role="img" aria-label="전체의 ' + pct(g) + '%"><i style="width:' + Math.max(2, pct(g)) + '%"></i></span>';
+    };
+    if (list.length <= 3) {
+      return '<div class="panel tlist">' + list.map(function (g) {
+        return '<button class="trow"' + g.attr + (g.attr ? '' : ' disabled') + '>' +
+          '<span class="tn"><b>' + esc(g.label) + '</b><small>' + esc(g.sub || '') + (g.sub && g.meta ? ' · ' : '') + (g.meta || '') + '</small></span>' +
+          '<span class="tv">' + won(g.value) + '</span>' +
+          '<span class="tb">' + bar(g) + '<small>전체의 ' + pct(g) + '%</small></span>' +
+          '<span class="tu' + (g.unk ? ' on' : '') + '">' + (g.unk == null ? '' : g.unk ? '미확정 ' + n0(g.unk) : '미확정 없음') + '</span></button>';
+      }).join('') + '</div>';
+    }
+    return '<div class="tcards">' + list.map(function (g) {
+      return '<button class="tcard"' + g.attr + (g.attr ? '' : ' disabled') + '><span class="tl">' + esc(g.label) + '</span>' +
         '<span class="ts">' + esc(g.sub || '') + '</span>' +
-        '<span class="tv">' + won(g.cost) + '</span>' +
-        '<span class="tbar"><i style="width:' + Math.max(3, Math.round(g.cost / max * 100)) + '%"></i></span>' +
-        '<span class="tm">' + n0(g.n) + '명 · 운행 ' + n0(g.trips) + '건' + (g.unk ? ' · <em>미확정 ' + n0(g.unk) + '</em>' : '') + '</span></button>';
+        '<span class="tv">' + won(g.value) + '</span>' + bar(g) +
+        '<span class="tm">' + (g.meta || '') + ' · 전체의 ' + pct(g) + '%' + (g.unk ? ' · <em>미확정 ' + n0(g.unk) + '</em>' : '') + '</span></button>';
     }).join('') + '</div>';
   }
   /** 직원별 금액 표. 관리 화면에서는 소속을 맨 앞에 두고 팀별로 묶어 팀 합계를 붙인다(2026-10-07). */
   function personTable(rows) {
     if (!rows.length) return blank('집계할 운행이 없습니다.', null, 'users');
     var all = isAll(), cols = all ? 10 : 9;
-    var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable"><thead><tr>' +
+    var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable mc"><thead><tr>' +
       (all ? '<th>파트·센터</th>' : '') + '<th>이름</th>' + (all ? '' : '<th>소속</th>') + '<th class="n">운행</th><th class="n">거리(km)</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th>' +
       '<th class="n">합계</th><th class="n">통행료 미확정</th>' +
@@ -4652,17 +4732,17 @@
       var u = USERS[x.u] || {};
       return '<tr class="clk" tabindex="0" data-person="' + esc(x.u) + '">' +
         (all ? orgCell(x.u, true) : '') +
-        '<td><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
-        (all ? '' : '<td class="dim">' + esc(u.dept || '—') + '</td>') +
-        '<td class="n">' + n0(x.n) + '</td>' +
-        '<td class="n">' + km(x.km) + '</td>' +
-        '<td class="n">' + n0(x.fuel) + '</td>' +
-        '<td class="n">' + n0(x.toll) + '</td>' +
-        '<td class="n">' + (x.park ? n0(x.park) : '—') + '</td>' +
-        '<td class="n total">' + n0(x.cost) + '</td>' +
-        '<td class="n ' + (x.unk ? 'unk' : 'dim') + '">' + (x.unk ? n0(x.unk) + '건' : '—') + '</td>' +
+        '<td class="m1"><span class="lead">' + esc(u.name || x.u) + '</span></td>' +
+        (all ? '' : '<td class="dim m1">' + esc(u.dept || '—') + '</td>') +
+        '<td class="n" data-l="운행" data-u="건">' + n0(x.n) + '</td>' +
+        '<td class="n" data-u="km">' + km(x.km) + '</td>' +
+        '<td class="n" data-l="유류비">' + n0(x.fuel) + '</td>' +
+        '<td class="n" data-l="통행료">' + n0(x.toll) + '</td>' +
+        '<td class="n" data-l="주차">' + (x.park ? n0(x.park) : '—') + '</td>' +
+        '<td class="n total mr">' + n0(x.cost) + '</td>' +
+        '<td class="n ' + (x.unk ? 'unk' : 'dim mx') + '"' + (x.unk ? ' data-l="통행료 미확정"' : '') + '>' + (x.unk ? n0(x.unk) + '건' : '—') + '</td>' +
         (all
-          ? '<td class="n"><button class="btn sm" data-print="' + esc(x.u) + '" ' +
+          ? '<td class="n mact"><button class="btn sm" data-print="' + esc(x.u) + '" ' +
             'title="' + esc(u.name || x.u) + ' 님 운행기록부 인쇄">' + ic('receipt', 13) + '인쇄</button></td>'
           : '') + '</tr>';
     };
@@ -4708,11 +4788,11 @@
     var T = totals(TRIPS, { allUsers: true }), A = audit();
     var V = EXT.statusVerify ? EXT.statusVerify(CYCKEY()) : null;
     var rows = statusRows(V);
-    var c = { approved: 0, submitted: 0, rej: 0, none: 0, vbad: 0, vnone: 0 };
+    var c = { approved: 0, submitted: 0, rej: 0, none: 0, vbad: 0, vwarn: 0, vnone: 0 };
     rows.forEach(function (x) {
       if (x.st === 'approved') c.approved++; else if (x.st === 'submitted') c.submitted++;
       else if (x.st === 'rejected') c.rej++; else c.none++;          // 회수(withdrawn)는 미상신
-      if (V) { if (!x.v) c.vnone++; else if (x.v.bad) c.vbad++; }
+      if (V) { if (!x.v) c.vnone++; else if (x.v.bad) c.vbad++; else if (x.v.warn) c.vwarn++; }
     });
     var r = cycleRange(CYC.y, CYC.m), now = Date.now(), closed = now >= r.hi;
     var drivers = Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false && orgMatch(u); }).length;
@@ -4731,7 +4811,9 @@
         '<i style="width:' + pa + '%"></i><i class="mid" style="width:' + ps + '%"></i></div>' +
       '<div class="facts">' +
       // 결재 상태 숫자는 위 큰 제목 한 줄이 말한다(예전에는 숫자 칸에 한 번 더, 분류도 달랐다 — 2026-10-19). 여기는 검증·금액만.
+      // 불일치와 확인 필요를 나눠 센다(2026-10-19 사용성 2차 — 「불일치 0명」인데 표에는 「확인 1」이 붙은 사람이 있어 헷갈렸다)
       fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했습니다' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
+      (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', '불일치는 없고 사람이 한 번 볼 것만 있음') : '') +
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
         (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) +
       '</div></div>';
@@ -4774,22 +4856,23 @@
       var L = ST_LABEL[x.st] || ['미상신', 'dim'];
       return '<span class="st ' + L[1] + '" title="' + esc(x.a ? apprStatusText(x.a).t : '아직 상신하지 않았습니다') + '">' + esc(L[0]) + '</span>';
     };
-    var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable stable"><thead><tr>' +
+    var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable stable mc"><thead><tr>' +
       '<th>파트·센터</th><th>이름</th><th>상신</th><th>검증</th><th class="n">운행</th>' +
       '<th class="n">유류비</th><th class="n">통행료</th><th class="n">주차</th><th class="n">합계</th><th class="n" title="통행료 미확정(0원으로 정산)">미확정</th><th></th></tr></thead><tbody>';
     var row = function (x) {
       var u = USERS[x.u] || {};
       return '<tr>' + orgCell(x.u, true) +
-        '<td><button type="button" class="plink lead" data-person="' + esc(x.u) + '" title="' + esc(u.name || x.u) + ' 님 운행 기록 보기">' + esc(u.name || x.u) + '</button></td>' +
-        '<td>' + stCell(x) + '</td>' +
-        '<td style="white-space:nowrap">' + (V ? V.chip(x.u) : '<span class="dim">…</span>') + '</td>' +
-        '<td class="n">' + n0(x.n) + '건<div class="dim skm">' + km(x.km) + ' km</div></td>' +
-        '<td class="n">' + n0(x.fuel) + '</td><td class="n">' + n0(x.toll) + '</td>' +
-        '<td class="n">' + (x.park ? n0(x.park) : '—') + '</td>' +
-        '<td class="n total">' + n0(x.cost) + '</td>' +
-        '<td class="n ' + (x.unk ? 'unk' : 'dim') + '">' + (x.unk ? n0(x.unk) + '건' : '—') + '</td>' +
-        '<td class="n sact">' + (V ? V.act(x.u) + ' ' : '') +
-          '<button class="btn sm" data-print="' + esc(x.u) + '" title="' + esc(u.name || x.u) + ' 님 운행기록부 인쇄">' + ic('receipt', 13) + '인쇄</button></td></tr>';
+        '<td class="m1"><button type="button" class="plink lead" data-person="' + esc(x.u) + '" title="' + esc(u.name || x.u) + ' 님 운행 기록 보기">' + esc(u.name || x.u) + '</button></td>' +
+        '<td class="m1">' + stCell(x) + '</td>' +
+        '<td class="m2" style="white-space:nowrap">' + (V ? V.chip(x.u) : '<span class="dim">…</span>') + '</td>' +
+        '<td class="n" data-l="운행">' + n0(x.n) + '건<div class="dim skm">' + km(x.km) + ' km</div></td>' +
+        '<td class="n mx">' + n0(x.fuel) + '</td><td class="n mx">' + n0(x.toll) + '</td>' +
+        '<td class="n mx">' + (x.park ? n0(x.park) : '—') + '</td>' +
+        '<td class="n total mr">' + n0(x.cost) + '</td>' +
+        '<td class="n ' + (x.unk ? 'unk' : 'dim mx') + '"' + (x.unk ? ' data-l="미확정"' : '') + '>' + (x.unk ? n0(x.unk) + '건' : '—') + '</td>' +
+        // 작업 단추는 한 줄 고정 자리 두 칸(검증 · 인쇄 — 2026-10-19 사용성 2차 #9). 결과 보기는 검증 칸 딱지를 누른다.
+        '<td class="n sact mact"><div class="sacts"><span class="sslot">' + (V ? V.act(x.u) : '') + '</span>' +
+          '<span class="sslot"><button class="btn sm" data-print="' + esc(x.u) + '" title="' + esc(u.name || x.u) + ' 님 운행기록부 인쇄">' + ic('receipt', 13) + '인쇄</button></span></div></td></tr>';
     };
     var sum = function (list, k) { return list.reduce(function (a, x) { return a + (Number(x[k]) || 0); }, 0); };
     orgGroups(rows, function (x) { return x.u; }).forEach(function (g) {
@@ -5021,7 +5104,8 @@
       }, 'date', -1);
     }
     var pg = g ? pageOf(g, rows.length) : { n: rows.length, more: '' };
-    var h = '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+    // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-19 사용성 2차 #7): 날짜·목적·거리 / 방문처·통행료·주차. PC 는 표 그대로.
+    var h = '<div class="panel"><div class="scroll" data-rows><table class="mc"><thead><tr>' +
       th('날짜', 'date', -1) + (showWho ? th('소속 · 이름', 'who', 1) : '') + th('목적', 'purp', 1) + th('차량', 'car', 1) +
       th('거리', 'dist', -1, true) + (opt.compact ? '' : th('계기판', 'odo', -1, true)) +
       th('통행료', 'toll', -1, true) + (opt.compact ? '' : th('주차', 'park', -1, true)) +
@@ -5030,17 +5114,17 @@
       var place = t.visit_place || t.end_address || '';
       h += '<tr class="clk' + (flags[t.id] ? ' flagged' : '') + '" tabindex="0" data-trip="' + t.id + '">' +
         // 여러 해를 함께 볼 때는 연도가 없으면 어느 해인지 알 수 없다.
-        '<td><span class="lead">' + (isMulti() ? ymd(t.start_time).slice(2).replace(/-/g, '.') : md(t.start_time)) +
+        '<td class="m1"><span class="lead">' + (isMulti() ? ymd(t.start_time).slice(2).replace(/-/g, '.') : md(t.start_time)) +
         '</span> <span class="dim">' + hm(t.start_time) + '</span>' +
         (t.is_manual ? ' <span class="kind">수기</span>' : '') + '</td>' +
-        (showWho ? whoCell(t.username) : '') +
-        '<td>' + purposeCell(t.purpose) + '</td>' +
-        '<td>' + esc(t.plate_no || '—') + '</td>' +
-        '<td class="n">' + km(t.distance_km) + '</td>' +
-        (opt.compact ? '' : '<td class="n dim" style="white-space:nowrap">' + n0(t.start_odometer) + ' → ' + n0(t.end_odometer) + '</td>') +
-        '<td class="n">' + tollCell(t) + '</td>' +
-        (opt.compact ? '' : '<td class="n">' + (t.parking_cost ? n0(t.parking_cost) : '—') + '</td>') +
-        '<td class="el" title="' + esc(place) + '">' + esc(place) + '</td></tr>';
+        (showWho ? whoCell(t.username).replace('<td class="whoc">', '<td class="whoc m1">') : '') +
+        '<td class="m1">' + purposeCell(t.purpose) + '</td>' +
+        '<td class="mx">' + esc(t.plate_no || '—') + '</td>' +
+        '<td class="n mr" data-u="km">' + km(t.distance_km) + '</td>' +
+        (opt.compact ? '' : '<td class="n dim mx" style="white-space:nowrap">' + n0(t.start_odometer) + ' → ' + n0(t.end_odometer) + '</td>') +
+        '<td class="n" data-l="통행료">' + tollCell(t) + '</td>' +
+        (opt.compact ? '' : '<td class="n' + (t.parking_cost ? '' : ' mx') + '" data-l="주차">' + (t.parking_cost ? n0(t.parking_cost) : '—') + '</td>') +
+        '<td class="el m2" title="' + esc(place) + '">' + esc(place) + '</td></tr>';
     });
     return h + '</tbody></table></div>' + pg.more + '</div>';
   }
@@ -5250,8 +5334,18 @@
       return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v">' + v +
         '</div><div class="sub">' + esc(sub || '') + '</div></div>';
     };
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>주차·통행료 영수증</div>' +
-      '<p class="verdict">' + won(settle) + '</p><div class="facts">' +
+    // 2026-10-19 사용성 2차: 이 카드는 「올린 영수증」 합계다 — 마감 화면의 업무용 비용(정산 금액)과 숫자가 달라 헷갈렸다.
+    //   이름을 「올린 영수증 합계」로 하고, 내 화면에서는 정산에 들어가는 금액(마감 화면과 같은 계산 totals)을 한 줄 같이 보인다.
+    var Tst = stepMode ? totals(TRIPS, { who: mine }) : null;
+    //   큰 숫자는 받을 돈(정산 금액)으로 — 로봇이 큰 「올린 영수증 합계」를 받을 돈으로 읽었다(2026-10-19).
+    h += '<div class="hero fade">' + (Tst
+      ? '<div class="eyebrow"><span class="dot"></span>정산에 들어가는 주차·통행료 · 마감 화면과 같음</div>' +
+        '<p class="verdict">' + won(Tst.park + Tst.toll) + '</p>' +
+        '<div class="evsettle" data-evsettle>주차비 <b>' + won(Tst.park) + '</b> · 통행료 <b>' + won(Tst.toll) + '</b> · 올린 영수증 합계 ' + won(settle) +
+        (Tst.park + Tst.toll !== settle ? '<br><span class="dim">올린 영수증 합계와 다른 까닭: 운행에 금액이 이미 있으면 영수증은 맞춰 보기만 하고(두 번 더하지 않음), 업무 운행이 없는 날의 영수증은 빠집니다.</span>' : '') +
+        '</div>'
+      : '<div class="eyebrow"><span class="dot"></span>올린 주차·통행료 영수증 합계</div><p class="verdict">' + won(settle) + '</p>') +
+      '<div class="facts">' +
       fct('주차', won((by['주차'] || {}).sum || 0), n0((by['주차'] || {}).n || 0) + '건 · 올린 영수증') +
       fct('통행료', won((by['통행료'] || {}).sum || 0), n0((by['통행료'] || {}).n || 0) + '건 · 올린 영수증') +
       fct('주유', won((by['주유'] || {}).sum || 0), n0((by['주유'] || {}).n || 0) + '건 · 증빙용(유류비는 거리×단가)') +
@@ -7305,20 +7399,20 @@ window.EduGuard = {
     var vOf = {};
     VEHICLES.forEach(function (v) { if (v && v.plate_no && !vOf[v.plate_no]) vOf[v.plate_no] = v; });
     h += sect('차량', plates.length + '대 운행', '',
-      plates.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+      plates.length ? '<div class="panel"><div class="scroll" data-rows><table class="mc"><thead><tr>' +
         '<th>번호판</th><th>사용자</th><th>차종</th><th class="n">운행</th><th class="n">거리</th>' +
         '<th class="n">계기판</th><th class="n">누적 km</th><th>비고</th></tr></thead><tbody>' +
         plates.map(function (p) {
           var v = used[p], us = Object.keys(v.users), reg = vOf[p];
           var multi = us.length > 1, wide = isFinite(v.min) && (v.max - v.min) > 10000;
           return '<tr class="clk' + (multi || wide ? ' flagged' : '') + '" tabindex="0" data-car="' + esc(p) + '">' +
-            '<td><span class="lead">' + esc(p) + '</span></td>' +
-            '<td>' + esc(us.map(nameOf).join(', ')) + '</td>' +
-            '<td class="dim">' + esc((reg && reg.vehicle_type) || '—') + '</td>' +
-            '<td class="n">' + n0(v.n) + '</td><td class="n">' + km(v.km) + '</td>' +
-            '<td class="n dim">' + (isFinite(v.min) ? n0(v.min) + ' – ' + n0(v.max) : '—') + '</td>' +
-            '<td class="n dim">' + (reg && reg.cumulative_km != null ? n0(reg.cumulative_km) : '—') + '</td>' +
-            '<td>' + (multi ? '<span class="st bad">사용자 ' + us.length + '명</span> ' : '') +
+            '<td class="m1"><span class="lead">' + esc(p) + '</span></td>' +
+            '<td class="m1">' + esc(us.map(nameOf).join(', ')) + '</td>' +
+            '<td class="dim mx">' + esc((reg && reg.vehicle_type) || '—') + '</td>' +
+            '<td class="n" data-l="운행" data-u="건">' + n0(v.n) + '</td><td class="n mr" data-u="km">' + km(v.km) + '</td>' +
+            '<td class="n dim" data-l="계기판">' + (isFinite(v.min) ? n0(v.min) + ' – ' + n0(v.max) : '—') + '</td>' +
+            '<td class="n dim mx">' + (reg && reg.cumulative_km != null ? n0(reg.cumulative_km) : '—') + '</td>' +
+            '<td class="m2">' + (multi ? '<span class="st bad">사용자 ' + us.length + '명</span> ' : '') +
             (wide ? '<span class="st bad">계기판 폭 ' + n0(v.max - v.min) + 'km</span>' : '') +
             (!multi && !wide ? '<span class="st dim">정상</span>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>' : blank('운행 기록이 없습니다.', null, 'car'));
@@ -10036,7 +10130,7 @@ window.EduGuard = {
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
       addCycle: addCycle, cmpCycle: cmpCycle, currentCycle: currentCycle, kd: kd,
       usesDriving: usesDriving, noDriving: noDriving,
-      apvSlot: apvSlot,
+      apvSlot: apvSlot, teamBars: teamBars, kmenu: kmenu,
       // 여러 줄 골라 지우기(2026-10-19) — 개인경비·법인카드 내역 표도 같은 모양·같은 확인 창
       mselDef: mselDef, mselAll: mselAll, mselAllLine: mselAllLine, mselBox: mselBox, mselBar: mselBar, mselSync: mselSync
     };

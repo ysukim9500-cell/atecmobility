@@ -298,14 +298,6 @@
     return h;
   }
 
-  /** 달력 칸에 들어갈 짧은 금액 — 4,300 → 4.3천, 12,800 → 1.3만, 128,000 → 12.8만, 1,234,000 → 123만. */
-  function shortWon(v) {
-    v = Math.round(Number(v) || 0);
-    if (v < 1000) return String(v);
-    if (v < 9950) return (Math.round(v / 100) / 10).toString().replace(/\.0$/, '') + '천';
-    var m = v / 10000;
-    return (m < 100 ? (Math.round(m * 10) / 10).toString().replace(/\.0$/, '') : String(Math.round(m))) + '만';
-  }
   /** 달력 — 기간(20일~19일) 날마다 건수·금액. */
   function calHtml(rows, r) {
     var by = {};
@@ -322,8 +314,8 @@
         '" data-xday="' + k + '"' + (k === XDAY ? ' aria-pressed="true"' : '') + ' aria-label="' + esc(k + (x ? ' ' + x.n + '건 ' + n0(x.sum) + '원' : ' 없음')) + '">' +
         '<span class="xn">' + lab + '</span>' +
         (x ? '<span class="xc">' + n0(x.n) + '건' + (x.meal ? ' <i class="xm" title="식비 기준 초과">!</i>' : '') + '</span>' +
-          // 폰(칸 약 45px)에서는 「12,800」이 잘린다 — 짧은 꼴(「1.3만」·「4.3천」)을 따로 두고 CSS 로 바꿔 보인다.
-          '<span class="xa"><span class="xaf">' + n0(x.sum) + '</span><span class="xas" aria-hidden="true">' + shortWon(x.sum) + '</span></span>' : '') + '</button>';
+          // 금액은 폰·PC 모두 표·합계와 같은 꼴(11,000 — 2026-10-19 사용성 2차 #18, 예전 폰은 「1.1만」). 폰은 글자를 줄여 칸에 맞춘다.
+          '<span class="xa">' + n0(x.sum) + '</span>' : '') + '</button>';
     }
     return h + '</div></div>';
   }
@@ -1471,11 +1463,14 @@
     if (tl.length > 1 && !byUnit) {
       var max = tl.reduce(function (m, g) { return Math.max(m, g.sum); }, 1);
       tl.sort(function (a, b) { return b.sum - a.sum; });
-      h += '<section class="sect"><div class="tcards">' + tl.map(function (g) {
+      // 팀이 셋 이하면 표 줄, 막대 = 전체의 N%(2026-10-19 사용성 2차 #13 — 운행일지 관리와 같은 C.teamBars)
+      h += '<section class="sect">' + (C.teamBars ? C.teamBars(tl.map(function (g) {
+        return { attr: ' data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"', label: C.orgName(g.p), sub: g.p.div || '', value: g.sum, meta: n0(g.n) + '명 · ' + n0(g.cnt) + '건' };
+      })) : '<div class="tcards">' + tl.map(function (g) {
         return '<button class="tcard" data-orgteam="' + esc(g.p.div + '|' + g.p.team) + '"><span class="tl">' + esc(C.orgName(g.p)) + '</span><span class="ts">' + esc(g.p.div || '') + '</span>' +
           '<span class="tv">' + won(g.sum) + '</span><span class="tbar"><i style="width:' + Math.max(3, Math.round(g.sum / max * 100)) + '%"></i></span>' +
           '<span class="tm">' + n0(g.n) + '명 · ' + n0(g.cnt) + '건</span></button>';
-      }).join('') + '</div></section>';
+      }).join('') + '</div>') + '</section>';
     }
     list.sort(function (x, y) { return y.sum - x.sum; });
     h += C.sect('직원별', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th>' +
@@ -1623,37 +1618,40 @@
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') + fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 상신해야 함', back.length > 0) + fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 경비가 있는데 상신 전', notYet.length > 0) + '</div></div>';
-    var tools = done.length ? '<label class="finall"><input type="checkbox" id="xFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
-      '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-xfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
+    var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-xfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-xfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('expense') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
-      : done.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
-      '<th>결재 완료</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
+      : done.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
+      // 세 표 같은 열 순서(팀 묶음 + 파트·센터 · 이름 · 상태) · 「전체 선택」은 표 머리 첫 칸(2026-10-19 사용성 2차 #12, 운행일지와 같게)
+      '<th class="fchk"><label class="finall"><input type="checkbox" id="xFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label></th>' +
+      '<th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
       C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
-        return C.orgGroupRow(g, 8, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') + g.list.map(function (a) {
+        return C.orgGroupRow(g, 9, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') + g.list.map(function (a) {
           var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
           return '<tr><td><input type="checkbox" data-xfinsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
-            C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.closed_at ? esc(C.vx.whenText(a.closed_at)) : '—') +
-            (C.prints ? '<div class="prline">' + C.prints.badge('expense', a) + '</div>' : '') + '</td>' +
-            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
+            C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
+            '<td><span class="st ok">결재 완료</span>' + (C.prints ? '<div class="prline">' + C.prints.badge('expense', a) + '</div>' : '') + '</td>' +
+            '<td class="dim">' + (a.closed_at ? '완료 ' + esc(C.vx.whenText(a.closed_at)) : '—') + '</td>' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" data-l="결재선" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n ract" style="white-space:nowrap"><button class="btn sm" data-xfzpdf="' + a.id + '">PDF</button> <button class="btn sm" data-xfzxlsx="' + a.id + '">엑셀</button> ' +
             '<button class="btn sm" data-appr="reopen" data-kind="expense" data-id="' + a.id + '">정정 열기</button></td></tr>';
         }).join('');
-      }).join('') + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
+      }).join('') + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
-        going.map(function (a) {
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
+        C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 8, '') + g.list.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
-          return '<tr>' + C.orgCell(a.username) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td class="dim">' + (a.submitted_at ? esc(C.vx.whenText(a.submitted_at)) : '') + '</td>' +
-            '<td class="n">' + n0((a.snapshot || {}).cost) + '</td><td>' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+          return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td><span class="st warn">결재 중</span></td>' +
+            '<td class="dim">' + (a.submitted_at ? '상신 ' + esc(C.vx.whenText(a.submitted_at)) : '') + '</td>' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td data-l="지금 차례">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
             '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '">관리자 반려</button></td></tr>';
-        }).join('') + '</tbody></table></div></div>');
+        }).join(''); }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
       var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '회수' }; }).concat(notYet.map(function (u) { return { u: u, st: '상신 전' }; }));
-      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 경비</th></tr></thead><tbody>' +
+      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 경비</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
             var p = by[x.u] || { n: 0, sum: 0 };

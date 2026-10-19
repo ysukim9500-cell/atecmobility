@@ -265,14 +265,15 @@
     return p.length ? p.join(' · ') : '이상 없음';
   }
   /** 검증 요약 딱지. 빨강은 '불일치'에만 쓴다 — 참고 1건까지 빨갛게 칠하면 무엇을 봐야 할지 모른다. */
-  function sumChip(s) {
+  /** bare = 표 칸 안(머리에 이미 「검증」이 있다 — 2026-10-19 사용성 2차 #9) */
+  function sumChip(s, bare) {
     if (!s) return '';
     var p = [];
     if (s.bad) p.push('<span class="st bad">불일치 ' + n0(s.bad) + '</span>');
     if (s.warn) p.push('<span class="st warn">확인 ' + n0(s.warn) + '</span>');
     if (s.info) p.push('<span class="st dim">참고 ' + n0(s.info) + '</span>');
     if (!p.length) p.push('<span class="st ok">이상 없음</span>');
-    return '<span class="vsumc"><span class="vlab">검증</span>' + p.join('') + '</span>';
+    return '<span class="vsumc">' + (bare ? '' : '<span class="vlab">검증</span>') + p.join('') + '</span>';
   }
   function whenText(iso) {
     var ms = Date.parse(iso);
@@ -294,6 +295,9 @@
     var row = ROWS[k], busy = RUN.busy && RUN.who === k;
     VITEMS = [];
     var a = C.myAppr(), locked = a && (a.status === 'submitted' || a.status === 'approved');
+    // 결재 중·결재 완료(2026-10-19 사용성 2차 #5) — 개인경비처럼 상신 때 굳힌 검증 결과를 먼저 보인다
+    //   (예전: 「검증 전 · 아직 검증하지 않았습니다」 + 「다시 검증하기」 + 없는 「위 ① 검증하기」 안내).
+    if (locked) return lockedVerify(a, cyc);
     // 반려·회수 뒤(2026-10-15 2차) — 3단계에도 반려 사유 띠. 무엇을 고쳐야 하는지 여기서 바로 보인다.
     if (a && (a.status === 'rejected' || a.status === 'withdrawn')) {
       var stx = C.apprStatusText(a);
@@ -381,6 +385,52 @@
     }
   }
 
+  /** 결재 중·결재 완료 기간의 검증·상신 화면(2026-10-19 사용성 2차 #5, 개인경비 lockedVerify 와 같은 모양).
+   *  다시 검증하지 않는다(잠긴 기간이라 자료가 바뀌지 않는다). 상신 때 굳힌 검증 결과(driving_frozen.verify)와
+   *  결재 문서(PDF 받기·문서 보기)만 둔다. 고칠 길이 없으니 항목 글의 「…하세요」 안내는 뗀다. */
+  function lockedVerify(a, cyc) {
+    var S = C.state(), done = a.status === 'approved';
+    var h = C.head('검증·상신', esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · ' + (done ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다'));
+    var fk = fzKey(a), f = FZSUM[fk];
+    if (f === undefined) wantSummaries([a.id]);
+    var v = f && f.verify, s = (v && v.summary) || {};
+    var items = ((v && (v.items || (v.result && v.result.items))) || []).map(function (i) {
+      return /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: String(i.detail).replace(/\s*[—-]?\s*다시 검증하면[^.。]*[.。]?\s*$/, '') }) : i;
+    });
+    var verdict, clean = '';
+    if (f === undefined) verdict = FZFAIL[fk] ? '상신 때 검증 결과를 불러오지 못했습니다 — 잠시 뒤 다시 열어 주세요' : '상신 때 검증 결과를 불러오는 중…';
+    else if (!v) verdict = '상신 때 검증 결과가 없습니다';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었습니다';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었습니다'; clean = ' wait'; }
+    else { verdict = '<em>이상 없었습니다</em>'; clean = ' clean'; }
+    var at = v && (v.ran_at || v.created_at || (f && f.frozen_at));
+    var fact = function (kk, val, sub, alert, gem) {
+      return '<div class="fact"><div class="k">' + esc(kk) + (gem ? ' ' + gemBadge() : '') + '</div>' +
+        '<div class="v' + (alert ? ' alert' : '') + '">' + val + '</div><div class="sub">' + esc(sub || '') + '</div></div>';
+    };
+    h += '<div class="hero fade" data-lockedverify><div class="eyebrow"><span class="dot' + (v && !s.bad ? ' ok' : '') + '"></span>' +
+      '상신 때 검증 결과' + (at ? ' · ' + esc(whenText(at)) : '') + '</div>' +
+      '<p class="verdict' + clean + '">' + verdict + '</p>' +
+      (v ? '<div class="facts">' +
+        fact('불일치', n0(s.bad), '금액·계기판이 서로 다름', s.bad > 0) +
+        fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
+        fact('참고', n0(s.info), '고칠 것은 아님') +
+        fact('사진 판독', v.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
+          v.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, v.ai) + '</div>' : '') +
+      '<div class="vact"><button class="btn" data-pdf="">' + ic('dl', 14) + 'PDF 받기</button></div>' +
+      // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만
+      (f !== null && C.apvSlot ? C.apvSlot('', a) : '') + '</div>';
+    if (v) {
+      var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
+      VITEMS = [];
+      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, false, true));
+      if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info, false, true));
+    }
+    h += '<div class="anote">' + (done ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않습니다. ' +
+      '위 결과는 상신할 때 저장된 그대로이고, 결재하는 분도 같은 결과를 봅니다. 결재 문서는 위 「PDF 받기」로 받습니다.</div>';
+    return h;
+  }
+
   function startRun(u) {
     var S = C.state(), cyc = S.CYCKEY, k = keyOf(u, cyc);
     if (RUN.busy) return;
@@ -446,14 +496,19 @@
       fail: fail,
       /** 검증 요약({ bad, warn, info, read, receipts }) — 검증 전이면 null */
       sum: function (u) { var r = by[u]; return r ? (r.summary || {}) : null; },
-      chip: function (u) { var r = by[u]; return r ? sumChip(r.summary) : '<span class="dim">' + (fail ? '불러오지 못함' : '검증 전') + '</span>'; },
+      // 검증 결과가 있으면 딱지 자체가 「결과 보기」 단추다(2026-10-19 사용성 2차 #9 — 줄마다 단추 수가 달랐다)
+      chip: function (u) {
+        var r = by[u];
+        return r ? '<button type="button" class="vchip" data-vshow="' + esc(u) + '" title="' + esc(C.nameOf(u)) + ' 님 검증 결과 보기">' + sumChip(r.summary, true) + '</button>'
+          : '<span class="dim">' + (fail ? '불러오지 못함' : '검증 전') + '</span>';
+      },
       text: function (u) { var r = by[u]; return r ? sumText(r.summary) : fail ? '불러오지 못함' : '검증 전'; },
       when: function (u) { var r = by[u]; return r ? whenText(r.created_at) + (r.frozen ? ' (상신 때)' : '') : ''; },
       /** 결과 보기 · (다시) 검증 — 그 직원 대신 돌린다 */
       act: function (u) {
         var r = by[u], busy = RUN.busy && RUN.who === keyOf(u, cyc);
-        return (r ? '<button class="btn sm" data-vshow="' + esc(u) + '">결과 보기</button> ' : '') +
-          gemBtn('data-vrunfor="' + esc(u) + '"' + (RUN.busy ? ' disabled' : ''), busy ? '읽는 중…' : r ? '다시 검증' : '검증', busy, ' sm');
+        // 결과 보기는 검증 칸의 딱지가 한다 — 여기는 늘 단추 하나(자리가 줄마다 같다)
+        return gemBtn('data-vrunfor="' + esc(u) + '"' + (RUN.busy ? ' disabled' : ''), busy ? '읽는 중…' : r ? '다시 검증' : '검증', busy, ' sm');
       }
     };
   }
@@ -1070,6 +1125,10 @@
   /** 보이는 줄 중 고른 것(2026-10-14) — 「출력 안 한 것만」으로 숨은 줄은 고른 채 남아 있어도 세지·묶지 않는다. */
   function finPicked(rows) { return rows.filter(function (a) { return FINSEL[a.id]; }); }
   function finVisible(a) { return !C.prints || C.prints.keep('driving', a); }
+  /** 결재 완료 출력 세 표가 같이 쓰는 앞 열(2026-10-19 사용성 2차 #12) */
+  var FIN_HEAD = '<th>파트·센터</th><th>이름</th><th>상태</th>';
+  /** 상신 때 통행료 미확정 수(snapshot.toll_unknown) */
+  function unkOf(a) { return Number((a && a.snapshot || {}).toll_unknown) || 0; }
   function viewFinal() {
     var S = C.state();
     if (!S.LOADED) return C.head('결재 완료 출력') + C.skeleton();
@@ -1119,8 +1178,7 @@
 
     // ── 결재 완료 — 출력 ──
     var tools = done.length
-      ? '<label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label>' +
-        '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
+      ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
         (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
         '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' +
         (C.prints ? C.prints.onlyBtn('driving') : '')
@@ -1128,12 +1186,15 @@
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
       : done.length
-      ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th style="width:36px"></th><th>파트·센터</th><th>이름</th>' +
-        '<th>결재 완료</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
+      // 세 표(결재 완료·결재 중·챙겨야 할 사람)가 같은 열 순서 — 팀 묶음 + 파트·센터 · 이름 · 상태(2026-10-19 사용성 2차 #12).
+      //   「전체 선택」은 표 머리 첫 칸(예전: 표 밖 단추 줄).
+      ? '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
+        '<th class="fchk"><label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label></th>' +
+        FIN_HEAD + '<th>날짜</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
         C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
-          return C.orgGroupRow(g, 7, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') +
+          return C.orgGroupRow(g, 8, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') +
             g.list.map(doneRow).join('');
-        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="3">결재 완료 ' + n0(done.length) + '명 합계</td>' +
+        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td>' +
         '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
     function doneRow(a) {
@@ -1142,10 +1203,12 @@
           return '<tr><td><input type="checkbox" data-finsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') +
             ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
-            '<td class="dim">' + (a.closed_at ? esc(whenText(a.closed_at)) : '—') +
+            // 상태: 결재 완료 + 통행료 미확정 딱지(정산은 0원으로 끝났지만 알 수 있게 — 2026-10-19 사용성 2차) + 출력 딱지
+            '<td><span class="st ok">결재 완료</span>' + (unkOf(a) ? ' <span class="unktag" title="통행료 미확정 ' + n0(unkOf(a)) + '건 — 0원으로 정산됨">미확정 ' + n0(unkOf(a)) + '</span>' : '') +
             (C.prints ? '<div class="prline">' + C.prints.badge('driving', a) + '</div>' : '') + '</td>' +
+            '<td class="dim">' + (a.closed_at ? '완료 ' + esc(whenText(a.closed_at)) : '—') + '</td>' +
             '<td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td class="el dim" title="' + esc(line) + '">' + esc(line) + '</td>' +
+            '<td class="el dim" data-l="결재선" title="' + esc(line) + '">' + esc(line) + '</td>' +
             '<td class="n ract" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
             '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button> ' +
             // 정정 열기 · 관리자 반려 — 개인경비·법인카드 출력 화면과 같게(2026-10-14). 운행일지는 data-kind 없이(driving-app.js openApprAct 가 APPR 에서 찾는다).
@@ -1153,29 +1216,32 @@
     }
 
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr>' +
-        '<th>소속</th><th>이름</th><th>상신</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
-        going.map(function (a) {
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
+        FIN_HEAD + '<th>날짜</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
+        C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 7, '') + g.list.map(goingRow).join(''); }).join('') +
+        '</tbody></table></div></div>');
+    }
+    function goingRow(a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
-          return '<tr>' + C.orgCell(a.username) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
-            '<td class="dim">' + (a.submitted_at ? esc(whenText(a.submitted_at)) : '') + '</td>' +
+          return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
+            '<td><span class="st warn">결재 중</span></td>' +
+            '<td class="dim">' + (a.submitted_at ? '상신 ' + esc(whenText(a.submitted_at)) : '') + '</td>' +
             '<td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td>' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+            '<td data-l="지금 차례">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
             '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-id="' + a.id + '">관리자 반려</button></td></tr>';
-        }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
       var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)', cls: a.status === 'rejected' ? 'bad' : 'warn' }; })
         .concat(notYet.map(function (u) { return { u: u, st: '미상신', cls: 'warn' }; }));
       h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '',
-        '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
+        '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' + FIN_HEAD + '<th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 5, '') + g.list.map(function (x) {
             var vr = ROWS[keyOf(x.u, cyc)], vs = vr && vr.summary;
             return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td>' +
               '<td><span class="st ' + x.cls + '">' + esc(x.st) + '</span></td>' +
               '<td class="n">' + n0(has[x.u] || 0) + '건</td>' +
-              '<td>' + (vs ? sumChip(vs) : '<span class="dim">검증 전</span>') + '</td></tr>';
+              '<td>' + (vs ? sumChip(vs, true) : '<span class="dim">검증 전</span>') + '</td></tr>';
           }).join('');
         }).join('') + '</tbody></table></div></div>');
     }
