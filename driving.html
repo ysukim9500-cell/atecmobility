@@ -140,6 +140,12 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 .ctab .cin.wide{min-width:220px}
 .ctab .cin.need{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
 .ctab .cin::placeholder{color:var(--ink-400)}
+/* 결재 중이라 잠긴 입력칸 — 흰 바탕이면 고칠 수 있는 칸으로 보였다(2026-10-19 웹 사용성 1차). 회색 바탕·흐린 글자·자물쇠 */
+.inp:disabled,.inp[readonly]{background-color:var(--sunken);color:var(--ink-500);-webkit-text-fill-color:var(--ink-500);
+  border-color:var(--ink-100);cursor:not-allowed;opacity:1}
+.ctab .cin:disabled{padding-right:26px;background-repeat:no-repeat;background-position:right 8px center;background-size:12px 12px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A0A6B0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E")}
+.ctab .cin.need:disabled{border-color:var(--ink-100);box-shadow:none}
 .csug{display:flex;width:max-content;align-items:center;margin-top:4px;height:24px;padding:0 9px;border-radius:999px;border:1px dashed var(--ink-300);
   background:transparent;color:var(--ink-500);font:inherit;font-size:12px;cursor:pointer}
 .csug:hover,.csug:focus-visible{border-color:var(--red);color:var(--red)}
@@ -367,6 +373,9 @@ th.srt button:hover{color:var(--ink-900)}
 th.srt.on{color:var(--ink-900)}
 th.srt .ar{display:inline-block;width:11px;margin-left:3px;font-size:8.5px;color:var(--red)}
 th.srt button:focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:3px}
+/* 숫자 칸 머리는 오른쪽 끝을 숫자와 맞춘다 — 정렬 화살표 자리(11px)를 앞으로(2026-10-19 웹 사용성 1차) */
+th.srt.n button{flex-direction:row-reverse}
+th.srt.n .ar{margin-left:0;margin-right:3px}
 .more{display:flex;align-items:center;gap:10px;justify-content:center;padding:12px;border-top:1px solid var(--ink-100);font-size:12px}
 tfoot td{padding:11px 15px;border-top:1px solid var(--ink-200);background:var(--sunken);font-size:12.5px;
   font-weight:500;color:var(--ink-700);white-space:nowrap}
@@ -583,7 +592,13 @@ table.evup tbody tr:first-child td{border-top:0}
 .otile .t{font-size:13px;font-weight:700;color:var(--ink-900)} .otile .d{font-size:11.5px;color:var(--ink-500);line-height:1.45}
 .otile.warn{border-color:#F0E2C4;background:var(--warn-50)} .otile.warn b{color:var(--warn)}
 .otile.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
-.omail{font-size:11px;color:var(--ink-400);margin-top:2px;white-space:normal;overflow-wrap:anywhere;max-width:15em}   /* 회사 메일이 길어도 표가 넘치지 않게 @ 앞에서 줄바꿈(2026-10-16 4차) */ .omail.miss{color:var(--warn);font-weight:600}
+.omail{font-size:11px;color:var(--ink-400);margin-top:2px;white-space:normal;overflow-wrap:anywhere;max-width:15em}   /* 회사 메일이 길어도 표가 넘치지 않게 @ 앞에서 줄바꿈(2026-10-16 4차) */ .omail.miss{color:var(--ink-400);font-weight:400}   /* 줄마다 주황이면 시끄럽다 — 흐린 회색, 셈은 위 「회사 메일 없는 사람」 칸(2026-10-19) */
+.ohelp{display:inline}
+.ohelp > summary{display:inline-flex;align-items:center;gap:2px;cursor:pointer;list-style:none;color:var(--ink-500);font-weight:600;padding:4px 6px;margin:-4px 0;border-radius:6px}
+.ohelp > summary::-webkit-details-marker{display:none}
+.ohelp > summary span{font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.ohelp[open] > summary{color:var(--ink-800)}
+.ohelp > div{margin-top:6px}
 @media (max-width:720px){.otiles{grid-template-columns:1fr}}
 .ocard{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px}
 .ohd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -787,6 +802,24 @@ main{flex:1;min-width:0;padding:28px 30px 88px}
 .btn.big{height:46px;padding:0 22px;font-size:14.5px;font-weight:700}
 .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
 .cards3.one{grid-template-columns:minmax(0,1fr);max-width:420px}   /* 상신 뒤 — 「내가 결재할 것」 한 장만(2026-10-15 2차) */
+/* 기록 점검 「이상 없음 N가지」 한 줄 접기(2026-10-19) */
+.okfold{margin-top:22px}
+.okfold > summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;cursor:pointer;list-style:none;
+  background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);color:var(--ok);font-size:13px}
+.okfold > summary::-webkit-details-marker{display:none}
+.okfold > summary > span:first-of-type{flex:none;color:var(--ink-800)}
+.okfold > summary .dim{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.okfold[open] > summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.okfold > .panel{border-top-left-radius:0;border-top-right-radius:0;border-top:0}
+/* 이름 옆 「관리자」 딱지(직원 현황, 2026-10-19) */
+.admtag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;font-size:12px;line-height:18px;font-weight:600;
+  color:var(--red-700);background:var(--red-50,#FDECEF);vertical-align:1px}
+/* 마감 첫 화면 한 줄 요약(2026-10-19 — 숫자 카드 3장 대신) */
+.sumline{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:16px;padding:12px 18px;background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r)}
+.sumline .si{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
+.sumline em{font-style:normal;font-size:12.5px;color:var(--ink-500)}
+.sumline b{font-size:17px;font-weight:700;color:var(--ink-900);font-variant-numeric:tabular-nums}
+.sumline small{font-size:12.5px;color:var(--ink-500);font-variant-numeric:tabular-nums}
 .cardx{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:16px 18px;min-width:0}
 .cardx .k{font-size:12px;color:var(--ink-500)}
 .cardx .v{margin-top:4px;font-size:24px;font-weight:700;color:var(--ink-900);letter-spacing:-.02em}
@@ -928,7 +961,7 @@ table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 thead th{position:sticky;top:0;z-index:2;background:var(--surface);
   text-align:left;font-weight:500;font-size:12px;color:var(--ink-600);letter-spacing:.02em;
   padding:12px 15px;border-bottom:1px solid var(--ink-200);white-space:nowrap}
-th.n,td.n{text-align:right}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
 tbody td{padding:11px 15px;border-bottom:1px solid var(--ink-100);white-space:nowrap;
   color:var(--ink-700);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
@@ -1405,6 +1438,14 @@ table.mday td:nth-child(6) .mlinkb{display:flex;margin:6px 0 0}
 .hpnote.notice{background:var(--surface);border-color:var(--red);border-left-width:4px;margin-bottom:12px}
 .hpnote.notice svg{color:var(--red)}
 .hpnote.notice b{font-weight:700;color:var(--red-700)}
+/* 공지 한 줄 요약 + 「자세히」(2026-10-19 웹 사용성 1차) — 펼치면 문구 전체, × 는 오른쪽 위 */
+.hpnote.notice{align-items:flex-start}
+.hpnote.notice .nfull{display:none}
+.hpnote.notice.open .nsum{display:none}
+.hpnote.notice.open .nfull{display:inline}
+.hpnote.notice .nmore{border:0;background:none;padding:0 2px;margin-left:4px;font:inherit;font-weight:600;color:var(--red-700);
+  text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.hpnote.notice > .iconbtn{align-self:flex-start;margin:-6px -8px -6px 0}
 
 .hpact{display:flex;align-items:center;gap:14px;justify-content:flex-end;margin-top:13px;
   font-size:12.5px}
@@ -1729,6 +1770,8 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .nextstep .btn{flex:1 1 auto;justify-content:center}
   .hpnote{flex-wrap:wrap}
   .hpnote > span{flex:1 1 calc(100% - 30px)}
+  .hpnote.notice{flex-wrap:nowrap}
+  .hpnote.notice > span{flex:1 1 auto}
   .hpnote > .btn{margin-left:26px}
   .vitem{flex-wrap:wrap}
   .vitem .vb{flex:1 1 calc(100% - 66px)}      /* 글 칸이 단추에 눌려 한 글자씩 꺾이던 것(법인카드 C07~C09 긴 문구) — 단추는 아래 줄로 */
@@ -1863,7 +1906,9 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
 .eduth.lk{cursor:default}
 .eduth i{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:20px}
 .edubd{flex:1;min-width:0}
-.edut{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.edut{display:flex;align-items:flex-start;gap:6px;flex-wrap:nowrap}   /* 딱지는 늘 제목 왼쪽(제목이 길면 제목만 줄바꿈 — 2026-10-19) */
+.edut .edutag{flex:none;margin-top:2px}
+.edut .lead{min-width:0;overflow-wrap:anywhere}
 .eduv.lk .edut .lead{color:var(--ink-500)}
 .edud{font-size:12px;color:var(--ink-600);margin-top:2px}
 .edubd .track{margin-top:8px}
@@ -1934,6 +1979,49 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   table.mday td:nth-child(2){grid-column:1 / -1;grid-row:2}
   table.mday td.n{text-align:left;white-space:normal}
   table.mday td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--ink-500);font-weight:400}
+}
+/* ═══ 웹 사용성 1차(2026-10-19) — 누름 영역 40px 이상 ═══
+   머리 단추(메뉴·로그아웃·종) 34 → 40, 날짜·찾기 칸은 안쪽 입력칸이 칸 높이를 다 쓰게(28~30px 이던 것). */
+@media screen{
+  header.top .iconbtn{width:40px;height:40px}
+  .field,.dfil{height:40px}
+  .field input,.field select{align-self:stretch;height:auto}
+  .dfil input{height:38px}
+  .bar > .field,.bar > .btn,.bar > .dfil{height:40px}
+  /* 좁은 폰에서 알림 숫자가 이름 단추에 붙는다 — 무슨 숫자인지 종 모양을 함께(2026-10-19) */
+  #uBadge::before{content:"";display:inline-block;width:10px;height:10px;margin:0 2px -1px 0;background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a6 6 0 0 0-6 6v4.2L4.3 15.6A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.4L18 12.2V8a6 6 0 0 0-6-6zm-2.6 16.5a2.7 2.7 0 0 0 5.2 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a6 6 0 0 0-6 6v4.2L4.3 15.6A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.4L18 12.2V8a6 6 0 0 0-6-6zm-2.6 16.5a2.7 2.7 0 0 0 5.2 0z'/%3E%3C/svg%3E") center/contain no-repeat}
+}
+@media screen and (max-width:460px){
+  #uBadge{right:-10px}      /* 종 모양이 붙어 넓어졌다 — 이름(두 글자)을 덜 가리게 */
+}
+@media screen and (max-width:400px){
+  header.top .iconbtn{width:38px;height:38px}
+}
+/* 768 폭(태블릿)에서 마감 단계표가 세로로 서고 글이 꺾였다 — 가로 4칸은 721px 부터 그대로(2026-10-19) */
+@media screen and (min-width:721px) and (max-width:900px){
+  .steps{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .steps .stp{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-height:0}
+  .steps .stp i{width:auto;height:6px}
+}
+/* 정산 — 세 칸 한 줄 · 머리 단추 묶음(2026-10-19) */
+.hdbtns{display:inline-flex;gap:8px;align-items:center;flex-wrap:nowrap}
+.hdbtns .btn{height:34px}
+@media screen and (max-width:900px){
+  .facts.f3{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
+  .facts.f3 > .fact:last-child:nth-child(odd){grid-column:auto}
+  .facts.f3 .fact .v{font-size:18px;overflow-wrap:anywhere}
+  .facts.f3 .fact .sub{font-size:12px}
+}
+@media screen and (max-width:600px){
+  .sect > .hd .hdbtns{flex:1 1 100%;justify-content:flex-start}
+  .hdbtns .btn{height:40px}
+}
+/* 지난 기간 띠 — 글이 길어도 「10월분으로」 단추는 같은 줄 오른쪽(폰 폭에서는 아래 줄) */
+@media screen and (min-width:601px){
+  .cycband > span{flex:1 1 0;min-width:0}
+  .cycband .btn{flex:none}
 }
 </style>
 </head>

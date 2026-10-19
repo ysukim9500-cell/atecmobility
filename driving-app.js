@@ -997,7 +997,7 @@
       // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
       ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + esc(name) + ' 영수증 ' + n0(by[name].n) + '건 보기·지우기 ↓</button>' : '') +
       '</div>';
-    if (name === '주차' || name === '통행료') body += noticeBand();      // 공지 띠(2026-10-15 2차)
+    // 공지 띠는 이번 달 마감 화면에만(2026-10-19 웹 사용성 1차 — 같은 띠가 두 화면에 나오던 것)
     var canUp = !cycleLocked(myName()) && !isMulti();
     // 웹 8차(2026-10-17 사용자 「직원들이 잘 모를 것 같은데… 좀 쉽게 할 수 없나?」) — 주차·통행료는 할 일을 맨 위 단추로.
     //   통행료: 같은 크기 단추 둘(영수증 사진 · 하이패스 이용내역 PDF — 둘 중 하나면 된다). 하이패스 단추는 바로 파일을 고르고
@@ -1045,7 +1045,10 @@
         (name === '계기판' ? '계기판 사진 올리기' : esc(name) + ' 영수증 올리기') + '</button>') +
       '<span style="flex:1"></span>' +
       (cur > 0 ? '<button class="btn" data-evsubmove="-1">← ' + esc(EV_SUBS[cur - 1]) + '</button>' : '') +
-      (cur < 3 ? '<button class="btn pri cta" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
+      // 아직 1단계 차례인데 영수증 화면을 먼저 열었으면 카드의 「다음: … →」는 숨긴다 — 맨 아래 「지금은 1단계 차례 → 1단계로」와
+      //   서로 다른 길을 가리켰다(2026-10-19 웹 사용성 1차). 위 차례 칩으로는 그대로 오갈 수 있다.
+      (evAhead() ? ''
+        : cur < 3 ? '<button class="btn pri cta" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
         : (stepNow() === 2 && !cycleLocked(myName()) && !isMulti()
           ? '<button class="btn pri cta" data-stepmove="1" data-from="2">다음: 3 검증·상신 →</button>'
           : '<span class="dim" style="font-size:12.5px">마지막 차례입니다.</span>')) +
@@ -1349,7 +1352,7 @@
       { v: 'evid', t: '영수증·통행료', n: unk,
         sub: (ev.length ? '영수증 ' + n0(ev.length) + '장' : '영수증 없음') + (unk ? ' · 통행료 미확정 ' + n0(unk) : '') },
       { v: 'verify', t: '검증·상신', n: 0,
-        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '결재 중' : st === 'rejected' ? '반려됨 — 다시 상신' : '아직 안 함' },
+        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '상신함' : st === 'rejected' ? '반려됨 — 다시 상신' : '아직 안 함' },
       { v: 'settle', t: '정산·엑셀', n: 0, sub: st === 'approved' ? '받을 수 있음' : '결재 후' }
     ];
     var cur = -1;
@@ -1538,6 +1541,7 @@
     return o;
   }
 
+  var SAFE_ALL = false;          // 안전운전 「전체 보기」(2026-10-19)
   function viewSafety() {
     if (!LOADED) return head(scopeTitle('안전운전')) + skeleton();
     var h = head(scopeTitle('안전운전'),
@@ -1564,8 +1568,15 @@
         fact('수기 운행', n0(s.manual) + '<small>건</small>', '평가 제외') +
         '</div></div>';
       h += sect('무엇이 깎였나', null, '', safeBreak(s));
-      h += sect('점수가 낮은 운행', null, '', safeTripTable(s.rows.slice()
-        .sort(function (a, b) { return safeScore(a) - safeScore(b); }).slice(0, 20)));
+      // 「점수가 낮은 운행」인데 100점까지 다 나왔다 — 90점 미만만, 「전체 보기」로 모두(2026-10-19 웹 사용성 1차)
+      var sorted = s.rows.slice().sort(function (a, b) { return safeScore(a) - safeScore(b); });
+      var low = sorted.filter(function (t) { return safeScore(t) < 90; });
+      var list = SAFE_ALL ? sorted : low.slice(0, 20);
+      var allBtn = sorted.length > list.length || SAFE_ALL
+        ? '<button class="btn sm" data-safeall="' + (SAFE_ALL ? 0 : 1) + '">' + (SAFE_ALL ? '90점 미만만 보기' : '전체 보기 (' + n0(sorted.length) + '건)') + '</button>' : '';
+      h += sect(SAFE_ALL ? '평가한 운행 전체' : '점수가 낮은 운행', SAFE_ALL ? n0(sorted.length) + '건 · 낮은 순' : '90점 미만 ' + n0(low.length) + '건', allBtn,
+        list.length ? safeTripTable(list)
+          : '<div class="panel" style="padding:16px 20px;color:var(--ink-600)">90점 미만인 운행이 없습니다.</div>');
       h += safeRuleNote();
       return h;
     }
@@ -1934,7 +1945,8 @@
       kv('직급', esc(u.position || '—')) +
       kv('차량번호', esc(u.plate_no || '—')) +
       kv('차 종', esc(u.vehicle_type || '—')) +
-      kv('운행일지 관리자', ME.is_admin ? '예' : '아니오') +
+      // 관리자에게만(2026-10-19 — 직원에게 「아니오」 줄은 뜻이 없었다)
+      (ME.is_admin ? kv('운행일지 관리자', '예') : '') +
       // 2026-10-07 — 업무용 차량을 운전하는가(운행일지 씀/안 씀). 바꾸는 것은 관리자가 「권한 관리」에서 한다.
       kv('차량 운전', (usesDriving(myName())
         ? '<b>운전합니다</b> <span class="dim">— 운행일지와 개인경비를 모두 씁니다</span>'
@@ -1945,7 +1957,8 @@
     h += sect('결재 서명', null, '', signPanel());
 
     h += sect('비밀번호 바꾸기', null, '',
-      '<div class="panel" style="padding:20px"><div class="form">' +
+      // 창 안의 폼과 달리 칸(panel) 맨 위라 위 구분선이 빈 줄처럼 보였다(2026-10-19) — 뺀다
+      '<div class="panel" style="padding:8px 20px 20px"><div class="form" style="border-top:0;margin-top:0">' +
       frow('현재 비밀번호', mineUserField() + '<input class="inp pw" type="password" id="pwCur" autocomplete="current-password">') +
       frow('새 비밀번호', '<input class="inp pw" type="password" id="pwNew" autocomplete="new-password">',
         '4자 이상. <b>앱과 웹이 같은 비밀번호</b>를 씁니다 — 바꾸면 앱에서도 새 것으로 들어가셔야 합니다.') +
@@ -3593,11 +3606,18 @@
   function noticeKey(k) { return 'drv.noticex.' + myName() + '.' + k; }
   function noticeClosed(k) { try { return localStorage.getItem(noticeKey(k)) === '1'; } catch (e) { return false; } }
   function noticeClose(k) { try { localStorage.setItem(noticeKey(k), '1'); } catch (e) { } }
-  /** 닫을 수 있는 공지 띠(아직 안 닫은 것만). 운행일지를 안 쓰는 사람·관리 화면에는 없다. */
+  /** 닫을 수 있는 공지 띠(아직 안 닫은 것만). 운행일지를 안 쓰는 사람·관리 화면에는 없다.
+      웹 사용성 1차(2026-10-19): 8줄 띠 → 한 줄 요약(title) + 「자세히」(펼치면 사용자 결정 문구 전체 그대로). × 는 오른쪽 위.
+      이번 달 마감 화면에만 단다(영수증 화면 주차·통행료 카드 안 것은 뺐다). 펼침은 이 창에서만 기억한다. */
+  var NOTICE_OPEN = {};
   function noticeBand() {
     if (!myName() || !usesDriving(myName()) || isAll()) return '';
     return NOTICES.filter(function (n) { return !noticeClosed(n.k); }).map(function (n) {
-      return '<div class="hpnote notice" data-notice="' + esc(n.k) + '">' + ic('alert', 16) + '<span><b>[안내]</b> ' + esc(n.text) + '</span>' +
+      var open = !!NOTICE_OPEN[n.k];
+      return '<div class="hpnote notice' + (open ? ' open' : '') + '" data-notice="' + esc(n.k) + '">' + ic('alert', 16) +
+        '<span class="ntx"><b>[안내]</b> <span class="nsum">' + esc(n.title) + '</span>' +
+        '<span class="nfull">' + esc(n.text) + '</span> ' +
+        '<button type="button" class="nmore" data-noticemore="' + esc(n.k) + '" aria-expanded="' + open + '">' + (open ? '접기' : '자세히') + '</button></span>' +
         '<button class="iconbtn" data-noticex="' + esc(n.k) + '" aria-label="이 안내 닫기" title="이 안내 닫기">' + ic('close', 14) + '</button></div>';
     }).join('');
   }
@@ -3613,6 +3633,7 @@
     if (bb) bb.setAttribute('aria-label', n ? '알림 — 읽지 않은 ' + n + '건' : '알림');
     var ub = $('uBtn');
     if (ub) ub.setAttribute('aria-label', '내 정보' + (n ? ' · 읽지 않은 알림 ' + n + '건' : ''));
+    if (ub) ub.title = '내 정보' + (n ? ' · 읽지 않은 알림 ' + n + '건' : '');      // 좁은 폰에서 이름 위 숫자의 뜻(2026-10-19)
     if (NOTE.open) paintNotePop();
   }
   /** 좁은 폰(≤460px)에서는 종을 따로 두지 않는다 — 머리줄이 넘친다. 이름 단추가 알림 창을 연다(창 안에 「내 계정」). */
@@ -4162,6 +4183,18 @@
     return '이미 승인한 분이 있어 회수할 수 없습니다. 고치시려면 지금 차례인 <b>' +
       esc(cur ? (cur.name || nameOf(cur.approver)) : '결재자') + '</b> 님에게 반려를 요청해 주세요.';
   }
+  /** 영수증 화면(2단계)을 지금 단계(1단계)보다 먼저 연 것인가 — 맨 아래 띠가 「지금은 1단계 차례」라고 말하는 경우와 같은 조건. */
+  function evAhead() {
+    return VIEW === 'evid' && !isAll() && !isMulti() && !cycleLocked(myName()) && Math.min(stepNow(), 3) < 2;
+  }
+  /** 결재 중인 기간을 고치는 방법 한 줄(글만, 마감 첫 화면 큰 제목 아래 — 2026-10-19). */
+  function fixHowPlain(a) {
+    if (!a) return '';
+    var anyDone = (a.steps || []).some(function (x) { return x.result; });
+    if (!anyDone) return '고치려면 아래 「회수」를 누른 뒤 고쳐서 다시 상신하세요.';
+    var cur = (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0];
+    return '고치려면 ' + (cur ? (cur.name || nameOf(cur.approver)) : '지금 차례인 결재자') + ' 님에게 반려를 요청하세요.';
+  }
   /** 그 사람의 가장 최근 운행 — 계기판 기본값에 쓴다. */
   function lastTripOf(u) {
     return TRIPS.filter(function (t) { return t.username === u; })
@@ -4411,14 +4444,20 @@
       desc = '아래 결재 띠에서 결재 완료본 PDF·엑셀을 받을 수 있습니다.';
     } else if (st === 'submitted') {
       verdict = '<em>결재 중입니다</em>'; clean = ' wait';
-      desc = '결재 차례가 된 분께 팀즈로 알림이 갑니다. 결재 중에는 이 기간의 기록을 고칠 수 없습니다.';
+      // 2026-10-19 웹 사용성 1차: 「결재 중」을 세 번 말하던 것 → 큰 제목 + 고치는 방법 한 줄(결재 띠 아래 같은 안내는 뺐다)
+      desc = fixHowPlain(myAppr());
     } else if (cur === 0 && !S.trips.length && !S.ev.length) {
       verdict = '아직 기록된 운행이 없습니다'; clean = ' clean';
       desc = '앱에서 운행을 기록하면 여기에 모입니다.';
     } else if (cur === 0) {
       verdict = S.fixBad ? '운행 기록 <em>' + n0(S.fixBad) + '건</em>을 먼저 손보세요' : '<em>① 운행 기록</em>을 확인하세요';
       desc = S.fixBad ? '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 고친 뒤 맨 아래 「2 영수증·통행료 →」를 누르세요.'
-        : '운행 ' + n0(S.trips.length) + '건이 맞는지 보고, 맨 아래 「2 영수증·통행료 →」를 누르세요.';
+        // 운행 기록 화면은 「일반업무」로 걸러져 열린다 — 같은 수를 말한다(전체 6건이라 해 놓고 4건이 보였다, 2026-10-19 로봇)
+        : (function () {
+            var biz = S.trips.filter(function (t) { return (t.purpose || '') === BUSINESS; }).length;
+            return '업무 운행 ' + n0(biz) + '건' + (biz !== S.trips.length ? '(전체 ' + n0(S.trips.length) + '건)' : '') +
+              '이 맞는지 보고, 맨 아래 「2 영수증·통행료 →」를 누르세요.';
+          })();
       btns = S.fixBad ? big('check', '기록 ' + n0(S.fixBad) + '건 고치기') + sub('trips', '운행 기록 보기') : big('trips', '운행 기록 확인하기');
     } else if (cur === 1) {
       verdict = '<em>② 영수증·통행료</em>를 차례대로 정리하세요';
@@ -4455,16 +4494,13 @@
     //   「내가 결재할 것」은 결재할 것이 있을 때만 남긴다.
     var sentNow = st === 'submitted' || st === 'approved';
     if (sentNow) h += ib.length ? '<div class="cards3 one">' + inboxCard() + '</div>' : '';
-    else h += '<div class="cards3">' +
-      '<div class="cardx"><div class="k">' + (closed ? '업무용 비용' : '업무용 비용 (지금까지)') + '</div><div class="v">' + won(T.cost) + '</div><div class="rows">' +
-        '<div><span>유류비</span><b>' + won(T.fuel) + '</b></div>' +
-        '<div><span>통행료' + (T.evToll ? ' (영수증 포함)' : '') + '</span><b>' + won(T.toll) + '</b></div>' +
-        '<div><span>주차비' + (T.evPark ? ' (영수증 포함)' : '') + '</span><b>' + won(T.park) + '</b></div></div></div>' +
-      '<div class="cardx"><div class="k">운행</div><div class="v">' + n0(T.n) + '<small>건</small></div><div class="rows">' +
-        '<div><span>거리</span><b>' + km(T.km) + ' km</b></div><div><span>업무용</span><b>' + km(T.bizKm) + ' km</b></div>' +
-        (T.manual ? '<div><span>수기 입력</span><b>' + n0(T.manual) + '건</b></div>' : '') + '</div></div>' +
-      inboxCard() +
-      '</div>';
+    // 2026-10-19 웹 사용성 1차: 숫자 카드 3장 → 한 줄 요약, 결재할 것 0건 카드는 숨긴다.
+    else h += '<div class="sumline">' +
+      '<span class="si"><em>' + (closed ? '업무용 비용' : '업무용 비용(지금까지)') + '</em><b>' + won(T.cost) + '</b><small>유류비 ' + won(T.fuel) +
+        ' · 통행료' + (T.evToll ? '(영수증 포함)' : '') + ' ' + won(T.toll) + ' · 주차비' + (T.evPark ? '(영수증 포함)' : '') + ' ' + won(T.park) + '</small></span>' +
+      '<span class="si"><em>운행</em><b>' + n0(T.n) + '건</b><small>' + km(T.km) + ' km · 업무용 ' + km(T.bizKm) + ' km' +
+        (T.manual ? ' · 수기 입력 ' + n0(T.manual) + '건' : '') + '</small></span></div>' +
+      (ib.length ? '<div class="cards3 one">' + inboxCard() + '</div>' : '');
     function inboxCard() {
       return '<div class="cardx"><div class="k">내가 결재할 것</div><div class="v' + (ib.length ? ' hot' : '') + '">' + n0(ib.length) + '<small>건</small></div>' +
         (ib.length
@@ -4474,7 +4510,9 @@
           : '<div class="rows"><div><span>지금 차례인 결재가 없습니다</span></div></div>') + '</div>';
     }
 
-    h += apprStrip(cur === 2);
+    // 「아직 상신하지 않았습니다」 띠는 3단계(검증·상신)일 때만 — 1·2단계에서는 위 「지금 할 일」 하나만(2026-10-19).
+    //   상신한 적이 있으면(결재 중·완료·반려·회수) 진행 줄을 보여야 하므로 그대로 단다.
+    if (cur === 2 || myAppr()) h += apprStrip(cur === 2, true);
     // 통행료 미확정은 위 '지금 할 일'·2단계가 말한다 — 여기서 또 세지 않는다.
     var others = A.filter(function (f) { return f.n > 0 && f.k !== 'unk'; });
     if (others.length && !approved) {
@@ -4516,7 +4554,7 @@
   }
 
   /** 마감 현황의 결재 띠. 상태에 따라 버튼이 달라진다. */
-  function apprStrip(nowVerify) {
+  function apprStrip(nowVerify, inHome) {
     var a = myAppr(), st = apprStatusText(a);
     var canWithdraw = a && a.status === 'submitted' &&
       !(a.steps || []).some(function (x) { return x.result; });
@@ -4541,12 +4579,23 @@
       '<span style="flex:1"></span>' + btn + '</div>' +
       (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선을 불러올 수도 있습니다.</div>') +
       (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x); })(EXT.apprExtra(a)) : '') +
-      (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
+      // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
+      (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
         withdrawHow(a) + '</div>' : '') +
       (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote">고친 뒤 「3 검증·상신」에서 다시 상신합니다.</div>' : '') +
       '</div></section>';
   }
 
+  /** 관리 화면의 점검 줄 — 직원용 문장(「영수증을 올리세요」) 대신 몇 건·몇 명인지와 누르면 무엇을 보는지(2026-10-19).
+      현황에서 누르면 전체 운행 기록을 소속·이름 순으로 연다(data-issue 처리). */
+  function adminIssueRow(f, byPerson) {
+    var who = {}; (f.rows || []).forEach(function (t) { if (t && t.username) who[t.username] = 1; });
+    var np = Object.keys(who).length, g = {};
+    for (var k in f) g[k] = f[k];
+    g.d = n0(f.n) + '건' + (np ? ' · ' + n0(np) + '명' : '') +
+      (f.rows && f.rows.length ? (byPerson === false ? ' — 누르면 그 운행을 봅니다' : ' — 누르면 운행 기록에서 사람별로 봅니다') : '');
+    return issueRow(g);
+  }
   function issueRow(f) {
     var clickable = f.rows && f.rows.length;
     return '<button class="issue sv-' + f.sev + '"' + (clickable ? ' data-issue="' + f.k + '"' : ' disabled') + '>' +
@@ -4641,7 +4690,8 @@
        표: 사람별 상신 상태 + 검증 결과 + 금액 · 줄마다 운행기록부 「인쇄」 · 머리에 「목록 CSV」(이 표 그대로)
      관리자 반려·정정 열기는 「결재 완료 출력」에만 둔다. 관리자 본인의 상신 띠(「내 것 상신」)·「내 운행기록부」는 넣지 않는다.
      예전 주소(#/a_close · #/a_verify · #/a_settle)는 이 화면으로 돌려보낸다(OLD_VIEWS — 북마크·알림 링크가 깨지지 않게). */
-  var ST_LABEL = { approved: ['결재 완료', 'ok'], submitted: ['결재 중', 'warn'], rejected: ['반려', 'bad'], withdrawn: ['회수', ''] };
+  // 분류 넷(결재 완료·결재 중·반려·미상신)을 현황·결재 완료 출력이 같이 쓴다(2026-10-19 웹 사용성 1차). 회수는 다시 올리기 전까지 미상신.
+  var ST_LABEL = { approved: ['결재 완료', 'ok'], submitted: ['결재 중', 'warn'], rejected: ['반려', 'bad'], withdrawn: ['미상신', 'dim'] };
   /** 현황 표의 줄 — 사람별 금액(perPersonTotals) + 이 기간 결재 상태 + 검증 요약. */
   function statusRows(V) {
     var cyc = CYCKEY();
@@ -4658,10 +4708,10 @@
     var T = totals(TRIPS, { allUsers: true }), A = audit();
     var V = EXT.statusVerify ? EXT.statusVerify(CYCKEY()) : null;
     var rows = statusRows(V);
-    var c = { approved: 0, submitted: 0, back: 0, none: 0, vbad: 0, vnone: 0 };
+    var c = { approved: 0, submitted: 0, rej: 0, none: 0, vbad: 0, vnone: 0 };
     rows.forEach(function (x) {
       if (x.st === 'approved') c.approved++; else if (x.st === 'submitted') c.submitted++;
-      else if (x.st === 'rejected' || x.st === 'withdrawn') c.back++; else c.none++;
+      else if (x.st === 'rejected') c.rej++; else c.none++;          // 회수(withdrawn)는 미상신
       if (V) { if (!x.v) c.vnone++; else if (x.v.bad) c.vbad++; }
     });
     var r = cycleRange(CYC.y, CYC.m), now = Date.now(), closed = now >= r.hi;
@@ -4671,7 +4721,7 @@
     // ── 진행 상태 요약 — 회사(보는 범위) 전체의 현황 문장(관리자 본인에게 시키는 말이 아니다) ──
     var verdict = !rows.length ? '아직 기록된 운행이 없습니다'
       : c.approved === rows.length ? '<em>모두 결재가 끝났습니다</em>'
-      : '결재 완료 <em>' + n0(c.approved) + '명</em> · 결재 중 ' + n0(c.submitted) + '명 · 상신 전 ' + n0(c.none + c.back) + '명';
+      : '결재 완료 <em>' + n0(c.approved) + '명</em> · 결재 중 ' + n0(c.submitted) + '명 · 반려 ' + n0(c.rej) + '명 · 미상신 ' + n0(c.none) + '명';
     // 막대 = 결재 완료(초록) + 결재 중(주황)의 비율(2026-10-16 3차 — 예전에는 기간이 지난 비율이라 「결재 완료 0」인데 85% 차 보였다)
     var pa = rows.length ? Math.round(c.approved / rows.length * 100) : 0, ps = rows.length ? Math.round((c.approved + c.submitted) / rows.length * 100) - pa : 0;
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (rows.length && c.approved === rows.length ? ' ok' : '') + '"></span>' +
@@ -4680,8 +4730,7 @@
       '<div class="track apv2" data-apvbar role="img" aria-label="결재 완료 ' + n0(c.approved) + '명 · 결재 중 ' + n0(c.submitted) + '명 / ' + n0(rows.length) + '명">' +
         '<i style="width:' + pa + '%"></i><i class="mid" style="width:' + ps + '%"></i></div>' +
       '<div class="facts">' +
-      fact('결재 완료', n0(c.approved) + '<small>명</small>', '결재 중 ' + n0(c.submitted) + '명') +
-      fact('상신 전', n0(c.none + c.back) + '<small>명</small>', c.back ? '그 중 반려·회수 ' + n0(c.back) + '명' : '아직 올리지 않음', c.none + c.back > 0 && closed) +
+      // 결재 상태 숫자는 위 큰 제목 한 줄이 말한다(예전에는 숫자 칸에 한 번 더, 분류도 달랐다 — 2026-10-19). 여기는 검증·금액만.
       fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했습니다' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
         (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) +
@@ -4692,7 +4741,7 @@
     if (issues.length) {
       h += sect('바로 봐야 할 기록', null,
         '<button class="btn sm" data-keeporg data-v="a_check">전체 점검 ' + ic('chev', 13) + '</button>',
-        '<div class="panel">' + issues.map(issueRow).join('') + '</div>');
+        '<div class="panel">' + issues.map(function (f) { return adminIssueRow(f, true); }).join('') + '</div>');
     }
     var tc = teamCards(rows);
     if (tc) h += sect(ORGF.team ? '파트·센터별' : '팀별', null, '', tc);
@@ -4722,7 +4771,7 @@
     // 2026-10-16 3차: 1280 폭에서 표(1068px)가 칸(954px)을 넘었다 — 운행·거리를 한 칸으로, 「통행료 미확정」은 「미확정」, 단추 칸은 줄을 바꿀 수 있게.
     var cols = 11;
     var stCell = function (x) {
-      var L = ST_LABEL[x.st] || ['상신 전', 'dim'];
+      var L = ST_LABEL[x.st] || ['미상신', 'dim'];
       return '<span class="st ' + L[1] + '" title="' + esc(x.a ? apprStatusText(x.a).t : '아직 상신하지 않았습니다') + '">' + esc(L[0]) + '</span>';
     };
     var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable stable"><thead><tr>' +
@@ -4763,7 +4812,7 @@
     var lines = [['사업부', '팀', '파트·센터', '이름', '상신', '검증', '운행', '거리km', '유류비', '통행료', '주차비', '합계', '통행료미확정'].join(',')];
     orgGroups(rows, function (x) { return x.u; }).forEach(function (g) {
       g.list.forEach(function (x) {
-        var p = orgPath(x.u), L = ST_LABEL[x.st] || ['상신 전'];
+        var p = orgPath(x.u), L = ST_LABEL[x.st] || ['미상신'];
         var cells = [p.div || '', p.team || '', p.unit || '', nameOf(x.u), L[0], V ? V.text(x.u) : '',
           x.n, Math.round(x.km), Math.round(x.fuel), Math.round(x.toll), Math.round(x.park), Math.round(x.cost), x.unk || 0];
         lines.push(cells.map(function (v) {
@@ -5117,7 +5166,7 @@
     var found = A.filter(function (f) { return f.n > 0; });
     var okOnes = A.filter(function (f) { return f.n === 0; });
 
-    var h = head(scopeTitle('기록 점검'), esc(viewName()) + ' · 실제로 사고가 났던 유형만 봅니다');
+    var h = head(scopeTitle('기록 점검'), esc(viewName()) + ' · 금액이 틀어지기 쉬운 기록을 찾아 줍니다');
 
     if (!found.length) {
       h += '<div class="hero fade"><div class="eyebrow"><span class="dot" style="background:var(--ok)"></span>점검 완료</div>' +
@@ -5126,23 +5175,24 @@
         A.length + '<small>가지</small></div><div class="sub">전부 이상 없음</div></div></div></div>';
     } else {
       h += sect('발견된 것', found.length + '가지', '',
-        '<div class="panel">' + found.map(issueRow).join('') + '</div>');
+        '<div class="panel">' + found.map(isAll() ? function (f) { return adminIssueRow(f, false); } : issueRow).join('') + '</div>');
     }
+    // 이상 없는 항목은 한 줄로 접는다(2026-10-19 웹 사용성 1차 — 6줄이 발견된 것보다 길었다). 펼치면 항목 이름.
     if (okOnes.length) {
-      h += sect('이상 없음', okOnes.length + '가지', '',
+      h += '<details class="okfold"><summary>' + ic('check', 15) + '<span>이상 없음 <b>' + okOnes.length + '가지</b></span>' +
+        '<span class="dim">' + esc(okOnes.map(function (f) { return f.t; }).join(' · ')) + '</span></summary>' +
         '<div class="panel">' + okOnes.map(function (f) {
           return '<div class="issue sv-ok" style="cursor:default">' +
             '<span class="ico">' + ic('check', 16) + '</span>' +
             '<span class="bd"><span class="t">' + esc(f.t) + '</span></span>' +
             '<span class="amt" style="color:var(--ok)">0</span><span style="width:15px"></span></div>';
-        }).join('') + '</div>');
+        }).join('') + '</div></details>';
     }
 
     h += sect('점검 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
-      '<b style="color:var(--ink-2)">계기판이 크게 튄 곳</b> — 같은 사람·같은 차에서 1,000km 이상 벌어진 지점. ' +
-      '2026년 9월 감사에서 175,500km 오타가 이렇게 잡혔습니다.<br>' +
-      '<b style="color:var(--ink-2)">한 차를 두 사람이</b> — 번호판을 잘못 고르면 남의 차 기록이 됩니다. 18건이 이렇게 섞였었습니다.<br>' +
+      '<b style="color:var(--ink-2)">계기판이 크게 튄 곳</b> — 같은 사람·같은 차에서 1,000km 이상 벌어진 지점. 계기판 숫자를 잘못 적었을 수 있습니다.<br>' +
+      '<b style="color:var(--ink-2)">한 차를 두 사람이</b> — 번호판을 잘못 고르면 남의 차 기록이 됩니다.<br>' +
       '<b style="color:var(--ink-2)">운행목적 미선택</b> — 업무용으로 안 잡혀 금액이 조용히 0원이 됩니다.<br>' +
       '<b style="color:var(--ink-2)">유류단가 미등록</b> — 기본 단가 159원/km 로 계산돼 실제와 어긋납니다.<br>' +
       '<b style="color:var(--ink-2)">통행료 미확정</b> — 정산에서 0원으로 잡혀 회사가 덜 내주게 됩니다.</div>');
@@ -6292,17 +6342,21 @@ window.EduGuard = {
       '<div class="fact"><div class="k">이번 회차 내 이수</div><div class="v">' + done + '<small> / ' + round.length + '편</small></div>' +
       '<div class="sub">' + (amTarget ? '의무 대상입니다' : '의무 대상 아님') + '</div></div>' +
       '<div class="fact"><div class="k">남은 의무</div><div class="v' + (ob.length ? ' alert' : '') + '">' + ob.length + '<small>편</small></div>' +
-      '<div class="sub">' + (ob.length ? (carry ? '이월 ' + carry + '편 포함 · ' : '') + '가장 급한 마감 ' + eduDday(ob[0].month) : '남은 것 없음') + '</div></div>' +
+      // D-day 는 위 머리 줄에 한 번만(2026-10-19) — 여기서는 마감 날짜
+      '<div class="sub">' + (ob.length ? (carry ? '이월 ' + carry + '편 포함 · ' : '') + '가장 급한 마감 ' + eduDeadlineLabel(ob[0].month) : '남은 것 없음') + '</div></div>' +
       '<div class="fact"><div class="k">전체 영상</div><div class="v">' + EDUV.length + '<small>편</small></div></div>' +
       '</div></div>';
 
     if (!EDUV.length) return h + blank('등록된 교육 영상이 없습니다.', null, 'play');
     var by = {}, keys = [];
     EDUV.forEach(function (v) { if (!by[v.month]) { by[v.month] = []; keys.push(v.month); } by[v.month].push(v); });
-    keys.sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0; });
+    // 순서: 이번 회차 → 지난 회차(최근 것부터) → 공개 예정(2026-10-19 웹 사용성 1차 — 공개 예정이 의무 영상보다 위에 있었다)
+    var rank = function (mo) { return mo === key ? 0 : eduIsOpen(mo) ? 1 : 2; };
+    keys.sort(function (a, b) { return rank(a) - rank(b) || (rank(a) === 2 ? (a < b ? -1 : a > b ? 1 : 0) : (a < b ? 1 : a > b ? -1 : 0)); });
     keys.forEach(function (mo) {
       var open = eduIsOpen(mo), yy = eduYm(mo);
-      var sub = open ? '시청기간 ' + eduOpenLabel(mo) + '~' + eduDeadlineLabel(mo) + ' · ' + eduDday(mo)
+      // 이번 회차의 D-day 는 머리 줄에 이미 있다 — 한 번만
+      var sub = open ? '시청기간 ' + eduOpenLabel(mo) + '~' + eduDeadlineLabel(mo) + (mo === key ? '' : ' · ' + eduDday(mo))
         : '🔒 공개예정 · ' + eduOpenLabel(mo) + ' 공개';
       h += sect(yy.y + '년 ' + pad(yy.m) + '월 회차', '<span class="' + (open ? '' : 'edusoon') + '">' + esc(sub) + '</span>', '',
         '<div class="panel edulist">' + by[mo].map(function (v) {
@@ -6506,7 +6560,8 @@ window.EduGuard = {
 
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>업무용 비용 합계</div>' +
       '<p class="verdict">' + won(T.cost) + '</p>' +
-      '<div class="facts">' +
+      // 세 칸(유류비·통행료·주차비)은 폰에서도 한 줄(2026-10-19 — 2열이라 주차비만 혼자 아래 줄이었다)
+      '<div class="facts f3">' +
       '<div class="fact"><div class="k">유류비</div><div class="v">' + won(T.fuel) +
       '</div><div class="sub">업무거리 ' + km(T.bizKm) + ' km</div></div>' +
       '<div class="fact"><div class="k">통행료</div><div class="v">' + won(T.toll) +
@@ -6529,9 +6584,10 @@ window.EduGuard = {
     h += sect(isAll() ? '직원별' : '내 정산',
       isAll() ? rows.length + '명' : '운행 ' + n0(T.n) + '건',
       // 버튼 이름을 받는 것 그대로 부른다(예전 「인쇄용 출력」은 엑셀 창을 열었다).
-      (isMulti() ? '' : '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
+      // 두 단추는 한 묶음(같은 줄·같은 높이 — 폰에서 두 줄로 갈라지던 것, 2026-10-19)
+      '<span class="hdbtns">' + (isMulti() ? '' : '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
         (isAll() ? '내 운행기록부' : '운행기록부 (엑셀 · PDF)') + '</button>') +
-      '<button class="btn sm" id="btnCsv" title="운행 목록을 CSV 로 받습니다">' + ic('dl', 13) + '목록 CSV</button>', personTable(rows));
+      '<button class="btn sm" id="btnCsv" title="운행 목록을 CSV 로 받습니다">' + ic('dl', 13) + '목록 CSV</button></span>', personTable(rows));
 
     h += sect('산정 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
@@ -7199,24 +7255,24 @@ window.EduGuard = {
 
     h += sect('명단', list.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
       '<th>파트·센터</th><th>이름</th><th>직급</th><th>차량</th><th class="n">운행</th>' +
-      '<th class="n">거리</th><th class="n">비용</th><th></th></tr></thead><tbody>' +
+      '<th class="n">거리</th><th class="n">비용</th></tr></thead><tbody>' +
       orgGroups(list, function (u) { return u.username; }, true).map(function (g) {
         var gi = g.list.filter(function (u) { return !(byU[u.username] || []).length; }).length;
-        return orgGroupRow(g, 8, gi ? '<span class="unk">기록 없음 ' + n0(gi) + '명</span>' : '전원 기록') + g.list.map(peopleRow).join('');
+        return orgGroupRow(g, 7, gi ? '<span class="unk">기록 없음 ' + n0(gi) + '명</span>' : '전원 기록') + g.list.map(peopleRow).join('');
       }).join('') + '</tbody></table></div></div>');
     return h;
     function peopleRow(u) {
       return (function () {
         var x = totals(byU[u.username] || [], { who: u.username });   // 영수증만 있는 사람도 금액이 나온다(다른 화면과 같은 기준)
         return '<tr class="clk" tabindex="0" data-person="' + esc(u.username) + '">' + orgCell(u.username, true) +
-          '<td><span class="lead">' + esc(u.name || u.username) + '</span>' +
+          // 「관리자」는 맨 끝 빈 칸이 아니라 이름 옆 딱지(2026-10-19 웹 사용성 1차)
+          '<td><span class="lead">' + esc(u.name || u.username) + '</span>' + (u.is_admin ? ' <span class="admtag">관리자</span>' : '') +
           '<div class="dim" style="font-size:11px">' + esc(u.username) + '</div></td>' +
           '<td class="dim">' + esc(u.position || '—') + '</td>' +
           '<td class="dim">' + esc(u.plate_no || '—') + '</td>' +
           '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td>' +
           '<td class="n">' + (x.km ? km(x.km) : '—') + '</td>' +
-          '<td class="n total">' + (x.cost ? n0(x.cost) : '—') + '</td>' +
-          '<td>' + (u.is_admin ? '<span class="st bad">관리자</span>' : '') + '</td></tr>';
+          '<td class="n total">' + (x.cost ? n0(x.cost) : '—') + '</td></tr>';
       })();
     }
   }
@@ -7244,33 +7300,40 @@ window.EduGuard = {
       '<div class="fact"><div class="k">등록된 차량</div><div class="v">' + VEHICLES.length + '<small>대</small></div></div>' +
       '</div></div>';
 
-    h += sect('이번 기간에 운행된 차량', plates.length + '대', '',
+    // 2026-10-19 웹 사용성 1차: 「이번 기간에 운행된 차량」·「등록된 차량」 두 표가 같은 차를 되풀이했다 → 표 하나(차종·누적 km 를 합침),
+    //   이번 기간에 운행이 없는 등록 차는 아래에 따로 짧게.
+    var vOf = {};
+    VEHICLES.forEach(function (v) { if (v && v.plate_no && !vOf[v.plate_no]) vOf[v.plate_no] = v; });
+    h += sect('차량', plates.length + '대 운행', '',
       plates.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-        '<th>번호판</th><th>사용자</th><th class="n">운행</th><th class="n">거리</th>' +
-        '<th class="n">계기판</th><th>비고</th></tr></thead><tbody>' +
+        '<th>번호판</th><th>사용자</th><th>차종</th><th class="n">운행</th><th class="n">거리</th>' +
+        '<th class="n">계기판</th><th class="n">누적 km</th><th>비고</th></tr></thead><tbody>' +
         plates.map(function (p) {
-          var v = used[p], us = Object.keys(v.users);
+          var v = used[p], us = Object.keys(v.users), reg = vOf[p];
           var multi = us.length > 1, wide = isFinite(v.min) && (v.max - v.min) > 10000;
           return '<tr class="clk' + (multi || wide ? ' flagged' : '') + '" tabindex="0" data-car="' + esc(p) + '">' +
             '<td><span class="lead">' + esc(p) + '</span></td>' +
             '<td>' + esc(us.map(nameOf).join(', ')) + '</td>' +
+            '<td class="dim">' + esc((reg && reg.vehicle_type) || '—') + '</td>' +
             '<td class="n">' + n0(v.n) + '</td><td class="n">' + km(v.km) + '</td>' +
             '<td class="n dim">' + (isFinite(v.min) ? n0(v.min) + ' – ' + n0(v.max) : '—') + '</td>' +
+            '<td class="n dim">' + (reg && reg.cumulative_km != null ? n0(reg.cumulative_km) : '—') + '</td>' +
             '<td>' + (multi ? '<span class="st bad">사용자 ' + us.length + '명</span> ' : '') +
             (wide ? '<span class="st bad">계기판 폭 ' + n0(v.max - v.min) + 'km</span>' : '') +
             (!multi && !wide ? '<span class="st dim">정상</span>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>' : blank('운행 기록이 없습니다.', null, 'car'));
 
-    if (VEHICLES.length) {
-      h += sect('등록된 차량', VEHICLES.length + '대', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+    var idleCars = VEHICLES.filter(function (v) { return v && v.plate_no && !used[v.plate_no]; })
+      .sort(function (a, b) { return (a.plate_no || '').localeCompare(b.plate_no || ''); });
+    if (idleCars.length) {
+      h += sect('이번 기간 운행 없는 차', idleCars.length + '대', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
         '<th>번호판</th><th>사용자</th><th>차종</th><th class="n">누적 km</th></tr></thead><tbody>' +
-        VEHICLES.slice().sort(function (a, b) { return (a.plate_no || '').localeCompare(b.plate_no || ''); })
-          .map(function (v) {
-            return '<tr><td><span class="lead">' + esc(v.plate_no) + '</span></td>' +
-              '<td>' + esc(nameOf(v.username)) + '</td>' +
-              '<td class="dim">' + esc(v.vehicle_type || '—') + '</td>' +
-              '<td class="n">' + n0(v.cumulative_km) + '</td></tr>';
-          }).join('') + '</tbody></table></div></div>');
+        idleCars.map(function (v) {
+          return '<tr><td><span class="lead">' + esc(v.plate_no) + '</span></td>' +
+            '<td>' + esc(nameOf(v.username)) + '</td>' +
+            '<td class="dim">' + esc(v.vehicle_type || '—') + '</td>' +
+            '<td class="n">' + n0(v.cumulative_km) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>');
     }
     return h;
   }
@@ -8555,6 +8618,25 @@ window.EduGuard = {
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
   var NOCYC_VIEWS = ['account', 'org', 'perm', 'eduadm', 'edu'];
+  /** 포털(work.html 「시스템 선택」) 카드의 내 상태 한 줄에 쓸 것 — 이 화면이 이미 아는 것만 이 탭(sessionStorage)에 적어 둔다
+      (2026-10-19 웹 사용성 1차). 이번 운행일지 기간의 내 단계·결재 상태, 종류별 「결재할 것」 수. 서버를 더 부르지 않는다. */
+  function portalHint() {
+    if (!LOADED || !myName() || isMulti()) return;
+    try {
+      var cur = cycKey(currentCycle()), old = {};
+      try { old = JSON.parse(sessionStorage.getItem('drv_portal_hint') || '{}') || {}; } catch (e) { old = {}; }
+      if (old.u !== myName()) old = {};
+      var n = { d: 0, x: 0, c: 0 };
+      inbox().forEach(function (a) {
+        var k = kindOf(a), s = !k ? 'd' : k === 'expense' ? 'x' : k === 'card' ? 'c' : '';
+        if (s) n[s]++;
+      });
+      var a = myAppr(cur);
+      var h = { u: myName(), at: Date.now(), cyc: cur, st: a ? a.status : '', inbox: { d: n.d, x: n.x, c: n.c },
+        step: CYCKEY() === cur ? Math.min(stepNow(), 4) : (old.cyc === cur ? old.step : null), drv: usesDriving(myName()) };
+      sessionStorage.setItem('drv_portal_hint', JSON.stringify(h));
+    } catch (e) { }
+  }
   function render() {
     // 운전 안 하는 사람은 결재함·개인경비·내 계정만 — 다른 화면 주소로 와도 그리로 돌린다.
     var nd = noDriving();
@@ -8582,6 +8664,7 @@ window.EduGuard = {
         '<button class="btn pri" id="btnRetryLoad">다시 불러오기</button></div></section>'
       : (LOADED ? stepChrome((VIEWS[VIEW] || viewClose)()) : (VIEWS[VIEW] || viewClose)());
     paintNavMode();
+    portalHint();
     // 기간과 상관없는 화면(내 계정·조직도·권한 관리·교육 관리·안전교육)에서는 위 기간 단추를 숨긴다 — 눌러도 아무 일이 없었다(2026-10-15 2차)
     var cbx = $('cycleBox'); if (cbx) cbx.classList.toggle('nocyc', NOCYC_VIEWS.indexOf(VIEW) >= 0);
     Array.prototype.forEach.call($('nav').querySelectorAll('[data-v]'), function (a) {
@@ -8780,7 +8863,15 @@ window.EduGuard = {
       if (c1) setPeriod({ cyc: c1 });
       return;
     }
+    if ((el = e.target.closest('[data-safeall]'))) { SAFE_ALL = el.dataset.safeall === '1'; render(); return; }
     if ((el = e.target.closest('[data-noticex]'))) { noticeClose(el.dataset.noticex); render(); return; }
+    if ((el = e.target.closest('[data-noticemore]'))) {
+      var nb = el.closest('.hpnote.notice'), nk = el.dataset.noticemore;
+      NOTICE_OPEN[nk] = !NOTICE_OPEN[nk];
+      if (nb) nb.classList.toggle('open', NOTICE_OPEN[nk]);
+      el.setAttribute('aria-expanded', String(NOTICE_OPEN[nk])); el.textContent = NOTICE_OPEN[nk] ? '접기' : '자세히';
+      return;
+    }
     if ((el = e.target.closest('[data-prevx]'))) {
       // '지난달분 아직 상신 전' 안내를 이 브라우저에서 접는다(종이로 이미 낸 달일 수 있다).
       try { localStorage.setItem('drv.prevx', el.dataset.prevx); } catch (e2) { }
@@ -8840,9 +8931,12 @@ window.EduGuard = {
       var issue = el.dataset.issue;
       // 미확정 통행료는 2단계 영수증 › 통행료 차례로(예전 「통행료 채우기」 화면은 없앴다 — 2026-10-15 사용자: 영수증으로만).
       if (issue === 'unk' && !isAll()) { tollBack(); return; }
+      var fromStatus = VIEW === 'a_status';
       KEEP_ORG = true;                     // 같은 범위를 그대로 들고 간다(팀을 골라 놓고 미확정을 누르면 그 팀 것만)
       go(isAll() ? 'a_trips' : 'trips');
       FILT.chip = issue; FILT.who = ''; FILT.purp = '';   // 점검 항목은 목적과 관계없이 다 보인다
+      // 관리 현황 「바로 봐야 할 기록」은 「사람별로 봅니다」라고 말한다 — 전체 운행 기록을 소속·이름 순으로 묶어 연다(2026-10-19 로봇)
+      if (fromStatus) SORTS.tr = 'who:1';
       render(); return;
     }
     if ((el = e.target.closest('[data-edit]'))) { openEdit(el.dataset.edit); return; }

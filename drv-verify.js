@@ -1100,6 +1100,7 @@
     var shown = C.prints ? done.filter(function (a) { return C.prints.keep('driving', a); }) : done;
     var nSel = finPicked(shown).length;
 
+    var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
     var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력합니다');
     var fact = function (k, v, sub, alert) {
       return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
@@ -1109,10 +1110,11 @@
       esc(cname) + ' · ' + esc(C.cycleSpan(S.CYC.y, S.CYC.m)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + C.won(total) + '</p>' +
       '<div class="facts">' +
-      fact('결재 완료', n0(done.length) + '<small>명</small>', '출력할 수 있습니다') +
+      // 2026-10-19 웹 사용성 1차: 「결재 완료」는 위 큰 제목이 말한다(숫자 칸에 또 있었다). 분류는 현황과 같은 넷 — 결재 완료·결재 중·반려·미상신.
+      //   회수한 사람은 다시 올리기 전까지 미상신으로 센다(현황과 같게).
       fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
-      fact('반려·회수', n0(back.length) + '<small>명</small>', '고쳐서 다시 상신해야 함', back.length > 0) +
-      fact('아직 상신 안 함', n0(notYet.length) + '<small>명</small>', '이번 기간 운행이 있는데 상신 전', notYet.length > 0) +
+      fact('반려', n0(nRej) + '<small>명</small>', '고쳐서 다시 상신해야 함', nRej > 0) +
+      fact('미상신', n0(notYet.length + nWd) + '<small>명</small>', nWd ? '이번 기간 운행이 있는데 상신 전(회수 ' + n0(nWd) + '명 포함)' : '이번 기간 운행이 있는데 상신 전', notYet.length + nWd > 0) +
       '</div></div>';
 
     // ── 결재 완료 — 출력 ──
@@ -1163,8 +1165,8 @@
         }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
-      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '회수', cls: 'bad' }; })
-        .concat(notYet.map(function (u) { return { u: u, st: '상신 전', cls: 'warn' }; }));
+      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)', cls: a.status === 'rejected' ? 'bad' : 'warn' }; })
+        .concat(notYet.map(function (u) { return { u: u, st: '미상신', cls: 'warn' }; }));
       h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '',
         '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {

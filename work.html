@@ -203,6 +203,10 @@ a.launch:hover::before{content:"";position:absolute;left:0;top:0;width:10px;heig
 a.launch:hover .go svg{transform:translateX(4px)}
 .launch .go svg{transition:transform .15s}
 .launch.off .go{color:var(--grey-2)}
+/* 카드마다 내 상태 한 줄(2026-10-19 웹 사용성 1차) — 「운행일지 D-1 · 1단계」·「결재할 것 N건」 */
+.launch p.mine{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:2px;font-size:13px;font-weight:700;color:var(--ink)}
+.launch p.mine .hot{color:var(--red)}
+.launch p.mine .ap{display:inline-flex;align-items:center;padding:0 8px;border-radius:999px;background:var(--red);color:#fff;font-size:12px;line-height:22px}
 .notice{margin-top:22px;display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--warn-50);border:1px solid #EAD9B5;font-size:13.5px;color:#6A4708}
 .notice .sp{flex:1}
 .notice[hidden]{display:none}
@@ -376,19 +380,22 @@ footer .wrap{font-size:13px}
       <a class="launch" href="driving.html">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 15.5v-2.6l1.8-4.1A2 2 0 017.1 7.6h9.8a2 2 0 011.8 1.2l1.8 4.1v2.6a1 1 0 01-1 1h-1.2"/><path d="M5.7 16.5H4.5a1 1 0 01-1-1"/><path d="M9.3 16.5h5.4"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M5 12.5h14"/></svg></span>
         <h2>운행일지 (ATEC DRIVING)</h2>
-        <p>이번 달 마감 · 영수증·통행료 · Gemini 검증 · 상신과 결재함</p>
+        <p>운행 기록·영수증·통행료를 정리해 상신합니다</p>
+        <p class="mine" id="mineD" hidden></p>
         <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
       <a class="launch" href="driving.html#/x_month">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.8h7l4 4v12.4H7z"/><path d="M14 3.8v4h4M10 12.5h5M10 16h5"/></svg></span>
         <h2>개인경비 지출결의</h2>
-        <p>이번 달 경비 · 영수증 올리기(Gemini 읽기) · 검증 · 상신과 결재함</p>
+        <p>영수증 사진을 올려 경비를 상신합니다</p>
+        <p class="mine" id="mineX" hidden></p>
         <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
       <a class="launch" href="driving.html#/c_month">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 9.5h18M7 15h4"/></svg></span>
         <h2>법인카드 지출결의</h2>
-        <p>이번 달 카드 내역(ERP 엑셀 올리기) · 구분·사용목적 · 검증 · 상신과 결재함</p>
+        <p>ERP 엑셀을 올리고 구분·사용목적을 적어 상신합니다</p>
+        <p class="mine" id="mineC" hidden></p>
         <span class="go">들어가기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
     </div>
@@ -671,6 +678,7 @@ footer .wrap{font-size:13px}
     $('uMeta').textContent = [m.dept, m.position].filter(Boolean).join(' · ');
     if (m.is_admin) { var t = document.createElement('span'); t.className = 'tag'; t.textContent = '관리자'; $('uName').appendChild(t); }
     window.scrollTo(0, 0);
+    paintMine(m);
     // 권한 관리를 맡은 관리자에게는 가입 신청이 있으면 알린다.
     post('/functions/v1/driving-account', { action: 'signups' }, ss(K_AT)).then(function (res) {
       var n = res.ok && res.j && res.j.list ? res.j.list.length : 0;
@@ -683,11 +691,60 @@ footer .wrap{font-size:13px}
     if (at) fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).catch(function () { });
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
     ss('drv_navmode', null);            // 운행일지 메뉴 갈래(2026-10-08) — 다음 사람이 앞사람 갈래로 열리지 않게
+    ss('drv_portal_hint', null);        // 카드의 내 상태 한 줄(아래 paintMine) — 다음 사람에게 남기지 않는다
+    ['mineD', 'mineX', 'mineC'].forEach(function (id) { var e = $(id); if (e) { e.hidden = true; e.textContent = ''; } });
     document.body.classList.remove('in');
     $('signupNote').hidden = true;
     if (!ls(K_UID)) $('liUser').value = '';   // 「아이디 저장」을 안 했으면 다음 사람에게 아이디를 남기지 않는다
   }
   $('btnOut').addEventListener('click', function () { leave(); });
+
+  /* ── 시스템 카드의 내 상태 한 줄(2026-10-19 웹 사용성 1차) ──
+     · 마감 D-day 는 아래 마감 일정 규칙(deadlines) 그대로 — 서버를 부르지 않는다.
+     · 운행일지 단계·결재 상태와 종류별 「결재할 것」은 운행일지 화면이 이 탭에 적어 둔 것(sessionStorage drv_portal_hint)을 쓴다.
+     · 그것이 없을 때(로그인 직후)만 운행일지 단계를 가볍게 한 번 묻는다(내 줄 하나 — driving_step_progress). */
+  var STEP_NM = ['', '1단계 운행 기록', '2단계 영수증·통행료', '3단계 검증·상신', '4단계 정산'];
+  function paintMine(m) {
+    var hint = null;
+    try { hint = JSON.parse(ss('drv_portal_hint') || 'null'); } catch (e) { hint = null; }
+    if (hint && hint.u !== m.username) hint = null;
+    var R = deadlines(Date.now()), dd = {};
+    R.list.forEach(function (x) { dd[x.k] = x; });
+    var ddTxt = function (k) { var x = dd[k]; return x ? (x.dday === 0 ? '오늘 마감' : '마감 D-' + x.dday) : ''; };
+    var dueD = dd.d && new Date(dd.d.due), cyc = dueD ? dueD.getUTCFullYear() + '-' + p2(dueD.getUTCMonth() + 1) : '';
+    var put = function (id, parts, nAp) {
+      var e = $(id); if (!e) return;
+      var h = parts.filter(Boolean).map(function (p) { return '<span' + (p.hot ? ' class="hot"' : '') + '>' + p.t + '</span>'; }).join('<span aria-hidden="true">·</span>');
+      if (nAp) h += ' <span class="ap">결재할 것 ' + nAp + '건</span>';
+      e.innerHTML = h; e.hidden = !h;
+    };
+    var ib = (hint && hint.inbox) || {};
+    var drv = !(hint && hint.drv === false) && m.uses_driving !== false;
+    var dParts = function (stepTxt) {
+      return drv ? [{ t: ddTxt('d'), hot: dd.d && dd.d.dday <= 3 }, stepTxt ? { t: stepTxt } : null] : [];
+    };
+    var stTxt = function () {
+      if (!hint || hint.cyc !== cyc) return '';
+      if (hint.st === 'submitted') return '결재 중';
+      if (hint.st === 'approved') return '결재 완료';
+      if (hint.st === 'rejected') return '반려됨 — 다시 상신';
+      return hint.step ? STEP_NM[hint.step] || '' : '';
+    };
+    put('mineD', dParts(stTxt()), ib.d);
+    put('mineX', [{ t: ddTxt('x'), hot: dd.x && dd.x.dday <= 3 }], ib.x);
+    put('mineC', [{ t: ddTxt('c'), hot: dd.c && dd.c.dday <= 3 }], ib.c);
+    if (drv && !stTxt() && cyc && m.username) {
+      var at = ss(K_AT); if (!at) return;
+      fetch(SB + '/rest/v1/driving_step_progress?select=step&username=eq.' + encodeURIComponent(m.username) + '&cycle=eq.' + cyc,
+        { headers: { apikey: KEY, Authorization: 'Bearer ' + at } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) {
+          if (!rows || !document.body.classList.contains('in')) return;
+          var st = rows[0] ? Number(rows[0].step) || 1 : 1;
+          put('mineD', dParts(STEP_NM[Math.min(st, 4)] || ''), ib.d);
+        }).catch(function () { });
+    }
+  }
 
   /** 저장된 세션이 아직 살아 있는지 서버에 확인한다(만료면 한 번 갱신, 안 되면 로그아웃 상태로). */
   function boot() {
@@ -715,6 +772,7 @@ footer .wrap{font-size:13px}
   /* ── 첫 화면 오른쪽: 마감 일정 ──────────────────────────────────────────────
      ★ 소식 한 줄 — 바꿀 때는 이 글자만 고친다(빈 글자 '' 면 줄을 감춘다).                                      */
   var NEWS = '법인카드 지출결의가 열렸습니다 · 결재 차례는 팀즈로 알려 드립니다';
+  var NEWS_UNTIL = '2026-10-31';   // 이 날(KST)까지만 보인다 — 지나면 줄을 감춘다(2026-10-19 웹 사용성 1차). 새 소식이면 둘 다 고친다.
   /* 규칙(모두 KST 날짜로만 센다 — 시각은 보지 않는다):
      · 개인경비 지출결의  기간 20일~19일. 오늘이 19일 이하면 이번 달 19일이 마감, 20일부터는 다음 달 19일.
      · 운행일지           기간 21일~20일. 오늘이 20일 이하면 이번 달 20일이 마감, 21일부터는 다음 달 20일.
@@ -783,7 +841,8 @@ footer .wrap{font-size:13px}
         '<span class="due-m">' + due + '</span></span>' +
         '<span class="dside">' + (first ? '<span class="due"><span class="chip1">가장 먼저</span> · ' + due + '</span>' : '<span class="due">' + due + '</span>') + '</span></li>';
     }).join('');
-    $('dlNewsT').textContent = NEWS; $('dlNews').hidden = !NEWS;
+    var newsOn = !!NEWS && (!NEWS_UNTIL || new Date(R.today).toISOString().slice(0, 10) <= NEWS_UNTIL);
+    $('dlNewsT').textContent = newsOn ? NEWS : ''; $('dlNews').hidden = !newsOn;
   }
   renderDeadlines();
   // 탭을 켜 둔 채 날이 바뀌어도 돌아오면 다시 센다

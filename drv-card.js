@@ -1292,13 +1292,20 @@
           g.list.map(function (it) {
             var bl = !String(it.category || '').trim() || !String(it.purpose || '').trim();
             return '<tr' + (bl ? ' class="xover"' : '') + '><td><span class="lead">' + esc(String(it.appr_date).slice(5).replace('-', '.')) + '</span></td>' + C.orgCell(it.username, true) +
-              '<td>' + esc(C.nameOf(it.username)) + '</td><td class="dim">' + esc(it.card_no || '') + '</td><td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
-              '<td class="n total">' + n0(it.amount) + '</td><td><span class="kind">' + esc(it.category || '—') + '</span></td>' +
-              '<td class="el" title="' + esc(it.purpose || '') + '">' + esc(it.purpose || '') + '</td><td class="el dim">' + esc(it.note || '') + '</td></tr>';
+              // 2026-10-19 웹 사용성 1차: 이름 굵게 · 카드번호는 끝 4자리(「…1234」, 전체는 title) · 비어 있는 구분·사용목적은 「빈칸」 딱지
+              '<td><span class="lead">' + esc(C.nameOf(it.username)) + '</span></td><td class="dim" title="' + esc(it.card_no || '') + '">' + esc(cardTail(it.card_no)) + '</td>' +
+              '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
+              '<td class="n total">' + n0(it.amount) + '</td><td>' + (String(it.category || '').trim() ? '<span class="kind">' + esc(it.category) + '</span>' : '<span class="st warn">빈칸</span>') + '</td>' +
+              '<td class="el" title="' + esc(it.purpose || '') + '">' + (String(it.purpose || '').trim() ? esc(it.purpose) : '<span class="st warn">빈칸</span>') + '</td><td class="el dim">' + esc(it.note || '') + '</td></tr>';
           }).join('');
       }).join('') + '</tbody><tfoot><tr><td colspan="5">보이는 ' + n0(rows.length) + '건 합계</td><td class="n total">' + n0(total) + '</td><td colspan="3"></td></tr></tfoot></table></div></div>'
       : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 카드 내역이 없습니다.</div><div style="margin-top:12px"><button class="btn sm" data-cclear>조건 지우기</button></div></div></div>');
     return h;
+  }
+  /** 카드번호 끝 4자리만(「…1234」). 숫자가 4자리보다 적으면 그대로. */
+  function cardTail(no) {
+    var d = String(no || '').replace(/[^0-9]/g, '');
+    return d.length > 4 ? '…' + d.slice(-4) : String(no || '') || '—';
   }
   /** CSV — 엑셀에서 바로 열리게 BOM. = + - @ 탭·CR 로 시작하는 글자는 ' 를 붙여 수식으로 실행되지 않게. */
   function csvText(rows) {
