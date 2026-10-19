@@ -1069,6 +1069,9 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 .aline{width:22px;height:2px;background:var(--ink-200);flex:none}
 .aline.done{background:var(--ok)}
 .aact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* 승인 취소·반려 안내(2026-10-19) — 단추 왼쪽, 좁으면 줄을 바꿔 단추 위로 */
+.aact{flex-wrap:wrap;align-items:center}
+.aact .arecall{flex:1 1 180px;margin:0;align-self:center}
 
 /* 상신 창 */
 .aline-list{border-top:1px solid var(--ink-100);margin-top:4px}

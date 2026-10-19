@@ -2845,6 +2845,8 @@
       var r = (a.steps || []).filter(function (s) { return s.result === 'rejected'; })[0];
       // 관리자 권한 반려는 그 칸의 결재자가 한 것이 아니다 — 이름을 바꿔 적는다.
       var who = r && r.forced_by ? '관리자(' + nameOf(r.forced_by) + ')' : ((r && r.name) || '');
+      // 승인했다가 취소하고 반려한 칸(2026-10-19)은 「승인 취소」를 붙인다 — 반려와 같은 띠·같은 다시 상신
+      if (r && r.recalled && !r.forced_by) who += '(승인 취소)';
       return { t: '반려 — ' + who + (r && r.comment ? ' · ' + r.comment : ''), cls: 'bad' };
     }
     // 상신한 본인에게는 「회수했습니다」, 결재하는 분에게는 「회수됨」(결재자가 회수한 것처럼 읽혔다 — 2026-10-15)
@@ -3177,7 +3179,13 @@
         if (!res.ok || !res.j || !res.j.ok) {
           toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return false;
         }
+        // 방금 결재한 건(승인·반려·승인 취소)은 결재함 「그 밖의 건」 기간 거르기와 상관없이 보이게 — 9월분을 10월분 화면에서
+        //   승인하면 카드가 사라져 「승인 취소·반려」를 못 찾았다(2026-10-19 로봇)
+        var acted = payload && payload.id && /^(approve|reject|recall_reject)$/.test(payload.action || '');
+        if (acted) INBOX_JUST = (payload.kind || 'd') + ':' + payload.id;
+        var midOk = payload && payload.action === 'approve' && res.j.row && res.j.row.status === 'submitted';
         toastOk(endDot(res.j.message || okMsg || '처리했습니다.') +
+          (midOk ? ' 다음 분이 결재하기 전까지는 아래 「그 밖의 건」에서 승인을 취소할 수 있습니다.' : '') +
           (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) : ''), res.j.warning);
         closePanel();
         TRIP_CACHE = {};                   // 잠금 상태가 바뀌었다 — 다른 주기 캐시도 믿지 않는다
@@ -3235,7 +3243,9 @@
       if ($('apprWhy')) $('apprWhy').value = w;
     });
     var title = act === 'approve' ? '승인' : act === 'reject' ? '반려' : act === 'force_reject' ? '관리자 반려'
-      : act === 'reopen' ? '정정 열기' : '상신 회수';
+      : act === 'reopen' ? '정정 열기' : act === 'recall_reject' ? '승인 취소·반려' : '상신 회수';
+    // 승인 취소·반려(2026-10-19) — 차례가 없어지는 다음 분 이름을 안내에 적는다
+    var rcNext = act === 'recall_reject' ? (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0] : null;
     var body = '';
     if (act === 'withdraw') {
       body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>' +
@@ -3248,7 +3258,11 @@
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
         (act === 'approve' ? '선택 — 남기면 상신자가 볼 수 있습니다.' : '무엇을 고쳐야 하는지 적어 주세요. 상신자에게 그대로 전달됩니다.') +
         '"></textarea></div></div>' +
-        '<div class="anote">' + (act === 'approve'
+        '<div class="anote">' + (act === 'recall_reject'
+          ? '<b>승인을 취소하고 반려합니다 — 상신한 분에게 돌아갑니다.</b> 결재란 내 칸의 이름·날짜(승인 도장)는 지워지고, 이 문서는 「반려」로 바뀝니다. ' +
+            (rcNext ? '다음 결재자 ' + esc(stepWho(rcNext) || rcNext.approver) + ' 님은 결재하지 않아도 됩니다. ' : '') +
+            '상신한 분이 고쳐서 다시 상신하면 결재선을 처음부터 다시 탑니다.'
+          : act === 'approve'
           ? '승인하면 결재란에 <b>이름과 날짜</b>가 찍힙니다. 위 금액과 검증 결과는 <b>상신 때 저장된 값</b>입니다. ' +
             '마지막 결재자가 승인하면 결재 완료본을 받을 수 있습니다.'
           : act === 'reopen'
@@ -3261,9 +3275,10 @@
     }
     openPanel(nameOf(a.username) + ' · ' + (kd ? kd.tag + ' ' : '') + title, cname,
       body,
-      '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      // 승인 취소·반려 창에서는 창 닫기를 「닫기」로 — 「취소」가 옆 단추(승인 취소)와 헷갈렸다(2026-10-19 로봇)
+      '<span style="flex:1"></span><button class="btn" data-close>' + (act === 'recall_reject' ? '닫기' : '취소') + '</button>' +
       '<button class="btn pri" id="btnApprGo" data-act="' + esc(act) + '" data-id="' + a.id + '"' + (kd ? ' data-kind="' + esc(kind) + '"' : '') + '>' +
-      (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : '반려') + '</button>');
+      (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : act === 'recall_reject' ? '승인 취소하고 반려' : '반려') + '</button>');
     if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
   }
 
@@ -3287,7 +3302,7 @@
     var cyk = CYCKEY(), q = INBOX_Q.replace(/\s+/g, '');
     var dayOf = function (a) { var t = Date.parse(a.submitted_at || ''); return isFinite(t) ? new Date(t + 9 * 3600e3).toISOString().slice(0, 10) : ''; };
     var base = others.filter(function (a) {
-      if (!INBOX_ALLCYC && a.cycle !== cyk) return false;
+      if (!INBOX_ALLCYC && a.cycle !== cyk && (kindOf(a) || 'd') + ':' + a.id !== INBOX_JUST) return false;
       if (q && String(nameOf(a.username) || '').replace(/\s+/g, '').indexOf(q) < 0) return false;
       var d = dayOf(a);
       if (INBOX_D1 && (!d || d < INBOX_D1)) return false;
@@ -3526,12 +3541,22 @@
           } else if (s.result === 'rejected') {
             push('r' + s.seq + ':' + s.acted_at, ms, s.forced_by
               ? '관리자 ' + nameOf(s.forced_by) + ' 님이 반려(결재자 대신)'
-              : noteWho(s) + '이 반려' + noteBox(s), s.comment || '');
+              : s.recalled ? noteWho(s) + '이 승인을 취소하고 반려' + noteBox(s)
+                : noteWho(s) + '이 반려' + noteBox(s), s.comment || '');
           }
         });
         if (reo) {
           var rms = noteMs(reo.reopened_at) || noteMs(a.closed_at);
           push('reopen:' + (reo.reopened_at || a.closed_at), rms, nameOf(reo.reopened_by) + ' 님이 정정으로 다시 열었습니다', reo.reopen_reason);
+        }
+      }
+      // 승인 취소·반려(2026-10-19) — 차례가 왔다가 없어진 다음 결재자에게 「결재할 필요가 없어졌습니다」
+      if (a.status === 'rejected' && a.username !== me) {
+        var rc = steps.filter(function (s) { return s.recalled && s.result === 'rejected'; })[0];
+        var rn = rc && steps.filter(function (s) { return s.seq === rc.seq + 1; })[0];
+        if (rn && rn.approver === me && rc.approver !== me) {
+          push('rc' + rc.seq + ':' + rc.acted_at, noteMs(rc.acted_at),
+            noteWho(rc) + '이 승인을 취소하고 반려해서 결재할 필요가 없어졌습니다', rc.comment || '');
         }
       }
       if (a.status === 'submitted') {
@@ -3675,6 +3700,16 @@
     };
     setTimeout(align, 40);
   }
+  /** 승인 취소·반려를 할 수 있는가(2026-10-19 사용자 — 세 결재 시스템 공통). 서버 approval-act kinds.ts recallRejectPlan 과 같은 판정:
+   *  결재 중 · 지금 차례 바로 앞 칸이 내 칸이고 내가 승인 · 지금 차례 칸은 아직 처리 전. 다음 분이 결재하면 단추가 사라진다. */
+  function canRecall(a) {
+    var me = myName();
+    if (!me || !a || a.status !== 'submitted') return false;
+    var st = a.steps || [];
+    var mine = st.filter(function (s) { return s.seq === a.cur_seq - 1; })[0];
+    var next = st.filter(function (s) { return s.seq === a.cur_seq; })[0];
+    return !!(mine && next && mine.approver === me && mine.result === 'approved' && !next.result && !next.acted_at);
+  }
   /** 결재 완료 건을 정정으로 다시 열 수 있는가 — 운행일지 관리자만(서버 approval-act 'reopen' 도 같은 판정). */
   function canReopen(a) { return !!(ME && ME.is_admin && a && a.status === 'approved'); }
   /** 결재 건 상태 이력에서 '정정 열기'가 있었으면 그 단계(누가·왜). */
@@ -3685,6 +3720,8 @@
   var INBOX_F = 'all';
   /** 그 밖의 건 — 전체 기간 보기 · 상신한 사람 이름 · 상신일 시작/끝(YYYY-MM-DD, 한국 날짜). 기본은 고른 기간만(2026-10-14). */
   var INBOX_ALLCYC = false, INBOX_Q = '', INBOX_D1 = '', INBOX_D2 = '';
+  /** 방금 결재한 건(종류:id) — 기간 거르기로 숨기지 않는다(새로고침하면 잊는다). */
+  var INBOX_JUST = '';
   function apprCard(a) {
     var st = apprStatusText(a);
     var s = a.snapshot || {};
@@ -3712,8 +3749,11 @@
         : (s.trips != null ? '<span class="asum">' + n0(s.trips) + '건 · ' + km(s.km) + ' km · ' + won(s.cost) + '</span>' : '')) +
       '</div>' +
       apprTrack(a) + ext +
-      (canAct || canWithdraw || canReopen(a) || canFix
+      (canAct || canWithdraw || canReopen(a) || canFix || canRecall(a)
         ? '<div class="aact">' +
+          // 방금 승인한 건 — 다음 분이 결재하기 전이면 승인을 거두고 반려로 돌려보낸다(2026-10-19)
+          (canRecall(a) ? '<span class="fhint arecall">다음 분이 결재하기 전이라 승인을 취소할 수 있습니다.</span>' +
+            '<button class="btn sm" data-appr="recall_reject" data-id="' + a.id + '"' + kattr + '>승인 취소·반려</button>' : '') +
           // 반려·회수된 내 건 — 고칠 화면으로 바로(2026-10-15 매뉴얼 로봇: 결재함 카드에 갈 길이 없었다)
           (canFix ? '<button class="btn pri sm" data-fixgo="' + esc(kd ? (kd.mode || 'x') + '_month' : 'close') + '" data-fixcyc="' + esc(a.cycle) + '">고쳐서 다시 상신 →</button>' : '') +
           (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
@@ -7360,27 +7400,27 @@ window.EduGuard = {
       render(); return;
     }
     HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…'; render();
-    var recs = [], done = 0, bad = 0;
+    var recs = [], done = 0, bad = 0, warns = [];
     Array.prototype.forEach.call(files, function (f) {
       f.arrayBuffer().then(function (buf) {
         return window.Hipass.parsePdf(buf);
       }).then(function (rs) {
-        recs = recs.concat(rs || []);
+        recs = recs.concat(rs || []); if (rs && rs.warning) warns.push(rs.warning);
       }).catch(function (e) { bad++; console.error(f.name, e); })
         .then(function () {
           if (++done < files.length) return;
           HP.busy = false;
           if (!recs.length) {
             HP.noteBad = true;
-            HP.note = bad ? '읽지 못한 파일이 있습니다. 한국도로공사 이용내역 PDF 가 맞는지 확인해 주세요.'
+            HP.note = bad ? '읽지 못한 파일이 있습니다. 한국도로공사 이용내역 PDF 가 맞는지 확인해 주세요. 영수증 사진은 「영수증 사진 올리기」로 올려도 됩니다.'
               : '영수증에서 통행 기록을 찾지 못했습니다.';
             HP.groups = []; render(); return;
           }
           HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
-          HP.noteBad = !!bad;
+          HP.noteBad = !!bad || warns.length > 0;
           // 다음에 할 일까지 한 줄로(웹 8차 — 「확정하기」를 눌러야 증빙이 된다는 것을 몰랐다)
-          HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') +
+          HP.note = n0(recs.length) + '건을 읽었습니다.' + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
             (isAll() ? '' : ' 아래 운행이 맞으면 「확정하기」를 누르세요 — 확정하면 그날 통행료 증빙이 되고 통행료 차례로 돌아갑니다.');
           render();
         });
@@ -8924,7 +8964,7 @@ window.EduGuard = {
     if ((el = e.target.closest('#btnApprGo'))) {
       var act = el.dataset.act, id = +el.dataset.id;
       var why = String(($('apprWhy') || {}).value || '').trim();
-      if ((act === 'reject' || act === 'force_reject' || act === 'reopen') && !why) {
+      if ((act === 'reject' || act === 'force_reject' || act === 'reopen' || act === 'recall_reject') && !why) {
         toast(act === 'reopen' ? '정정 사유를 적어 주세요.' : '반려 사유를 적어 주세요.', true); if ($('apprWhy')) $('apprWhy').focus(); return;
       }
       if (el.disabled) return;
@@ -8933,7 +8973,8 @@ window.EduGuard = {
       if (el.dataset.kind) p2.kind = el.dataset.kind;          // 개인경비 결재 건이면 서버가 개인경비 표를 쓴다
       if (why && act !== 'withdraw') p2.comment = why;
       // 서버가 문구를 안 보내는 동작(회수)도 무엇을 했는지 말한다 — 예전엔 「처리했습니다.」(2026-10-15 매뉴얼 로봇)
-      var okWord = { withdraw: '회수했습니다. 고친 뒤 다시 상신하세요.', approve: '승인했습니다.', reject: '반려했습니다.' }[act];
+      var okWord = { withdraw: '회수했습니다. 고친 뒤 다시 상신하세요.', approve: '승인했습니다.', reject: '반려했습니다.',
+        recall_reject: '승인을 취소하고 반려했습니다. 상신한 분에게 돌아갑니다.' }[act];
       callAppr(p2, okWord).then(function (ok) { if (!ok && document.contains(el)) el.disabled = false; });
       return;
     }
