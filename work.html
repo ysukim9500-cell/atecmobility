@@ -710,7 +710,7 @@ footer .wrap{font-size:13px}
     if (hint && hint.u !== m.username) hint = null;
     var R = deadlines(Date.now()), dd = {};
     R.list.forEach(function (x) { dd[x.k] = x; });
-    var ddTxt = function (k) { var x = dd[k]; return x ? (x.dday === 0 ? '오늘 마감' : '마감 D-' + x.dday) : ''; };
+    var ddTxt = function (k) { var x = dd[k]; return x ? ddWord(x.dday, true) : ''; };
     var dueD = dd.d && new Date(dd.d.due), cyc = dueD ? dueD.getUTCFullYear() + '-' + p2(dueD.getUTCMonth() + 1) : '';
     var put = function (id, parts, nAp) {
       var e = $(id); if (!e) return;
@@ -777,6 +777,7 @@ footer .wrap{font-size:13px}
      · 개인경비 지출결의  기간 20일~19일. 오늘이 19일 이하면 이번 달 19일이 마감, 20일부터는 다음 달 19일.
      · 운행일지           기간 21일~20일. 오늘이 20일 이하면 이번 달 20일이 마감, 21일부터는 다음 달 20일.
      · 법인카드 지출결의  기간 1일~말일. 늘 이번 달 말일(그래서 가장 가까운 마감은 늘 이번 달 안에 있다).
+     · ★ 2026-10-20: 마감일 뒤 GRACE_DAYS(5)일 동안은 방금 끝난 기간이 그대로 남는다 — D-day 가 음수, 「N일 지남」(운행일지 화면 defaultCycle 과 같다).
      · D-day = 마감일 − 오늘(날 수). 0 이면 「오늘 마감」. 가까운 순으로 늘어놓고, 같으면 위 순서(개인경비·운행일지·법인카드).
        가장 가까운 줄만 빨간 D-day + 「가장 먼저」.
      · 줄 그림은 이번 달 1일부터 세 마감 중 가장 늦은 날까지. 20일이 지나면 다음 달 19·20일까지 늘어나고,
@@ -787,6 +788,10 @@ footer .wrap{font-size:13px}
     { k: 'c', name: '법인카드 지출결의', short: '법인카드', note: 'ERP 엑셀을 올리고 구분만 적습니다', day: 0 }   // 0 = 말일
   ];
   var DAY = 864e5;
+  // 마감 뒤 며칠 동안 방금 끝난 기간을 먼저 보일까 — 운행일지 화면(driving-app.js GRACE_DAYS)과 같은 값(2026-10-20 사용자 「마감일 기준 5일 동안은 띄워줘」)
+  var GRACE_DAYS = 5;
+  /** D-day 글자 — 3 → 「D-3」/「마감 D-3」, 0 → 「오늘 마감」, -1 → 「1일 지남」/「마감 1일 지남」. */
+  function ddWord(n, long) { return n === 0 ? '오늘 마감' : n < 0 ? (long ? '마감 ' : '') + (-n) + '일 지남' : (long ? '마감 ' : '') + 'D-' + n; }
   var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
   var mdOf = function (u) { var t = new Date(u); return p2(t.getUTCMonth() + 1) + '.' + p2(t.getUTCDate()); };
   /** ms(지금 시각) → { today, list:[{k,K,due,from,dday}] } — 날짜는 모두 UTC 자정 값(KST 날짜를 담는 그릇). */
@@ -797,6 +802,9 @@ footer .wrap{font-size:13px}
       var due, from;
       if (!K.day) { due = Date.UTC(y, m + 1, 0); from = Date.UTC(y, m, 1); }
       else { var mm = d <= K.day ? m : m + 1; due = Date.UTC(y, mm, K.day); from = Date.UTC(y, mm - 1, K.day + 1); }
+      // 마감 뒤 GRACE_DAYS 일 동안은 방금 끝난 기간(운행일지 화면 defaultCycle·defCyc 와 같은 규칙, 2026-10-20) — dday 가 음수(-1 = 1일 지남)
+      var pd = from - DAY, pf = !K.day ? Date.UTC(y, m - 1, 1) : Date.UTC(new Date(pd).getUTCFullYear(), new Date(pd).getUTCMonth() - 1, K.day + 1);
+      if (today > pd && today - pd <= GRACE_DAYS * DAY) { due = pd; from = pf; }
       return { k: K.k, K: K, i: i, due: due, from: from, dday: Math.round((due - today) / DAY) };
     });
     list.sort(function (a, b) { return a.dday - b.dday || a.i - b.i; });
@@ -804,9 +812,11 @@ footer .wrap{font-size:13px}
   }
   function renderDeadlines() {
     var R = deadlines(Date.now()), T = new Date(R.today), L = R.list;
-    var start = Date.UTC(R.y, R.m, 1), end = Math.max.apply(null, L.map(function (x) { return x.due; }));
-    var endM = new Date(end).getUTCMonth(), cross = endM !== R.m;
-    $('dlTitle').innerHTML = (R.m + 1) + (cross ? '–' + (endM + 1) : '') + '월 마감<span class="pc"> 일정</span>';
+    // 마감 뒤 며칠(GRACE_DAYS) 동안의 지난 마감일이 이번 달 1일보다 앞이면 줄 그림을 그 달 1일부터(11.05 에 법인카드 10.31 → 10.01 부터)
+    var d0 = new Date(Math.min.apply(null, L.map(function (x) { return x.due; })));
+    var start = Math.min(Date.UTC(R.y, R.m, 1), Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1)), end = Math.max.apply(null, L.map(function (x) { return x.due; }));
+    var startM = new Date(start).getUTCMonth(), endM = new Date(end).getUTCMonth(), cross = endM !== startM;
+    $('dlTitle').innerHTML = (startM + 1) + (cross ? '–' + (endM + 1) : '') + '월 마감<span class="pc"> 일정</span>';
     $('dlToday').innerHTML = '오늘 ' + mdOf(R.today) + '<span class="pc"> (' + '일월화수목금토'.charAt(T.getUTCDay()) + ')</span>';
     // 줄 그림
     var pct = function (u) { return Math.max(0, Math.min(100, (u - start) / (end - start) * 100)); };
@@ -832,9 +842,9 @@ footer .wrap{font-size:13px}
     $('dlLine').innerHTML = h.join('');
     // 줄(가까운 순)
     $('dlRows').innerHTML = L.map(function (x, i) {
-      var first = i === 0, dd = x.dday === 0 ? '오늘 마감' : 'D-' + x.dday, due = mdOf(x.due) + ' 마감';
+      var first = i === 0, dd = ddWord(x.dday), due = mdOf(x.due) + (x.dday < 0 ? ' 마감 · 지금 상신' : ' 마감');
       return '<li class="dr' + (first ? ' first' : '') + '" data-k="' + x.k + '" data-dday="' + x.dday + '" data-due="' + new Date(x.due).toISOString().slice(0, 10) + '">' +
-        '<span class="dd' + (x.dday === 0 ? ' now' : '') + '">' + dd + '</span>' +
+        '<span class="dd' + (x.dday <= 0 ? ' now' : '') + '">' + dd + '</span>' +
         '<span class="dtx"><b><span class="lg">' + x.K.name + '</span><span class="sh">' + x.K.short + '</span></b>' +
         (first ? '<em class="chm">가장 먼저</em>' : '') +
         '<span class="per">' + mdOf(x.from) + ' – ' + mdOf(x.due) + ' · ' + x.K.note + '</span>' +

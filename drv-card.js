@@ -31,6 +31,8 @@
   /** 오늘이 속한 법인카드 기간 — 달력 달(KST). */
   function cCurrent() { var d = C.kd(Date.now()); return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 }; }
   function cSpan(y, m) { return R.span(y + '-' + pad(m)); }
+  /** 법인카드 기간(1일~말일)의 ms 범위 — KST. 마감 뒤 며칠 계산에만 쓴다(2026-10-20). */
+  function cRange(y, m) { var K9 = 9 * 3600e3; return { lo: Date.UTC(y, m - 1, 1) - K9, hi: Date.UTC(y, m, 1) - K9 }; }
   function cycName(k) { var c = parseKey(k); return c.y && c.m ? C.cycleName(c.y, c.m) : String(k || '') + '분'; }
   function rangeHiMs(k) { return Date.parse(R.cycleRange(k).hi + 'T00:00:00+09:00'); }
 
@@ -1579,7 +1581,9 @@
     orgbar: ADMIN_C,
     orgUsers: orgUsers,
     kinds: { card: K0 },
-    period: { mode: 'c', views: CVIEWS, current: cCurrent, span: cSpan, band: band, tag: tag },
+    // range·status: 마감 뒤 며칠(GRACE_DAYS) 동안 처음 보일 기간·마감 띠(driving-app.js defCyc·graceBand, 2026-10-20)
+    period: { mode: 'c', views: CVIEWS, current: cCurrent, span: cSpan, band: band, tag: tag, range: cRange,
+      status: function (k) { var a = myC(k); return a ? a.status : ''; } },
     load: loadWith,
     onGo: function (v, prev) {
       if (v === 'ca_list' && prev !== 'ca_close' && prev !== 'ca_people') CL = { cat: '', who: '', blank: false };

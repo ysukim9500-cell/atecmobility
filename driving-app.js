@@ -165,6 +165,22 @@
     if (d.getUTCDate() >= 21) { m += 1; if (m > 12) { m = 1; y += 1; } }
     return { y: y, m: m };
   }
+  /* ── 마감 뒤 며칠(2026-10-20 사용자 「마감일 기준 5일 동안은 띄워줘. 바로 11월로 가지 말고」) ──
+     기간이 끝난 뒤 GRACE_DAYS 일 동안은 처음 여는 기간(오른쪽 위)을 방금 끝난 기간으로 둔다 — 세 시스템 모두.
+     ★ 「처음 보이는 기간」만 바꾼다. 오늘 운행·영수증이 들어갈 기간 · 잠금 · ▶ 로 갈 수 있는 끝(= 오늘이 든 기간)은
+       그대로 currentCycle()/curCyc() 이다. 운행일지 10월분(09.21~10.20)은 10.25 까지, 개인경비 10월분(09.20~10.19)은 10.24 까지,
+       법인카드 10월분은 11.05 까지 먼저 열린다. 날은 모두 한국시간 달력 날짜로 센다. */
+  var GRACE_DAYS = 5;
+  /** 기간이 끝난 뒤 며칠째인가(마지막 날 다음 날 = 1, KST 날짜). 아직 안 끝났으면 0 이하. */
+  function daysPast(r, now) { return dayNo(now) - dayNo(r.hi - 1); }
+  /** cur(오늘이 든 기간) 바로 앞 기간이 끝난 지 GRACE_DAYS 일 안이면 그 기간, 아니면 null. range(y, m) → { lo, hi } */
+  function graceCyc(cur, range) {
+    if (!range) return null;
+    var p = addCycle(cur, -1), d = daysPast(range(p.y, p.m), Date.now());
+    return d >= 1 && d <= GRACE_DAYS ? p : null;
+  }
+  /** 운행일지를 처음 열 때 보일 기간 — 마감 뒤 GRACE_DAYS 일 동안은 방금 끝난 기간, 그 밖에는 오늘이 든 기간. */
+  function defaultCycle() { var c = currentCycle(); return graceCyc(c, cycleRange) || c; }
 
   /* ══════════════════ 분기·지역·유류단가 ══════════════════
      서버 index.ts 47~66행(region) · 107~119행(quarterOf) 을 그대로 옮긴 것.
@@ -238,7 +254,7 @@
   }
 
   /* ══════════════════ 상태 ══════════════════ */
-  var ME = null, VIEW = 'close', CYC = currentCycle();
+  var ME = null, VIEW = 'close', CYC = defaultCycle();
   // ALL_* = 서버(RLS)가 내려준 전부. 일반 직원이면 어차피 본인 것뿐이다.
   // TRIPS·EVID = 지금 열려 있는 화면이 쓰는 범위. applyScope() 가 채운다.
   var ALL_TRIPS = [], ALL_EVID = [];
@@ -268,6 +284,16 @@
   function curCyc(view) {
     var p = periodOf(view || VIEW);
     return p ? p.current() : currentCycle();
+  }
+  /** 그 화면을 처음 열 때(주소에 기간이 없을 때) 보일 기간 — 마감 뒤 GRACE_DAYS 일 동안은 방금 끝난 기간(2026-10-20).
+   *  ▶ 의 끝·잠금·새 기록이 들어갈 기간은 여전히 curCyc() 다. */
+  function defCyc(view) {
+    var p = periodOf(view || VIEW), c = p ? p.current() : currentCycle();
+    return graceCyc(c, p ? p.range : cycleRange) || c;
+  }
+  /** 지금 보는 기간 c 가 「마감 뒤 며칠」 기간인가(오늘이 든 기간 바로 앞 + 끝난 지 GRACE_DAYS 일 안). */
+  function inGrace(c, view) {
+    return !RANGE && cmpCycle(c, curCyc(view)) < 0 && cmpCycle(c, defCyc(view)) === 0;
   }
   /** 그 화면이 다른 기간 규칙(개인경비·법인카드)을 쓰는가(2026-10-08). */
   function usesXPeriod(v) { return !!periodOf(v); }
@@ -450,7 +476,10 @@
     var last = RANGE ? RANGE.to : CYC;
     $('cycNext').disabled = cmpCycle(last, cur) >= 0;
     $('cycleBox').classList.toggle('multi', !!RANGE);
-    $('cycleBox').classList.toggle('past', !RANGE && cmpCycle(CYC, cur) < 0);
+    // 마감 뒤 며칠(GRACE_DAYS) 동안의 방금 끝난 기간은 「지난 기간」(노랑)이 아니라 「마감 중」(2026-10-20)
+    var gr = inGrace(CYC);
+    $('cycleBox').classList.toggle('past', !RANGE && cmpCycle(CYC, cur) < 0 && !gr);
+    $('cycleBox').classList.toggle('grace', gr);
     // 기간이 바뀌면 한 번 반짝 — 화면 전체가 다른 기간으로 바뀌었다는 것을 눈에 띄게.
     var sig = RANGE ? 'r' + RANGE.from.y + RANGE.from.m + '-' + RANGE.to.y + RANGE.to.m : 'c' + CYC.y + '-' + CYC.m;
     if (CYC_SIG && CYC_SIG !== sig) {
@@ -465,6 +494,7 @@
     var cur = currentCycle();
     // 기간 단추를 숨기는 화면(내 계정·조직도·권한 관리·교육 관리·안전교육)에는 「지난 기간」 띠도 달지 않는다(2026-10-16 3차).
     if (NOCYC_VIEWS.indexOf(VIEW) >= 0) return '';
+    if (!RANGE && inGrace(CYC)) return graceBand();
     if (pv() && !RANGE) return pv().band ? pv().band() : '';
     if (RANGE) {
       return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(RANGE.from.y + '년 ' + RANGE.from.m + '월분 – ' + RANGE.to.y + '년 ' + RANGE.to.m + '월분</b>') +
@@ -477,6 +507,20 @@
         '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">' + cur.m + '월분으로 →</button></div>';
     }
     return '';
+  }
+  /** 마감 뒤 며칠(GRACE_DAYS) 동안 방금 끝난 기간을 볼 때의 띠 — 「지난 기간」 대신 마감 안내(2026-10-20, 세 시스템 같은 띠).
+   *  본인 화면에서 아직 상신 전(또는 반려·회수)이면 「지금 상신해 주세요」, 결재 중·완료면 그 상태만. 관리 화면은 안내만. */
+  function graceBand() {
+    var P = pv(), cur = curCyc(), key = cycKey(CYC);
+    var r = P ? P.range(CYC.y, CYC.m) : cycleRange(CYC.y, CYC.m), span = P ? P.span(CYC.y, CYC.m) : cycleSpan(CYC.y, CYC.m);
+    var st = isAll() ? '' : P ? (P.status ? P.status(key) : '') : ((myAppr(key) || {}).status || '');
+    var say = isAll() ? '아직 상신하지 않은 사람은 지금 상신하면 됩니다.'
+      : st === 'approved' ? '결재가 끝났습니다.' : st === 'submitted' ? '결재 중입니다.'
+      : st === 'rejected' ? '반려됐습니다 — 고쳐서 다시 상신해 주세요.'
+      : '아직 상신 전이면 지금 상신해 주세요.';
+    return '<div class="cycband grace" data-graceband>' + ic('cal', 15) + '<span><b>' + CYC.y + '년 ' + CYC.m + '월분 (' + esc(span) + ') 마감 · ' +
+      esc(dueText(r, Date.now())) + '</b> — ' + say + '</span>' +
+      '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">' + cur.m + '월분 보기 →</button></div>';
   }
   /** 내 결재 상태 한 마디(주기 목록에 붙인다). */
   function myApprTag(key) {
@@ -514,7 +558,7 @@
       var c = addCycle(cur, -i), on = !RANGE && cmpCycle(CYC, c) === 0;
       h += '<button class="cpi' + (on ? ' on' : '') + '"' + (on ? ' aria-current="true"' : '') + ' data-cyc="' + c.y + '-' + c.m + '">' +
         '<b>' + c.y + '년 ' + c.m + '월분</b><span class="dim">' + spanOf(c) + '</span>' +
-        (i === 0 ? '<span class="kind">이번</span>' : '') + '<span style="flex:1"></span>' + tagOf(cycKey(c)) + '</button>';
+        (i === 0 ? '<span class="kind">이번</span>' : i === 1 && inGrace(c) ? '<span class="kind">마감 중</span>' : '') + '<span style="flex:1"></span>' + tagOf(cycKey(c)) + '</button>';
     }
     h += '</div>';
     for (var k = 0; k < 36; k++) {
@@ -4476,7 +4520,7 @@
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       '<div class="track' + (closed ? ' done' : '') + '"><i style="width:' + pct + '%"></i></div>' +
       '<div class="facts">' +
-      fact('마감', closed ? '종료' : (days <= 0 ? '오늘' : 'D-' + days),
+      fact('마감', closed ? (daysPast(r, now) <= GRACE_DAYS ? daysPast(r, now) + '일 지남' : '종료') : (days <= 0 ? '오늘' : 'D-' + days),
         closed ? esc(cycleSpan(CYC.y, CYC.m)) + ' 종료' : pct + '% 지남') +
       fact('운행', n0(T.n) + '<small>건</small>', km(T.km) + ' km' + (T.manual ? ' · 수기 ' + n0(T.manual) : '')) +
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll)) +
@@ -7208,7 +7252,8 @@ window.EduGuard = {
    *  예전에는 남은 시간을 올림해서 10/16 에 10/20 마감이 「5일」로 나와 안전교육 「D-4」와 달랐다. */
   function dueDays(r, now) { return dayNo(r.hi - 1) - dayNo(now); }
   function dueText(r, now) {
-    if (now >= r.hi) return '마감 종료';
+    // 끝난 뒤 GRACE_DAYS 일 동안은 며칠 지났는지(2026-10-20 — 포털 첫 화면 「1일 지남」과 같은 셈)
+    if (now >= r.hi) { var p = daysPast(r, now); return p >= 1 && p <= GRACE_DAYS ? '마감 ' + p + '일 지남' : '마감 종료'; }
     var d = dueDays(r, now);
     return d <= 0 ? '오늘 마감' : '마감 D-' + d;
   }
@@ -8755,7 +8800,7 @@ window.EduGuard = {
   function portalHint() {
     if (!LOADED || !myName() || isMulti()) return;
     try {
-      var cur = cycKey(currentCycle()), old = {};
+      var cur = cycKey(defaultCycle()), old = {};   // 포털 카드 = 처음 보일 기간(마감 뒤 GRACE_DAYS 일은 방금 끝난 기간, work.html deadlines 와 같다)
       try { old = JSON.parse(sessionStorage.getItem('drv_portal_hint') || '{}') || {}; } catch (e) { old = {}; }
       if (old.u !== myName()) old = {};
       var n = { d: 0, x: 0, c: 0 };
@@ -8776,8 +8821,8 @@ window.EduGuard = {
     if (nd && NODRV_VIEWS.indexOf(VIEW) < 0) {
       VIEW = ndLanding(); ND_AUTO = !LOADED;
       // 운행일지 화면에서 개인경비로 돌린 것이다 — 기간도 개인경비의 이번 기간으로(20일에 지난 기간에 떨어지지 않게, 2026-10-08).
-      if (!RANGE && usesXPeriod(VIEW) && cmpCycle(CYC, curCyc(VIEW)) !== 0) {
-        setPeriod({ cyc: curCyc(VIEW) }, { silent: true });
+      if (!RANGE && usesXPeriod(VIEW) && cmpCycle(CYC, defCyc(VIEW)) !== 0) {
+        setPeriod({ cyc: defCyc(VIEW) }, { silent: true });
         applyScope(); writeHash();
         // 받은(받는 중인) 자료는 옛 기간 것이다 — 새 기간으로 다시 받는다(loadAll 이 다시 그린다. 늦게 온 옛 응답은 LOAD_SEQ 가 버린다).
         if (LOADED || LOADING) { loadAll({ soft: true }); return; }
@@ -8839,12 +8884,13 @@ window.EduGuard = {
     //   사용자가 고른 기간을 그대로 둔다.
     // 2026-10-09: 기간 규칙이 셋(운행일지 21~20 · 개인경비 20~19 · 법인카드 1~말일). 규칙이 바뀌는 이동이면(함께 쓰는 화면으로 가는 것은 빼고)
     //   그 화면의 이번 기간으로 — 25일에 법인카드(10월분)에서 운행일지로 오면 운행일지 11월분, 반대면 법인카드 10월분.
-    var enterX = !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0;
+    // 2026-10-20: 들어갈 때 맞추는 기간은 그 화면의 「처음 보일 기간」(마감 뒤 GRACE_DAYS 일 동안은 방금 끝난 기간). 앞날을 당기는 것은 오늘이 든 기간까지.
+    var enterX = !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, defCyc(v)) !== 0;
     // ★ 함께 쓰는 화면(결재함·내 계정·사람·조직도·권한)은 기간과 무관하다 — 개인경비 갈래에서 들어가도
     //   운행일지 규칙으로 기간을 당기지 않는다(돌아왔을 때 기간이 말없이 바뀌어 있지 않게, 2026-10-08).
     var clampCyc = enterX || (!RANGE && SHARED_VIEWS.indexOf(v) < 0 && cmpCycle(CYC, curCyc(v)) > 0);
     VIEW = v;
-    if (clampCyc) setPeriod({ cyc: curCyc(v) }, { silent: true });
+    if (clampCyc) setPeriod({ cyc: enterX ? defCyc(v) : curCyc(v) }, { silent: true });
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
     clearFilters();
     if (v === 'evid' && !isMulti()) { EVF.cat = EV_SUBS[evSub()]; EVF.touched = false; }   // 영수증·통행료 단계: 지금 차례의 구분부터
@@ -8887,8 +8933,8 @@ window.EduGuard = {
     // ★ 주소에 기간 없이 개인경비 화면만 적혀 왔으면(포털 카드 driving.html#/x_month, 첫 진입) 개인경비의 이번 기간으로.
     //   운행일지 주기를 그대로 쓰면 20일에는 지난 기간에 떨어진다(2026-10-08). go() 와 같은 규칙 —
     //   개인경비 갈래 안에서 옮겨 다니는 중이면 고른 기간을 그대로 둔다. 주소에 기간이 적혀 있으면 그것을 따른다(위).
-    if (!h.a && okView && !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, curCyc(v)) !== 0) {
-      setPeriod({ cyc: curCyc(v) }, { silent: true });
+    if (!h.a && okView && !RANGE && SHARED_VIEWS.indexOf(v) < 0 && !samePeriod(v) && cmpCycle(CYC, defCyc(v)) !== 0) {
+      setPeriod({ cyc: defCyc(v) }, { silent: true });
       changed = true;
     }
     if (okView) {

@@ -328,6 +328,10 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cycband b{font-weight:800}
 .cycband.multi{border-color:var(--ink-300);background:var(--ink-50);color:var(--ink-700,#3A4146)}
 .cycband .btn{margin-left:auto}
+/* 마감 뒤 며칠(GRACE_DAYS, 2026-10-20) — 방금 끝난 기간은 「지난 기간」(노랑)이 아니라 「마감 중」(이번 기간과 같은 빨강 계열) */
+.cyc.cyc.grace:not(.past):not(.multi) .cycle .tag::after{content:" · 마감 중";color:var(--red-700);font-weight:700}
+.cycband.grace{border-color:var(--red-100,#FBDDE4);background:var(--red-50);color:var(--ink-900)}
+.cycband.grace b{color:var(--red-700)}
 #cycPop{position:absolute;top:calc(100% + 8px);right:0;z-index:60;width:372px;max-width:calc(100vw - 24px);
   background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);padding:14px;
   box-shadow:0 18px 44px -18px rgba(29,37,43,.34),0 2px 6px rgba(29,37,43,.06)}
