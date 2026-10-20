@@ -209,6 +209,25 @@
     });
   }
 
+  /**
+   * 여러 PDF 를 한 번에 올렸을 때 파일끼리 겹친 기록 빼기(2026-10-20 AU2) — 파일 하나 안의 겹침은 읽을 때(dedupe) 이미 뺐다.
+   * 기간이 겹치는 두 달치 · 같은 파일을 이름만 바꿔 두 번 고른 경우 같은 통과 기록이 두 번 더해져 통행료가 두 배로 확정됐다.
+   * 열쇠: 통과 시각 · 금액 · 영업소 · 카드 끝 4자리. lists = 파일마다 읽은 기록 배열(파일 순서대로).
+   * 돌려주는 것: { recs: 합친 기록(시각 순), removed: 뺀 건수 }
+   */
+  function mergeFiles(lists) {
+    var seen = new Set(), out = [], removed = 0;
+    (lists || []).forEach(function (rs) {
+      (rs || []).forEach(function (r) {
+        var k = r.at + '|' + r.amount + '|' + (r.office || '') + '|' + (r.card4 || '');
+        if (seen.has(k)) { removed++; return; }
+        seen.add(k); out.push(r);
+      });
+    });
+    out.sort(function (a, b) { return a.at - b.at; });
+    return { recs: out, removed: removed };
+  }
+
   // 같은 영수증이 두 번 잡히는 일이 없도록 (시각+금액+영업소)로 중복 제거
   function dedupe(recs) {
     var seen = new Set();
@@ -425,5 +444,5 @@
     return g;
   }
 
-  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource };
+  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles };
 })(window);

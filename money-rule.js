@@ -31,6 +31,9 @@
      표시용 D·dup 은 맞음일 때만 채운다(판정에 쓰지 않는다). 금액 다름이면 d.gap(안내용 숫자) — adviceOf 가 문구를 만든다.
    자정 넘긴 운행(2026-10-19 — 정본 「자정 넘긴 운행」): 이음 없는 영수증 날짜 D 에, 전날 시작해 D 에 끝난 업무 운행이 있으면
      그 운행의 날(D−1)로 붙인다 — receiptHome. 서버 driving-calc.ts receiptHome 과 같다.
+   다음 날 날짜로 올라온 영수증(2026-10-20 사용자 결정 ② 「자동으로 옮기지 말고 안내」 — 정본 「다음 날 날짜로 올라온 영수증」):
+     D 는 운행 금액이 있는데 영수증 없음, D+1 은 업무 운행 금액이 비어 같은 금액 영수증으로 채움이면 D+1 에 d.twice(두 번 정산 의심 —
+     서버 검증 R14). 정산 금액은 그대로 — 2단계 표의 D+1 줄에 안내만. twicePick 이 서버 driving-calc.ts twicePick 과 같다.
 
    의존성 없음 — 브라우저(window.MoneyRule)와 node(require) 양쪽에서 쓴다(test/money-v3.test.js).
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -258,6 +261,28 @@
     return out;
   }
 
+  /** 'YYYY-MM-DD' 의 전날(달력). 서버 driving-calc.ts prevYmd 와 같다. */
+  function prevDay(k) {
+    var p = String(k).split('-'), t = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] - 1));
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    return t.getUTCFullYear() + '-' + z(t.getUTCMonth() + 1) + '-' + z(t.getUTCDate());
+  }
+  /**
+   * 두 번 정산 의심 영수증 고르기(2026-10-20, R14) — 서버 driving-calc.ts twicePick 과 같다.
+   *   prevAmts = 전날 D 운행 금액(운행마다), prevT = 그 합, cands = D+1 의 후보 영수증 [{ id, a }](id 순).
+   *   ① 금액이 D 운행 한 건의 금액이나 D 합과 같은 영수증들 ② 없으면 후보가 2장 이상이고 합이 D 합과 같을 때 후보 모두(톨게이트마다 낸 영수증).
+   */
+  function twicePick(prevAmts, prevT, cands) {
+    var A = {};
+    (prevAmts || []).forEach(function (x) { var a = Math.round(Number(x) || 0); if (a > 0) A[a] = 1; });
+    var T = Math.round(Number(prevT) || 0);
+    if (!(T > 0) || !cands || !cands.length) return [];
+    var hit = cands.filter(function (c) { var a = Math.round(Number(c.a) || 0); return a > 0 && (A[a] || a === T); });
+    if (hit.length) return hit.map(function (c) { return c.id; });
+    var s = cands.reduce(function (x, c) { return x + Math.round(Number(c.a) || 0); }, 0);
+    return cands.length >= 2 && s === T ? cands.map(function (c) { return c.id; }) : [];
+  }
+
   /**
    * 한 사람의 v3 결과.
    * @param o.trips  그 사람의 운행(이 기간 · 지워진 것 제외). 목적은 섞여도 된다 — 업무 운행만 금액에 쓰고,
@@ -275,7 +300,10 @@
    *     ha = { 운행id: 그 운행의 하이패스 몫 } (hp 의 운행마다)
    *     D = 맞음인 날 U − N(하이패스와 겹친 영수증 금액 — 표시용, 2026-10-19) · dup = 합이 D 인 영수증(찾을 수 있을 때만). 금액 다름이면 0·[]
    *     gap = 금액 다름인 날의 안내용 숫자(gapOf — adviceOf 가 문구로)
-   *   sum = { T, R, settle, fill, fillN, evN, noTrip, noTripN, noTripShowN, none, diff, ok, fillDays, bad }
+   *     twice = 두 번 정산 의심(filled 인 D+1 날만, 2026-10-20 — 서버 R14): { prev: 전날 'YYYY-MM-DD', trips: [전날 금액 있는 운행],
+   *             ev: [의심 영수증], amount: 그 합, prevT: 전날 운행 금액 합 } · 없으면 undefined
+   *   sum = { T, R, settle, fill, fillN, evN, noTrip, noTripN, noTripShowN, none, diff, ok, fillDays, bad, twice, twiceDays }
+   *     twice/twiceDays = 두 번 정산 의심 영수증 장수·날 수(표시하는 날만)
    *     fill/fillN = 영수증으로 채운 금액·장수(결재 요약 ev_* · ev_n) · noTrip/noTripN = 정산에서 뺀 영수증(모든 날 — 금액)
    *     evN = 업무 운행이 있는 날에 붙은 영수증 장수 · none/diff/ok = R06/R10/일치 날 수 · bad = none + diff
    *     ★ none·diff·ok·bad·noTripShowN 은 표시용 — show 인 날만 센다(「10월분부터」)
@@ -326,7 +354,7 @@
         d.R += a; d.ev.push({ e: e, a: a, t: lt });
       });
       var byTrip = {};
-      var sum = { T: 0, R: 0, settle: 0, fill: 0, fillN: 0, evN: 0, noTrip: 0, noTripN: 0, noTripShowN: 0, none: 0, diff: 0, ok: 0, fillDays: 0, bad: 0 };
+      var sum = { T: 0, R: 0, settle: 0, fill: 0, fillN: 0, evN: 0, noTrip: 0, noTripN: 0, noTripShowN: 0, none: 0, diff: 0, ok: 0, fillDays: 0, bad: 0, twice: 0, twiceDays: 0 };
       var list = Object.keys(days).sort().map(function (k) { return days[k]; }).filter(function (d) {
         d.trips.forEach(function (t) { byTrip[t.id] = { amt: d.amt[t.id] || 0, fill: 0 }; });
         return d.T > 0 || d.R > 0;
@@ -353,9 +381,12 @@
         } else if (has) {
           d.settle = d.R; d.st = 'filled';
           // 이은 영수증 → 그 운행 줄(업무 운행일 때). 나머지 → 그날 첫 업무 운행 줄.
+          //   fillEv = 운행마다 그 줄을 채운 영수증 id(웹 영수증 적기가 근거로 남긴다 — 2026-10-20 AU2)
+          d.fillEv = {};
           d.ev.forEach(function (x) {
             var to = (x.t && d.trips.filter(function (t) { return String(t.id) === String(x.t.id); })[0]) || d.trips[0];
             d.fill[to.id] = (d.fill[to.id] || 0) + x.a;
+            (d.fillEv[to.id] = d.fillEv[to.id] || []).push(x.e.id);
             byTrip[to.id].fill += x.a;
           });
           sum.fill += d.R; sum.fillN += d.ev.length; sum.fillDays++;
@@ -376,6 +407,31 @@
         var withFill = d.trips.filter(function (t) { return d.fill[t.id] > 0; });
         d.target = withAmt[0] || withFill[0] || d.trips[0] || null;
       });
+      // 다음 날 날짜로 올라온 영수증 — 두 번 정산 의심(2026-10-20 사용자 결정 ② · R14 · 서버 driving-calc.ts moneyV3 twice 와 같다).
+      //   D 는 영수증 없음, D+1 은 영수증으로 채움 — 후보(이음 없음 · 영수증 날짜가 D+1 · 시각이 있으면 D+1 업무 운행 시간 안이 아님)가
+      //   D 운행 금액과 같으면(twicePick) D+1 에 d.twice. 정산 금액은 그대로.
+      var byDay = {};
+      list.forEach(function (d) { byDay[d.day] = d; });
+      list.forEach(function (d1) {
+        if (d1.st !== 'filled') return;
+        var d0 = byDay[prevDay(d1.day)];
+        if (!d0 || d0.st !== 'no_receipt') return;
+        var inTrip = function (ms) {
+          return (ms + KST) % 864e5 !== 0 && d1.trips.some(function (t) {
+            return t.end_time != null && t.end_time !== '' && isFinite(Number(t.end_time)) && Number(t.start_time) <= ms && ms <= Number(t.end_time);
+          });
+        };
+        var cands = d1.ev.filter(function (e) { var ms = Number(e.date_millis); return e.trip_id == null && day(ms) === d1.day && !inTrip(ms); })
+          .map(function (e) { return { id: e.id, a: Number(e.amount), e: e }; })
+          .sort(function (x, y) { return Number(x.id) - Number(y.id); });
+        var pt = d0.trips.filter(function (t) { return d0.amt[t.id] > 0; });
+        var ids = twicePick(pt.map(function (t) { return d0.amt[t.id]; }), d0.T, cands);
+        if (!ids.length) return;
+        var picked = cands.filter(function (c) { return ids.some(function (i) { return String(i) === String(c.id); }); });
+        d1.twice = { prev: d0.day, trips: pt, ev: picked.map(function (c) { return c.e; }),
+          amount: Math.round(picked.reduce(function (s, c) { return s + c.a; }, 0)), prevT: Math.round(d0.T) };
+        if (d1.show) { sum.twice += picked.length; sum.twiceDays++; }
+      });
       sum.bad = sum.none + sum.diff;
       out[cat] = { days: list, byTrip: byTrip, sum: sum };
     });
@@ -388,9 +444,46 @@
     return out;
   }
 
+  /**
+   * 영수증을 지우거나 「다른 운행에 붙이기」로 옮길 때 되돌릴 「영수증 금액을 넣은 운행 금액」(2026-10-20 AU2 ①).
+   * 웹 영수증 적기(autoFillEv)는 채움인 날 영수증 금액을 그 운행의 금액 칸에 실제로 적는다. 그 영수증을 지우거나 다른 운행에 이으면
+   * 적어 둔 금액이 남아 두 번 정산됐다(09.26 영수증 3,000 → 운행 43 에 적힘 → 09.24 운행 42 에 붙이면 42 에도 3,000 → 6,000).
+   *   M      = compute(지금 자료 — 바꾸기 전) 결과
+   *   moves  = [{ e: 영수증, to: 새로 이을 운행 id(지우기·「자동」이면 null) }]
+   *   markOf = function (cat, trip) → 그 운행 금액이 웹 영수증 적기로 들어간 것이면 { ids: [근거 영수증 id] | null(근거 글이 없는 예전 기록), prev: 적기 전 금액(null|0) }, 아니면 null
+   * 그 영수증이 붙어 있는 날(지금)의 같은 구분 업무 운행 중 금액이 있고, 표시(markOf)가 그 영수증을 가리키는 것 —
+   *   근거 영수증 목록이 없으면(예전 기록) 운행 금액이 그 영수증 금액이나 그날 영수증 합과 같을 때만 — 을 돌려준다. 새로 이을 운행 자신은 빼고.
+   * 돌려주는 것: [{ trip, cat, amount(지금 금액), prev, ev: [이 바꿈으로 근거가 사라지는 영수증 id], exact }] (운행·구분마다 한 줄)
+   * 되돌린 뒤 그날 남은 영수증이 있으면 영수증 적기가 남은 금액으로 다시 적는다 — 정산은 늘 금액 규칙대로.
+   */
+  function fillUndo(M, moves, markOf) {
+    var out = [], seen = {};
+    (moves || []).forEach(function (mv) {
+      var e = mv && mv.e, cat = e && e.category;
+      if (!e || !M || !M[cat]) return;
+      var d = M[cat].days.filter(function (x) { return x.ev.some(function (y) { return String(y.id) === String(e.id); }); })[0];
+      if (!d) return;
+      d.trips.forEach(function (t) {
+        var a = d.amt[t.id] || 0;
+        if (!(a > 0) || (mv.to != null && mv.to !== '' && String(mv.to) === String(t.id))) return;
+        var mk = markOf ? markOf(cat, t) : null;
+        if (!mk) return;
+        var hit = mk.ids ? mk.ids.some(function (i) { return String(i) === String(e.id); })
+          : (Math.round(a) === Math.round(Number(e.amount)) || Math.round(a) === Math.round(d.R));
+        if (!hit) return;
+        var k = cat + '|' + t.id;
+        if (seen[k]) { if (seen[k].ev.indexOf(e.id) < 0) seen[k].ev.push(e.id); return; }
+        seen[k] = { trip: t, cat: cat, amount: a, prev: mk.prev == null ? null : Number(mk.prev), ev: [e.id], exact: !!mk.ids };
+        out.push(seen[k]);
+      });
+    });
+    return out;
+  }
+
   /** 결과 글자(표·검증 공통). */
   var LABEL = { no_receipt: '영수증 없음', mismatch: '금액 다름', match: '일치', filled: '영수증으로 채움', no_trip: '운행 없는 영수증(정산 제외)' };
 
   return { compute: compute, hpPair: hpPair, hipassOf: hipassOf, subsetSums: subsetSums, gapOf: gapOf, adviceOf: adviceOf, receiptHome: receiptHome, tollOf: tollOf, tripAmt: tripAmt, ymdK: ymdK, LABEL: LABEL, TOLL_MAX: TOLL_MAX, BUSINESS: BUSINESS,
+    twicePick: twicePick, prevDay: prevDay, fillUndo: fillUndo,
     HIPASS_SOURCE: HIPASS_SOURCE, FROM: FROM, VERSION: 3 };
 });

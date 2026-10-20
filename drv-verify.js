@@ -149,7 +149,9 @@
     // 2026-10-06 — R10 은 운행에 적은 금액을 지우는 것, R11·R12 는 영수증·계기판 사진을 올리는 것
     R10: ['trips', '운행일지에서 보기'], R11: ['evid', '주유 영수증 올리기'], R12: ['evid', '계기판 사진 올리기'],
     // 2026-10-15 금액 규칙 v3 — R09(근거자료 행)는 없어지고 R13(운행 없는 영수증 · 정산에서 뺌)이 생겼다. 2단계 그 차례로 보낸다.
-    R13: ['evid', '영수증에서 보기']
+    R13: ['evid', '영수증에서 보기'],
+    // 2026-10-20 — R14(두 번 정산 의심 — 다음 날 날짜로 올라온 전날 영수증)도 2단계 그 차례로(그 줄에 「다른 운행에 붙이기」)
+    R14: ['evid', '영수증에서 보기']
   };
   /** R13(운행 없는 주차·통행료 영수증)이 가리키는 영수증의 구분 — 통행료만이면 통행료 차례, 아니면 주차 차례부터. */
   function r13Cat(it) {
@@ -202,7 +204,7 @@
       // 통행료 미확정(R02)·운행 없는 영수증(R13)은 2단계 영수증 › 그 차례로(「통행료 채우기」 화면은 없앴다 — 2026-10-15).
       //   R13 은 그 차례에 「다른 운행에 붙이기」(그 줄)·운행 추가 안내가 있다.
       if (links && it.code === 'R02') go = '<button class="btn sm vgo" data-evstep="통행료">통행료 차례로' + ic('chev', 12) + '</button>';
-      else if (links && it.code === 'R13') { var sc = r13Cat(it); go = '<button class="btn sm vgo" data-evstep="' + sc + '">' + sc + ' 차례로' + ic('chev', 12) + '</button>'; }
+      else if (links && (it.code === 'R13' || it.code === 'R14')) { var sc = r13Cat(it); go = '<button class="btn sm vgo" data-evstep="' + sc + '">' + sc + ' 차례로' + ic('chev', 12) + '</button>'; }
       // 주유 영수증·계기판 사진이 모자란 것은 고칠 기록이 아니라 올릴 것이 없는 것 — 영수증 화면으로 보낸다.
       else if (fx && (it.code === 'R11' || it.code === 'R12')) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
       else if (links && nRef) {
@@ -692,7 +694,8 @@
     var hasR02 = items.some(function (i) { return i.code === 'R02'; });
     if (s.toll_unknown && !hasR02) checks.push(['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 정산)']);
     // 영수증 없음(R06)·금액 다름(R10)·운행 없는 영수증(R13)이 남았으면 「✓ 통행료 모두 확정」을 달지 않는다(2026-10-16 3차 — 같은 카드에 ✓ 와 「영수증 없는 통행료 3일」이 같이 떴다)
-    var tollIssue = items.some(function (i) { return ((i.code === 'R06' || i.code === 'R10') && /통행료/.test(i.title || '')) || i.code === 'R13'; });
+    //   두 번 정산 의심(R14, 2026-10-20)도 — 통행료 영수증일 수 있다(어느 구분인지는 상세에만 있다)
+    var tollIssue = items.some(function (i) { return ((i.code === 'R06' || i.code === 'R10') && /통행료/.test(i.title || '')) || i.code === 'R13' || (i.code === 'R14' && /통행료/.test(i.detail || '')); });
     if (!s.toll_unknown && !hasR02 && !tollIssue) checks.push(['ok', '통행료 모두 확정']);
     // rate_miss 는 단가가 없던 「분기-지역」 목록이다(예: 2026-4-수도권). 빈 목록이면 문제없음.
     var rm = Array.isArray(s.rate_miss) ? s.rate_miss : (Number(s.rate_miss) > 0 ? [String(s.rate_miss) + '건'] : []);

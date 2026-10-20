@@ -17,6 +17,15 @@
 (function () {
   try {
     var l = location;
+    // 앱 → 웹 프리패스(2026-10-20, 4.1.7): #pass=<코드>(또는 #/화면&pass=<코드>)로 오면 로그인 여부와 상관없이 work.html 로 넘긴다 —
+    //   work.html 이 주소에서 코드를 지우고 웹 세션으로 바꾼 뒤 여기(보던 화면, 없으면 첫 화면)로 돌려보낸다. 로컬 시험에서도 같다.
+    var pm = /(^#|&)pass=([^&]*)/.exec(l.hash || '');
+    if (pm) {
+      var rest = l.hash.replace(/^#/, '').split('&').filter(function (p) { return p && p.indexOf('pass=') !== 0; }).join('&');
+      window.__DRV_TO_WORK = 1;          // driving-app.js 가 시작하지 않게(주소를 또 바꾸면 코드가 실린 이동이 덮인다)
+      l.replace('work.html?next=' + encodeURIComponent(/^\/[A-Za-z0-9_\/~-]*$/.test(rest) ? '#' + rest : '#/') + '#pass=' + pm[2]);
+      return;
+    }
     if (/^(127\.0\.0\.1|localhost)$/.test(l.hostname) || /[?&]direct=1/.test(l.search)) return;
     if (!sessionStorage.getItem('drv_at') || !sessionStorage.getItem('drv_me')) {
       var h = l.hash;
@@ -1167,6 +1176,11 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
 .acard.cmp{padding:11px 20px 12px}
 .acard.cmp .ahd{gap:6px 10px;margin-bottom:0;min-height:30px}
 .acard.cmp .ahd>.st.along{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(100%,460px);flex:0 1 auto}
+/* 머리 줄 요약 「업무 운행 N건 · X km (전체 M건) · ₩…」(2026-10-20) — PC 에서는 남는 폭 안에서 한 줄(넘치면 말줄임, 전체는 마우스를 올리면).
+   길어진 요약이 머리 줄을 두 줄로 만들어 얇은 카드(그 밖의 건 ≤ 110px)가 두꺼워지던 것. 폰은 예전처럼 줄을 바꾼다. */
+@media screen and (min-width:901px){
+  .acard.cmp .ahd>.asum{flex:9 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+}
 .acard.cmp .ahact{margin:0 0 0 4px;flex-wrap:nowrap;gap:6px}
 .acard.cmp .acrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:7px;min-width:0}
 .acard.cmp .acrow .aprog{margin-top:0;flex:0 1 auto;min-width:0}
@@ -1220,6 +1234,13 @@ tr.msel-on td{background:var(--red-50)}
 .mselist{margin:10px 0 0;padding:0;list-style:none;max-height:min(46vh,360px);overflow:auto;border:1px solid var(--ink-200);border-radius:var(--r-xs)}
 .mselist li{padding:8px 12px;border-top:1px solid var(--ink-100);font-size:13.5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .mselist li:first-child{border-top:0}
+/* 영수증을 지우거나 옮길 때 그 금액이 들어간 운행(2026-10-20 AU2 ①) — 확인 창 목록(기본 켬) */
+.undoblk{margin-top:12px;padding:12px 14px;border:1px solid #EAD9B5;background:var(--warn-50,#FCF5E9);border-radius:var(--r-sm)}
+.undoblk .anote{margin:0;color:#6A4708;font-size:13px}
+.undolist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.undolist label{display:flex;align-items:flex-start;gap:8px;min-height:40px;padding:8px 10px;background:var(--surface,#fff);border:1px solid var(--ink-200);border-radius:var(--r-xs);font-size:13.5px;line-height:1.45;cursor:pointer;word-break:keep-all;overflow-wrap:anywhere}
+.undolist input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--red)}
+.undowait{margin-top:10px;font-size:13px}
 .mselist li.now{background:var(--warn-50)}
 .mselist li.done{color:var(--ink-400);text-decoration:line-through}
 .mselist li.bad{color:var(--red-700);background:var(--red-50)}
@@ -1459,6 +1480,8 @@ tr.evwait td{background:linear-gradient(90deg,rgba(76,141,246,.04),rgba(155,114,
 .mtable .mai{font-size:11.5px;color:var(--red-700);margin-top:2px;white-space:normal}
 /* 기간 경계에 걸친 이은 영수증(2026-10-17) — 금액은 그대로, 문구만 */
 .mtable .mxl,.evxl{font-size:11.5px;color:var(--warn);margin-top:2px;white-space:normal;line-height:1.4}
+/* 다음 날 날짜로 올라온 전날 영수증 — 두 번 정산 의심(2026-10-20, R14) — 금액은 그대로, 그 줄에 할 일 한 줄 */
+.mtable .mtw,.evtw{font-size:12.5px;color:var(--warn);margin-top:4px;white-space:normal;line-height:1.45;word-break:keep-all;text-align:left}
 .hpnote .xlitem{display:block;margin-top:6px}
 .mres{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-500);white-space:nowrap}
 .mres.ok{color:var(--ok)} .mres.bad{color:var(--red-700)}
@@ -2030,6 +2053,9 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:12.5px;color:var(--
   .scroll table.mc td.m1,.scroll table.mc td.m1:first-child{order:1;font-size:14px;color:var(--ink-900)}
   .scroll table.mc td.mr,.scroll table.mc td.mr:first-child{order:2;margin-left:auto;font-size:14px;font-weight:600;color:var(--ink-900);text-align:right}
   .scroll table.mc td.m2,.scroll table.mc td.m2:first-child{order:6;flex:1 1 0;overflow:hidden;text-overflow:ellipsis}
+  /* 관리 현황(stable) 둘째 줄의 검증 딱지는 제 폭 그대로 — 「업무 운행 N건 · X km (전체 M건)」이 길어 딱지가 32px 로 잘려 「• 확」만 보였다(2026-10-20 AU6).
+     남는 칸(업무 운행·미확정)은 다음 줄로 내려간다(flex-wrap). */
+  .scroll table.mc.stable td.m2,.scroll table.mc.stable td.m2:first-child{flex:0 0 auto;overflow:visible}
   .scroll table.mc td.mx,.scroll table.mc td.mx:first-child{display:none !important}
   .scroll table.mc td.mact,.scroll table.mc td.mact:first-child{order:9;flex:1 1 100%;display:flex !important;justify-content:flex-end;padding-top:4px !important}
   table.mc td[data-l]::before{content:attr(data-l) " ";color:var(--ink-500);font-size:11.5px;font-weight:400}

@@ -6,6 +6,19 @@
 <title>업무 결재 포털 · ATEC 에이텍모빌리티</title>
 <meta name="description" content="운행일지와 결재 시스템을 한 번의 로그인으로 쓰는 에이텍모빌리티 업무 결재 포털">
 <script>
+/* 앱 → 웹 프리패스(2026-10-20, 4.1.7): 앱이 연 주소에 #pass=<코드>(또는 #/화면&pass=<코드>)가 있으면 맨 먼저 주소에서 지운다 —
+   뒤로 가기·방문 기록·공유에 남지 않게. 코드는 아래 본문 스크립트가 한 번 쓰고 버린다(어디에도 저장하지 않는다).
+   남은 #/화면 은 로그인 뒤 돌아갈 운행일지 화면으로 넘긴다(?next= 와 같은 규칙). */
+(function () {
+  try {
+    var h = location.hash || '', m = /(^#|&)pass=([^&]*)/.exec(h);
+    if (!m) return;
+    var rest = h.replace(/^#/, '').split('&').filter(function (p) { return p && p.indexOf('pass=') !== 0; }).join('&');
+    history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+    window.__WK_PASS = { code: m[2], next: /^\/[A-Za-z0-9_\/~-]*$/.test(rest) ? '#' + rest : '' };
+    document.documentElement.classList.add("booting");
+  } catch (e) { }
+})();
 /* 로그인돼 있으면 확인이 끝날 때까지 첫 화면을 그리지 않는다 — 새로 고침 때 로그인 전 화면이 깜빡이지 않게(2026-10-06). */
 try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) document.documentElement.classList.add("booting"); } catch (e) { }
 </script>
@@ -670,6 +683,9 @@ footer .wrap{font-size:13px}
     try { var n = new URLSearchParams(location.search).get('next') || ''; return /^#\/[A-Za-z0-9_\/~-]*$/.test(n) ? n : ''; }
     catch (e) { return ''; }
   })();
+  // 앱 → 웹 프리패스(2026-10-20) — 머리 스크립트가 주소에서 지운 코드. 꺼내고 바로 지운다(한 번만 쓰고 어디에도 두지 않는다).
+  var PASS = (function () { var p = window.__WK_PASS || null; try { delete window.__WK_PASS; } catch (e) { window.__WK_PASS = undefined; } return p; })();
+  if (!NEXT && PASS && PASS.next) NEXT = PASS.next;
   function enter() {
     var m = me(); if (!m) return;
     if (NEXT) { location.replace('driving.html' + NEXT); return; }
@@ -720,8 +736,12 @@ footer .wrap{font-size:13px}
     };
     var ib = (hint && hint.inbox) || {};
     var drv = !(hint && hint.drv === false) && m.uses_driving !== false;
+    // 결재 중·결재 완료면 D-day(마감 N일 지남 — 빨강) 대신 그 상태만, 빨강 없이(2026-10-20 AU6 — 이미 상신한 사람에게도 「마감 1일 지남」이 빨갛게 보였다).
+    //   반려면 D-day + 「반려됨 — 다시 상신」. 세 카드가 같은 규칙.
     var dParts = function (stepTxt) {
-      return drv ? [{ t: ddTxt('d'), hot: dd.d && dd.d.dday <= 3 }, stepTxt ? { t: stepTxt } : null] : [];
+      if (!drv) return [];
+      if (stepTxt === '결재 중' || stepTxt === '결재 완료') return [{ t: stepTxt }];
+      return [{ t: ddTxt('d'), hot: dd.d && dd.d.dday <= 3 }, stepTxt ? { t: stepTxt, hot: stepTxt.indexOf('반려') === 0 } : null];
     };
     var stTxt = function () {
       if (!hint || hint.cyc !== cyc) return '';
@@ -730,9 +750,17 @@ footer .wrap{font-size:13px}
       if (hint.st === 'rejected') return '반려됨 — 다시 상신';
       return hint.step ? STEP_NM[hint.step] || '' : '';
     };
+    // 개인경비·법인카드 — 운행일지 화면이 적어 둔 내 결재 상태(hint.xs·cs = { cyc, st }), 마감 일정의 그 기간일 때만
+    var kParts = function (k) {
+      var x = dd[k], s = hint && hint[k + 's'], due = x && new Date(x.due);
+      var st = s && due && s.cyc === due.getUTCFullYear() + '-' + p2(due.getUTCMonth() + 1) ? s.st : '';
+      if (st === 'submitted') return [{ t: '결재 중' }];
+      if (st === 'approved') return [{ t: '결재 완료' }];
+      return [{ t: ddTxt(k), hot: x && x.dday <= 3 }, st === 'rejected' ? { t: '반려됨 — 다시 상신', hot: true } : null];
+    };
     put('mineD', dParts(stTxt()), ib.d);
-    put('mineX', [{ t: ddTxt('x'), hot: dd.x && dd.x.dday <= 3 }], ib.x);
-    put('mineC', [{ t: ddTxt('c'), hot: dd.c && dd.c.dday <= 3 }], ib.c);
+    put('mineX', kParts('x'), ib.x);
+    put('mineC', kParts('c'), ib.c);
     if (drv && !stTxt() && cyc && m.username) {
       var at = ss(K_AT); if (!at) return;
       fetch(SB + '/rest/v1/driving_step_progress?select=step&username=eq.' + encodeURIComponent(m.username) + '&cycle=eq.' + cyc,
@@ -746,11 +774,28 @@ footer .wrap{font-size:13px}
     }
   }
 
+  /** 앱 → 웹 프리패스(2026-10-20, 4.1.7) — 앱이 준 한 번 쓰는 코드를 웹 세션으로 바꾼다(driving-auth pass_redeem).
+   *  성공하면 비밀번호 로그인과 같은 저장·같은 다음 화면(운행일지에서 왔으면 그 화면, 아니면 시스템 선택).
+   *  이 탭에 이미 다른 세션이 있으면 앱에서 넘어온 사람이 우선이다 — 그 세션은 끊고 바꾼다(실패해도 끊는다).
+   *  실패하면(지난 코드·이미 쓴 코드·없는 코드·서버 오류) 로그인 칸 + 안내 한 줄. 코드는 어디에도 저장하지 않는다. */
+  var PASS_FAIL = '앱에서 넘어온 로그인이 만료되었습니다 — 비밀번호로 로그인하거나 앱에서 다시 눌러 주세요';
+  function passIn(code, done) {
+    var fail = function () { if (ss(K_AT)) leave(); msg('liMsg', PASS_FAIL); done(); };
+    if (!/^[A-Za-z0-9_-]{43}$/.test(code || '')) { fail(); return; }
+    post('/functions/v1/driving-auth', { action: 'pass_redeem', code: code }).then(function (res) {
+      if (!(res.ok && res.j && res.j.ok && res.j.access_token && res.j.profile)) { fail(); return; }
+      if (ss(K_AT)) leave();
+      ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token); ss(K_ME, JSON.stringify(res.j.profile));
+      closeModals(); enter(); done();
+    }).catch(fail);
+  }
+
   /** 저장된 세션이 아직 살아 있는지 서버에 확인한다(만료면 한 번 갱신, 안 되면 로그아웃 상태로). */
   function boot() {
     var at = ss(K_AT), rt = ss(K_RT);
     var done = function () { document.documentElement.classList.remove('booting'); };
     setTimeout(done, 4000);             // 서버가 늦어도 4초 뒤에는 화면을 보인다
+    if (PASS) { var pc = PASS.code; PASS = null; passIn(pc, done); return; }
     if (!at || !me()) {
       // 운행일지에서 넘어왔으면 로그인 창을 바로 연다.
       if (NEXT) { openModal('login'); msg('liMsg', '로그인하면 보시던 운행일지 화면으로 돌아갑니다.', true); }

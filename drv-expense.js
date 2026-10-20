@@ -388,9 +388,13 @@
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXUpGo" disabled>올리기</button>', true);
     C.bindDrop($('xDrop'), addFiles);
   }
+  /** 빈 줄 하나 — 날짜는 달력에서 고른 날, 아니면 오늘. 오늘이 보는 기간 밖이면 비워 두고 고르게 한다(2026-10-20 AU2 —
+   *  예전엔 기간 끝날로 당겨 넣어, 마감 뒤 5일 동안 지난 기간 화면에서 올린 오늘 영수증이 10.19 로 조용히 들어갔다). */
   function blankItem(pi) {
-    var d = XUP.defDate || C.ymd(Math.max(XUP.lo, Math.min(Date.now(), XUP.hi - 1)));
-    return { page: pi, cat: '', merchant: '', amt: '', usage: '', note: '', date: d, hint: '', crop: null, ai: null };
+    var now = Date.now(), inside = now >= XUP.lo && now < XUP.hi;
+    var d = XUP.defDate || (inside ? C.ymd(now) : '');
+    return { page: pi, cat: '', merchant: '', amt: '', usage: '', note: '', date: d, crop: null, ai: null,
+      hint: d ? '' : '날짜를 골라 주세요 — 오늘은 이 기간(' + xSpanKey(XUP.cyc) + ') 밖입니다' };
   }
   function addFiles(files) {
     var list = Array.prototype.slice.call(files || []);
@@ -467,6 +471,12 @@
                     var ms = dayMs(x.date);
                     if (isFinite(ms) && ms >= XUP.lo && ms < XUP.hi) it.date = x.date;
                     else { it.date = ''; hint.push('사진의 날짜가 ' + x.date + ' 입니다 — 이 기간(' + xSpanKey(XUP.cyc) + ') 영수증이 아니면 이 줄을 빼 주세요'); }
+                  } else if (XUP.defDate) {
+                    // 날짜를 못 읽었다 — 달력에서 고른 날로 두되 Gemini 가 채운 것처럼 보이지 않게 말한다(2026-10-20 AU2)
+                    it.date = XUP.defDate; hint.push('날짜를 읽지 못해 고른 날(' + XUP.defDate.slice(5).replace('-', '.') + ')로 두었습니다 — 맞는지 확인해 주세요');
+                  } else {
+                    // 예전엔 오늘(기간 밖이면 기간 끝날)로 조용히 들어가고 「Gemini 가 채웠습니다」로 보였다 — 비우고 그렇게 말한다
+                    it.date = ''; hint.push('날짜를 읽지 못했습니다 — 직접 넣어 주세요');
                   }
                   if (x.legible === false || x.kind === 'unreadable') hint.push('글자가 흐립니다 — 직접 확인해 주세요');
                   it.hint = hint.join(' · ');
