@@ -489,8 +489,9 @@
       h += '<div class="awarn" id="lovConfirm" style="margin-top:12px">' + ic('alert', 15) + '<span><b>' + esc(nodeName(SEL)) + '</b>의 앱 계정 직원 <b>' + n0(tg.length) +
         '명</b>(하위 부서 포함)의 결재선을 모두 이것으로 바꿉니다(지금 지정이 있으면 덮어씁니다): ' +
         esc(tg.slice(0, 12).map(function (o) { return o.name; }).join(', ') + (tg.length > 12 ? ' 외 ' + (tg.length - 12) + '명' : '')) + '</span></div>' +
-        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn sm" data-lovallno>취소</button>' +
-        '<button class="btn sm pri" id="lovAllGo" data-n="' + tg.length + '">' + n0(tg.length) + '명에 적용</button></div>';
+        // 본문 안 확인 줄도 [동작] [취소] 차례(2026-10-20 단추 차례 통일 — 창 아래 줄 규칙 footOrder 가 닿지 않는 곳이라 여기서)
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">' +
+        '<button class="btn sm pri" id="lovAllGo" data-n="' + tg.length + '">' + n0(tg.length) + '명에 적용</button><button class="btn sm" data-lovallno>취소</button></div>';
     }
     $('pBody').innerHTML = h;
     $('pFoot').innerHTML = (had ? '<button class="btn" id="lovClear">자동으로 되돌리기</button>' : '') +
@@ -585,13 +586,24 @@
     var id = sel && sel.value;
     if (!id) { C.toast('조직도에서 누구인지 먼저 골라 주세요.', true); if (sel) sel.focus(); return; }
     var S = C.state(), o = S.ORG.filter(function (x) { return String(x.id) === String(id); })[0];
-    C.apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(id), {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    // 고를 때 본 계정 칸 그대로일 때만 잇는다(2026-10-20 AU2 #16) — 그 사이 다른 관리자가 그 사람에게 다른 계정을 이었으면
+    //   말없이 덮지 않는다. 비어 있던 사람이면 username=is.null, 없어진 계정이 남아 있던 사람이면 그 값 그대로.
+    var was = o && o.username ? 'eq.' + encodeURIComponent(o.username) : 'is.null';
+    C.apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(id) + '&username=' + was, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ username: u, updated_by: C.myName(), updated_at: new Date().toISOString() })
-    }).then(function (r) { if (!r.ok) return fail(r, '잇기'); })
+    }).then(function (r) {
+      if (!r.ok) return fail(r, '잇기');
+      return r.json().catch(function () { return null; }).then(function (rows) {
+        if (!Array.isArray(rows) || !rows.length) { var er = new Error('그 사이 다른 분이 이 사람에게 계정을 이었습니다 — 목록을 다시 불러왔으니 확인해 주세요.'); er.raced = true; throw er; }
+      });
+    })
       .then(reloadOrg)
       .then(function () { C.toast(C.nameOf(u) + ' 계정을 ' + (o ? o.name : '조직도') + ' 님에게 이었습니다.'); C.render(); openUnlinked(); })
-      .catch(function (e) { C.toast((e && e.message) || '잇지 못했습니다.', true); });
+      .catch(function (e) {
+        C.toast((e && e.message) || '잇지 못했습니다.', true);
+        if (e && e.raced) reloadOrg().then(function () { C.render(); openUnlinked(); }, function () { });
+      });
   }
 
   /* ══════════════════ 이벤트 ══════════════════ */

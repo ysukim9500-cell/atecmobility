@@ -42,8 +42,8 @@
   var PREVIEWED = (function () { try { return JSON.parse(sessionStorage.getItem('drv.previewed') || '{}'); } catch (e) { return {}; } })();
   /** 이 사람·주기의 운행·영수증 지문 — 고치면 달라진다(PDF 확인을 다시 받게). */
   function dataSig(k) {
-    var S = C.state(), u = k.split('|')[0], cy = k.split('|')[1].split('-');
-    var r = C.cycleRange(+cy[0], +cy[1]), h = 0, n = 0;
+    var S = C.state(), u = k.split('|')[0];
+    var r = keyRange(k.split('|')[1]), h = 0, n = 0;
     var add = function (v) { var x = String(v == null ? '' : v); for (var i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0; };
     (S.ALL_TRIPS || []).forEach(function (t) {
       if (t.username !== u || t.start_time < r.lo || t.start_time >= r.hi) return;
@@ -71,11 +71,19 @@
   }
   var ALLROWS = { key: '', list: null };          // 전체 검증(관리) — 주기별 최신 한 줄씩
   function keyOf(u, cyc) { return u + '|' + cyc; }
-  /** "2026-09" → "2026년 9월분". 다른 화면과 같은 이름으로 부른다. */
+  /** "2026-09" → "2026년 9월분" · "2026-12b" → "2026년 12월분 2차". 다른 화면과 같은 이름으로 부른다. */
   function cycName(key) {
-    var p = String(key || '').split('-');
-    return p.length === 2 && +p[0] && +p[1] ? C.cycleName(+p[0], +p[1]) : String(key || '') + '분';
+    var c = CR.parse(key);
+    return c ? CR.name(c) : String(key || '') + '분';
   }
+  // ★ 2026-10-20 연말 마감 설정: 운행일지 기간 범위·이름은 엔진(cycle-rules.js 의 'driving') — 관리자가 정하지 않으면 늘 21일 ~ 20일(지금과 같다).
+  var CR = C.CR || window.CycleRules;
+  /** 운행일지 기간 키 → { lo, hi } ms(hi 는 들어가지 않음). 없는 기간이면 NaN. */
+  function keyRange(key) { var P = CR.byKey('driving', key); return P ? { lo: P.loMs, hi: P.endMs } : { lo: NaN, hi: NaN }; }
+  /** 운행일지 기간 키 → '09.21 – 10.20'. */
+  function keySpan(key) { var P = CR.byKey('driving', key); return P ? P.lo.slice(5).replace('-', '.') + ' – ' + P.hi.slice(5).replace('-', '.') : ''; }
+  /** 「전월 대비」의 앞 기간 키 — 이름 달의 앞 달('2027-01' → '2026-12'). 12월 추가 기간('2026-12b')은 견주지 않는다(null). */
+  function prevMonthKey(k) { var c = CR.parse(k); return !c || c.x ? null : c.m > 1 ? c.y + '-' + (c.m < 11 ? '0' : '') + (c.m - 1) : (c.y - 1) + '-12'; }
 
   function fetchLatest(u, cyc) {
     var k = keyOf(u, cyc);
@@ -109,28 +117,41 @@
    * onNote(글) 로 진행 상황을 알린다. 끝나면 마지막 결과 행을 돌려준다.
    * quiet 이면 사진을 못 읽었다는 토스트를 띄우지 않는다(상신 창이 따로 말한다).
    */
+  /** 마지막 검증의 사진 판독 경고(사람|기간 → 글) — 부른 쪽이 마지막 알림(「검증했습니다 — …」)에 이어 붙이고 ① 카드 문구에 쓴다(2026-10-20 V3 B6). */
+  var WARN = {};
   function runVerify(u, cyc, onNote, quiet) {
     var say = onNote || function () { };
-    say('기록을 검사하는 중…');
+    var wk = u + '|' + cyc;
+    WARN[wk] = '';
+    // 두 번째 값(info)은 AI 검증 모션(2026-10-20)이 쓴다 — 단계 · 몇 장째 · 지금 읽는 사진 · 방금 읽은 값(서버가 돌려준 실제 값)
+    say('기록을 검사하는 중…', { phase: 'check' });
     return call({ op: 'run', cycle: cyc, username: u }).then(function (j) {
       var unread = j.unread || [];
       if (!unread.length) return j.row;
-      var stop = '';
+      var stop = '', byId = {}, last = null;
+      (C.state().ALL_EVID || []).forEach(function (e) { byId[String(e.id)] = e; });
+      var kindOf = function (id) { var e = byId[String(id)]; return e ? (AIM_KIND[e.category] || ((e.category || '') + ' 영수증')) : '영수증'; };
+      var label = function (n, total) { return '사진 ' + Math.min(n + 1, total) + ' / ' + total + ' 읽는 중 — ' + kindOf(unread[Math.min(n, total - 1)]); };
+      say(label(0, unread.length), { phase: 'read', n: 0, N: unread.length, cur: unread[0] });
       return pool(unread, 3, function (id) {
         if (stop) return Promise.reject(new Error(stop));
-        return call({ op: 'read', evidence_id: id }).catch(function (e) {
+        return call({ op: 'read', evidence_id: id }).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
           // 하루 상한에 닿았으면 남은 것은 더 보내지 않는다.
           if (/횟수|한도/.test(String(e && e.message))) stop = e.message;
           throw e;
         });
-      }, function (n, total) { say('영수증 사진을 읽는 중… ' + n + ' / ' + total + '장'); })
+      }, function (n, total) {
+        var rr = last && last.r && last.r.result, v = !rr ? '' : rr.odometer_km != null && isFinite(Number(rr.odometer_km)) ? n0(rr.odometer_km) + ' km'
+          : rr.amount != null && isFinite(Number(rr.amount)) ? n0(rr.amount) + '원' : '';
+        say(n < total ? label(n, total) : '읽은 값을 대조하는 중…',
+          { phase: 'read', n: n, N: total, cur: n < total ? unread[n] : null, pop: v ? { kind: kindOf(last.id), value: v } : null });
+      })
         .then(function (res) {
-          say('읽은 값을 대조하는 중…');
+          say('읽은 값을 운행과 맞춰 보는 중…', { phase: 'match' });
           return call({ op: 'run', cycle: cyc, username: u }).then(function (j2) {
-            if (!quiet) {
-              if (stop) C.toast(stop, true);
-              else if (res.fail) C.toast('사진 ' + res.fail + '장은 읽지 못했습니다. 다시 실행하면 이어서 읽습니다.', true);
-            }
+            // 판독 실패(500 등)·하루 한도는 곧바로 알리지 않고 남겨 둔다 — 예전에는 뒤이은 「검증했습니다」 알림에 바로 덮여 몰랐다(V3 B6).
+            //   quiet(상신 창)는 창이 따로 말한다 — 남겨만 둔다.
+            WARN[wk] = stop ? String(stop) : res.fail ? '사진 ' + res.fail + '장은 읽지 못했습니다 — 다시 검증하면 이어서 읽습니다' : '';
             return j2.row;
           });
         });
@@ -288,8 +309,10 @@
     if (!S.LOADED) return C.head('검증·상신') + C.skeleton();
     if (C.isMulti()) return C.singleOnly('검증', '검증');
     var u = C.myName(), cyc = S.CYCKEY, k = keyOf(u, cyc);
-    var h = C.head('검증·상신', esc(C.cycleName(S.CYC.y, S.CYC.m)) +
-      ' · 상신하기 전에 운행·영수증·계기판이 서로 맞는지 살펴봅니다');
+    // 마감 단계가 아직 1·2단계인가(맨 아래 「지금은 N단계 차례」 — 그때는 깜빡이는 단추가 없다, AU6-L9)
+    var ahead = !!C.stepNow && Math.min(C.stepNow(), 3) < 3;
+    var h = C.head('검증·상신', esc(cycName(S.CYCKEY)) +
+      (ahead ? ' · 지금은 앞 단계 차례입니다 — 맨 아래 단추로 그 단계부터 하세요' : ' · 순서대로 눌러 주세요 — 깜빡이는 단추가 지금 할 일입니다'));
     if (ROWS[k] === undefined) {
       fetchLatest(u, cyc).then(function () { if (C.state().VIEW === 'verify') C.render(); });
       return h + C.skeleton();
@@ -308,7 +331,8 @@
     }
     var s = row && row.summary, items = (row && row.result && row.result.items) || [];
     var verdict, clean = '';
-    if (busy) verdict = '<span class="gemrun">' + gemBadge('Gemini') + '</span>' + esc(RUN.note || '검증하는 중…');
+    // 진행 글은 .vnote 칸만 고친다(Gemini 표시는 그대로 — 개인경비 .xvnote · 법인카드 .cvnote 와 같게, 2026-10-20)
+    if (busy) verdict = '<span class="gemrun">' + gemBadge('Gemini') + '</span><span class="vnote">' + esc(RUN.note || '검증하는 중…') + '</span>';
     else if (!row) verdict = '아직 검증하지 않았습니다';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
@@ -318,34 +342,35 @@
     // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
     var seen = previewOk(k);
     var fresh = !!FRESH[k];
-    var stage = locked ? 0 : !row || !fresh ? 1 : !seen ? 2 : 3;
+    // 검증이 도는 동안(「다시 검증하기」 포함)은 ① = 도는 중 · ②③ = 아직(2026-10-20 V3 B2 — 다시 검증할 때 ① 초록 ✓ · ② 분홍 「지금」인데 못 누름으로 거꾸로 보였다)
+    var stage = locked ? 0 : busy || !row || !fresh ? 1 : !seen ? 2 : 3;
     // 2026-10-07: 순서대로 큰 단추 세 칸 — ① 검증하기 → ② PDF 미리보기 → ③ 결재 상신. 앞 단계를 마쳐야 다음 칸이 열린다.
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
-    var stepCard = function (n, title, desc, button) {
-      var st = stage > n ? 'done' : stage === n ? 'now' : 'todo';
-      return '<li class="vstep ' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '>' +
-        '<div class="vsh"><i>' + (st === 'done' ? '✓' : n) + '</i><b>' + title + '</b></div>' +
-        '<p>' + desc + '</p>' + button + '</li>';
-    };
+    // 2026-10-20 디자인 v2: 세 시스템 같은 단계 카드(C.vx.stepCard). 마감 단계가 아직 1·2단계면(위 ahead) 큰 단추를 흐리게(AU6-L9)
+    var card = function (n, title, desc, button) { return stepCard(n, stage, title, desc, button, { busy: busy && n === 1, ahead: ahead }); };
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
-      stepCard(1, '검증하기 ' + gemBadge('Gemini'),
+      card(1, '검증하기 ' + gemBadge('Gemini'),
         busy ? 'Gemini 가 영수증·계기판 사진을 읽고 기록과 맞춰 보는 중입니다…'
-          : row && fresh ? 'Gemini 가 사진을 읽어 대조했습니다. 고친 게 있으면 다시 눌러 주세요.'
+          : row && fresh ? readDone(row, WARN[u + '|' + cyc])
           : row ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(whenText(row.created_at)) + ') 결과입니다.'
           : 'Gemini 가 영수증·계기판 사진을 읽어 운행 기록과 서로 맞는지 봅니다.',
         gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-          busy ? (RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
+          busy ? (aimShort('d:' + k) || RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
-      stepCard(2, 'PDF 미리보기',
+      card(2, 'PDF 미리보기',
         row && fresh ? '결재자에게 갈 문서를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' +
           ic('dl', 16) + 'PDF 미리보기</button>') +
-      stepCard(3, '상신',
+      card(3, '상신',
         !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
         canSubmit ? '<button class="btn big' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit"' + (stage === 3 && !busy ? '' : ' disabled') + '>' +
           (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '') +
       '</ol>';
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
+    // 단계 카드는 제목 바로 아래(P_Verifying) — 그 아래 결과 자리. 검증이 도는 동안은 결과 자리에 AI 검증 모션(응답 뒤 실제 결과로 딱지)
+    var moving = busy && aimOn('d:' + k);
+    h += steps;
+    if (moving) h += aimHtml('d:' + k, verdict);
+    else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
       (row ? '마지막 검증 ' + esc(whenText(row.created_at)) : '검증 전') + '</div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' +
@@ -354,21 +379,12 @@
         fact('참고', n0(s.info), '고칠 것은 아님') +
         fact('사진 판독', row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
           row.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, row.ai) +
-        '</div>' : '') +
-      (locked ? '<div class="vact">' + gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-        busy ? (RUN.note || 'Gemini 가 읽는 중…') : '다시 검증하기', busy, '') + '<button class="btn" data-pdf="">' + ic('dl', 14) + 'PDF 받기</button></div>' +
-        // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만(없으면 단추가 지금 자료로 만든다).
-        (FZSUM[fzKey(a)] !== null && C.apvSlot ? C.apvSlot('', a) : '') : steps) + '</div>';
-
-    if (locked) {
-      h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' +
-        (a.status === 'approved' ? '결재가 끝났습니다.' : '결재 중입니다.') +
-        '</b> 상신할 때의 자료와 검증 결과는 그대로 저장돼 있습니다. 아래는 지금 자료를 다시 본 결과입니다.</span></div>';
-    }
-    if (row) {
+        '</div>' : '') + '</div>';
+    if (moving) { /* 결과는 응답 뒤에 — 지난 결과를 먼저 보이지 않는다 */ }
+    else if (row) {
       var need = items.filter(function (i) { return i.level !== 'info'; });
       var info = items.filter(function (i) { return i.level === 'info'; });
-      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, !locked));
+      h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, true));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('scan', 21) + '</div>' +
@@ -392,7 +408,7 @@
    *  결재 문서(PDF 받기·문서 보기)만 둔다. 고칠 길이 없으니 항목 글의 「…하세요」 안내는 뗀다. */
   function lockedVerify(a, cyc) {
     var S = C.state(), done = a.status === 'approved';
-    var h = C.head('검증·상신', esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · ' + (done ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다'));
+    var h = C.head('검증·상신', esc(cycName(S.CYCKEY)) + ' · ' + (done ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다'));
     var fk = fzKey(a), f = FZSUM[fk];
     if (f === undefined) wantSummaries([a.id]);
     var v = f && f.verify, s = (v && v.summary) || {};
@@ -434,18 +450,20 @@
   }
 
   function startRun(u) {
-    var S = C.state(), cyc = S.CYCKEY, k = keyOf(u, cyc);
+    var S = C.state(), cyc = S.CYCKEY, k = keyOf(u, cyc), mk = 'd:' + k;
     if (RUN.busy) return;
     RUN = { busy: true, note: '기록을 검사하는 중…', who: k };
+    aimBegin(mk, drvMotion(u, cyc));            // AI 검증 모션(2026-10-20) — 응답이 올 때까지 결과 자리에
     C.render();
     // 돌고 있는 검증의 결과를 다른 곳(상신 창)도 기다릴 수 있게 약속을 걸어 둔다.
-    var p = runVerify(u, cyc, function (t) {
+    var p = runVerify(u, cyc, function (t, info) {
       RUN.note = t;
+      aimStep(mk, info);
       // 화면 전체를 다시 그리지 않는다. 그 사이 다른 주기로 넘어갔으면 남의 판정 줄에 쓰지 않는다.
-      var st = C.state(), v = document.querySelector('.hero .verdict');
+      var st = C.state(), v = document.querySelector('.hero .verdict .vnote');
       if (v && st.VIEW === 'verify' && st.CYCKEY === cyc && !C.isMulti()) {
         v.textContent = t;
-        var gl = document.querySelector('[data-vrun] .gl'); if (gl) gl.textContent = t;   // 버튼에도 진행 상황
+        var gl = document.querySelector('[data-vrun] .gl'); if (gl) gl.textContent = aimShort(mk) || t;   // 단추에는 짧게(「읽는 중… 3 / 9」)
       }
     });
     RUN.p = p;
@@ -455,10 +473,13 @@
       setPreviewed(k, false);
       ALLROWS.list = null;
       if (C.aiReset) C.aiReset();                 // 영수증 화면의 사진 판독도 새로 받게
-      C.toast(row ? '검증했습니다 — ' + sumText(row.summary) : '검증했습니다.');
+      var w = WARN[u + '|' + cyc] || '';          // 사진 판독 실패·하루 한도는 이 마지막 알림에 이어 붙인다(V3 B6)
+      C.toast((row ? '검증했습니다 — ' + sumText(row.summary) : '검증했습니다.') + (w ? ' · ' + w : ''), !!w);
+      // 응답이 왔다 — 실제 결과(서버 refs.trips)로 운행 줄마다 딱지를 찍은 뒤(80ms 간격) 결과 화면으로
+      if (row) return aimFinish(mk, drvChips(row));
     }).catch(function (e) {
       C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true);
-    }).then(function () { RUN = { busy: false, note: '', who: '' }; C.render(); });
+    }).then(function () { RUN = { busy: false, note: '', who: '' }; aimEnd(mk); C.render(); });
   }
 
   /* ══════════════════ 관리 「현황」의 검증 칸 (2026-10-15 2차) ══════════════════
@@ -470,7 +491,7 @@
     if (ALLROWS.key !== cyc || (!ALLROWS.list && !ALLROWS.busy)) {
       ALLROWS = { key: cyc, list: null, busy: true };
       C.fetchAll('/rest/v1/driving_verifications?cycle=eq.' + encodeURIComponent(cyc) +
-        '&select=id,username,summary,ai,created_at,result&order=created_at.desc')
+        '&select=id,username,summary,ai,created_at,result&order=created_at.desc,id.desc')     // id 둘째 열쇠(2026-10-20)
         .then(function (rows) {
           var seen = {}, out = [];
           (rows || []).forEach(function (r) { if (!seen[r.username]) { seen[r.username] = 1; out.push(r); } });
@@ -602,6 +623,8 @@
         // ★ 실패를 '고정본 없음'으로 굳히지 않는다 — 그러면 결재 문서 버튼이 세션 내내 사라진다.
         need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); });
         FZASK = '';
+        // 못 받았어도 다시 그린다 — 결재함은 검증 결과를 받기 전에는 카드를 묶지 않고 기다린다(2026-10-20 V3 B7)
+        if (C.state().VIEW === view) C.render();
         fzFlush();
       });
   }
@@ -657,24 +680,23 @@
     if (s.cost == null) return '';
     var won = C.won, cost = Number(s.cost) || 0;
     // 전월 — 같은 사람의 바로 앞 주기 결재(완료 또는 결재 중). 볼 권한이 없으면 목록에 없다.
-    var cy = String(a.cycle || '').split('-').map(Number), py = cy[0], pm = cy[1] - 1;
-    if (pm < 1) { pm = 12; py--; }
-    var pkey = py + '-' + (pm < 10 ? '0' : '') + pm;
+    //   이름 달의 앞 달(1월분 → 12월분, 2026-10-20). 12월 추가 기간(12월분 2차)은 견주지 않는다 — 「—」.
+    var pkey = prevMonthKey(a.cycle), pm = pkey ? +pkey.slice(5, 7) + '월분' : '';
     // 스냅샷 버전이 다르면(예전 방식은 영수증 미포함) 금액 기준이 달라 비교하지 않는다.
-    var prev = (C.state().APPR || []).filter(function (x) {
+    var prev = pkey ? (C.state().APPR || []).filter(function (x) {
       return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') &&
         x.snapshot && x.snapshot.cost != null && (x.snapshot.version || 1) === (s.version || 1);
-    })[0];
+    })[0] : null;
     var cmp = '';
     var bigJump = false;
     if (prev) {
       var pc = Number(prev.snapshot.cost) || 0, d = cost - pc, pct = pc ? Math.round(d / pc * 100) : null;
       bigJump = pc > 0 && d > 50000 && pct >= 50;
-      cmp = '<div class="abf"><span class="k">전월(' + pm + '월분) 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' +
+      cmp = '<div class="abf"><span class="k">전월(' + pm + ') 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' +
         (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b>' +
-        '<span class="sub">' + pm + '월분 ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + ' km</span></div>';
+        '<span class="sub">' + pm + ' ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + ' km</span></div>';
     } else {
-      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">볼 수 있는 ' + pm + '월분 결재가 없습니다</span></div>';
+      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 결재가 없습니다' : '추가 기간은 전월과 견주지 않습니다') + '</span></div>';
     }
     // 검증(상신 때 굳힌 결과)
     var v = f && f.verify, vs = (v && v.summary) || null;
@@ -720,7 +742,11 @@
       // 운행은 업무 운행을 먼저(2026-10-20 — 금액이 업무 운행만이라). 고정본에 업무 건수가 없으면 업무 거리 · 전체 건수
       (s.biz_km != null && s.biz_trips == null
         ? '<div class="abf"><span class="k">업무 운행</span><b>' + C.km(s.biz_km) + '<small>km</small></b><span class="sub">전체 운행 ' + n0(s.trips) + '건 · ' + C.km(s.km) + ' km</span></div>'
-        : '<div class="abf"><span class="k">운행</span><b>' + esc(C.snapTrips ? C.snapTrips(s) : n0(s.trips) + '건') + '</b></div>') +
+        // 「(전체 M건)」은 아랫줄 — 굵은 17px 한 줄로 두면 1280~1366 폭에서 옆 칸(전월 대비 「▼ ₩…」) 위로 넘쳤다(2026-10-20 V3 B3)
+        : (function () {
+          var tt = C.snapTrips ? C.snapTrips(s) : n0(s.trips) + '건', mm = /^(.*) \((전체 [^)]*)\)$/.exec(tt);
+          return '<div class="abf"><span class="k">운행</span><b class="abwrap">' + esc(mm ? mm[1] : tt) + '</b>' + (mm ? '<span class="sub">' + esc(mm[2]) + '</span>' : '') + '</div>';
+        })()) +
       cmp +
       // 금액 규칙 v3(version 3) — ev_* 는 운행 금액이 없는 날 영수증으로 채운 금액, no_trip_* 는 운행 없는 날이라 정산에서 뺀 영수증.
       //   예전(version 2)은 영수증을 모두 더한 금액이라 문구가 다르다.
@@ -962,14 +988,14 @@
         // 결재 완료본에는 검증 결과 쪽을 붙이지 않는다 — 고정본이 없는 옛 건도 frozenOpts 와 같게(2026-10-14)
         doc: doc, verify: done ? null : v,
         title: done ? '결재 완료본' : old ? '결재 문서' : 'PDF 미리보기',
-        sub: C.nameOf(u) + ' · ' + C.cycleName(S.CYC.y, S.CYC.m),
+        sub: C.nameOf(u) + ' · ' + cycName(S.CYCKEY),
         file: '운행기록부_' + safeName(C.nameOf(u)) + '_' + cyc + (done ? '_결재완료' : old ? '_결재중' : '_미리보기') + '.pdf',
         note: old ? '이 결재 건은 상신 때 저장한 자료가 없어(예전 방식) <b>지금 자료</b>로 만들었습니다.' : null,
         expect: expect, expectName: old ? '상신 때 집계한 금액' : '화면 합계',
         okKey: !old && u === C.myName() ? k : '',
         again: !!(ap && (ap.status === 'rejected' || ap.status === 'withdrawn')),     // 반려·회수 뒤면 「② 확인 완료 → 다시 상신」
         prints: done ? { kind: 'driving', ids: [ap.id] } : null,
-        meta: { name: C.nameOf(u), cycleName: C.cycleName(S.CYC.y, S.CYC.m), mark: mark,
+        meta: { name: C.nameOf(u), cycleName: cycName(S.CYCKEY), mark: mark,
           docNo: old ? '결재 #' + ap.id + ' · 지금 자료로 ' + now + ' 출력' : '상신 전 미리보기 · ' + now + ' 출력' }
       }).catch(function () { });
     };
@@ -1086,14 +1112,15 @@
       RUN = { busy: true, note: '', who: k }; C.render();
       runVerify(u, S.CYCKEY).then(function (row) {
         ROWS[k] = row || null; ALLROWS.list = null;
-        C.toast(C.nameOf(u) + ' — ' + (row ? sumText(row.summary) : '검증했습니다'));
+        var w = WARN[u + '|' + S.CYCKEY] || '';   // 사진 판독 경고는 이 알림에 이어 붙인다(V3 B6)
+        C.toast(C.nameOf(u) + ' — ' + (row ? sumText(row.summary) : '검증했습니다') + (w ? ' · ' + w : ''), !!w);
       }).catch(function (er) { C.toast(failMsg('검증하지 못했습니다', er, '잠시 뒤 다시 눌러 주세요.'), true); })
         .then(function () { RUN = { busy: false, note: '', who: '' }; C.render(); });
       return;
     }
     if ((el = e.target.closest('[data-vshow]'))) {
       var S2 = C.state(), r = FZV[keyOf(el.dataset.vshow, S2.CYCKEY)] || ROWS[keyOf(el.dataset.vshow, S2.CYCKEY)];   // 상신 때 굳힌 결과가 먼저
-      if (r) showItems(C.nameOf(el.dataset.vshow) + ' 검증 결과', C.cycleName(S2.CYC.y, S2.CYC.m), r);
+      if (r) showItems(C.nameOf(el.dataset.vshow) + ' 검증 결과', cycName(S2.CYCKEY), r);
       return;
     }
     if ((el = e.target.closest('[data-fzverify]'))) {
@@ -1139,7 +1166,7 @@
     var S = C.state();
     if (!S.LOADED) return C.head('결재 완료 출력') + C.skeleton();
     if (C.isMulti()) return C.singleOnly('결재 완료 출력', '출력');
-    var cyc = S.CYCKEY, cname = C.cycleName(S.CYC.y, S.CYC.m);
+    var cyc = S.CYCKEY, cname = cycName(S.CYCKEY);
     // 「보는 범위」(사업부·팀·파트) 안의 사람만.
     var list = S.APPR.filter(function (a) { return a.cycle === cyc && C.orgMatch(a.username); });
     var done = list.filter(function (a) { return a.status === 'approved'; })
@@ -1147,7 +1174,7 @@
     var going = list.filter(function (a) { return a.status === 'submitted'; });
     var back = list.filter(function (a) { return a.status === 'rejected' || a.status === 'withdrawn'; });
     // 챙겨야 할 사람 = 이 결재 기간에 **운행이 있는** 사람만(2026-10-07 사용자 — 영수증만 있는 사람·운행 없는 사람은 뺀다).
-    var r = C.cycleRange(S.CYC.y, S.CYC.m), has = {};
+    var r = keyRange(S.CYCKEY), has = {};
     (S.ALL_TRIPS || []).forEach(function (t) {
       if (t.start_time >= r.lo && t.start_time < r.hi && S.USERS[t.username] && C.orgMatch(t.username)) has[t.username] = (has[t.username] || 0) + 1;
     });
@@ -1172,7 +1199,7 @@
         '<div class="sub">' + esc(sub || '') + '</div></div>';
     };
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' +
-      esc(cname) + ' · ' + esc(C.cycleSpan(S.CYC.y, S.CYC.m)) + '</div>' +
+      esc(cname) + ' · ' + esc(keySpan(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + C.won(total) + '</p>' +
       '<div class="facts">' +
       // 2026-10-19 웹 사용성 1차: 「결재 완료」는 위 큰 제목이 말한다(숫자 칸에 또 있었다). 분류는 현황과 같은 넷 — 결재 완료·결재 중·반려·미상신.
@@ -1274,7 +1301,7 @@
       return;
     }
     var job = FINJOB = { stop: false };
-    var cname = C.cycleName(S.CYC.y, S.CYC.m);
+    var cname = cycName(S.CYCKEY);
     C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="finNote" role="status">준비하는 중…</div>' +
       '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
@@ -1400,11 +1427,228 @@
       C.render();
     }
   });
+  /** 검증을 마친 ① 카드 문구 — 실제로 읽은 사진 장수대로(2026-10-20 V3 B6: 0/6장인데 「사진을 읽어 대조했습니다」라 했다). row.summary.read/receipts = 서버가 센 것.
+   *  warn = 이번 검증의 판독 실패·하루 한도 글(runVerify). 운행일지·개인경비가 같이 쓴다(C.vx.readDone). */
+  function readDone(row, warn) {
+    var s = (row && row.summary) || {}, n = Number(s.receipts) || 0, rd = Math.min(Number(s.read) || 0, n), again = ' 고친 게 있으면 다시 눌러 주세요.';
+    if (!row || !row.ai) return 'Gemini 가 설정되지 않아 규칙으로만 검사했습니다.' + again;
+    if (!n) return '기록을 검사했습니다(읽을 사진 없음).' + again;
+    if (rd >= n) return 'Gemini 가 사진 ' + n0(n) + '장을 모두 읽어 대조했습니다.' + again;
+    // 하루 한도처럼 서버가 멈춘 까닭이 있으면 그 말을, 아니면(읽기 실패) 다시 누르면 이어서 읽는다는 말
+    var w = String(warn || '').replace(/[.\s]+$/, '');
+    return '사진 ' + n0(n) + '장 중 ' + n0(rd) + '장만 읽었습니다 — ' + (w && !/^사진 \d+장은 읽지 못했습니다/.test(w) ? w + '.' : '다시 누르면 못 읽은 사진을 이어서 읽습니다.');
+  }
+  /* ══════════════════ 검증·상신 단계 카드(2026-10-20 디자인 v2 — P_Verifying, 세 시스템 같은 모양) ══════════════════
+     stage = 지금 할 단계(1 검증 · 2 미리보기 · 3 상신, 0 = 잠김). 순서·규칙은 각 화면이 정한 그대로 — 여기서는 모양만.
+       now  = 지금 누를 단계(연분홍·빨간 테두리·번호 고리·단추 깜빡임) · work = ① 이 도는 중(진행 막대) · done = 끝(초록 ✓) · todo = 아직(회색, 못 누름)
+       ahead = 마감 단계가 아직 1·2단계인데 이 화면을 연 것 — 큰 단추를 흐리게(누르는 것은 그대로, AU6-L9: 맨 아래 「지금은 1단계 차례」와 부딪쳤다) */
+  function stepCard(n, stage, title, desc, button, o) {
+    o = o || {};
+    // o.st — 화면이 정한 상태(예: 법인카드 빈 칸 때 ③ 이 지금이면 ② 는 「끝」이 아니라 「아직」, 2026-10-20 V3 B5)
+    var st = o.st || (stage > n ? 'done' : stage === n ? (o.busy ? 'work' : o.ahead ? 'ahead' : 'now') : 'todo');
+    return '<li class="vstep ' + st + '"' + (stage === n ? ' aria-current="step"' : '') + '>' +
+      '<div class="vsh"><i aria-hidden="true">' + (st === 'done' ? '✓' : n) + '</i><b>' + title + '</b></div>' +
+      '<p>' + desc + '</p>' +
+      (st === 'work' ? '<span class="vbar" aria-hidden="true"><i data-aimo-bar style="width:' + (AIM ? AIM.pct : 4) + '%"></i></span>' : '') +
+      button + '</li>';
+  }
+
+  /* ══════════════════ AI 검증 모션(2026-10-20 디자인 v2 — P_Verifying, 세 시스템 같은 판) ══════════════════
+     「검증하기」를 누른 뒤 서버 응답이 올 때까지 결과 자리에 「AI가 영수증을 읽고 있습니다」 판을 둔다.
+       · 지난 초 · 「사진 i / N 읽는 중 — 종류」(N = 서버가 이번에 읽힐 사진 수, 그 전에는 사진 있는 영수증 수) · 진행 막대(추정 — 응답 전 90% 를 넘지 않음)
+       · 실제 영수증 사진 썸네일(없으면 종이 그림)을 스캐너 빛(빨간 2px 줄 + 옅은 띠)이 훑고, 옆에 이번 기간 줄(날짜·방문처·금액)이 「확인 중」으로 선다
+       · 응답이 오면 실제 결과로 줄마다 차례로(80ms) 딱지가 찍히고 결과 화면으로. 가짜 결과는 먼저 보이지 않는다(추정은 진행 표시뿐)
+       · 60초가 넘으면 「평소보다 오래 걸립니다 — 그대로 기다려 주세요」 · 움직임 줄이기 설정이면 글자 진행만(딱지도 한 번에)
+     화면 전체를 다시 그려도(C.render) 판은 지금 상태로 다시 그려지고, 시계(250ms)는 DOM 을 찾아 고친다(다른 화면이면 건너뛴다). */
+  var AIM = null, AIM_T = null;
+  var AIM_KIND = { '통행료': '통행료 영수증', '주차': '주차 영수증', '주유': '주유 영수증', '계기판': '계기판 사진' };
+  function aimReduce() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
+  /** o: { title, cols:[머리 넷], rows:[{ id, date, place, amt }], photos:[{ id, src, kind }], N(추정 사진 수), paper('receipt'|'sheet') } */
+  function aimBegin(k, o) {
+    clearInterval(AIM_T);
+    AIM = { k: k, t0: Date.now(), phase: 'check', n: 0, N: o.N || 0, cur: null, tp: 0, tm: 0, pct: 4, pi: 0, ps: 0, done: false, chips: {}, pop: null,
+      title: o.title || 'AI가 영수증을 읽고 있습니다', cols: o.cols || ['날짜', '운행', '금액(원)', '맞춰 보기'], rows: (o.rows || []).slice(0, 6),
+      more: o.more != null ? o.more : Math.max(0, (o.rows || []).length - 6),
+      photos: o.photos || [], paper: o.paper || 'receipt' };
+    AIM_T = setInterval(aimTick, 250);
+    // 폰에서는 단계 카드 셋이 위아래로 쌓여 판이 화면 아래에 있다 — 판의 머리가 보이게 내려 준다(그린 뒤에)
+    setTimeout(function () {
+      var el = document.querySelector('[data-aimo]');
+      if (el && window.innerWidth <= 720) { try { el.scrollIntoView({ block: 'nearest', behavior: aimReduce() ? 'auto' : 'smooth' }); } catch (e) { } }
+    }, 80);
+  }
+  function aimOn(k) { return !!AIM && AIM.k === k; }
+  /** 진행 알림 — info: { phase:'check'|'read'|'match'|'run', n, N, cur(지금 읽는 사진 id), pop:{ kind, value } } */
+  function aimStep(k, info) {
+    if (!aimOn(k) || !info || AIM.done) return;
+    var el = (Date.now() - AIM.t0) / 1000;
+    if (info.phase && info.phase !== AIM.phase) { AIM.phase = info.phase; if (info.phase === 'match') AIM.tm = el; if (info.phase === 'read') AIM.tp = el; }
+    if (info.N != null) AIM.N = info.N;
+    if (info.n != null && info.n !== AIM.n) { AIM.n = info.n; AIM.tp = el; }
+    if (info.cur != null) {
+      AIM.cur = String(info.cur);
+      for (var i = 0; i < AIM.photos.length; i++) if (String(AIM.photos[i].id) === AIM.cur) { AIM.pi = i; AIM.ps = Date.now(); break; }
+    }
+    if (info.pop) AIM.pop = info.pop;
+    aimPaint(true);
+  }
+  function aimPctCalc() {
+    var el = (Date.now() - AIM.t0) / 1000, p;
+    if (AIM.done) return 100;
+    if (AIM.phase === 'check') p = 4 + 11 * (1 - Math.exp(-el / 3));
+    else if (AIM.phase === 'read') p = 15 + 65 * Math.min(1, (AIM.N ? AIM.n / AIM.N : 0) + (AIM.N ? (1 - Math.exp(-(el - AIM.tp) / 4)) * 0.9 / AIM.N : 0));
+    else if (AIM.phase === 'match') p = 80 + 10 * (1 - Math.exp(-(el - AIM.tm) / 6));
+    else p = 90 * (1 - Math.exp(-el / 12));                    // 'run' — 한 번에 묻는 것(법인카드)
+    return Math.min(90, Math.max(AIM.pct, Math.round(p)));
+  }
+  function aimCount() {
+    if (!AIM.N) return '';
+    if (AIM.done || AIM.phase === 'match') return AIM.N + ' / ' + AIM.N;
+    return (AIM.phase === 'read' ? Math.min(AIM.n + 1, AIM.N) : 0) + ' / ' + AIM.N;
+  }
+  /** 단추에 쓸 짧은 글 — 「읽는 중… 3 / 9」 */
+  function aimShort(k) {
+    if (!aimOn(k)) return '';
+    if (AIM.phase === 'read' && AIM.N) return '읽는 중… ' + Math.min(AIM.n + 1, AIM.N) + ' / ' + AIM.N;
+    return AIM.phase === 'match' ? '맞춰 보는 중…' : AIM.phase === 'run' ? '읽는 중…' : '살피는 중…';
+  }
+  function aimPhoto() {
+    if (!AIM.photos.length) return null;
+    // 지금 읽는 사진이 있으면 그것, 없으면(검사·대조 중) 1.4초마다 다음 사진 — 이번 기간 영수증을 차례로 훑는다
+    if (!(AIM.phase === 'read' && AIM.cur) && Date.now() - AIM.ps > 1400) { AIM.pi = (AIM.pi + 1) % AIM.photos.length; AIM.ps = Date.now(); }
+    return AIM.photos[AIM.pi % AIM.photos.length];
+  }
+  function aimPaperHtml(ph) {
+    var doc = AIM.paper === 'sheet'
+      ? '<div class="doc"><i class="h"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="l"></i><span>카드 내역<b>' + n0(AIM.rows.length + AIM.more) + '줄</b></span></div>'
+      : '<div class="doc"><i class="h"></i><i style="width:80%"></i><i style="width:64%"></i><i style="width:72%"></i><i class="l"></i><span>합계<b>···</b></span><i style="width:54%"></i><i style="width:38%"></i></div>';
+    return doc + (ph ? '<img alt="" src="' + esc(ph.src) + '">' : '') + '<span class="aimo-scan"></span>' + (ph ? '<span class="aimo-tag">' + esc(ph.kind || '영수증') + '</span>' : '');
+  }
+  function aimChip(c) { return '<span class="dchip ' + (c ? c[1] : 'wait') + '">' + esc(c ? c[0] : '확인 중') + '</span>'; }
+  /** 판 — viewVerify 의 결과 자리(.hero). verdictHtml = 지금 진행 글(각 화면의 노트 칸 — 바뀌면 각 화면이 그 칸만 고친다). */
+  function aimHtml(k, verdictHtml) {
+    if (!aimOn(k)) return '';
+    var ph = aimPhoto(), el = Math.floor((Date.now() - AIM.t0) / 1000), long = el >= 60;
+    AIM.pct = aimPctCalc();
+    return '<section class="hero aimo" data-aimo aria-busy="true" aria-label="AI 검증 중">' +
+      '<div class="aimo-hd"><h2>' + esc(AIM.title) + '</h2><span class="aimo-el" data-aimo-el>' + el + '초 지남</span></div>' +
+      '<div class="aimo-st"><p class="verdict" role="status" aria-live="polite">' + verdictHtml + '</p><b class="aimo-cnt" data-aimo-cnt>' + aimCount() + '</b></div>' +
+      '<span class="aimo-bar" aria-hidden="true"><i data-aimo-bar style="width:' + AIM.pct + '%"></i></span>' +
+      '<div class="aimo-stage" aria-hidden="true">' +
+        '<div class="aimo-pile"><span class="pp"></span><span class="pp p2"></span><div class="aimo-frame" data-aimo-frame data-pid="' + esc(ph ? String(ph.id) : '') + '">' +
+          '<div class="aimo-paper" data-aimo-paper>' + aimPaperHtml(ph) + '</div><span class="cn tl"></span><span class="cn tr"></span><span class="cn bl"></span><span class="cn br"></span></div></div>' +
+        '<div class="aimo-flow"><i></i><i></i><i></i></div>' +
+        '<div class="aimo-side"><div class="aimo-pop" data-aimo-pop' + (AIM.pop ? '' : ' hidden') + '>' + (AIM.pop ? '<span>' + esc(AIM.pop.kind) + ' 읽음</span><b>' + esc(AIM.pop.value) + '</b>' : '') + '</div>' +
+          // 머리 칸에도 줄 칸과 같은 이름(pl·am·ac) — 폰에서 금액 칸을 숨길 때 머리 「금액(원)」도 같이 숨는다(2026-10-20 V3 B11: 머리만 남아 「맞춰 보기」가 아랫줄로 밀렸다)
+          '<div class="aimo-rows"><div class="ar hd">' + AIM.cols.map(function (c, i) { return '<span' + ([' class="dt"', ' class="pl"', ' class="am"', ' class="ac"'][i] || '') + '>' + esc(c) + '</span>'; }).join('') + '</div>' +
+          (AIM.rows.length ? AIM.rows.map(function (r) {
+            return '<div class="ar" data-aimo-row="' + esc(String(r.id)) + '"><b>' + esc(r.date) + '</b><span class="pl">' + esc(r.place || '—') + '</span>' +
+              '<span class="am">' + esc(r.amt == null ? '—' : r.amt) + '</span><span class="ac">' + aimChip(AIM.chips[String(r.id)]) + '</span></div>';
+          }).join('') : '<div class="aimo-more">이번 기간에 맞춰 볼 줄이 없습니다</div>') +
+          (AIM.more ? '<div class="aimo-more">외 ' + n0(AIM.more) + '줄도 함께 봅니다</div>' : '') + '</div></div>' +
+      '</div>' +
+      '<p class="aimo-note' + (long ? ' long' : '') + '" data-aimo-note>' + (long ? '평소보다 오래 걸립니다 — 그대로 기다려 주세요' : '보통 10~30초 걸립니다 · 읽는 동안 이 화면에 그대로 있어 주세요') + '</p></section>';
+  }
+  /** 시계·진행 알림 때 판의 바뀐 곳만 고친다(화면 전체를 다시 그리지 않는다). */
+  function aimPaint(force) {
+    if (!AIM) return;
+    var root = document.querySelector('[data-aimo]');
+    AIM.pct = aimPctCalc();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-aimo-bar]'), function (b) { b.style.width = AIM.pct + '%'; });
+    if (!root) return;
+    var el = Math.floor((Date.now() - AIM.t0) / 1000), e1 = root.querySelector('[data-aimo-el]'), c1 = root.querySelector('[data-aimo-cnt]'), nt = root.querySelector('[data-aimo-note]');
+    if (e1) e1.textContent = el + '초 지남';
+    if (c1) c1.textContent = aimCount();
+    if (nt && el >= 60 && !nt.classList.contains('long')) { nt.classList.add('long'); nt.textContent = '평소보다 오래 걸립니다 — 그대로 기다려 주세요'; }
+    var ph = aimPhoto(), fr = root.querySelector('[data-aimo-frame]');
+    if (fr && fr.getAttribute('data-pid') !== (ph ? String(ph.id) : '')) {
+      fr.setAttribute('data-pid', ph ? String(ph.id) : '');
+      var pp = fr.querySelector('[data-aimo-paper]'); if (pp) pp.innerHTML = aimPaperHtml(ph);
+      if (!aimReduce()) { fr.classList.remove('slide'); void fr.offsetWidth; fr.classList.add('slide'); }
+    }
+    var img = fr && fr.querySelector('img');
+    if (img && !img.__aimo) { img.__aimo = 1; img.addEventListener('error', function () { img.style.display = 'none'; }); }
+    var pop = root.querySelector('[data-aimo-pop]');
+    if (pop && AIM.pop && force) { pop.hidden = false; pop.innerHTML = '<span>' + esc(AIM.pop.kind) + ' 읽음</span><b>' + esc(AIM.pop.value) + '</b>'; pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
+  }
+  function aimTick() { if (!AIM || AIM.done) { clearInterval(AIM_T); AIM_T = null; return; } aimPaint(false); }
+  /** 응답이 왔다 — 실제 결과로 줄마다 딱지를 찍는다(80ms 간격, 움직임 줄이기면 한 번에). res = { byId: { 줄 id: [글, 색] }, fallback: [글, 색] } */
+  function aimFinish(k, res) {
+    return new Promise(function (ok) {
+      if (!aimOn(k)) { ok(); return; }
+      AIM.done = true; AIM.pct = 100; clearInterval(AIM_T); AIM_T = null;
+      aimPaint(false);
+      var red = aimReduce(), list = AIM.rows.slice(), i = 0;
+      var stamp = function () {
+        if (!aimOn(k)) { ok(); return; }
+        if (i >= list.length) { setTimeout(ok, red ? 0 : 450); return; }
+        var r = list[i++], c = (res && res.byId && res.byId[String(r.id)]) || (res && res.fallback) || null;
+        if (c) {
+          AIM.chips[String(r.id)] = c;
+          var row = null;
+          Array.prototype.forEach.call(document.querySelectorAll('[data-aimo-row]'), function (x) { if (x.getAttribute('data-aimo-row') === String(r.id)) row = x; });
+          if (row) {
+            var ac = row.querySelector('.ac'); if (ac) ac.innerHTML = aimChip(c);
+            if (!red) { row.classList.remove('hit'); void row.offsetWidth; row.classList.add('hit'); }
+          }
+        }
+        if (red) stamp(); else setTimeout(stamp, 80);
+      };
+      stamp();
+    });
+  }
+  function aimEnd(k) { if (aimOn(k)) { clearInterval(AIM_T); AIM_T = null; AIM = null; } }
+  /** 결과(items + refs)에서 줄마다 딱지 — key = 'trips'(운행일지 refs.trips) | 'items'(개인경비·법인카드 ref.items). 맨 나쁜 것 하나. */
+  function aimChipsFrom(items, key, map) {
+    var by = {};
+    (items || []).forEach(function (it) {
+      var ids = key === 'trips' ? (it.refs || {}).trips : ((it.ref && it.ref.items) || (it.refs && it.refs.items));
+      var c = map(it);
+      if (!c || !ids || !ids.length) return;
+      ids.forEach(function (id) { var o = by[String(id)]; if (!o || o.r < c[2]) by[String(id)] = { c: [c[0], c[1]], r: c[2] }; });
+    });
+    var out = {}; Object.keys(by).forEach(function (id) { out[id] = by[id].c; });
+    return { byId: out, fallback: ['맞음', 'ok'] };
+  }
+  var AIMO = { begin: aimBegin, step: aimStep, finish: aimFinish, end: aimEnd, html: aimHtml, on: aimOn, short: aimShort, chipsFrom: aimChipsFrom, kind: AIM_KIND,
+    pct: function () { return AIM ? AIM.pct : 0; } };
+  /** 운행일지 판 재료 — 이번 기간 업무 운행 줄(금액 있는 운행 먼저 여섯, 날짜순)과 사진 있는 영수증. */
+  function drvMotion(u, cyc) {
+    // 기간 범위는 엔진 열쇠로(2026-10-20 V3 — 연말 추가 기간 '2026-12b' 를 달 숫자로 나눠 NaN 범위가 되어 판에 운행·사진이 0줄이었다)
+    var S = C.state(), r = keyRange(cyc);
+    var biz = (S.ALL_TRIPS || []).filter(function (t) { return t.username === u && !t.deleted_at && t.purpose === '일반업무' && t.start_time >= r.lo && t.start_time < r.hi; });
+    var amt = function (t) { return (Number(t.toll_cost) || 0) + (Number(t.parking_cost) || 0); };
+    var pick = biz.filter(function (t) { return amt(t) > 0; }).concat(biz.filter(function (t) { return !(amt(t) > 0); })).slice(0, 6)
+      .sort(function (a, b) { return a.start_time - b.start_time; });
+    var short = function (a) { var w = String(a || '').trim().split(/\s+/).filter(Boolean); return w.slice(-2).join(' '); };
+    var ev = (S.ALL_EVID || []).filter(function (e) { var d = Number(e.date_millis); return e.username === u && e.photo_path && d >= r.lo && d < r.hi; })
+      .sort(function (a, b) { return a.date_millis - b.date_millis; });
+    return { title: 'AI가 영수증을 읽고 있습니다', cols: ['날짜', '운행', '금액(원)', '맞춰 보기'], N: ev.length,
+      rows: pick.map(function (t) { return { id: t.id, date: C.md(t.start_time), place: t.visit_place || short(t.end_address) || '방문처 없음', amt: amt(t) ? n0(amt(t)) : '—' }; }),
+      more: Math.max(0, biz.length - 6),
+      photos: ev.map(function (e) { return { id: e.id, src: C.photoUrl(e.photo_path), kind: AIM_KIND[e.category] || ((e.category || '') + ' 영수증') }; }) };
+  }
+  /** 운행일지 검증 결과 → 운행 줄 딱지(서버 R06·R10·R14·R02 와 그 밖의 확인 항목 refs.trips). */
+  function drvChips(row) {
+    return aimChipsFrom((row && row.result && row.result.items) || [], 'trips', function (it) {
+      if (it.code === 'R06') return ['영수증 없음', 'bad', 6];
+      if (it.code === 'R10') return ['금액 다름', 'bad', 5];
+      if (it.code === 'R14') return ['두 번 정산 의심', 'warn', 4];
+      if (it.code === 'R02') return ['통행료 미확정', 'warn', 3];
+      if (it.level === 'bad') return ['확인 필요', 'bad', 2];
+      if (it.level === 'warn') return ['확인 필요', 'warn', 1];
+      return null;
+    });
+  }
+
   // 개인경비(drv-expense.js)가 같은 모양·같은 순서를 쓰도록 내어 준다 — 결과 창·Gemini 단추·검증 딱지·사진 받기.
   C.vx = {
     makePdf: makePdf, buildPdf: buildPdf, ensureLibs: ensureLibs, loadPhoto: loadPhoto, pool: pool, safeName: safeName,
     gemBtn: gemBtn, gemBadge: gemBadge, sumChip: sumChip, sumText: sumText, whenText: whenText, showItems: showItems, warnTail: warnTail,
-    pdfUrls: function () { return PDF_URLS; }, setPdfUrls: function (a) { PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); }); PDF_URLS = a || []; }
+    pdfUrls: function () { return PDF_URLS; }, setPdfUrls: function (a) { PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); }); PDF_URLS = a || []; },
+    // 2026-10-20 디자인 v2 — 세 시스템이 같이 쓰는 검증·상신 단계 카드와 AI 검증 모션
+    stepCard: stepCard, aiMotion: AIMO,
+    readDone: readDone       // ① 카드 「읽은 사진 장수」 문구(2026-10-20 V3 B6)
   };
   return {
     // 「검증 현황」(a_verify)은 관리 「현황」(driving-app.js a_status)으로 합쳤다(2026-10-15 2차) — 검증 칸은 statusVerify 가 낸다

@@ -25,16 +25,22 @@
   var LABEL = { category: '구분', purpose: '사용목적', note: '비고' };
   var MAXLEN = { category: 20, purpose: 200, note: 200 };
 
-  /* ══════════════════ 기간 (1일 ~ 말일) ══════════════════ */
-  function keyOf(c) { return c.y + '-' + pad(c.m); }
-  function parseKey(k) { var p = String(k || '').split('-'); return { y: +p[0], m: +p[1] }; }
-  /** 오늘이 속한 법인카드 기간 — 달력 달(KST). */
-  function cCurrent() { var d = C.kd(Date.now()); return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 }; }
-  function cSpan(y, m) { return R.span(y + '-' + pad(m)); }
-  /** 법인카드 기간(1일~말일)의 ms 범위 — KST. 마감 뒤 며칠 계산에만 쓴다(2026-10-20). */
-  function cRange(y, m) { var K9 = 9 * 3600e3; return { lo: Date.UTC(y, m - 1, 1) - K9, hi: Date.UTC(y, m, 1) - K9 }; }
-  function cycName(k) { var c = parseKey(k); return c.y && c.m ? C.cycleName(c.y, c.m) : String(k || '') + '분'; }
+  /* ══════════════════ 기간 (1일 ~ 말일) ══════════════════
+     ★ 2026-10-20 연말 마감 설정: 범위·이름은 엔진(cycle-rules.js 의 'card')이 정한다 — 관리자가 정하지 않으면 늘 달력 한 달(지금과 같다).
+       기간 c = {y, m} · 12월 추가 기간은 {y, m:12, x:'b'}(키 '2026-12b'). cSpan·cRange 는 c 하나로도, 예전처럼 (y, m) 두 숫자로도 받는다. */
+  var CR = C.CR || window.CycleRules;
+  function cArg(y, m) { return y && typeof y === 'object' ? y : { y: +y, m: +m }; }
+  function keyOf(c) { return CR.key(c); }
+  function parseKey(k) { return CR.parse(k) || { y: NaN, m: NaN }; }
+  /** 오늘이 속한 법인카드 기간 — 달력 달(KST, 연말 설정이 있으면 그 범위). */
+  function cCurrent() { var P = CR.current('card'); return P.x ? { y: P.y, m: P.m, x: P.x } : { y: P.y, m: P.m }; }
+  function cSpan(y, m) { return R.span(keyOf(cArg(y, m))); }
+  /** 법인카드 기간의 ms 범위 — KST(hi 는 들어가지 않음). 마감 뒤 며칠 계산에만 쓴다(2026-10-20). 없는 기간이면 NaN. */
+  function cRange(y, m) { var P = CR.byKey('card', cArg(y, m)); return P ? { lo: P.loMs, hi: P.endMs } : { lo: NaN, hi: NaN }; }
+  function cycName(k) { var c = CR.parse(k); return c ? CR.name(c) : String(k || '') + '분'; }
   function rangeHiMs(k) { return Date.parse(R.cycleRange(k).hi + 'T00:00:00+09:00'); }
+  /** 「전월 대비」의 앞 기간 키 — 이름 달의 앞 달('2027-01' → '2026-12'). 12월 추가 기간('2026-12b')은 견주지 않는다(null). */
+  function prevMonthKey(k) { var c = CR.parse(k); return !c || c.x ? null : c.m > 1 ? c.y + '-' + pad(c.m - 1) : (c.y - 1) + '-12'; }
 
   /* ══════════════════ 서버 ══════════════════ */
   function rest(path, opt) {
@@ -71,6 +77,9 @@
   var CLOCK = {};          // 'user|cyc' → 서버 잠금(card_cycle_locked)
   var HIST = null, HIST_ASK = null;   // 구분 추천 재료 — 내가 전에 구분을 적은 줄(최근 순)
   var MISSING = {};        // 마지막으로 올린 파일에 없던 줄 id → 1 (이번 화면에서만 표시)
+  /** 전액 취소로 확인된 승인인가(2026-10-20 AU2 #5) — 올리기 창에서 「같이 지우기」를 끄고 올린 줄. 줄의 src.cancel 에 남겨
+   *  새로 고침해도 표시가 남는다(예전 「파일에 없는 줄」은 그 화면에서만 보였다). 다음에 올린 파일에 그 승인이 다시 있으면 src 가 새로 써져 풀린다. */
+  function cancelOf(it) { return !!(it && it.src && typeof it.src === 'object' && it.src.cancel); }
   function me() { return C.myName(); }
   function myFullName() { return C.nameOf(me()); }
   function isAdmin() { var S = C.state(); return !!(S.ME && S.ME.is_admin); }
@@ -83,7 +92,7 @@
     var p = C.fetchAll('/rest/v1/card_items?select=*&cycle=eq.' + encodeURIComponent(cyc) +
       (all ? '' : '&username=eq.' + encodeURIComponent(me())) + '&order=appr_date.asc,appr_time.asc,id.asc')
       .then(function (rows) { ITEMS[k] = { rows: (rows || []).sort(byDate) }; if (!all) pruneFailed(cyc); return ITEMS[k].rows; })
-      .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료되었습니다.' : '법인카드 내역을 불러오지 못했습니다.' }; return null; });
+      .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료되었습니다.' : (e && e.noPerm) ? '법인카드 내역을 볼 권한이 없습니다.' : '법인카드 내역을 불러오지 못했습니다.' }; return null; });
     ITEMS[k] = { wait: p };
     if (!all) {
       rest('/rest/v1/rpc/card_cycle_locked', { method: 'POST', body: JSON.stringify({ p_username: me(), p_cycle: cyc }) })
@@ -92,7 +101,7 @@
     return p;
   }
   function loadAppr() {
-    return C.fetchAll('/rest/v1/card_approvals?select=*&order=submitted_at.desc')
+    return C.fetchAll('/rest/v1/card_approvals?select=*&order=submitted_at.desc,id.desc')     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
       .then(function (rows) { CAPPR = (rows || []).map(function (a) { a._kind = 'card'; return a; }); })
       .catch(function () { if (!CAPPR) CAPPR = []; });
   }
@@ -159,7 +168,7 @@
   }
   function head(title, extra) {
     var S = C.state();
-    return C.head(title, esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · <b>' + esc(cSpan(S.CYC.y, S.CYC.m)) + '</b>' + (extra ? ' · ' + extra : ''));
+    return C.head(title, esc(cycName(S.CYCKEY)) + ' · <b>' + esc(R.span(S.CYCKEY)) + '</b>' + (extra ? ' · ' + extra : ''));
   }
   function notReady(title, x) {
     if (x && x.err) {
@@ -173,9 +182,9 @@
   function band() {
     var S = C.state(), cur = cCurrent();
     if (C.cmpCycle(S.CYC, cur) >= 0) return '';
-    return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + S.CYC.y + '년 ' + S.CYC.m + '월분 (' + esc(cSpan(S.CYC.y, S.CYC.m)) +
+    return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + esc(cycName(S.CYCKEY)) + ' (' + esc(R.span(S.CYCKEY)) +
       ') · 지난 기간</b>을 보고 있습니다. 법인카드는 <b>1일 ~ 말일</b>이 한 기간입니다.</span>' +
-      '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + '">이번 기간(' + cur.m + '월분 ' + esc(cSpan(cur.y, cur.m)) + ')으로 →</button></div>';
+      '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + (cur.x || '') + '">이번 기간(' + esc(CR.short(cur)) + ' ' + esc(cSpan(cur)) + ')으로 →</button></div>';
   }
   function tag(key) {
     var a = myC(key);
@@ -250,10 +259,11 @@
     var nSug = locked ? 0 : sugCount(rows);
     var h = head(title, 'ERP 에서 받은 내 카드 내역에 구분·사용목적을 적습니다');
     h += apprStrip(a);
+    h += cancelBand(rows);                 // 전액 취소된 승인이 남아 있으면(2026-10-20 AU2 #5)
     // ★ 2026-10-15: 「ERP 엑셀 올리기」는 요약 칸의 빨간 단추 하나만(빈 기간에 둘이던 것). 「임시저장」 단추는 뺐다 —
     //   칸은 자동 저장이고, 표 위 저장 상태 줄이 저장 중·저장됨·저장 못 함을 알리며, 저장이 실패했을 때만 그 줄에 「다시 저장」이 나온다.
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (a && a.status === 'approved' ? ' ok' : '') + '"></span>' +
-      esc(C.cycleName(S.CYC.y, S.CYC.m)) + ' · ' + esc(cSpan(S.CYC.y, S.CYC.m)) + ' · ' + n0(T.n) + '건</div>' +
+      esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + ' · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.cost) + '</p><div class="facts" id="cFacts">' + factsInner(rows) + '</div>' +
       (locked ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-cup>' + ic('card', 14) + 'ERP 엑셀 올리기</button>' +
         (rows.length ? sugBtnHtml(nSug) : '') +
@@ -295,7 +305,8 @@
       '<td class="dim" data-l="시간">' + esc(String(it.appr_time || '').slice(0, 5)) + '</td>' +
       // 「파일에 없는 줄」 표시는 가맹점 아래 줄에 — 가맹점 옆에 붙이면 칸이 넓어져 맨 끝 「지우기」가 표 밖으로 밀렸다(2026-10-15)
       '<td class="el" data-l="가맹점" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') +
-        (MISSING[it.id] ? '<div style="margin-top:3px;line-height:1"><span class="st warn">파일에 없는 줄</span></div>' : '') + '</td>' +
+        (cancelOf(it) ? '<div style="margin-top:3px;line-height:1"><span class="st bad" data-ccancel title="' + esc((it.src.cancel.file || 'ERP 파일') + '에서 전액 취소로 확인 — 청구하지 않으려면 이 줄을 지워 주세요') + '">전액 취소된 승인</span></div>'
+          : MISSING[it.id] ? '<div style="margin-top:3px;line-height:1"><span class="st warn">파일에 없는 줄</span></div>' : '') + '</td>' +
       '<td class="el dim" data-l="업종">' + esc(it.biz_type || '') + '</td>' +
       '<td class="n total" data-l="승인금액">' + n0(it.amount) + '</td>' +
       // 추천은 칸 아래 점선 단추 하나로만 보인다 — 칸 안 흐린 글씨(placeholder)에 또 쓰지 않는다(2026-10-15)
@@ -452,8 +463,16 @@
       (rest.length ? fact('외 ' + n0(rest.length) + '구분', won(restSum), n0(restN) + '건 · ' + rest.map(function (x) { return x.c; }).join(' · ')) : '');
   }
   function sectN(rows) {
-    var blank = R.blankRows(rows), nMiss = rows.filter(function (it) { return MISSING[it.id]; }).length;
-    return n0(rows.length) + '건' + (blank ? ' · 빈칸 ' + n0(blank) + '줄' : '') + (nMiss ? ' · 파일에 없는 줄 ' + n0(nMiss) : '');
+    var blank = R.blankRows(rows), nMiss = rows.filter(function (it) { return MISSING[it.id] && !cancelOf(it); }).length, nCan = rows.filter(cancelOf).length;
+    return n0(rows.length) + '건' + (blank ? ' · 빈칸 ' + n0(blank) + '줄' : '') + (nCan ? ' · 전액 취소된 승인 ' + n0(nCan) : '') + (nMiss ? ' · 파일에 없는 줄 ' + n0(nMiss) : '');
+  }
+  /** 전액 취소로 확인된 승인이 아직 남아 있으면 띠 하나(2026-10-20 AU2 #5 — 검증 경고). 고칠 수 없는 기간(결재 중·완료)에는 없다. */
+  function cancelBand(rows) {
+    var c = (rows || []).filter(cancelOf);
+    if (!c.length || lockedFor(me(), C.state().CYCKEY)) return '';
+    var amt = c.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0);
+    return '<div class="awarn" id="cCancelBand">' + ic('alert', 15) + '<span><b>전액 취소된 승인 ' + n0(c.length) + '건(' + won(amt) + ')이 아직 남아 있습니다.</b> ' +
+      'ERP 파일에서 취소로 확인된 결제라 그대로 상신하면 취소된 금액까지 청구됩니다 — 표에서 「전액 취소된 승인」 줄을 지워 주세요.</span></div>';
   }
   function paintBlank() {
     var rows = mineRows(C.state().CYCKEY);
@@ -491,8 +510,17 @@
       var chip = document.querySelector('[data-csug="' + x.id + '"]'); if (chip) chip.remove();
       return saveCell(x.id, 'category', x.cat, cyc);
     }).then(function () {
-      C.toast(n0(todo.length) + '줄에 추천 구분을 채웠습니다. 맞는지 한 번 보세요.');
-      if (!typing()) C.render(); else paintSug();
+      // ★ 칸 저장은 실패해도 reject 하지 않는다(그 칸에 「저장 못 함」을 단다) — 그래서 끝난 뒤 실패한 칸을 센다(2026-10-20 AU2 #14:
+      //   결재 중 잠김 등으로 하나도 안 들어갔는데 「N줄에 추천 구분을 채웠습니다」라고 했다). 실패가 있으면 그 수를 알리고 다시 받는다.
+      var bad = todo.filter(function (x) { return FAILED[x.id + '|category']; }).length, ok = todo.length - bad;
+      if (!bad) {
+        C.toast(n0(todo.length) + '줄에 추천 구분을 채웠습니다. 맞는지 한 번 보세요.');
+        if (!typing()) C.render(); else paintSug();
+        return;
+      }
+      C.toast((ok ? n0(ok) + '줄은 채웠지만 ' : '') + n0(bad) + '줄은 저장하지 못했습니다 — 빨간 「저장 못 함」 칸을 확인해 주세요(결재 중이면 회수한 뒤에 채울 수 있습니다).', true);
+      dropItems(cyc);
+      loadItems(cyc, false, true).then(function () { if (!typing()) C.render(); else { paintSug(); paintSave(); } });
     });
   }
   function openDel(id) {
@@ -552,10 +580,10 @@
     if (lockedFor(me(), S.CYCKEY)) { C.toast('결재 중이거나 끝난 기간이라 올릴 수 없습니다.', true); return; }
     if (C_SENDING) { C.toast('앞서 고른 파일을 아직 올리는 중입니다. 끝난 뒤 다시 열어 주세요.'); return; }
     CUP = { cyc: S.CYCKEY, busy: false, sent: false, res: null, plan: null, file: '', useOwner: true };
-    C.openPanel('ERP 엑셀 올리기 — 법인카드', C.cycleName(S.CYC.y, S.CYC.m) + ' · ' + cSpan(S.CYC.y, S.CYC.m),
+    C.openPanel('ERP 엑셀 올리기 — 법인카드', cycName(S.CYCKEY) + ' · ' + R.span(S.CYCKEY),
       '<div class="drop" id="cDrop" style="margin:0 0 14px">' +
       '<div class="dt">ERP 에서 받은 <b>내 법인카드 승인내역</b> 엑셀을 올립니다</div>' +
-      '<div class="dd">.xls · .xlsx · PC 에서는 여기에 끌어다 놓아도 됩니다<br>0원·취소 줄과 ' + esc(cSpan(S.CYC.y, S.CYC.m)) + ' 밖의 줄은 자동으로 뺍니다</div>' +
+      '<div class="dd">.xls · .xlsx · PC 에서는 여기에 끌어다 놓아도 됩니다<br>0원·취소 줄과 ' + esc(R.span(S.CYCKEY)) + ' 밖의 줄은 자동으로 뺍니다</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기<input type="file" id="cFile" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>' +
       '</div><div id="cPrev"></div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCUpGo" disabled>올리기</button>', true);
@@ -566,7 +594,8 @@
   function prevMsg(t) { var el = $('cPrev'); if (el) el.innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(t) + '</span></div>'; }
   function replan(s) {
     var cur = mineRows(s.cyc);
-    s.plan = E.plan(cur, s.res.items.filter(function (it) { return s.useOwner || !it.owner_mismatch; }));
+    // 뺀 줄(dropped)도 넘긴다 — 이미 올린 승인이 이 파일에서 전액 취소로 확인되면 plan.cancelled 로 따로 묶인다(2026-10-20 AU2 #5)
+    s.plan = E.plan(cur, s.res.items.filter(function (it) { return s.useOwner || !it.owner_mismatch; }), s.res.dropped);
   }
   function readFile(f) {
     var s = CUP;
@@ -583,10 +612,11 @@
       if (CUP !== s) return;
       var bytes = new Uint8Array(r[1]);
       if (!E.looksLikeSheet(bytes)) throw new Error('NOT_SHEET');
-      var res = E.parse(E.sheetRows(r[0], bytes), { cycle: s.cyc, me: myFullName(), file: f.name });
+      var res = E.parse(E.sheetRows(r[0], bytes), { cycle: s.cyc, range: R.cycleRange(s.cyc), me: myFullName(), file: f.name });   // range — 연말 설정 기간(2026-10-20)
       if (!res.ok) { var er = new Error(res.error); er.res = res; throw er; }
       s.res = res; s.file = f.name;
       s.useOwner = !res.owner.all;         // 모든 줄이 남의 카드면 기본으로 빼 둔다(경고만 — 사용자가 고른다)
+      s.delCancel = true;                  // 전액 취소로 확인된 이미 올린 승인은 기본으로 「같이 지우기」(2026-10-20 AU2 #5 — 끄면 표시만 남긴다)
       replan(s);
       s.busy = false;                       // ★ 그리기 전에 푼다 — 읽는 중(busy)이면 paintPreview 가 「넣기」를 끈 채로 둔다
       paintPreview();
@@ -635,6 +665,20 @@
         '<label class="finall" style="margin:6px 0 10px"><input type="checkbox" id="cOwn"' + (s.useOwner ? ' checked' : '') + '> 소유자가 다른 줄 ' + n0(res.owner.mismatch) + '건도 올리기' +
         (s.useOwner ? '' : ' <span class="dim">(지금은 빼 둡니다)</span>') + '</label>';
     }
+    // 이미 올린 승인 가운데 이 파일에서 전액 취소로 확인된 것(2026-10-20 AU2 #5) — 기본 「같이 지우기」.
+    //   끄면 지우지 않고 그 줄에 「전액 취소된 승인」 표시를 남긴다(새로 고침해도 남음 — src.cancel). 돈이 틀리는 경고라 숫자 칸보다 위에.
+    var canc = pl.cancelled || [], nDel = s.delCancel ? canc.length : 0;
+    var nMark = s.delCancel ? 0 : canc.filter(function (e) { return !cancelOf(e); }).length;
+    if (canc.length) {
+      var cAmt = canc.reduce(function (a2, e) { return a2 + (Number(e.amount) || 0); }, 0);
+      if (!s.delCancel) nCheck += canc.length;
+      h += '<div class="awarn" id="cCancelGone">' + ic('alert', 15) + '<span><b>이미 올린 승인 ' + n0(canc.length) + '건(' + won(cAmt) + ')이 이 파일에서 전액 취소로 확인됐습니다.</b> ' +
+        '그대로 두면 취소된 결제가 청구됩니다 — ' + esc(canc.slice(0, 5).map(function (e) {
+          return String(e.appr_date || '').slice(5).replace('-', '.') + ' ' + (e.merchant || '') + ' ' + n0(e.amount) + '원';
+        }).join(', ')) + (canc.length > 5 ? ' 외 ' + n0(canc.length - 5) + '건' : '') + '</span></div>' +
+        '<label class="finall" style="margin:6px 0 10px"><input type="checkbox" id="cCancelDel"' + (s.delCancel ? ' checked' : '') + '> 취소된 승인 ' + n0(canc.length) + '건 같이 지우기' +
+        (s.delCancel ? '' : ' <span class="dim">(지금은 지우지 않고 「전액 취소된 승인」으로 표시만 합니다)</span>') + '</label>';
+    }
     h += '<div class="facts cfacts">' +
       fact('새 줄', n0(pl.inserts.length) + '<small>줄</small>', '처음 들어오는 승인') +
       fact('바뀐 줄', n0(pl.updates.length) + '<small>줄</small>', 'ERP 칸만 고침 — 구분·사용목적은 그대로') +
@@ -648,7 +692,8 @@
       h += '<section class="sect" style="margin-top:12px"><div class="hd"><h2>뺀 줄</h2><span class="cnt">' + n0(res.dropped.length) + '줄</span></div>' +
         '<div class="panel"><div class="scroll" data-rows><table class="cdrop"><thead><tr><th class="n">엑셀 행</th><th>승인일</th><th>승인번호</th><th>가맹점</th><th class="n">금액</th><th>까닭</th></tr></thead><tbody>' +
         res.dropped.map(function (d) {
-          var inv = d.reason === 'invalid', why = d.label + (inv && d.cancel ? ' — 취소 줄: 원래 승인은 남음' : '');
+          // 무엇을 못 읽었는지(card-erp detail — 「승인일 「26.10.14」」 등, 2026-10-20) · 금액을 못 읽은 줄은 금액 칸 「—」(예전 NaN)
+          var inv = d.reason === 'invalid', why = d.label + (d.detail ? ' — ' + d.detail : '') + (inv && d.cancel ? ' — 취소 줄: 원래 승인은 남음' : '');
           return '<tr' + (inv ? ' class="cbad"' : '') + ' data-dreason="' + esc(d.reason) + '"><td class="n">' + d.row + '</td><td>' + esc(d.appr_date || '—') + '</td><td>' + esc(d.appr_no || '(없음)') + '</td>' +
             '<td class="el">' + esc(d.merchant) + '</td><td class="n">' + (d.cancel ? '−' : '') + n0(d.amount) + '</td><td>' + (inv ? '<span class="st bad">' + esc(why) + '</span>' : esc(why)) + '</td></tr>';
         }).join('') + '</tbody></table></div></div></section>';
@@ -656,24 +701,29 @@
     el.innerHTML = h;
     var b = $('btnCUpGo');
     if (b) {
-      b.disabled = !nGo || s.busy;
+      var nAct = nGo + nDel + nMark;      // 올릴 줄 + 같이 지울 취소 줄 + 표시만 남길 취소 줄(2026-10-20)
+      b.disabled = !nAct || s.busy;
       // 개인경비 「N건 올리기」와 같은 이름(2026-10-15 — 예전 「넣기 (새 5 · 바뀜 0)」). 새·바뀐 줄 수는 위 숫자 칸에 있다.
-      b.textContent = !nGo ? '올릴 줄이 없습니다' : n0(nGo) + '건 올리기' + (nCheck ? ' · 확인 ' + n0(nCheck) + '건' : '');
+      b.textContent = !nAct ? '올릴 줄이 없습니다' : [nGo ? n0(nGo) + '건 올리기' : '', nDel ? '취소 ' + n0(nDel) + '건 지우기' : '', nMark ? '취소 ' + n0(nMark) + '건 표시' : '']
+        .filter(Boolean).join(' · ') + (nCheck ? ' · 확인 ' + n0(nCheck) + '건' : '');
       b.title = nCheck ? '위의 경고를 확인한 뒤 올려 주세요' : '';
     }
     // 경고가 있으면 창 안을 미리보기 머리까지 내려 둔다(올리기 칸 아래에 묻히지 않게) — 뒤 화면은 건드리지 않는다
     var pb = $('pBody');
     var firstPaint = !s.painted; s.painted = true;      // 새 파일의 첫 그림에서만 — 체크박스 등으로 다시 그릴 때는 자리를 지킨다
-    if (pb && firstPaint && (erpBad || bad.length)) pb.scrollTop += Math.max(0, el.getBoundingClientRect().top - pb.getBoundingClientRect().top - 8);
+    if (pb && firstPaint && (erpBad || bad.length || canc.length)) pb.scrollTop += Math.max(0, el.getBoundingClientRect().top - pb.getBoundingClientRect().top - 8);
   }
   function runUpload() {
     var s = CUP;
     if (!s || !s.plan || s.busy) return;
     var list = s.plan.inserts.concat(s.plan.updates.map(function (u) { return u.item; }));
-    if (!list.length) { C.closePanel(); return; }
+    // 전액 취소로 확인된 이미 올린 승인(2026-10-20 AU2 #5) — 「같이 지우기」면 지우고, 끄면 src.cancel 표시만 남긴다(아직 표시 안 된 줄만)
+    var canc = s.plan.cancelled || [];
+    var toDel = s.delCancel ? canc : [], toMark = s.delCancel ? [] : canc.filter(function (e) { return !cancelOf(e); });
+    if (!list.length && !toDel.length && !toMark.length) { C.closePanel(); return; }
     s.busy = true; C_SENDING = true;
     var b = $('btnCUpGo'); if (b) { b.disabled = true; b.textContent = '올리는 중…'; }
-    var at = new Date().toISOString(), u = me(), done = 0;
+    var at = new Date().toISOString(), u = me(), done = 0, nDel = 0, nMark = 0, delFail = [];
     var payload = list.map(function (it) { return E.toRow(it, u, { file: s.file, at: at }); });   // ★ 손 칸은 보내지 않는다
     var chunks = [];
     for (var i = 0; i < payload.length; i += 200) chunks.push(payload.slice(i, i + 200));
@@ -684,12 +734,30 @@
         }).then(function () { done += ch.length; });
       });
     }, Promise.resolve()).then(function () {
+      // 올린 뒤 취소된 승인 — 한 줄씩(실패해도 나머지는 계속, 몇 줄이 왜 남았는지 알린다)
+      return toDel.reduce(function (p, e) {
+        return p.then(function () { return delOne(String(e.id)).then(function () { nDel++; }, function (er) { delFail.push(failMsg('지우지 못했습니다', er, why(er))); }); });
+      }, Promise.resolve()).then(function () {
+        return toMark.reduce(function (p, e) {
+          var src = {}; Object.keys(e.src && typeof e.src === 'object' ? e.src : {}).forEach(function (k) { src[k] = e.src[k]; });
+          src.cancel = { file: String(s.file || '').slice(0, 120), at: at };
+          return p.then(function () {
+            return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(e.id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ src: src }) })
+              .then(function () { nMark++; }, function (er) { console.warn('취소 표시를 남기지 못했습니다:', (er && er.message) || er); });
+          });
+        }, Promise.resolve());
+      });
+    }).then(function () {
       s.sent = true;
       MISSING = {};
       s.plan.missing.forEach(function (e) { MISSING[e.id] = 1; });
       C.closePanel();
-      C.toast('올렸습니다 — 새 ' + n0(s.plan.inserts.length) + '줄 · 바뀜 ' + n0(s.plan.updates.length) + '줄' +
-        (s.plan.missing.length ? ' · 파일에 없는 줄 ' + n0(s.plan.missing.length) + '줄은 표에 표시했습니다' : ''));
+      var msg = '올렸습니다 — 새 ' + n0(s.plan.inserts.length) + '줄 · 바뀜 ' + n0(s.plan.updates.length) + '줄' +
+        (nDel ? ' · 전액 취소된 승인 ' + n0(nDel) + '줄을 지웠습니다' : '') +
+        (toMark.length ? ' · 전액 취소된 승인 ' + n0(nMark) + '줄은 표에 「전액 취소된 승인」으로 표시했습니다' : '') +
+        (s.plan.missing.length ? ' · 파일에 없는 줄 ' + n0(s.plan.missing.length) + '줄은 표에 표시했습니다' : '');
+      if (delFail.length) C.toast(msg + ' — 취소된 승인 ' + n0(delFail.length) + '줄은 지우지 못했습니다: ' + delFail[0], true);
+      else C.toast(msg);
     }).catch(function (e) {
       C.toast(failMsg('올리지 못했습니다', e, why(e)) + (done ? ' (' + n0(done) + '줄은 들어갔습니다)' : ''), true);
       if (b && document.contains(b)) { b.disabled = false; b.textContent = '다시 올리기'; }
@@ -753,15 +821,25 @@
   }
   function sayRun(t) {
     VRUN.note = t;
+    var M = C.vx.aiMotion, mk = 'c:' + VRUN.k;
+    if (M) M.step(mk, { phase: 'run' });
     var v = document.querySelector('.hero .verdict .cvnote'); if (v) v.textContent = t;
-    var gl = document.querySelector('[data-cvrun] .gl'); if (gl) gl.textContent = t;
+    var gl = document.querySelector('[data-cvrun] .gl'); if (gl) gl.textContent = (M && M.short(mk)) || t;   // 단추에는 짧게(2026-10-20)
+  }
+  /** AI 검증 모션 재료(2026-10-20) — 이번 달 카드 줄(날짜·가맹점·금액, 여섯 줄). 사진이 없으니 종이(카드 내역) 그림. */
+  function cMotion(cyc) {
+    var rows = mineRows(cyc).slice().sort(byDate);
+    return { title: 'AI가 카드 내역을 읽고 있습니다', cols: ['날짜', '가맹점', '금액(원)', '맞춰 보기'], N: 0, paper: 'sheet', more: Math.max(0, rows.length - 6),
+      rows: rows.slice(0, 6).map(function (it) { return { id: it.id, date: String(it.appr_date || '').slice(5).replace('-', '.'), place: it.merchant || '—', amt: n0(it.amount) }; }),
+      photos: [] };
   }
   function runCheck() {
-    var S = C.state(), u = me(), cyc = S.CYCKEY, k = vkey(u, cyc);
+    var S = C.state(), u = me(), cyc = S.CYCKEY, k = vkey(u, cyc), mk = 'c:' + k, M = C.vx.aiMotion;
     if (VRUN.busy) return;
     if (pending()) { C.toast('칸을 저장하는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
     var n = mineRows(cyc).length, s0 = sig(u, cyc);
     VRUN = { busy: true, note: '규칙을 살피는 중…', k: k, t0: Date.now() };
+    if (M) { M.begin(mk, cMotion(cyc)); M.step(mk, { phase: 'run' }); }
     C.render();
     loadExp(cyc).then(function () {
       var tick = function () { if (VRUN.busy && VRUN.k === k) sayRun('카드 ' + n0(n) + '줄을 읽는 중… ' + Math.round((Date.now() - VRUN.t0) / 1000) + '초'); };
@@ -783,8 +861,12 @@
       VR[k] = { at: Date.now(), sig: s0, res: res, ai: ai };
       setPreviewed(k, false);
       C.toast('검증했습니다 — ' + sumText(res.summary) + (ai.note ? ' · ' + ai.note : '') + (ai.exNote ? ' · ' + ai.exNote : ''));
+      // 응답이 왔다 — 실제 결과(항목이 가리키는 줄)로 카드 줄마다 딱지(80ms 간격) 뒤 결과 화면
+      if (M) return M.finish(mk, M.chipsFrom(res.items || [], 'items', function (it) {
+        return it.level === 'block' ? ['빈칸', 'bad', 4] : it.level === 'bad' ? ['불일치', 'bad', 3] : it.level === 'warn' ? ['확인 필요', 'warn', 2] : null;
+      }));
     }).catch(function (e) { C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true); })
-      .then(function () { clearInterval(VTICK); VTICK = null; VRUN = { busy: false, note: '', k: '', t0: 0 }; C.render(); });
+      .then(function () { clearInterval(VTICK); VTICK = null; VRUN = { busy: false, note: '', k: '', t0: 0 }; if (M) M.end(mk); C.render(); });
   }
   /** AI 상태 → [값, 설명]. */
   function aiFact(ai, nRows) {
@@ -832,7 +914,8 @@
     var v = VR[k], fresh = !!(v && v.sig === sig(u, cyc)), s = v ? v.res.summary : {}, items = v ? v.res.items : [];
     var seen = previewOk(k), blocked = !!(v && fresh && s.block);
     var busy = VRUN.busy && VRUN.k === k;
-    var stage = locked ? 0 : !v || !fresh ? 1 : !seen ? 2 : 3;
+    // 도는 동안은 ① 도는 중 · ②③ 아직(2026-10-20 V3 B2). 빈 칸이 있으면 지금 할 일은 ③ 「빈 칸으로 가기」(V3 B5 — ② PDF 가 깜빡이고 ③ 이 회색이었다)
+    var stage = locked ? 0 : busy || !v || !fresh ? 1 : blocked ? 3 : !seen ? 2 : 3;
     var canSubmit = !a || a.status === 'rejected' || a.status === 'withdrawn';
     VITEMS = [];
     var verdict, clean = '';
@@ -843,28 +926,35 @@
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
     else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
-    var card = function (n, title, desc, button) {
-      var st = stage > n ? 'done' : stage === n ? 'now' : 'todo';
-      return '<li class="vstep ' + st + '"' + (st === 'now' ? ' aria-current="step"' : '') + '><div class="vsh"><i>' + (st === 'done' ? '✓' : n) + '</i><b>' + title + '</b></div><p>' + desc + '</p>' + button + '</li>';
-    };
+    // 2026-10-20 디자인 v2: 세 시스템 같은 단계 카드(C.vx.stepCard — 지금 할 단계 단추가 깜빡임, 도는 동안 진행 막대)
+    // st — 빈 칸이 있어 ③ 이 지금일 때 ② 는 「끝」이 아니라 「아직」(누를 수는 있다 — 흰 바탕 단추, V3 B5)
+    var card = function (n, title, desc, button, st) { return C.vx.stepCard(n, stage, title, desc, button, { busy: busy && n === 1, st: st }); };
+    var mk = 'c:' + k, AM = C.vx.aiMotion;
     var none = !rows.length;
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
       card(1, '검증하기 ' + C.vx.gemBadge('Gemini'), none ? '먼저 「이번 달 카드 내역」에서 ERP 엑셀을 올려 주세요.'
         : busy ? '규칙으로 살피고, Gemini 가 구분·사용목적을 읽는 중입니다…'
         : v && fresh ? '지금 자료로 검증했습니다. 고친 게 있으면 다시 눌러 주세요.'
         : '빈칸·같은 승인번호·기간 밖·소유자·0원 줄과 같은 날 같은 금액의 개인경비를 규칙으로 보고, Gemini 가 구분이 가맹점·시간과 맞는지와 사용목적을 봅니다.',
-        C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? (VRUN.note || 'Gemini 가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
+        C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? ((AM && AM.short(mk)) || VRUN.note || 'Gemini 가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
       card(2, 'PDF 미리보기', v && fresh ? '결재자에게 갈 지출결의서(가로 A4)를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
-        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>') +
-      card(3, '상신', !canSubmit ? '이미 상신했습니다.' : blocked ? '구분·사용목적이 빈 줄이 있어 상신할 수 없습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+        '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>',
+        blocked && !seen ? 'todo' : undefined) +
+      card(3, '상신', !canSubmit ? '이미 상신했습니다.' : blocked ? '구분·사용목적이 빈 줄이 있습니다 — 「빈 칸으로 가기」로 채운 뒤 ① 다시 검증하면 상신할 수 있습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+        // 빈 칸이 있으면 지금 누를 단추는 「빈 칸으로 가기」(빨강·깜빡임) — 상신 단추는 그 아래 회색(못 누름)
+        (blocked ? '<button class="btn big pri cta" data-cgoblank>' + ic('chev', 14) + '빈 칸으로 가기</button>' : '') +
         (canSubmit ? '<button class="btn big' + (stage === 3 && !blocked ? ' pri cta' : '') + '" id="btnOpenSubmit" data-kind="card"' + (stage === 3 && !blocked && !busy ? '' : ' disabled') + '>' +
-          (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '') +
-        (blocked ? ' <button class="btn big" data-cgoblank>' + ic('chev', 14) + '빈 칸으로 가기</button>' : '')) + '</ol>';
-    var h = head('검증·상신', '상신하기 전에 빈 칸과 맞지 않는 곳을 살펴봅니다');
+          (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '')) + '</ol>';
+    var h = head('검증·상신', '순서대로 눌러 주세요 — 깜빡이는 단추가 지금 할 일입니다');
     h += apprStrip(a);
+    h += cancelBand(rows);                 // 전액 취소된 승인이 남아 있으면 — 상신 전에 한 번 더(2026-10-20 AU2 #5 검증 경고)
     var af = aiFact(v && v.ai, rows.length);
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && fresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
+    // 단계 카드는 제목 바로 아래(P_Verifying) — 그 아래 결과 자리. 검증이 도는 동안은 결과 자리에 AI 검증 모션(응답 뒤 실제 결과로 딱지)
+    var moving = busy && AM && AM.on(mk);
+    h += steps;
+    if (moving) h += AM.html(mk, verdict);
+    else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && fresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
       (v ? '마지막 검증 ' + esc(C.vx.whenText(new Date(v.at).toISOString())) : '검증 전') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
       '<p class="verdict' + (busy ? '' : clean) + '">' + verdict + '</p>' +
       (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적 — 상신을 막음', s.block > 0) +
@@ -872,7 +962,7 @@
         '<div class="fact" id="cAiFact"><div class="k">AI 확인 ' + C.vx.gemBadge() + '</div><div class="v">' + esc(af[0]) + '</div><div class="sub">' + esc(af[1]) + '</div></div></div>' +
         (v.ai && v.ai.note ? '<div class="awarn" id="cAiNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.note) + '</span></div>' : '') +
         (v.ai && v.ai.exNote ? '<div class="awarn" id="cExNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.exNote) + '</span></div>' : '') : '') +
-      steps + '</div>';
+      '</div>';
     if (v && fresh && !busy) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, true));
@@ -1086,7 +1176,11 @@
         FZASK = '';
         if (C.state().VIEW === view && !typing()) C.render();
         fzFlush();
-      }).catch(function () { need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = ''; fzFlush(); });
+      }).catch(function () {
+        need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = '';
+        if (C.state().VIEW === view && !typing()) C.render();   // 못 받았어도 다시 그린다 — 결재함이 묶기 전에 기다린다(2026-10-20 V3 B7)
+        fzFlush();
+      });
   }
   /** 지금 내가 결재할 차례인 건인가(요약 문구용). */
   function myTurn(a) { var me = (C.state().ME || {}).username; return !!me && (a.steps || []).some(function (s) { return s.seq === a.cur_seq && s.approver === me; }); }
@@ -1105,14 +1199,15 @@
     if (!a || a.status !== 'submitted') return '';
     var s = a.snapshot || {};
     if (s.cost == null) return '';
-    var cost = Number(s.cost) || 0, cy = parseKey(a.cycle), pc = C.addCycle(cy, -1), pkey = keyOf(pc);
-    var prev = (CAPPR || []).filter(function (x) { return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') && x.snapshot && x.snapshot.cost != null; })[0];
+    // 전월 = 이름 달의 앞 달(1월분 → 12월분, 2026-10-20). 12월 추가 기간(12월분 2차)은 견주지 않는다 — 「—」.
+    var cost = Number(s.cost) || 0, pkey = prevMonthKey(a.cycle), pm = pkey ? +pkey.slice(5, 7) + '월분' : '';
+    var prev = pkey ? (CAPPR || []).filter(function (x) { return x.username === a.username && x.cycle === pkey && (x.status === 'approved' || x.status === 'submitted') && x.snapshot && x.snapshot.cost != null; })[0] : null;
     var cmp;
     if (prev) {
       var p0 = Number(prev.snapshot.cost) || 0, d = cost - p0, pct = p0 ? Math.round(d / p0 * 100) : null;
-      cmp = '<div class="abf"><span class="k">전월(' + pc.m + '월분) 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' + (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) +
-        (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b><span class="sub">' + pc.m + '월분 ' + won(p0) + ' · ' + n0(prev.snapshot.n) + '건</span></div>';
-    } else cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">볼 수 있는 ' + pc.m + '월분 법인카드 결재가 없습니다</span></div>';
+      cmp = '<div class="abf"><span class="k">전월(' + pm + ') 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' + (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) +
+        (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b><span class="sub">' + pm + ' ' + won(p0) + ' · ' + n0(prev.snapshot.n) + '건</span></div>';
+    } else cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 법인카드 결재가 없습니다' : '추가 기간은 전월과 견주지 않습니다') + '</span></div>';
     var v = f && f.verify, vs = (v && v.summary) || null;
     var items = ((v && v.items) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
     var checks = [];
@@ -1189,6 +1284,20 @@
     var cats = Object.keys(T.by_cat || {}).map(function (c) { return { c: c, n: T.by_cat[c].n, sum: T.by_cat[c].sum }; })
       .sort(function (a, b) { return b.sum - a.sum; });
     var h = head('법인카드 현황', '직원별 금액·구분·팀');
+    // 챙길 사람 + 팀즈 알림 보내기(2026-10-20 D2 — 운행일지 현황과 같은 조각 C.follow, 서버 approval-act op 'remind' 가 다시 확인).
+    //   결재 완료 출력 「챙겨야 할 사람」과 같은 사람: 이번 달 카드 내역이 있는데 상신 전 · 회수 · 반려. 남은 일은 이 화면이 이미 센 것만(건수·금액·빈칸, 반려면 사유).
+    if (C.follow) {
+      var lastC = {};
+      rows.forEach(function (it) { var ms = Date.parse(it.updated_at || it.created_at || '') || 0; if (ms > (lastC[it.username] || 0)) lastC[it.username] = ms; });
+      h += '<div class="d2grid">' + C.follow('card', S.CYCKEY, list.filter(function (x) {
+        return (!x.a && x.n > 0) || (x.a && (x.a.status === 'rejected' || x.a.status === 'withdrawn'));
+      }).map(function (x) {
+        var a = x.a, st = !a ? 'none' : a.status, rs = st === 'rejected' ? (a.steps || []).filter(function (s) { return s && s.result === 'rejected'; })[0] : null;
+        return { u: x.u, st: st, last: Math.max(lastC[x.u] || 0, a ? (Date.parse(a.closed_at || a.updated_at || '') || 0) : 0),
+          left: st === 'rejected' ? '반려 사유: ' + (rs && rs.comment ? String(rs.comment).replace(/\s+/g, ' ') : '(사유 없음)')
+            : (st === 'withdrawn' ? '회수함 · ' : '') + '카드 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.blank ? ' · 빈칸 ' + n0(x.blank) + '줄' : '') };
+      }), { wide: true, none: '이번 달 카드 내역이 있는 사람은 모두 상신했습니다' }) + '</div>';
+    }
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>카드 내역이 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.cost) + '</p>' +
       (cats.length ? '<div class="facts">' + cats.slice(0, 4).map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') +
@@ -1300,7 +1409,8 @@
               // 2026-10-19 웹 사용성 1차: 이름 굵게 · 카드번호는 끝 4자리(「…1234」, 전체는 title) · 비어 있는 구분·사용목적은 「빈칸」 딱지
               '<td><span class="lead">' + esc(C.nameOf(it.username)) + '</span></td><td class="dim" title="' + esc(it.card_no || '') + '">' + esc(cardTail(it.card_no)) + '</td>' +
               '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
-              '<td class="n total">' + n0(it.amount) + '</td><td>' + (String(it.category || '').trim() ? '<span class="kind">' + esc(it.category) + '</span>' : '<span class="st warn">빈칸</span>') + '</td>' +
+              // 금액은 .xamt — 폰 두 줄 카드에서 개인경비 전체 내역처럼 줄 맨 위 오른쪽(예전엔 가운데 줄 왼쪽에 놓였다, 2026-10-20 D2)
+              '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span></td><td>' + (String(it.category || '').trim() ? '<span class="kind">' + esc(it.category) + '</span>' : '<span class="st warn">빈칸</span>') + '</td>' +
               '<td class="el" title="' + esc(it.purpose || '') + '">' + (String(it.purpose || '').trim() ? esc(it.purpose) : '<span class="st warn">빈칸</span>') + '</td><td class="el dim">' + esc(it.note || '') + '</td></tr>';
           }).join('');
       }).join('') + '</tbody><tfoot><tr><td colspan="5">보이는 ' + n0(rows.length) + '건 합계</td><td class="n total">' + n0(total) + '</td><td colspan="3"></td></tr></tfoot></table></div></div>'
@@ -1337,6 +1447,8 @@
     C.toast('CSV 를 내려받습니다(' + n0(rows.length) + '건).');
   }
   var FINSEL = {}, FINJOB = null;
+  /** 결재 완료 출력 표의 날짜 — 「10.14 15:20」(한국시간, 2026-10-20 AU6-M3, 개인경비와 같게). */
+  function finWhen(iso) { var ms = Date.parse(iso); return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : ''; }
   function viewAdminFinal() {
     var S = C.state();
     if (!S.LOADED) return C.head('법인카드 결재 완료 출력') + C.skeleton();
@@ -1378,10 +1490,13 @@
           return '<tr><td><input type="checkbox" data-cfinsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td><span class="st ok">결재 완료</span>' + (C.prints ? '<div class="prline">' + C.prints.badge('card', a) + '</div>' : '') + '</td>' +
-            '<td class="dim">' + (a.closed_at ? '완료 ' + esc(C.vx.whenText(a.closed_at)) : '—') + '</td>' +
-            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td class="el dim" data-l="결재선" title="' + esc(line) + '">' + esc(line) + '</td>' +
-            '<td class="n ract" style="white-space:nowrap"><button class="btn sm" data-cfzpdf="' + a.id + '">PDF</button> <button class="btn sm" data-cfzxlsx="' + a.id + '">엑셀</button> ' +
-            '<button class="btn sm" data-appr="reopen" data-kind="card" data-id="' + a.id + '">정정 열기</button></td></tr>';
+            // 1280 에서 표가 칸보다 넓던 것(2026-10-20 AU6-M3, 개인경비와 같게): 날짜 「MM.DD HH:MM」 · 결재선 두 줄 말줄임 · 단추 셋은 「⋯」 하나
+            '<td class="dim" style="white-space:nowrap"' + (a.closed_at ? ' title="결재 완료 ' + esc(C.vx.whenText(a.closed_at)) + '">' + esc(finWhen(a.closed_at)) : '>—') + '</td>' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
+            '<td class="el dim" data-l="결재선" title="' + esc(line) + '"><span style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">' + esc(line) + '</span></td>' +
+            '<td class="n ract" style="white-space:nowrap">' + C.kmenu(C.nameOf(a.username) + ' 님 결재 완료 문서', [
+              ['data-cfzpdf="' + a.id + '"', 'PDF 받기'], ['data-cfzxlsx="' + a.id + '"', '엑셀 받기'],
+              ['data-appr="reopen" data-kind="card" data-id="' + a.id + '"', '정정 열기', true]]) + '</td></tr>';
         }).join('');
       }).join('') + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
@@ -1539,6 +1654,7 @@
     if (t.classList && t.classList.contains('cin')) { queueSave(t, true); return; }
     if (t.id === 'cFile') { var f = t.files && t.files[0]; t.value = ''; readFile(f); return; }
     if (t.id === 'cOwn') { if (CUP && CUP.res) { CUP.useOwner = t.checked; replan(CUP); paintPreview(); } return; }
+    if (t.id === 'cCancelDel') { if (CUP && CUP.res) { CUP.delCancel = t.checked; paintPreview(); } return; }     // 전액 취소된 승인 같이 지우기(2026-10-20)
     if (t.id === 'cWho') { CL.who = t.value; C.render(); var w = $('cWho'); if (w) w.focus(); return; }
     if (t.id === 'cCat') { CL.cat = t.value; C.render(); var w2 = $('cCat'); if (w2) w2.focus(); return; }
     if (t.matches && t.matches('[data-cfinsel]')) { if (t.checked) FINSEL[t.dataset.cfinsel] = 1; else delete FINSEL[t.dataset.cfinsel]; C.render(); return; }
@@ -1566,7 +1682,7 @@
       var S = C.state(), rows = mineRows(S.CYCKEY), T = R.totals(rows), warn = [], bl = R.blankRows(rows);
       if (!rows.length) warn.push('이 기간에 올린 카드 내역이 없습니다 — 먼저 ERP 엑셀을 올려 주세요');
       if (bl) warn.push('구분·사용목적이 빈 줄 ' + n0(bl) + '건 — 채워야 상신됩니다');
-      return { title: C.cycleName(S.CYC.y, S.CYC.m) + ' 법인카드 상신', sub: cSpan(S.CYC.y, S.CYC.m) + ' · ' + n0(T.n) + '건 · ' + won(T.cost), warn: warn };
+      return { title: cycName(S.CYCKEY) + ' 법인카드 상신', sub: R.span(S.CYCKEY) + ' · ' + n0(T.n) + '건 · ' + won(T.cost), warn: warn };
     },
     rangeHi: function () { return rangeHiMs(C.state().CYCKEY); },
     beforeSubmit: beforeSubmit,

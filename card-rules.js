@@ -10,9 +10,10 @@
    브라우저(window.CardRules)·Node(require) 양쪽.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.CardRules = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  // ★ 2026-10-20 연말 마감 설정: 기간 범위는 엔진(cycle-rules.js)에서 — 브라우저는 window.CycleRules(이 파일보다 먼저 싣는다), Node 는 require.
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cycle-rules.js'));
+  else root.CardRules = factory(root.CycleRules);
+})(typeof self !== 'undefined' ? self : this, function (CR) {
   'use strict';
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -23,19 +24,44 @@
   function str(v) { return String(v == null ? '' : v); }
   function cmpS(a, b) { a = str(a); b = str(b); return a < b ? -1 : a > b ? 1 : 0; }
 
-  /* ── 기간(SPEC §0) — 당월 1일 00:00 ~ 말일 24:00(KST) ── */
-  function isCycle(c) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(str(c)); }
+  /* ── 기간(SPEC §0) — 당월 1일 00:00 ~ 말일 24:00(KST) ──
+     ★ 2026-10-20 연말 마감 설정: 범위는 엔진(cycle-rules.js 의 'card') — 관리자가 정하지 않으면 달력 한 달 그대로(글자 하나까지 지금과 같다).
+       12월분을 12.20 에서 끊거나 12월 추가 기간('2026-12b' = 「2026년 12월분 2차」)을 두면 그 범위. 이름은 키로 만든다(override 의 label 은 쓰지 않는다).
+       서버 card-verify.ts 와 같은 답 — 키 꼴('YYYY-MM' · 'YYYY-12b')만 엔진에 묻고, 엔진에 없는 기간·다른 글자는 예전 식 그대로. */
+  var KEY_STD = /^\d{4}-(0[1-9]|1[0-2])$/, KEY_X = /^\d{4}-12b$/;
+  function per(cycle) { var s = str(cycle); return KEY_STD.test(s) || KEY_X.test(s) ? CR.byKey('card', s) : null; }
+  /** '2026-07' → '2026년 7월분' · '2026-12b' → '2026년 12월분 2차'(DB cycle_label · 서버 periodName 과 같다). */
+  function pname(s) { return KEY_X.test(s) ? +s.slice(0, 4) + '년 12월분 2차' : +s.slice(0, 4) + '년 ' + +s.slice(5, 7) + '월분'; }
+  function isCycle(c) { var s = str(c); return KEY_STD.test(s) || (KEY_X.test(s) && !!per(s)); }
   function ym(cycle) { var p = str(cycle).split('-'); return { y: +p[0], m: +p[1] }; }
-  function lastDay(cycle) { var c = ym(cycle); return new Date(Date.UTC(c.y, c.m, 0)).getUTCDate(); }
+  /** 기간 마지막 날(일) — 기본은 그 달 말일, 12월분을 당기면 그 날(서버 cardLastDay 와 같다). */
+  function lastDay(cycle) {
+    var P = per(cycle);
+    if (P) return +P.hi.slice(8, 10);
+    var c = ym(cycle); return new Date(Date.UTC(c.y, c.m, 0)).getUTCDate();
+  }
+  function mdOf(s) { return s.slice(5, 7) + '.' + s.slice(8, 10); }
+  function dayAfter(s) { var t = new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10) + 1)); return t.getUTCFullYear() + '-' + pad(t.getUTCMonth() + 1) + '-' + pad(t.getUTCDate()); }
+  /** { lo, hi } 'YYYY-MM-DD' — hi 는 끝날 다음 날(들어가지 않음). */
   function cycleRange(cycle) {
+    var P = per(cycle);
+    if (P) return { lo: P.lo, hi: dayAfter(P.hi) };
     var c = ym(cycle), ny = c.m === 12 ? c.y + 1 : c.y, nm = c.m === 12 ? 1 : c.m + 1;
     return { lo: c.y + '-' + pad(c.m) + '-01', hi: ny + '-' + pad(nm) + '-01' };
   }
   /** '2026-07' → '07.01 – 07.31'(화면 머리띠·문서). */
-  function span(cycle) { var c = ym(cycle); return pad(c.m) + '.01 – ' + pad(c.m) + '.' + pad(lastDay(cycle)); }
-  /** '2026-07' → '2026년 7월분(07.01 ~ 07.31)'(팀즈·검증 문구 — SPEC §3 꼴 그대로). */
+  function span(cycle) {
+    var P = per(cycle);
+    if (P) return mdOf(P.lo) + ' – ' + mdOf(P.hi);
+    var c = ym(cycle); return pad(c.m) + '.01 – ' + pad(c.m) + '.' + pad(lastDay(cycle));
+  }
+  /** '2026-07' → '2026년 7월분(07.01 ~ 07.31)'(팀즈·검증 문구 — SPEC §3 꼴 그대로). '2026-12b' → '2026년 12월분 2차(12.21 ~ 12.31)',
+   *  설정에 없는 '2026-12b' 는 이름만(「2026년 12월분 2차」 — 서버와 같다). */
   function cycleLabel(cycle) {
-    if (!isCycle(cycle)) return str(cycle) + '분';
+    var s = str(cycle);
+    if (!isCycle(s)) return KEY_X.test(s) ? pname(s) : s + '분';
+    var P = per(s);
+    if (P) return pname(s) + '(' + mdOf(P.lo) + ' ~ ' + mdOf(P.hi) + ')';
     var c = ym(cycle);
     return c.y + '년 ' + c.m + '월분(' + pad(c.m) + '.01 ~ ' + pad(c.m) + '.' + pad(lastDay(cycle)) + ')';
   }

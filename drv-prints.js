@@ -58,25 +58,30 @@
     });
     if (any && !TIMER) TIMER = setTimeout(flush, 0);
   }
+  // 서버 approval_print_stats 는 한 번에 앞 500개만 본다((p_ids)[1:500]) — 그보다 많으면 나눠 묻는다(2026-10-20 AU2 #16:
+  //   예전엔 한 번에 보내 501번째부터는 답이 없어 딱지가 「볼 수 없음」으로 숨었다).
+  var STATS_MAX = 500;
   function flush() {
     TIMER = null;
     Object.keys(PEND).forEach(function (kind) {
-      var ids = Object.keys(PEND[kind]).map(Number).filter(isFinite);
+      var all = Object.keys(PEND[kind]).map(Number).filter(isFinite);
       PEND[kind] = {};
-      if (!ids.length) return;
-      ids.forEach(function (id) { ASKING[kind][id] = 1; });
-      rpc('approval_print_stats', { p_kind: kind, p_ids: ids }).then(function (rows) {
-        var by = {};
-        (Array.isArray(rows) ? rows : []).forEach(function (r) { by[r.approval_id] = r; });
-        ids.forEach(function (id) { ST[kind][id] = by[id] || null; delete ASKING[kind][id]; });
-        FAIL[kind] = 0;
-        repaint();
-      }).catch(function (e) {
-        ids.forEach(function (id) { delete ASKING[kind][id]; });
-        if (!FAIL[kind]) console.warn('출력 기록 요약을 받지 못했습니다(딱지를 숨깁니다):', (e && e.message) || e);
-        FAIL[kind] = Date.now();
-        repaint();
-      });
+      for (var i = 0; i < all.length; i += STATS_MAX) ask(kind, all.slice(i, i + STATS_MAX));
+    });
+  }
+  function ask(kind, ids) {
+    ids.forEach(function (id) { ASKING[kind][id] = 1; });
+    rpc('approval_print_stats', { p_kind: kind, p_ids: ids }).then(function (rows) {
+      var by = {};
+      (Array.isArray(rows) ? rows : []).forEach(function (r) { by[r.approval_id] = r; });
+      ids.forEach(function (id) { ST[kind][id] = by[id] || null; delete ASKING[kind][id]; });
+      FAIL[kind] = 0;
+      repaint();
+    }).catch(function (e) {
+      ids.forEach(function (id) { delete ASKING[kind][id]; });
+      if (!FAIL[kind]) console.warn('출력 기록 요약을 받지 못했습니다(딱지를 숨깁니다):', (e && e.message) || e);
+      FAIL[kind] = Date.now();
+      repaint();
     });
   }
   /** 받은 요약을 화면에 — 칸에 글을 치는 중이면 다시 그리지 않는다(커서가 튄다). 다음에 그릴 때 붙는다. */
@@ -117,8 +122,8 @@
     var s = cur(kind, a);
     if (s === undefined) { want(kind, [a.id]); return ''; }
     if (!s || down(kind)) return '';
-    var key = esc(kind + ':' + a.id), cy = String(a.cycle || '').split('-'),
-      who = esc(C.nameOf(a.username) + ' · ' + (cy.length === 2 ? C.cycleName(+cy[0], +cy[1]) : String(a.cycle || '')));   // 다른 창과 같은 「2026년 9월분」(2026-10-15)
+    var key = esc(kind + ':' + a.id), CR = C.CR || window.CycleRules, cy = CR.parse(a.cycle),
+      who = esc(C.nameOf(a.username) + ' · ' + (cy ? CR.name(cy) : String(a.cycle || '')));   // 다른 창과 같은 「2026년 9월분」(2026-10-15) · 「2026년 12월분 2차」(연말 추가 기간, 2026-10-20)
     if (!s.n) {
       return '<button type="button" class="prb none" data-prhist="' + key + '" data-prwho="' + who + '" title="아직 아무도 출력하지 않았습니다 — 눌러서 출력 기록 보기">미출력</button>';
     }

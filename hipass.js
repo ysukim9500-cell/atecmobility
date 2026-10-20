@@ -382,7 +382,9 @@
     if (!s) return 'none';
     if (s.indexOf('기사 ') === 0 || s.indexOf('사용자 입력') === 0) return 'person';
     if (PERSON_SOURCES.indexOf(s) >= 0) return 'person';
-    if (s === '자동계산 실패' || s === '영업소 요금표' || s === '요금소 미통과(실주행 GPS)') return 'machine';
+    // 앱이 설·추석 운행에 적는 '명절 통행료 면제'(FREE_CONFIRMED 0원)도 기계 계산이다 — 서버 보호 트리거 v5
+    //   (20260902010000_protect_driver_toll_decision_v5.sql)의 기계 출처 목록과 같게(2026-10-20 AU5-L7)
+    if (s === '자동계산 실패' || s === '영업소 요금표' || s === '요금소 미통과(실주행 GPS)' || s === '명절 통행료 면제') return 'machine';
     if (s.indexOf('카카오 길찾기') === 0) return 'machine';
     if (s === 'legacy migration') return 'person';   // 이관된 사람 입력값
     return 'unknown';

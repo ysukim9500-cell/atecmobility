@@ -11,9 +11,10 @@
    ★ 손 칸(구분·사용목적·비고)은 여기서 만들지도, 서버로 보내지도 않는다(toRow). 다시 올려도 손 칸은 그대로다.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.CardErp = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  // ★ 2026-10-20 연말 마감 설정: 기간 키는 엔진(cycle-rules.js)에서 — 브라우저는 window.CycleRules(이 파일보다 먼저 싣는다), Node 는 require.
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cycle-rules.js'));
+  else root.CardErp = factory(root.CycleRules);
+})(typeof self !== 'undefined' ? self : this, function (CR) {
   'use strict';
 
   var HEAD = { s: 'S', card: '법인카드', owner: '소유자', date: '승인일자', time: '승인시간', merchant: '가맹점',
@@ -35,6 +36,12 @@
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function norm(v) { return String(v == null ? '' : v).replace(/[\s 　﻿]+/g, ''); }
   function text(v) { return String(v == null ? '' : v).replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  /** 승인일 'YYYY-MM-DD' 이 든 법인카드 기간 키 — 설정이 없으면 그 달('2026-07'), 연말 설정이면 '2026-12b' 등(2026-10-20).
+   *  서버 트리거가 승인일로 다시 매기므로 화면 묶음을 맞추는 값이다. 날짜 모양이 아니면 예전처럼 앞 일곱 글자. */
+  function cycleOfDate(d) {
+    var s = String(d == null ? '' : d), P = /^\d{4}-\d{2}-\d{2}$/.test(s) ? CR.periodOfDay('card', s) : null;
+    return P ? P.key : s.slice(0, 7);
+  }
 
   /** 금액 — 숫자 칸은 그대로, 글자는 「19,800」「₩19,800」「-19,800」「(19,800)」「-」. 빈칸 = 0, 못 읽으면 NaN. */
   function num(v) {
@@ -133,8 +140,9 @@
     return null;
   }
   function drop(o, reason) {
+    // detail — 읽지 못한 칸과 그 글자(「승인일 「26.10.14」」 등, 2026-10-20) · 금액을 못 읽었으면 amount 는 null(화면에 NaN 이 찍히던 것)
     return { row: o.row, reason: reason, label: REASON[reason], appr_date: o.appr_date || '', appr_no: o.appr_no || '',
-      merchant: o.merchant || '', amount: o.amount0 != null ? o.amount0 : o.amount, cancel: !!o.cancel };
+      merchant: o.merchant || '', amount: o.amount0 != null ? o.amount0 : o.amount, cancel: !!o.cancel, detail: o.detail || '' };
   }
 
   /**
@@ -162,17 +170,26 @@
       //   실제 10월 ERP 파일은 승인 줄이 N 이고 합계 줄은 S 가 비어 있다 — S 로 가르면 승인 0줄·합계 없음이 된다.
       //   카드번호 모양 + 승인일이 있으면 승인 줄(S 가 Y 인 줄도 승인 줄), 나머지는 합계 줄 후보.
       var sFlag = cols.s != null ? norm(gt('s')).toUpperCase() : '';
-      if (!date || !(CARD_RE.test(card) || sFlag === 'Y')) { sums.push(r); continue; }
-      var amt = num(g('amount')), no = gt('no');
+      // ★ 카드번호 모양(또는 S=Y)인 줄은 승인일을 못 읽어도 승인 줄이다(2026-10-20 AU2 #13) — 예전엔 합계 줄 후보로 보내
+      //   「26.10.14」·「10/15/2026」 같은 날짜의 줄이 「뺀 줄」에도 없이 사라졌다. 아래에서 「읽지 못함」으로 뺀 줄에 올린다.
+      if (!(CARD_RE.test(card) || sFlag === 'Y')) { sums.push(r); continue; }
+      var amt = num(g('amount')), no = gt('no'), okAmt = isFinite(amt);
       var rec = {
         row: r + 1, card_no: card.slice(0, 25), appr_date: date, appr_time: hms(g('time')), appr_no: no,
-        merchant: gt('merchant').slice(0, 80), amount: Math.abs(amt), amount0: Math.abs(amt),
+        // 금액을 못 읽었으면 null — 예전엔 NaN 이 「뺀 줄」 금액 칸에 그대로 찍혔다(2026-10-20)
+        merchant: gt('merchant').slice(0, 80), amount: okAmt ? Math.abs(amt) : null, amount0: okAmt ? Math.abs(amt) : null,
         owner_name: gt('owner').slice(0, 40), biz_type: gt('biz').slice(0, 60), biz_no: gt('bizNo').slice(0, 20),
         supply: cols.supply == null ? null : numOrNull(g('supply')), vat: cols.vat == null ? null : numOrNull(g('vat')),
         // 구분에 「취소」가 있거나 금액이 음수면 취소 — 구분이 「승인」이어도 음수는 양수 지출로 두지 않는다(D1)
         cancel: norm(gt('kind')).indexOf('취소') >= 0 || amt < 0
       };
-      if (!date || !no || no.length > 20 || !isFinite(amt) || Math.abs(amt) > 50000000) { dropped.push(drop(rec, 'invalid')); continue; }
+      if (!date || !no || no.length > 20 || !okAmt || Math.abs(amt) > 50000000) {
+        // 무엇을 못 읽었는지 글자 그대로(「뺀 줄」 까닭 칸) — 사용자가 ERP 에서 그 칸을 고쳐 다시 받을 수 있게
+        rec.detail = [!date ? '승인일 「' + (gt('date') || '빈칸').slice(0, 30) + '」' : '',
+          !no || no.length > 20 ? '승인번호 「' + (no ? no.slice(0, 24) : '빈칸') + '」' : '',
+          !okAmt || Math.abs(amt) > 50000000 ? '금액 「' + (gt('amount') || '빈칸').slice(0, 30) + '」' : ''].filter(Boolean).join(' · ');
+        dropped.push(drop(rec, 'invalid')); continue;
+      }
       recs.push(rec);
     }
     // ── 취소 짝 맞추기 ──
@@ -201,7 +218,8 @@
         o.partial = o.amount - o.left; o.amount = o.left;
       }
       if (o.amount === 0) { dropped.push(drop(o, 'zero')); return; }
-      if (opt.cycle && o.appr_date.slice(0, 7) !== opt.cycle) { dropped.push(drop(o, 'month')); return; }
+      // 고른 기간 밖 — opt.range(card-rules cycleRange: hi 는 들어가지 않는 다음 날)가 있으면 그 범위로(연말에 당긴 12월분·12월분 2차, 2026-10-20), 없으면 승인일의 달
+      if (opt.range ? !(o.appr_date >= opt.range.lo && o.appr_date < opt.range.hi) : (opt.cycle && o.appr_date.slice(0, 7) !== opt.cycle)) { dropped.push(drop(o, 'month')); return; }
       kept.push(o);
     });
     // ── 파일 안 중복(서버 unique 와 같은 열쇠) ──
@@ -241,7 +259,13 @@
 
   /* ── 다시 올리기 계획 — (승인번호, 승인일)로 맞춘다. 손 칸은 보지 않는다 ── */
   function same(a, b) { return String(a == null ? '' : a) === String(b == null ? '' : b); }
-  function plan(existing, items) {
+  /**
+   * existing = 이 기간에 이미 있는 줄 · items = 이 파일에서 넣을 줄 · dropped = 이 파일의 뺀 줄(parse 결과, 없어도 된다).
+   * cancelled(2026-10-20 AU2 #5) = 이미 있는 줄 가운데 이 파일에서 **전액 취소로 확인된** 승인(뺀 줄의 「취소된 승인」 원래 줄과 열쇠가 같음).
+   *   예전엔 그냥 「파일에 없는 줄」로만 표시돼(그것도 그 화면에서만) 환불된 결제가 청구에 남았다. 화면이 「같이 지우기」로 묶는다.
+   * missing = 그 밖의 「파일에 없는 줄」(지우지 않는다 — SPEC 결정 그대로).
+   */
+  function plan(existing, items, dropped) {
     var byKey = {};
     (existing || []).forEach(function (e) { byKey[e.appr_no + '|' + e.appr_date] = e; });
     var seen = {}, inserts = [], updates = [], same0 = [];
@@ -252,13 +276,19 @@
       var cs = ERP_COLS.filter(function (c) { return !same(e[c], it[c]); });
       if (cs.length) updates.push({ id: e.id, item: it, cols: cs }); else same0.push(e.id);
     });
-    var missing = (existing || []).filter(function (e) { return !seen[e.appr_no + '|' + e.appr_date]; });
-    return { inserts: inserts, updates: updates, same: same0, missing: missing };
+    var gone = {};
+    (dropped || []).forEach(function (d) { if (d && d.reason === 'cancel' && !d.cancel) gone[d.appr_no + '|' + d.appr_date] = 1; });
+    var missing = [], cancelled = [];
+    (existing || []).forEach(function (e) {
+      var k = e.appr_no + '|' + e.appr_date;
+      if (!seen[k]) (gone[k] ? cancelled : missing).push(e);
+    });
+    return { inserts: inserts, updates: updates, same: same0, missing: missing, cancelled: cancelled };
   }
   /** 서버로 보낼 한 줄 — ERP 칸 + 열쇠 + src 만. category·purpose·note 는 절대 넣지 않는다(upsert 가 손 칸을 덮지 않게). */
   function toRow(it, username, src) {
     return {
-      username: username, cycle: String(it.appr_date).slice(0, 7), card_no: it.card_no || '', appr_date: it.appr_date,
+      username: username, cycle: cycleOfDate(it.appr_date), card_no: it.card_no || '', appr_date: it.appr_date,
       appr_time: it.appr_time || '', appr_no: it.appr_no, merchant: it.merchant || '', amount: it.amount,
       owner_name: it.owner_name || '', biz_type: it.biz_type || '', biz_no: it.biz_no || '',
       supply: it.supply == null ? null : it.supply, vat: it.vat == null ? null : it.vat,
