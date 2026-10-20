@@ -1112,7 +1112,7 @@
       var el = document.querySelector('.evsubs'); if (!el) return;
       var hd = document.querySelector('header.top'), hb = hd ? hd.getBoundingClientRect().bottom : 0;
       var top = el.getBoundingClientRect().top;
-      if (top < hb + 4 || top > window.innerHeight * 0.5) window.scrollTo({ top: Math.max(0, window.scrollY + top - hb - 12), behavior: 'smooth' });
+      if (top < hb + 4 || top > window.innerHeight * 0.5) window.scrollTo({ top: Math.max(0, window.scrollY + top - hb - 12), behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') });
     };
     if (window.requestAnimationFrame) requestAnimationFrame(go1); else setTimeout(go1, 0);
   }
@@ -1179,7 +1179,8 @@
       // 결재 중·결재 완료 기간은 「올리세요」 대신 올릴 수 없다는 말(2026-10-19 마지막 검증 — 잠긴 기간에도 할 일 문구가 나왔다)
       '<span class="dim">' + esc(myCycLocked() ? lockWhy(myName()) + ' 이 기간에는 영수증을 올리거나 지울 수 없습니다 — 아래는 확인만 하세요.' : EV_SUB_DESC[name]) + '</span>' +
       // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
-      ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + esc(name) + ' 영수증 ' + n0(by[name].n) + '건 보기·지우기 ↓</button>' : '') +
+      //   계기판은 영수증이 아니라 사진(2026-10-20 V3 다듬기 — 「계기판 영수증 1건」)
+      ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + (name === '계기판' ? '계기판 사진 ' + n0(by[name].n) + '장' : esc(name) + ' 영수증 ' + n0(by[name].n) + '건') + ' 보기·지우기 ↓</button>' : '') +
       '</div>';
     // 공지 띠는 이번 달 마감 화면에만(2026-10-19 웹 사용성 1차 — 같은 띠가 두 화면에 나오던 것)
     var canUp = !cycleLocked(myName()) && !isMulti();
@@ -1190,11 +1191,12 @@
     // 2026-10-20 디자인 v2(P_Evid): 차례 카드 = 왼쪽 날짜별 확인(main) · 오른쪽 「올리기」 카드(side — 끌어 놓기 · 하이패스 PDF · 금액 설명). 좁으면 올리기가 위.
     //   빨간 단추는 하나 — 이 차례에 확인할 것이 남았으면 올리기 단추, 없으면 「다음」 단추.
     //   아직 1단계 차례(evAhead — 맨 아래 「1단계로 가기」가 빨강)면 올리기 단추도 빨갛게 하지 않는다.
+    //   그 빨간 단추가 이 화면에서 깜빡이는 하나(cta — 「확인 N」이 있어도 올리기 단추가 깜빡인다, 2026-10-20 V3 U1)
     var side = '', main = '', hot = !!need[name] && !evAhead();
     if ((name === '주차' || name === '통행료') && canUp) {
       side += '<div class="evpick' + (name === '통행료' ? ' two' : '') + '">' +
         '<div class="evpk" data-evdrop="' + esc(name) + '"><span class="ico" aria-hidden="true">' + ic('upload', 24) + '</span><b>영수증 사진·PDF를 여기에 끌어 놓으세요</b>' +
-          '<button class="btn' + (hot ? ' pri' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 15) +
+          '<button class="btn' + (hot ? ' pri cta' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 15) +
           (name === '통행료' ? '영수증 사진 올리기' : '주차 영수증 올리기') + '</button>' +
           '<span class="dim">' + (name === '통행료' ? '통행료 영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다' : '영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다') + '</span></div>' +
         (name === '통행료'
@@ -1231,7 +1233,7 @@
     var upHere = canUp && name !== '주차' && name !== '통행료';       // 주차·통행료는 위 「할 일」 단추(웹 8차)
     if (upHere) side += '<div class="evpick"><div class="evpk" data-evdrop="' + esc(name) + '"><span class="ico" aria-hidden="true">' + ic('upload', 24) + '</span>' +
       '<b>' + (name === '계기판' ? '계기판 사진을' : esc(name) + ' 영수증을') + ' 여기에 끌어 놓으세요</b>' +
-      '<button class="btn' + (hot ? ' pri' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) +
+      '<button class="btn' + (hot ? ' pri cta' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 13) +
       (name === '계기판' ? '계기판 사진 올리기' : esc(name) + ' 영수증 올리기') + '</button></div></div>';
     // ★ <aside> 를 쓰지 않는다 — 왼쪽 메뉴(aside#nav)용 aside{…} 규칙(폭 248·고정·폰에서 숨김)이 그대로 걸린다
     body += '<div class="evcols"><div class="evmain">' + main + '</div>' + (side ? '<div class="evside" role="group" aria-label="올리기">' + side + '</div>' : '') + '</div>';
@@ -3495,28 +3497,39 @@
   }
 
   /** 서버 오류 글 — error 가 약속된 코드(STALE 등 영문 대문자)면 사람 말(message)을, 아니면 error 글 그대로(2026-10-20). */
-  function apiErrText(j) {
+  function apiErrText(j, status) {
     j = j || {};
     var e = j.error == null ? '' : String(j.error), m = j.message == null ? '' : String(j.message);
-    return /^[A-Z][A-Z0-9_]+$/.test(e) && m ? m : (e || m);
+    var t = /^[A-Z][A-Z0-9_]+$/.test(e) && m ? m : (e || m);
+    // 서버가 영어 기본 글만 주면(「Internal Server Error」 등) 우리말로 — 상신 500 이 영어로 떴다(2026-10-20 V3 U7). 상태 번호는 괄호에.
+    if (t && !/[가-힣]/.test(t)) t = '서버에서 처리하지 못했습니다' + (status ? '(오류 ' + status + ')' : '') + '. 잠시 뒤 다시 해 주세요.';
+    return t;
   }
   /** 낡은 결재 화면(409 STALE, 2026-10-20 서버·웹 약속) — 서버 문구를 띄우고 창을 닫은 뒤 그 종류의 결재 목록을 새로 받아 다시 그린다.
    *  (그 사이 상신자가 회수하고 금액을 바꿔 다시 상신했다 — 결재함을 다시 열어 새 문서를 보고 결재하게.) */
   /** STALE 로 창이 닫힐 때 적던 반려·정정 사유(종류:번호:동작 → 글) — 같은 문서의 같은 창을 다시 열면 채운다(2026-10-20 V3 B8 — 창이 닫히며 사유가 사라졌다). 처리되면 지운다. */
   var APPR_KEEP = {};
   function apprStale(payload, j) {
-    // 적던 사유를 맡아 둔다 — 같은 문서의 같은 창을 다시 열면 채운다(V3 B8)
+    // 적던 사유를 맡아 둔다 — 같은 문서의 같은 창을 다시 열면 채운다(V3 B8). 바뀌기 전 금액도 기억한다(새로 읽은 뒤 무엇이 바뀌었는지 알린다 — V3 U6)
     var kk = (payload && payload.kind || 'd') + ':' + (payload && payload.id);
     var why = String(($('apprWhy') || {}).value || '').trim();
     if (why && payload && payload.action) APPR_KEEP[kk + ':' + payload.action] = why;
-    toast(((j && j.message) || '그 사이 문서가 바뀌었습니다 — 결재함을 새로 고쳐 다시 열어 주세요') + (why ? ' 적던 사유는 다시 열면 그대로 있습니다.' : ''), true);
+    var a0 = payload && payload.id ? apprFind(+payload.id, (payload && payload.kind) || '') : null, c0 = a0 && a0.snapshot ? a0.snapshot.cost : null;
     closePanel();
     TRIP_CACHE = {};
     var kd = kindDef(payload && payload.kind);
+    // 알림 — 결재함은 이미 새로 읽었다(예전 서버 글 「새로 고쳐 다시 열어 주세요」는 실제와 달랐다, 2026-10-20 V3 U6) · 바뀐 금액 · 맡아 둔 사유
+    var say = function (fresh) {
+      var a1 = fresh ? apprFind(+payload.id, (payload && payload.kind) || '') : null, c1 = a1 && a1.snapshot ? a1.snapshot.cost : null;
+      var amt = c0 != null && c1 != null ? (Number(c0) !== Number(c1) ? '(금액 ' + won(c0) + ' → ' + won(c1) + ')' : '(금액은 그대로 ' + won(c1) + ')') : '';
+      toast('그 사이 문서가 바뀌었습니다' + amt + (fresh ? ' — 결재함을 새로 읽었습니다. 카드를 다시 열어 확인한 뒤 결재해 주세요.' : ' — 결재함을 다시 불러옵니다.') +
+        (why ? ' 적던 사유는 다시 열면 그대로 있습니다.' : ''), true);
+    };
     (kd ? Promise.resolve(kd.reload ? kd.reload() : null)
       : fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc').then(function (rows) { APPR = rows || []; }))
-      .then(function () { paintPills(); render(); }, function (e) {
+      .then(function () { paintPills(); render(); say(true); }, function (e) {
         if (e && e.authGone) { toast('로그인이 만료되었습니다. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return; }
+        say(false);
         loadAll();
       });
   }
@@ -3547,11 +3560,19 @@
       '<button class="btn" id="btnRateReject">반려하기</button>' +
       '<button class="btn pri" id="btnRateGo">그래도 승인</button>';
     var b = $('btnRateGo'); if (b) { try { b.focus(); } catch (e) { } }
+    // 금액 차이도(2026-10-20 V3 다듬기 — 단가만 보여 얼마가 달라지는지 몰랐다): 서버가 함께 주는 fuel_from(상신 때 단가로 센 업무 운행 유류비)·
+    //   fuel_to(지금 단가로 센 것, 둘 다 반올림 — _shared/driving-freeze.ts rateChanges)의 차이. 없거나 같으면 예전처럼 단가만.
+    var f0 = j.fuel_from, f1 = j.fuel_to, fd = typeof f0 === 'number' && typeof f1 === 'number' && isFinite(f0) && isFinite(f1) ? f1 - f0 : 0;
+    var fel = fd ? document.querySelector('#pFoot [data-rateask]') : null;
+    if (fel) {
+      fel.setAttribute('data-ratediff', String(fd));
+      fel.innerHTML = esc(head) + '<br>이대로 승인하면 옛 단가로 정산됩니다 — 새 단가로 셈하면 유류비가 ' + won(Math.abs(fd)) + ' ' + (fd < 0 ? '적습니다' : '많습니다') + '.';
+    }
     return true;
   }
   function callAppr(payload, okMsg) {
     return apiRetry('/functions/v1/approval-act', { method: 'POST', body: JSON.stringify(payload) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j, st: r.status }; }); })
       .then(function (res) {
         if (!res.ok || !res.j || !res.j.ok) {
           var ej = res.j || {};
@@ -3560,7 +3581,7 @@
           // 상신 뒤 유류단가가 바뀜 — 이대로 승인할지 반려할지 승인 창에서 묻는다
           if (ej.error === 'RATE_CHANGED' && payload && payload.action === 'approve' && !payload.ack_rate_change &&
             apprRateAsk(payload, okMsg, ej)) return 'ask';
-          toast(apiErrText(ej) || '처리하지 못했습니다.', true); return false;
+          toast(apiErrText(ej, res.st) || '처리하지 못했습니다.', true); return false;
         }
         // 방금 결재한 건(승인·반려·승인 취소)은 결재함 「그 밖의 건」 기간 거르기와 상관없이 보이게 — 9월분을 10월분 화면에서
         //   승인하면 카드가 사라져 「승인 취소·반려」를 못 찾았다(2026-10-19 로봇)
@@ -3721,6 +3742,9 @@
 
     var nTurn = mine.length + SP.ndMine.length;
     INBOX_ORDER = [];          // 내 차례 문서가 보이는 차례(확인 필요 → 이상 없음) — 승인·반려 뒤 다음 문서를 고를 때 쓴다(inboxNextMark)
+    // 두 묶음(내 차례 · 운행일지 결재 — 내 차례)의 차례를 먼저 다 채운다 — 카드 아래 「다음 문서」 안내가 승인 창 안내(inboxNextHint)와 같고,
+    //   빨간 「승인」(맨 앞 카드 하나)이 화면에 하나다(2026-10-20 V3 다듬기)
+    [mine, SP.ndMine].forEach(function (l) { turnOrder(l).forEach(function (k) { if (INBOX_ORDER.indexOf(k) < 0) INBOX_ORDER.push(k); }); });
     var h = head(SP.split ? MODE_NAME[SP.mode] + ' 결재함' : '결재함',
       nTurn ? '내 차례 ' + nTurn + '건' : '내 차례인 건이 없습니다');
     // 다른 갈래로 가는 줄 — 갈래마다 한 줄(2026-10-09 세 갈래). 그쪽에 내 차례가 있으면 건수를, 없으면 문서가 있다는 것만.
@@ -4160,6 +4184,13 @@
     var kd = kindDef(kindOf(a)), ext = kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '');
     return /<div class="abrief[^>]*>[\s\S]*?검증 결과를 불러오는 중입니다/.test(String(ext || ''));
   }
+  /** 내 차례 묶음의 보이는 차례(종류:id) — 확인 필요 → 이상 없음(turnGroups 와 같은 차례). 판정을 받는 중이면 [](묶지 않고 뼈대만, V3 B7). */
+  function turnOrder(list) {
+    if (list.some(function (a) { return apprLoading(a); })) return [];
+    var need = [], ok = [];
+    list.forEach(function (a) { (apprLevel(a) === 'ok' ? ok : need).push(a); });
+    return need.concat(ok).map(function (a) { return (kindOf(a) || 'd') + ':' + a.id; });
+  }
   /** 내 차례를 둘로 묶는다 — 판정 띠가 「이상 없음」(ok)인 문서는 아래 「이상 없음」, 나머지(확인·불일치·결과를 받는 중)는 위 「확인 필요」.
    *  묶음 안 순서는 그대로. 카드 모양·단추는 그대로(줄 배치만). */
   function turnGroups(list) {
@@ -4175,7 +4206,12 @@
     list.forEach(function (a) { (apprLevel(a) === 'ok' ? ok : need).push(a); });
     var order = need.concat(ok), akey = function (a) { return (kindOf(a) || 'd') + ':' + a.id; };
     order.forEach(function (a) { if (INBOX_ORDER.indexOf(akey(a)) < 0) INBOX_ORDER.push(akey(a)); });
-    var card = function (a, i) { var nx = order[i + 1]; return apprCard(a, { next: nx ? nameOf(nx.username) : '' }); };
+    // 카드 아래 안내 = 승인 창 안내(같은 inboxNextOf — 마지막 카드면 남은 맨 앞 문서, 예전엔 카드는 「마지막 문서입니다」인데 창은 다음 문서를 말했다) ·
+    //   빨간 「승인」은 화면에 하나 — 내 차례 맨 앞 카드(lead), 나머지는 테두리 단추(2026-10-20 V3 다듬기)
+    var card = function (a) {
+      var nk = inboxNextOf(akey(a)), p = nk ? nk.split(':') : null, nb = p ? apprFind(+p[1], p[0] === 'd' ? '' : p[0]) : null;
+      return apprCard(a, { next: nb ? nameOf(nb.username) : '', lead: INBOX_ORDER[0] === akey(a) });
+    };
     var grp = function (cls, label, n, desc) {
       return '<h3 class="ibgrp ' + cls + '"><span class="d2chip ' + cls + '">' + label + ' ' + n0(n) + '</span><span class="ibgd">' + desc + '</span></h3>';
     };
@@ -4270,9 +4306,9 @@
           ' · ' + won(s.cost) + '</span>' : '')) +
       // 「자세히」(판정 상자·긴 사유) / 「확인 항목 N건」 — 머리 줄 오른쪽(아래 줄은 단추가 많아 넘쳤다)
       detBtn +
-      // 내 차례 — 반려·승인을 머리 줄 오른쪽에(카드를 내리지 않고 누른다)
+      // 내 차례 — 반려·승인을 머리 줄 오른쪽에(카드를 내리지 않고 누른다). 빨간 「승인」은 맨 앞 카드 하나(opt.lead === false 면 테두리, 2026-10-20 V3 다듬기)
       (canAct ? '<span class="aact ahact"><button class="btn sm" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
-        '<button class="btn pri sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></span>' : '') +
+        '<button class="btn' + (opt.lead === false ? '' : ' pri') + ' sm" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></span>' : '') +
       '</div>' +
       '<div class="acrow">' + apprTrack(a) + '<span class="asp"></span>' + tail +
       (acts ? '<span class="aact">' + acts + '</span>' : '') +
@@ -4285,7 +4321,7 @@
       //   PC·태블릿은 위 머리 줄 단추 그대로(CSS 가 폭에 따라 하나만 보인다 — 같은 data-appr 단추).
       (canAct ? '<div class="amact"><span class="amnext">' + (opt.next ? '승인·반려하면 다음 문서(' + esc(opt.next) + ')가 바로 열립니다' : '내 차례 마지막 문서입니다') + '</span>' +
         '<div class="amgrid"><button class="btn" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
-        '<button class="btn pri" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></div></div>' : '') +
+        '<button class="btn' + (opt.lead === false ? '' : ' pri') + '" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></div></div>' : '') +
       '</div>';
   }
   /** 결재 카드 「자세히」를 펼친 카드(종류:id) — 화면을 다시 그려도 그대로. 새로고침하면 잊는다. */
@@ -4926,13 +4962,14 @@
     var cur = S.cur;
     if (S.sent || (cur === 0 && !S.trips.length && !S.ev.length)) return null;
     if (cur === 0) {
+      // 「2 영수증·통행료 →」 단추는 이 화면이 아니라 운행 기록·기록 점검 화면 맨 아래에 있다 — 그 화면을 말한다(2026-10-20 V3 U2)
       if (S.fixBad) return { n: 1, t: '운행 기록 ' + n0(S.fixBad) + '건을 먼저 손보세요',
-        d: '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 고친 뒤 맨 아래 「2 영수증·통행료 →」를 누르세요.',
+        d: '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 「기록 ' + n0(S.fixBad) + '건 고치기」로 고친 뒤 그 화면 맨 아래 「2 영수증·통행료 →」를 누르세요.',
         b: { t: '기록 ' + n0(S.fixBad) + '건 고치기', a: 'data-v="check"', i: 'list' } };
       // 운행 기록 화면은 「일반업무」로 걸러져 열린다 — 같은 수를 말한다(전체 6건이라 해 놓고 4건이 보였다, 2026-10-19 로봇)
       var biz = S.trips.filter(function (t) { return (t.purpose || '') === BUSINESS; }).length;
       return { n: 1, t: '운행 기록을 확인하세요',
-        d: '업무 운행 ' + n0(biz) + '건' + (biz !== S.trips.length ? '(전체 ' + n0(S.trips.length) + '건)' : '') + '이 맞는지 보고, 맨 아래 「2 영수증·통행료 →」를 누르세요.',
+        d: '「운행 기록 확인하기」에서 업무 운행 ' + n0(biz) + '건' + (biz !== S.trips.length ? '(전체 ' + n0(S.trips.length) + '건)' : '') + '이 맞는지 보고, 그 화면 맨 아래 「2 영수증·통행료 →」를 누르세요.',
         b: { t: '운행 기록 확인하기', a: 'data-v="trips"', i: 'list' } };
     }
     if (cur === 1) return { n: 2, t: '영수증·통행료를 차례대로 정리하세요', d: '주차 → 통행료 → 주유 → 계기판 순서로 하나씩 확인합니다.',
@@ -5109,9 +5146,10 @@
     var empty = !sentNow && cur === 0 && !S.trips.length && !S.ev.length;
     var step = closeStep(S, closed), when = dueText(cycleRange(CYC), Date.now());
     var title = cmpCycle(CYC, currentCycle()) === 0 ? '이번 달 마감' : cycleName(CYC) + ' 마감';
-    // 제목 줄 — 오른쪽에 지금 단계 단추 하나(빨간 단추는 화면에 하나, 폰에서는 아래 「다음 할 일」이 대신한다)
+    // 제목 줄 — 오른쪽에 지금 단계 단추 하나(빨간 단추는 화면에 하나, 폰에서는 아래 「다음 할 일」이 대신한다).
+    //   이 단추가 이 화면에서 깜빡이는 하나(cta — 단계 카드와 같은 1.6초 고리, 움직임 줄이기면 멈춤. 2026-10-20 사용자 「화면마다 지금 할 일 단추 하나만 깜빡」 V3 U1)
     var h = '<div class="phead pact"><div><h1>' + esc(title) + '</h1><p>' + esc(cycleName(CYC) + ' · ' + cycleSpan(CYC) + ' · ' + (ME.name || '')) + '</p></div>' +
-      (step ? '<div class="nowbtns"><button class="btn pri" ' + step.b.a + '>' + esc(step.b.t) + ' →</button></div>' : '') + '</div>' + (bands || '');
+      (step ? '<div class="nowbtns"><button class="btn pri cta" ' + step.b.a + '>' + esc(step.b.t) + ' →</button></div>' : '') + '</div>' + (bands || '');
     // 상태 한 줄 — 상신한 기간·빈 기간·반려(예전과 같은 말)
     var verdict = '', desc = '', clean = '';
     if (st === 'approved') {
@@ -5165,9 +5203,11 @@
     h += sect('최근 운행', n0(TRIPS.length) + '건', '<button class="btn sm" data-v="trips">운행 기록 전체 ' + ic('chev', 13) + '</button>',
       closeTripTable(TRIPS.slice(0, 6), TK ? TK.M : moneyOf(myName(), cycleRange(CYC), ALL_TRIPS, ALL_EVID)));
     // 폰 아래 고정 「다음 할 일」 — 첫 남은 일(없으면 지금 단계). 빨간 단추는 이것 하나(제목 줄 단추는 폰에서 숨긴다)
-    var nx = TK && TK.list.length ? TK.list[0] : null, nb = (nx && (nx.b1 || nx.b2)) || (step && step.b) || null;
+    //   1단계(운행 기록 확인) 차례면 위 안내와 같은 일 = 지금 단계 단추(2026-10-20 V3 U2 — 위는 「운행 기록 확인」인데 아래 띠는 「사진 올리기」였다).
+    //   폰에서 이 화면의 깜빡이는 단추 하나(cta, V3 U1)
+    var nx = TK && TK.list.length && !(step && step.n === 1) ? TK.list[0] : null, nb = (nx && (nx.b1 || nx.b2)) || (step && step.b) || null;
     if (nb && !nb.hp) h += '<div class="cnext-sp" aria-hidden="true"></div><div class="cnext" role="region" aria-label="다음 할 일"><span class="cnn">' +
-      (nx ? '다음 할 일 1 / ' + n0(TK.list.length) + ' · ' + esc(nx.nx || nx.t) : '지금 할 일 · ' + esc(step.t)) + '</span>' + ctBtn(nb, 'pri') + '</div>';
+      (nx ? '다음 할 일 1 / ' + n0(TK.list.length) + ' · ' + esc(nx.nx || nx.t) : '지금 할 일 · ' + esc(step.t)) + '</span>' + ctBtn(nb, 'pri cta') + '</div>';
     return h;
   }
 
@@ -5442,6 +5482,7 @@
      people = [{ u, st: 'none'|'withdrawn'|'rejected', left: 남은 일 한 줄, last: 마지막 활동(ms) }]. 반려 → 회수 → 상신 전 차례로, 처음 6명만(「N명 모두 보기」).
      줄마다 [알림], 머리에 [미상신 N명에게 알림](오늘 이미 보낸 사람 빼고). 오늘 보낸 사람은 「오늘 보냄」 — 기록은 approval_remind_log(관리자만 읽음). */
   var FOLLOW_N = 6, FOLLOW_ALL = {}, FOLLOW_LIST = {};
+  var REMIND_NEW_UNTIL = '2026-11-30';     // 「팀즈 알림 보내기」 머리의 「새 기능」 딱지를 이 날(한국 날짜)까지만(2026-10-20 V3 다듬기)
   var FOLLOW_VIEWS = ['a_status', 'xa_close', 'ca_close'];
   var KIND_TAG = { driving: '운행일지', expense: '개인경비', card: '법인카드' };
   var RMD = { day: '', by: {}, ask: {}, job: null };
@@ -5456,10 +5497,11 @@
   function remindLoad(kind) {
     var day = RMD.day || ymd(Date.now());
     RMD.ask[kind] = true;
-    return fetchAll('/rest/v1/approval_remind_log?select=target,created_at,result&kind=eq.' + encodeURIComponent(kind) + '&day=eq.' + day + '&order=created_at.asc')
+    // cycle 도 받는다 — 다른 기간 안내를 보낸 날이면 그 기간 이름으로 보인다(2026-10-20 V3 U8 — 10월분 보낸 날 9월분 현황도 「오늘 보냄」이었다)
+    return fetchAll('/rest/v1/approval_remind_log?select=target,created_at,result,cycle&kind=eq.' + encodeURIComponent(kind) + '&day=eq.' + day + '&order=created_at.asc')
       .then(function (rows) {
         var m = {};
-        (rows || []).forEach(function (x) { m[x.target] = { at: Date.parse(x.created_at || '') || 0, result: String(x.result || '') }; });
+        (rows || []).forEach(function (x) { m[x.target] = { at: Date.parse(x.created_at || '') || 0, result: String(x.result || ''), cycle: String(x.cycle || '') }; });
         RMD.by[kind] = m;
       }, function () { RMD.by[kind] = {}; })        // 표가 아직 없는 서버(마이그레이션 전) 등 — 「오늘 보냄」 표시만 빠진다
       .then(function () { delete RMD.ask[kind]; if (FOLLOW_VIEWS.indexOf(VIEW) >= 0 && LOADED) render(); });
@@ -5484,14 +5526,18 @@
     var who = function (u) { var o = orgPath(u); return [orgName(o), o.unit].filter(Boolean).join(' · '); };
     var btn = function (p) {
       var s = seen[p.u];
-      if (s && gone(p.u)) return '<span class="d2sent" title="' + esc(hm(s.at) + (s.result === 'pending' ? ' 보내는 중' : ' 보냄')) + '">' + ic('check', 13) + (s.result === 'pending' ? '보내는 중' : '오늘 보냄') + '</span>';
+      // 다른 기간 안내를 보낸 날이면 그 기간 이름(「10월분 보냄」) — 한 사람에게 하루 한 번이라 오늘은 더 못 보낸다(V3 U8)
+      var other = s && s.cycle && s.cycle !== cyc ? keyShort(s.cycle, s.cycle) : '';
+      if (s && gone(p.u)) return '<span class="d2sent" title="' + esc(hm(s.at) + ' ' + (other ? other + ' 마감 안내 ' : '') + (s.result === 'pending' ? '보내는 중' : '보냄') +
+        (other ? ' — 한 사람에게 하루 한 번만 갑니다' : '')) + '">' + ic('check', 13) + (s.result === 'pending' ? '보내는 중' : other ? esc(other) + ' 보냄' : '오늘 보냄') + '</span>';
       // 팀즈가 받지 않음 — 폰에서도 보이게 글로(예전엔 「오늘 보냄」에 마우스를 올려야 보였다) + 다시 보내기
       var fail = s ? '<span class="d2fail" title="' + esc(hm(s.at) + ' 팀즈 응답 ' + s.result) + '">' + ic('alert', 13) + '못 보냄</span>' : '';
       return fail + '<button type="button" class="btn sm d2rbtn" data-remind="' + esc(kind + '|' + p.u) + '" aria-label="' + esc(nameOf(p.u)) + ' 님에게 팀즈 알림' + (s ? ' 다시 보내기' : '') + '">' +
         sendIco(14) + (s ? '다시 알림' : '알림') + '</button>';
     };
     var hd = '<div class="d2hd"><div class="d2t"><h2 id="d2fh-' + kind + '">챙길 사람</h2><span class="cnt">' + n0(people.length) + '명</span></div>' +
-      '<div class="d2act"><span class="d2new">새 기능</span>' +
+      // 「새 기능」 딱지는 REMIND_NEW_UNTIL(한국 날짜)까지만 — 뗄 날이 없었다(2026-10-20 V3 다듬기). 늘리려면 날짜만 고친다.
+      '<div class="d2act">' + (ymd(Date.now()) <= REMIND_NEW_UNTIL ? '<span class="d2new" title="' + REMIND_NEW_UNTIL + '까지 보입니다">새 기능</span>' : '') +
       '<button type="button" class="btn pri d2all" data-remindall="' + kind + '"' + (bulk.length ? '' : ' disabled') + '>' + sendIco(15) +
       (bulk.length ? '미상신 ' + n0(bulk.length) + '명에게 알림' : notYet.length ? '미상신 모두 오늘 보냄' : '미상신 없음') + '</button></div></div>';
     var body = people.length
@@ -6906,7 +6952,7 @@
     fillUndoPlan([{ e: e, to: null }]).then(function (plan) {
       if (EVUNDO !== tok) return;
       tok.plan = plan;
-      var box = $('evUndo'); if (box) box.outerHTML = undoBlock(plan);
+      var box = $('evUndo'); if (box) box.outerHTML = undoBlock(plan, true);
       var b = $('btnEvDelGo'); if (b && b.dataset.id === String(e.id)) b.disabled = false;
     });
   }
@@ -7081,7 +7127,7 @@
       def.undoPlan(ids).then(function (plan) {
         if (g.undo !== tok) return;
         tok.plan = plan || [];
-        var box = $('mselUndo'); if (box) box.outerHTML = undoBlock(tok.plan);
+        var box = $('mselUndo'); if (box) box.outerHTML = undoBlock(tok.plan, true);
         var b = $('btnMselGo'); if (b && b.dataset.grp === grp && !g.busy) b.disabled = false;
       }, function () { var b = $('btnMselGo'); if (b) b.disabled = false; var box = $('mselUndo'); if (box) box.remove(); });
     }
@@ -7522,7 +7568,7 @@ window.EduGuard = {
       '<button class="btn pri sm" data-educg>확인</button></div>';
     c.hidden = false;
     // 영상 아래에 붙어 낮은 화면에서는 창 밖이었다 — 보이게 굴린다(2026-10-15 매뉴얼 로봇)
-    try { c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { }
+    try { c.scrollIntoView({ block: 'nearest', behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') }); } catch (e) { }
   }
   /** 창을 닫을 때 — 앱 EduPlayerPause 와 같다(일시정지 + 지금 위치 저장). 저장이 끝나면 목록을 다시 그린다. */
   function eduStop() {
@@ -9578,13 +9624,17 @@ window.EduGuard = {
     if (sn && sn <= 3 && !isAll() && !isMulti() && !cycleLocked(myName())) {
       var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
+      // 3단계(검증·상신)에는 맨 아래 「다음 단계」 단추가 없다 — 위 ①②③ 으로 상신하면 끝난다고 말한다(2026-10-20 V3 다듬기: 없는 단추를 가리켰다)
+      var back = sn > 1 ? ' 잘못 넘어갔으면 「← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '」로 돌아오면 됩니다.' : '';
       var note = sn < p ? '<b>이미 지난 단계</b>입니다. 고친 뒤 「다음 단계」로 다시 넘어가세요.'
         : sn > p ? '지금은 <b>' + p + '단계(' + esc(STEP_NAMES[p - 1]) + ')</b> 차례입니다.'
+        : sn === 3 ? (here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 상신할 수 있습니다(결재하는 분께 함께 보입니다).'
+          : '위 <b>① 검증하기 → ② PDF 미리보기 → ③ 상신</b> 차례로 하면 이 단계가 끝납니다.') + back
         : here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 다음 단계로 갈 수 있습니다.'
-        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.' + (sn > 1 ? ' 잘못 넘어갔으면 「← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '」로 돌아오면 됩니다.' : '');
+        : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.' + back;
       html += '<div class="nextstep"><span class="stepbadge">' + sn + '</span><span class="t">' + note + '</span>' +
-        // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만.
-        (sn > p ? '<button class="btn pri" data-v="' + STEP_VIEW[p - 1] + '">' + p + '단계로 가기 →</button>' : '') +
+        // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만. 이 화면에서 깜빡이는 하나(마감 뒤 5일에 1·2단계인 사람 등, 2026-10-20 V3 U1)
+        (sn > p ? '<button class="btn pri cta" data-v="' + STEP_VIEW[p - 1] + '">' + p + '단계로 가기 →</button>' : '') +
         (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
         // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
         //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
@@ -9592,7 +9642,8 @@ window.EduGuard = {
           ? '<span class="dim" style="font-size:12.5px">주차 → 통행료 → 주유 → 계기판을 차례로 마치면 3 검증·상신으로 넘어갈 수 있습니다.</span>'
           // 계기판 차례에서는 카드의 「다음: 3 검증·상신 →」 하나만(같은 단추가 카드와 띠에 둘이었다 — 2026-10-15 2차)
           : sn === 2 && sn === p && VIEW === 'evid' && evSub() === 3 ? ''
-          : sn < 3 && sn <= p ?'<button class="btn pri' + (sn === p ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
+          // 영수증 화면은 카드 안의 단추(올리기·「다음」)가 깜빡이는 하나 — 띠 단추는 빨강만(깜빡임 둘이 되지 않게, V3 U1)
+          : sn < 3 && sn <= p ?'<button class="btn pri' + (sn === p && VIEW !== 'evid' ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
             (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
     // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
@@ -10228,7 +10279,7 @@ window.EduGuard = {
     if ((el = e.target.closest('#btnOpenSubmit'))) { openSubmit(el.dataset.kind || ''); return; }
     if ((el = e.target.closest('[data-orgteam]'))) {
       var tp = el.dataset.orgteam.split('|'); ORGF = { div: tp[0] || '-', team: tp[1] || '', unit: '' }; saveOrgF();
-      PAGES = {}; AUDIT = null; applyScope(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+      PAGES = {}; AUDIT = null; applyScope(); render(); window.scrollTo({ top: 0, behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') }); return;
     }
     if ((el = e.target.closest('[data-orgunit]'))) { ORGF.unit = el.dataset.orgunit; saveOrgF(); PAGES = {}; AUDIT = null; applyScope(); render(); return; }
     if ((el = e.target.closest('[data-permf]'))) {
@@ -10960,12 +11011,12 @@ window.EduGuard = {
       return window.MoneyRule.fillUndo(M, moves, markOf).filter(function (p) { return p.trip.username === me && !apprLocked(p.trip); });
     }).catch(function () { return []; });
   }
-  /** 확인 창에 넣는 목록 — 줄마다 고르기 칸(기본 켬). */
-  function undoBlock(plan) {
+  /** 확인 창에 넣는 목록 — 줄마다 고르기 칸(기본 켬). del = 영수증 지우기 창 — 지우면 「두 번 정산」이 아니라 운행에 영수증 없는 금액으로 남는다(2026-10-20 V3 다듬기). */
+  function undoBlock(plan, del) {
     if (!plan || !plan.length) return '';
     return '<div class="undoblk" role="group" aria-label="영수증 금액이 들어간 운행 되돌리기">' +
-      '<div class="anote warn" style="margin-top:0">이 영수증 금액이 아래 운행에 들어가 있습니다. 함께 되돌리지 않으면 두 번 정산될 수 있습니다' +
-      ' — 되돌리지 않을 줄만 끄세요.</div><ul class="undolist">' +
+      '<div class="anote warn" style="margin-top:0">이 영수증 금액이 아래 운행에 들어가 있습니다. 함께 되돌리지 않으면 ' +
+      (del ? '운행에 영수증 없는 금액으로 남습니다' : '두 번 정산될 수 있습니다') + ' — 되돌리지 않을 줄만 끄세요.</div><ul class="undolist">' +
       plan.map(function (p, i) {
         var t = p.trip, w = p.cat === '주차' ? '주차비' : '통행료';
         return '<li><label><input type="checkbox" data-undo="' + i + '" checked> <span>' +
@@ -11068,7 +11119,8 @@ window.EduGuard = {
       '「그날 업무 운행 없음」이면, 운행 칸에서 <b>어느 운행의 영수증인지</b> 골라 저장하세요(영수증 날짜는 바뀌지 않습니다). ' +
       '맞는 운행이 아예 없으면 1단계에서 운행을 넣거나, 잘못 올린 영수증이면 영수증 내역에서 지우세요.</div>' +
       '<div id="evLinkUndo"></div>' +
-      '<div class="panel" style="margin-top:12px"><div class="scroll"><table><thead><tr><th>영수증 날짜</th><th class="n">금액</th><th>운행</th></tr></thead>' +
+      // evlinkt — 폰에서는 줄마다 두 줄(날짜·금액 / 운행 고르기 칸 전체 폭). 창(348px) 안에 660px 표라 운행 칸이 가로 스크롤 뒤에 있었다(2026-10-20 V3 U3)
+      '<div class="panel" style="margin-top:12px"><div class="scroll"><table class="evlinkt"><thead><tr><th>영수증 날짜</th><th class="n">금액</th><th>운행</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnEvLinkSave">저장</button>', true);
     // 표의 그 줄 「다른 운행에 붙이기」로 열었으면 그 영수증 줄을 보이게(웹 8차)

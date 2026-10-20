@@ -400,7 +400,7 @@
     else if (ST.dryErr && !ST.dryBusy) { t = ST.dryErr; cls = 'bad'; }
     else if (bl.length) { t = lockedText(bl); cls = 'bad'; }
     else if (!d) t = dirty ? '미리 보기를 받는 중입니다…' : '';
-    else if (!chN) t = '바꾼 것이 없습니다. 날짜를 고르면 아래 미리 보기가 바로 바뀝니다.';
+    else if (!chN) t = '바꾼 것이 없습니다. 날짜를 고르면 위 미리 보기가 바로 바뀝니다.';   // 이 글은 미리 보기 아래에 있다(2026-10-20 V3 다듬기 — 「아래」라 했다)
     else if (!dirty) { t = '지금 저장된 설정이 이 화면의 모양과 조금 다릅니다 — 저장하면 위 미리 보기처럼 맞춰집니다.'; cls = 'warn'; }
     else t = '저장하면 직원 화면·포털 마감 일정이 바로 바뀝니다.';
     return {

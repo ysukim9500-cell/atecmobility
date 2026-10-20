@@ -809,6 +809,7 @@ footer .wrap{font-size:13px}
      운행일지 화면에 한 번 다녀와야(drv_portal_hint) 포털 첫 화면이 맞았다 — 로그인 직후에는 이미 상신한 개인경비가 빨간 「상신 준비 · 1일 지남」,
      결재자에게는 결재할 문서가 안 보였다. 그래서 들어올 때마다(enter) 세 결재 표를 한 번 읽는다(RLS — 내 것·내가 결재선에 든 것만 보인다):
        ① 갈래마다 처음 보일 기간(마감 일정과 같은 열쇠 x.key)의 내 결재 상태  ② 지금 내 차례인 결재 건 수
+       ③ 마감 뒤 GRACE_DAYS 일이 지나 오늘 기간으로 넘어갔으면 바로 앞 기간도 — 아직 상신 전(자료가 있을 때만)·반려·회수면 「오늘 할 일」에 남긴다(V3 U11)
      읽은 값(LIVE)이 운행일지 화면이 적어 둔 것(hint)보다 먼저다. 남은 일·단계는 hint 그대로.
      ★ 상태를 모르는 동안(읽는 중)·못 읽은 갈래는 빨강 없이 「들어가서 확인」 — 이미 상신한 사람에게 빨간 「지남」을 보이지 않는다.
      body[data-live] = 다 읽음 'ok' · 일부 못 읽음 'part'(시험 하네스가 기다리는 표시이기도 하다). */
@@ -817,7 +818,7 @@ footer .wrap{font-size:13px}
   function liveRead(m) {
     var at = ss(K_AT), who = m && m.username;
     if (!at || !who) return;
-    var now = Date.now(), R = deadlines(now), L = LIVE = { u: who, done: false, bad: {}, st: {}, inbox: {} };
+    var now = Date.now(), R = deadlines(now), L = LIVE = { u: who, done: false, bad: {}, st: {}, inbox: {}, prev: {} };
     document.body.removeAttribute('data-live');
     var hdr = { apikey: KEY, Authorization: 'Bearer ' + at }, wq = encodeURIComponent(who);
     var get = function (path) {
@@ -825,11 +826,23 @@ footer .wrap{font-size:13px}
     };
     var jobs = [];
     R.list.forEach(function (x) {
-      var k = x.k, t = APPR_T[k];
-      jobs.push(get(t + '?select=cycle,status,submitted_at&username=eq.' + wq + '&cycle=eq.' + encodeURIComponent(x.key) + '&order=submitted_at.desc')
+      // pv = 마감 뒤 며칠이 지나 처음 보일 기간이 오늘 기간이 됐으면 바로 앞 기간(V3 U11 — 그 기간을 상신하지 않았으면 「오늘 할 일」에서 빠졌다)
+      var k = x.k, t = APPR_T[k], cur = CR.current(DL_KIND[k], now), pv = cur && cur.key === x.key ? CR.prev(cur) : null;
+      var keys = [x.key].concat(pv ? [pv.key] : []);
+      jobs.push(get(t + '?select=cycle,status,submitted_at&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
         .then(function (rows) {
-          var a = (rows || []).filter(function (r) { return r.cycle === x.key; })[0];
-          L.st[k] = a ? String(a.status || '') : '';
+          var stOfKey = function (key) { var a = (rows || []).filter(function (r) { return r.cycle === key; })[0]; return a ? String(a.status || '') : ''; };
+          L.st[k] = stOfKey(x.key);
+          if (!pv) return;
+          var ps = stOfKey(pv.key);
+          if (ps === 'submitted' || ps === 'approved' || ps === 'draft') return;
+          var keep = function () { L.prev[k] = { key: pv.key, st: ps, hi: pv.hi }; };
+          if (ps === 'rejected' || ps === 'withdrawn') { keep(); return; }
+          // 상신 전 — 그 기간에 올린 자료(운행·경비·카드 줄)가 하나라도 있을 때만(운행일지 화면 prevPending 과 같은 생각)
+          return get(k === 'd' ? 'trips?select=id&deleted_at=is.null&username=eq.' + wq + '&start_time=gte.' + pv.loMs + '&start_time=lt.' + pv.endMs + '&limit=1'
+            : k === 'x' ? 'expense_items?select=id&username=eq.' + wq + '&date_millis=gte.' + pv.loMs + '&date_millis=lt.' + pv.endMs + '&limit=1'
+            : 'card_items?select=id&username=eq.' + wq + '&cycle=eq.' + encodeURIComponent(pv.key) + '&limit=1')
+            .then(function (r2) { if (r2 && r2.length) keep(); }, function () { });
         }).catch(function () { L.bad[k] = 1; delete L.st[k]; }));
       // 지금 내 차례인 결재 건(결재선의 지금 칸 = 나) — 운행일지 결재함 inbox() 와 같은 판정
       jobs.push(get(t + '?select=cur_seq,steps&status=eq.submitted').then(function (rows) {
@@ -975,17 +988,28 @@ footer .wrap{font-size:13px}
       if (x.dday <= 3) rows.push({ k: k, t: KN[k] + ' ' + mon + (quiet ? ' 마감' : ' 아직 상신 전'), s: quiet ? '상신했는지는 들어가서 확인합니다' : '검증한 뒤 상신합니다',
         due: due, note: until, b: quiet ? '들어가서 확인' : '상신 준비', href: VERIFY_OF[k], quiet: quiet });
     });
+    // 마감 뒤 GRACE_DAYS 일이 지나 오늘 기간으로 넘어간 지난 기간 — 아직 상신 전(자료 있음)·반려·회수면 맨 위에 남긴다(2026-10-20 V3 U11 —
+    //   예전에는 마감 뒤 5일이 지나면 「오늘 할 일」에서 빠져 상신하지 않은 채 잊혔다). 그 기간 검증·상신 화면으로 바로 간다.
+    var late = [];
+    if (LIVE && LIVE.u === m.username) ['d', 'x', 'c'].forEach(function (k) {
+      var p = LIVE.prev[k];
+      if (!p || (k === 'd' && !drv)) return;
+      var hi = Date.UTC(+p.hi.slice(0, 4), +p.hi.slice(5, 7) - 1, +p.hi.slice(8, 10)), past = Math.round((R.today - hi) / DAY);
+      late.push({ k: k, key: p.key, dday: -past, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' 반려됨 — 고쳐서 다시 상신' : p.st === 'withdrawn' ? ' 회수함 — 다시 상신' : ' 아직 상신 전'),
+        s: '마감이 지났습니다 — 늦었지만 지금 상신해 주세요', due: ['warn', ddWord(-past)], note: mdOf(hi) + ' 마감', b: '상신하러 가기', href: VERIFY_OF[k] + '/' + p.key });
+    });
+    rows = late.concat(rows);
     ['d', 'x', 'c'].forEach(function (k) {
       if (ib[k]) rows.push({ k: k, t: '결재할 문서 ' + ib[k] + '건', s: KN[k] + ' 결재함에서 결재합니다', due: ['', '결재 대기'], note: '', b: '결재함 열기', href: 'driving.html#/inbox', mode: k });
     });
-    // 제목 아래 한 줄 — 아직 상신 전인 것 중 가장 가까운 마감. 모두 상신했으면 그렇다고(V3 B1 — 예전엔 가장 가까운 마감
+    // 제목 아래 한 줄 — 아직 상신 전인 것 중 가장 가까운 마감(지난 기간을 상신하지 않았으면 그것, V3 U11). 모두 상신했으면 그렇다고(V3 B1 — 예전엔 가장 가까운 마감
     //   「마감 1일 지남」이 그대로 나왔다). 상태를 아직 읽는 중이면 날짜만, 못 읽은 갈래는 마감 글만(색 없음).
     var mine = R.list.filter(function (x) { return x.k !== 'd' || drv; });
     var sts = mine.map(stOf);
     var open = mine.filter(function (x, i) { return sts[i] !== null && sts[i] !== 'submitted' && sts[i] !== 'approved'; });
     var unknown = mine.filter(function (x, i) { return sts[i] === null; });
     var nm = m.name || m.username || '', T = new Date(R.today),
-      f = open[0] || (!pending ? unknown[0] : null), allSent = !open.length && !unknown.length && mine.length > 0;
+      f = late[0] || open[0] || (!pending ? unknown[0] : null), allSent = !late.length && !open.length && !unknown.length && mine.length > 0;
     $('helloT').textContent = nm + ' 님, 오늘 할 일이 ' + (rows.length ? rows.length + '건 있습니다' : '없습니다');
     $('helloS').textContent = T.getUTCFullYear() + '년 ' + (T.getUTCMonth() + 1) + '월 ' + T.getUTCDate() + '일 (' + '일월화수목금토'.charAt(T.getUTCDay()) + ')' +
       (f ? ' · ' + KN[f.k] + ' ' + (CR.short(f.key) || ((new Date(f.due).getUTCMonth() + 1) + '월분')) + ' ' + (f.dday === 0 ? '마감일' : f.dday < 0 ? '마감 ' + (-f.dday) + '일 지남' : '마감 D-' + f.dday)

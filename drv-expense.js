@@ -1955,7 +1955,7 @@
       C.closePanel();
       if (C.state().VIEW !== 'x_verify') C.go('x_verify'); else C.render();
       // 이름대로 바로 상신 창을 연다(2026-10-15 매뉴얼 로봇: 창만 닫혀 한 번 더 눌러야 했다). 아직 못 누르는 상태면 그 단추로 데려간다.
-      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } catch (er) { } } }, 60);
+      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') }); } } catch (er) { } } }, 60);
       return;
     }
     if ((el = e.target.closest('[data-xfzpdf]'))) { pdfFrozen(el.dataset.xfzpdf); return; }

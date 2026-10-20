@@ -773,6 +773,9 @@
      운행일지·개인경비와 같은 세 칸: ① 검증하기 → ② PDF 미리보기(열어 봐야 확인) → ③ 결재 상신.
      검증은 브라우저에서 card-rules.js 로(서버와 같은 판정). 구분·사용목적이 빈 줄이 있으면 ③ 이 꺼지고 그 줄로 가는 단추. */
   var VR = {}, VITEMS = [];
+  /** 이번에 검증 화면에 들어와서 검증을 돌렸는가(키별) — 화면에 들어올 때마다 비운다(onGo). 운행일지·개인경비처럼 들어올 때마다 ① 검증하기부터
+   *  (2026-10-20 V3 U9 — 법인카드만 다른 화면에 다녀와도 ③ 부터였다). 지난 결과는 아래에 그대로 보인다. */
+  var CFRESH = {};
   var PREV = (function () { try { return JSON.parse(sessionStorage.getItem('drv.cpreviewed') || '{}'); } catch (e) { return {}; } })();
   function vkey(u, cyc) { return u + '|' + cyc; }
   function sig(u, cyc) {
@@ -842,7 +845,8 @@
     if (M) { M.begin(mk, cMotion(cyc)); M.step(mk, { phase: 'run' }); }
     C.render();
     loadExp(cyc).then(function () {
-      var tick = function () { if (VRUN.busy && VRUN.k === k) sayRun('카드 ' + n0(n) + '줄을 읽는 중… ' + Math.round((Date.now() - VRUN.t0) / 1000) + '초'); };
+      // 지난 초는 AI 판(「N초 지남」)이 센다 — 진행 글에 따로 세면 시계가 둘이고 1초 어긋났다(2026-10-20 V3 다듬기). 판이 없을 때만 글에 초를
+      var tick = function () { if (VRUN.busy && VRUN.k === k) sayRun('카드 ' + n0(n) + '줄을 읽는 중…' + (M && M.on(mk) ? '' : ' ' + Math.round((Date.now() - VRUN.t0) / 1000) + '초')); };
       tick(); clearInterval(VTICK); VTICK = setInterval(tick, 1000);
       return cai({ op: 'card_review', cycle: cyc }).then(function (j) { return { j: j }; }, function (e) { return { e: e }; });
     }).then(function (x) {
@@ -859,6 +863,7 @@
         ai = { status: 'failed', note: AI_FAIL, model: '', data: null };
       }
       VR[k] = { at: Date.now(), sig: s0, res: res, ai: ai };
+      CFRESH[k] = 1;                               // 이번에 들어와서 검증했다(V3 U9)
       setPreviewed(k, false);
       C.toast('검증했습니다 — ' + sumText(res.summary) + (ai.note ? ' · ' + ai.note : '') + (ai.exNote ? ' · ' + ai.exNote : ''));
       // 응답이 왔다 — 실제 결과(항목이 가리키는 줄)로 카드 줄마다 딱지(80ms 간격) 뒤 결과 화면
@@ -911,7 +916,8 @@
     var u = me(), cyc = S.CYCKEY, k = vkey(u, cyc), a = myC(cyc);
     var locked = !!(a && (a.status === 'submitted' || a.status === 'approved'));
     if (locked) return lockedVerify(rows, a);
-    var v = VR[k], fresh = !!(v && v.sig === sig(u, cyc)), s = v ? v.res.summary : {}, items = v ? v.res.items : [];
+    // dataFresh = 지난 검증 뒤 자료가 그대로 · fresh = 그리고 이번에 들어와서 검증했다(단계는 fresh 로 — 들어올 때마다 ① 부터, V3 U9. 지난 결과 글·목록은 dataFresh 로)
+    var v = VR[k], dataFresh = !!(v && v.sig === sig(u, cyc)), fresh = dataFresh && !!CFRESH[k], s = v ? v.res.summary : {}, items = v ? v.res.items : [];
     var seen = previewOk(k), blocked = !!(v && fresh && s.block);
     var busy = VRUN.busy && VRUN.k === k;
     // 도는 동안은 ① 도는 중 · ②③ 아직(2026-10-20 V3 B2). 빈 칸이 있으면 지금 할 일은 ③ 「빈 칸으로 가기」(V3 B5 — ② PDF 가 깜빡이고 ③ 이 회색이었다)
@@ -921,7 +927,7 @@
     var verdict, clean = '';
     if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('Gemini') + '</span><span class="cvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
     else if (!v) verdict = '아직 검증하지 않았습니다';
-    else if (!fresh) verdict = '자료가 바뀌었습니다 — 다시 검증해 주세요';
+    else if (!dataFresh) verdict = '자료가 바뀌었습니다 — 다시 검증해 주세요';
     else if (s.block) verdict = '빈 칸이 있는 줄이 <em>' + n0(s.blank_rows) + '줄</em> — 채워야 상신할 수 있습니다';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
@@ -935,6 +941,7 @@
       card(1, '검증하기 ' + C.vx.gemBadge('Gemini'), none ? '먼저 「이번 달 카드 내역」에서 ERP 엑셀을 올려 주세요.'
         : busy ? '규칙으로 살피고, Gemini 가 구분·사용목적을 읽는 중입니다…'
         : v && fresh ? '지금 자료로 검증했습니다. 고친 게 있으면 다시 눌러 주세요.'
+        : v && dataFresh ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(C.vx.whenText(new Date(v.at).toISOString())) + ') 결과입니다.'
         : '빈칸·같은 승인번호·기간 밖·소유자·0원 줄과 같은 날 같은 금액의 개인경비를 규칙으로 보고, Gemini 가 구분이 가맹점·시간과 맞는지와 사용목적을 봅니다.',
         C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? ((AM && AM.short(mk)) || VRUN.note || 'Gemini 가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
@@ -954,7 +961,7 @@
     var moving = busy && AM && AM.on(mk);
     h += steps;
     if (moving) h += AM.html(mk, verdict);
-    else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && fresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
+    else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && dataFresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
       (v ? '마지막 검증 ' + esc(C.vx.whenText(new Date(v.at).toISOString())) : '검증 전') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
       '<p class="verdict' + (busy ? '' : clean) + '">' + verdict + '</p>' +
       (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적 — 상신을 막음', s.block > 0) +
@@ -963,7 +970,7 @@
         (v.ai && v.ai.note ? '<div class="awarn" id="cAiNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.note) + '</span></div>' : '') +
         (v.ai && v.ai.exNote ? '<div class="awarn" id="cExNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.exNote) + '</span></div>' : '') : '') +
       '</div>';
-    if (v && fresh && !busy) {
+    if (v && dataFresh && !busy) {                // 지난 검증 결과도 보인다(자료가 그대로일 때) — 다시 들어와 ① 부터여도(V3 U9)
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, true));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
@@ -1628,7 +1635,7 @@
       C.closePanel();
       if (C.state().VIEW !== 'c_verify') C.go('c_verify'); else C.render();
       // 이름대로 바로 상신 창을 연다(2026-10-15 매뉴얼 로봇: 창만 닫혀 한 번 더 눌러야 했다). 아직 못 누르는 상태면 그 단추로 데려간다.
-      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } catch (er) { } } }, 60);
+      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') }); } } catch (er) { } } }, 60);
       return;
     }
     if ((el = e.target.closest('[data-cfzpdf]'))) { pdfFrozen(el.dataset.cfzpdf); return; }
@@ -1702,6 +1709,7 @@
       status: function (k) { var a = myC(k); return a ? a.status : ''; } },
     load: loadWith,
     onGo: function (v, prev) {
+      if (v === 'c_verify') CFRESH = {};          // 검증 화면에 들어올 때마다 ① 검증하기부터(운행일지·개인경비와 같게, 2026-10-20 V3 U9)
       if (v === 'ca_list' && prev !== 'ca_close' && prev !== 'ca_people') CL = { cat: '', who: '', blank: false };
       if (ADMIN_C.indexOf(v) >= 0 && isAdmin()) loadItems(C.state().CYCKEY, true);
     },

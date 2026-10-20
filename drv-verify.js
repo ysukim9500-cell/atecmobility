@@ -435,9 +435,13 @@
         fact('참고', n0(s.info), '고칠 것은 아님') +
         fact('사진 판독', v.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
           v.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, v.ai) + '</div>' : '') +
-      '<div class="vact"><button class="btn" data-pdf="">' + ic('dl', 14) + 'PDF 받기</button></div>' +
-      // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만
-      (f !== null && C.apvSlot ? C.apvSlot('', a) : '') + '</div>';
+      // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만. 「PDF 받기」·「문서 보기」는 한 줄·같은 높이로 —
+      //   미리보기 자리의 단추 줄 맨 앞에 넣는다(2026-10-20 V3 다듬기: 두 단추가 다른 줄·다른 높이였다). 미리보기가 없으면 예전처럼 따로 한 줄.
+      (function () {
+        var pdfB = '<button class="btn sm" data-pdf="">' + ic('dl', 14) + 'PDF 받기</button>';
+        var slot = f !== null && C.apvSlot ? C.apvSlot('', a) : '';
+        return slot.indexOf('<div class="apvbar">') >= 0 ? slot.replace('<div class="apvbar">', '<div class="apvbar">' + pdfB) : '<div class="vact">' + pdfB + '</div>' + slot;
+      })() + '</div>';
     if (v) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
       VITEMS = [];
@@ -926,7 +930,8 @@
       }
       var mk = o.meta.mark || '';
       // 반려·회수 뒤 다시 올리는 것이면 「다시 상신」(상신 단추 이름과 같게, 2026-10-16 3차)
-      var okLab = '② 확인 완료 → ' + (o.again ? '다시 상신' : '상신');
+      //   단추 이름에 ①② 를 달지 않는다 — 단계 카드의 ①②③(검증·미리보기·상신)과 번호가 겹쳤다(2026-10-20 V3 다듬기)
+      var okLab = '확인 완료 → ' + (o.again ? '다시 상신' : '상신');
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
         '<div class="dim">' + mb + ' MB · ' + (typeof o.stat === 'function' ? o.stat(res) : o.stat || '운행기록부 ' + n0((o.doc.sheets || []).length) + '장') +
         (o.verify ? ' · 검증 결과' : '') + (nImg ? ' · 영수증 사진 ' + n0(nImg) + '장' : '') + '</div>' + chk +
@@ -934,7 +939,7 @@
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(o.file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri' + (o.okKey ? ' cta' : '') + '" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">' +
-          (o.okKey ? '① 열어서 보기' : '열기 · 인쇄') + '</a>' +
+          (o.okKey ? '열어서 보기' : '열기 · 인쇄') + '</a>' +
         // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
         // 2026-10-07: 문서를 먼저 열어 봐야 「확인 완료」가 눌린다(열기·내려받기 중 하나).
         (o.okKey ? '<button class="btn" id="pdfOkBtn" ' + (o.okAttr || 'data-pdfok') + '="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">' + okLab + '</button>' : '');
@@ -942,7 +947,7 @@
       if (o.prints && C.prints) C.prints.bindOut($('pFoot'), o.prints.kind, o.prints.ids, url);
       if (o.okKey) {
         $('pBody').insertAdjacentHTML('beforeend', '<div class="hpnote" id="pdfStepNote" style="margin-top:14px">' + ic('alert', 15) +
-          '<span><b>① 열어서 보기</b>로 문서를 끝까지 확인한 뒤 <b>' + okLab + '</b>을 눌러 주세요.</span></div>');
+          '<span><b>열어서 보기</b>로 문서를 끝까지 확인한 뒤 <b>' + okLab + '</b>을 눌러 주세요.</span></div>');
         var unlock = function () {
           var b = $('pdfOkBtn'); if (!b || !b.disabled) return;
           b.disabled = false; b.removeAttribute('title'); b.classList.add('pri', 'cta');
@@ -993,7 +998,7 @@
         note: old ? '이 결재 건은 상신 때 저장한 자료가 없어(예전 방식) <b>지금 자료</b>로 만들었습니다.' : null,
         expect: expect, expectName: old ? '상신 때 집계한 금액' : '화면 합계',
         okKey: !old && u === C.myName() ? k : '',
-        again: !!(ap && (ap.status === 'rejected' || ap.status === 'withdrawn')),     // 반려·회수 뒤면 「② 확인 완료 → 다시 상신」
+        again: !!(ap && (ap.status === 'rejected' || ap.status === 'withdrawn')),     // 반려·회수 뒤면 「확인 완료 → 다시 상신」
         prints: done ? { kind: 'driving', ids: [ap.id] } : null,
         meta: { name: C.nameOf(u), cycleName: cycName(S.CYCKEY), mark: mark,
           docNo: old ? '결재 #' + ap.id + ' · 지금 자료로 ' + now + ' 출력' : '상신 전 미리보기 · ' + now + ' 출력' }
@@ -1136,7 +1141,7 @@
       C.closePanel();
       if (C.state().VIEW !== 'verify') C.go('verify'); else C.render();
       // 이름대로 바로 상신 창을 연다(2026-10-15 매뉴얼 로봇: 창만 닫혀 한 번 더 눌러야 했다). 아직 못 누르는 상태면 그 단추로 데려간다.
-      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } catch (er) { } } }, 60);
+      setTimeout(function () { var b = document.getElementById('btnOpenSubmit'); if (b) { try { if (!b.disabled) b.click(); else { b.focus(); b.scrollIntoView({ block: 'center', behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') }); } } catch (er) { } } }, 60);
       return;
     }
     if ((el = e.target.closest('[data-fzxlsx]'))) { xlsxFrozen(el.dataset.fzxlsx); return; }
