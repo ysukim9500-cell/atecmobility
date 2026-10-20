@@ -129,8 +129,10 @@
     }
     var tip = [s.n_pdf ? FMT.pdf + ' ' + n0(s.n_pdf) + '회' : '', s.n_print ? FMT.print + ' ' + n0(s.n_print) + '회' : '',
       s.n_xlsx ? FMT.xlsx + ' ' + n0(s.n_xlsx) + '회' : ''].filter(Boolean).join(' · ');
+    // 두 덩어리(「출력 N회 ·」 · 「마지막 MM.DD HH:MM 이름」) — 칸이 좁으면 그 사이에서 줄을 바꾼다(2026-10-21 매뉴얼 로봇:
+    //   한 줄로만 늘어나 1280 결재 완료 출력 표가 칸보다 넓어지고 「정정 열기」가 밀려났다). 글자는 예전과 같다.
     return '<button type="button" class="prb done" data-prhist="' + key + '" data-prwho="' + who + '" title="' + esc(tip + ' — 눌러서 전체 출력 기록 보기') + '">' +
-      '출력 ' + n0(s.n) + '회 · 마지막 ' + esc(kst(s.last_at)) + ' ' + esc(s.last_name || s.last_by || '') + '</button>';
+      '<span>출력 ' + n0(s.n) + '회 ·</span> <span>마지막 ' + esc(kst(s.last_at)) + ' ' + esc(s.last_name || s.last_by || '') + '</span></button>';
   }
   function stat(kind, id) { return KINDS[kind] ? ST[kind][id] : undefined; }
 

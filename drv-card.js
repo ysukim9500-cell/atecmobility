@@ -1070,6 +1070,8 @@
       ranAt: isFinite(atMs) ? C.vx.whenText(new Date(atMs).toISOString()) : '', ai: false,
       noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원 · 개인경비 중복)' +
         (aiUsed === true ? ' + Gemini 구분·사용목적 확인' : aiUsed === false ? ' · Gemini 확인 없음' : ''),
+      // 검증 결과 창(C.vx.showItems) 한 줄 — 검증 화면과 같은 말. 모르면 말하지 않는다(2026-10-21: 예전엔 늘 「Gemini 읽기 없음」)
+      aiNote: aiUsed === true ? 'Gemini 가 구분·사용목적을 봤습니다' : aiUsed === false ? 'AI 검증을 하지 못했습니다(규칙 검증만)' : '',
       notes: ['· 금액은 ERP 에서 받은 승인금액 그대로입니다(취소·0원 줄은 올릴 때 뺐습니다).',
         '· 구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다. 나머지 항목은 결재자가 보고 판단합니다.'],
       summary: { bad: (s.block || 0) + (s.bad || 0), warn: s.warn || 0, info: s.info || 0, receipts: 0, read: 0 },
@@ -1706,7 +1708,8 @@
     kinds: { card: K0 },
     // range·status: 마감 뒤 며칠(GRACE_DAYS) 동안 처음 보일 기간·마감 띠(driving-app.js defCyc·graceBand, 2026-10-20)
     period: { mode: 'c', views: CVIEWS, current: cCurrent, span: cSpan, band: band, tag: tag, range: cRange,
-      status: function (k) { var a = myC(k); return a ? a.status : ''; } },
+      status: function (k) { var a = myC(k); return a ? a.status : ''; },
+      row: function (k) { return myC(k) || null; } },          // 포털 한 줄이 정정 열기를 「정정 중」으로 가른다(2026-10-21)
     load: loadWith,
     onGo: function (v, prev) {
       if (v === 'c_verify') CFRESH = {};          // 검증 화면에 들어올 때마다 ① 검증하기부터(운행일지·개인경비와 같게, 2026-10-20 V3 U9)

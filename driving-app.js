@@ -1096,12 +1096,14 @@
     '계기판': '월초·월말 계기판 사진을 올립니다. 운행 기록의 계기판 숫자와 맞는지 확인하는 데 씁니다.'
   };
   var EVSUB_FX = '';
-  function evSub() { var v = 0; try { v = +sessionStorage.getItem('drv.evsub.' + CYCKEY()) || 0; } catch (e) { } return Math.max(0, Math.min(3, v)); }
+  // 지금 차례도 사람마다(2026-10-21 — 같은 탭에서 다른 사람으로 들어오면 앞사람의 차례(계기판 등)에서 열리고 3단계로 넘어갈 수 있었다. evsubmax 와 같은 열쇠 모양)
+  function evSubKey() { return 'drv.evsub.' + myName() + '.' + CYCKEY(); }
+  function evSub() { var v = 0; try { v = +sessionStorage.getItem(evSubKey()) || 0; } catch (e) { } return Math.max(0, Math.min(3, v)); }
   /** 이 주기에서 영수증 차례를 어디까지 지나왔는가(0~3). 3 이면 계기판까지 왔다 — 3단계로 넘어갈 수 있다. */
   function evSubMax() { var v = 0; try { v = +localStorage.getItem('drv.evsubmax.' + myName() + '.' + CYCKEY()) || 0; } catch (e) { } return Math.max(evSub(), Math.min(3, v)); }
   function setEvSub(i, fx) {
     i = Math.max(0, Math.min(3, i));
-    try { sessionStorage.setItem('drv.evsub.' + CYCKEY(), String(i)); } catch (e) { }
+    try { sessionStorage.setItem(evSubKey(), String(i)); } catch (e) { }
     try { if (i > evSubMax()) localStorage.setItem('drv.evsubmax.' + myName() + '.' + CYCKEY(), String(i)); } catch (e) { }
     EVSUB_FX = fx || '';
     EVF.cat = EV_SUBS[i]; EVF.touched = false;
@@ -3461,8 +3463,10 @@
     var prev = previousSteps();
     var sameLine = function (x, y) { return JSON.stringify(x.map(function (s) { return s.box + ':' + s.approver; })) === JSON.stringify(y.map(function (s) { return s.box + ':' + s.approver; })); };
     if (prev && !sameLine(prev, DRAFT)) {
-      h += '<div style="margin-top:10px"><button class="btn sm" id="btnPrevLine">' + ic('list', 13) + '지난번 결재선 불러오기 — ' +
-        esc(prev.map(function (s) { return stepText(s); }).join(' → ')) + '</button></div>';
+      // 결재선이 길면 창 폭 안에서 줄을 바꾼다(CSS #btnPrevLine) — 「이름 직책 (칸)」 한 덩어리는 끊지 않고 「→」 앞뒤에서만(2026-10-21)
+      var nw = function (t) { return '<span style="white-space:nowrap">' + esc(t) + '</span>'; };
+      h += '<div style="margin-top:10px"><button class="btn sm" id="btnPrevLine">' + ic('list', 13) + '<span>' + nw('지난번 결재선 불러오기 —') + ' ' +
+        prev.map(function (s) { return nw(stepText(s)); }).join(' → ') + '</span></button></div>';
     }
     h += '<div class="anote" style="margin-top:10px">결재받을 <b>칸을 누르고 이름</b>을 넣으세요. <b>비워 둔 칸은 빗금(/)</b>으로 찍히고 건너뜁니다. ' +
       '결재는 왼쪽 칸부터 차례로 진행되고 <b>사업부장에서 끝납니다</b>' +
@@ -4238,7 +4242,7 @@
     var nk = inboxNextOf((payload.kind || 'd') + ':' + payload.id);
     if (!nk) return;
     var p = nk.split(':');
-    try { sessionStorage.setItem('apv.' + p[0] + ':' + p[1], '1'); } catch (e) { }
+    try { sessionStorage.setItem(apvSsKey(p[0], p[1]), '1'); } catch (e) { }
     NOTE.focus = nk; NOTE.focusUntil = Date.now() + 2500;
     var t0 = Date.now();
     (function focusNext() {
@@ -4355,8 +4359,16 @@
   var APV_FAIL = '미리보기를 만들지 못했습니다 — 「PDF 받기」로 열어 보세요';
   var APV_PDFATTR = { '': 'data-fzpdf', expense: 'data-xfzpdf', card: 'data-cfzpdf' };
   function apvProv(kind) { return kind ? (EXT.kinds[kind] || {}).previewBytes : EXT.previewBytes; }
-  function apvKey(kind, a) { return (kind || 'd') + ':' + a.id + ':' + a.status + ':' + (a.submitted_at || '') + ':' + (a.closed_at || ''); }
-  function apvSaved(kind, id) { try { return sessionStorage.getItem('apv.' + (kind || 'd') + ':' + id); } catch (e) { return null; } }
+  // 그림 열쇠 — 결재란이 바뀌면 열쇠도 바뀐다(2026-10-21 매뉴얼 로봇: 중간 승인은 상태·상신·완료 시각이 그대로라
+  //   승인한 뒤 「그 밖의 건」 카드에 승인 전 그림이 남았다). 지금 차례(cur_seq)와 칸마다 결과·시각을 넣는다.
+  function apvKey(kind, a) {
+    var st = (a.steps || []).map(function (s) { return s ? (s.seq || '') + '=' + (s.result || '') + '@' + (s.acted_at || '') : ''; }).join(',');
+    return (kind || 'd') + ':' + a.id + ':' + a.status + ':' + (a.submitted_at || '') + ':' + (a.closed_at || '') + ':' + (a.cur_seq == null ? '' : a.cur_seq) + ':' + st;
+  }
+  /** 「문서 보기」로 펼친 것을 이 탭에 기억하는 열쇠 — 사람마다 따로(2026-10-21 매뉴얼 로봇: 같은 탭에서 로그아웃한 뒤 다른 사람으로
+   *  들어오면 앞사람이 펼쳐 둔 문서가 펼친 채 남았다). 로그아웃하면 모두 지운다(tabMemClear). */
+  function apvSsKey(kind, id) { return 'apv.' + myName() + '|' + (kind || 'd') + ':' + id; }
+  function apvSaved(kind, id) { try { return sessionStorage.getItem(apvSsKey(kind, id)); } catch (e) { return null; } }
   /** 결재 카드·결재 띠에 끼우는 미리보기 자리(모듈의 extra/apprExtra 가 「결재 문서 PDF」 줄 아래에 붙인다).
    *  2026-10-15 2차(「똑같은 내용 아니야? 버튼??」): 같은 문서를 보는 단추 셋(결재 문서 PDF·문서 펼치기·크게 보기) →
    *  「문서 보기」(그 자리에 펼침 · 펼친 쪽을 누르면 크게) + 「PDF 받기」(받기·인쇄 — 모듈 줄의 단추) 둘. */
@@ -4518,7 +4530,7 @@
       t.setAttribute('aria-expanded', String(open));
       t.textContent = open ? '문서 접기' : '문서 보기';
       if (box) box.hidden = !open;
-      try { sessionStorage.setItem('apv.' + (el.dataset.apvk || 'd') + ':' + el.dataset.apvid, open ? '1' : '0'); } catch (er) { }
+      try { sessionStorage.setItem(apvSsKey(el.dataset.apvk, el.dataset.apvid), open ? '1' : '0'); } catch (er) { }
       if (open) apvPaint(el);
       return;
     }
@@ -7021,7 +7033,7 @@
   /* ══════════════════ 여러 줄 골라 지우기(2026-10-19 사용자 「하나씩 지워야 하는데 너무 힘드네. 선택 항목을 넣으면」) ══════════════════
      내역 표 공통 — 운행일지 영수증·통행료(2단계)·관리 영수증 · 개인경비 내역 · 법인카드 내역(drv-expense·drv-card 가 C.msel* 로 같이 쓴다).
        · 줄 첫 칸 안에 고르기 칸 · 표 머리(폰에서 머리가 숨는 표는 표 위 한 줄)에 「보이는 줄 모두 고르기」
-       · 고르면 표 아래 띠 「선택 N건 · ₩합계 [선택 풀기] [선택 지우기]」 — 화면 아래에 붙어 따라온다(긴 표를 다시 내리지 않게)
+       · 고르면 표 아래 띠 「선택 N건 · ₩합계 [선택 지우기] [선택 풀기]」 — 화면 아래에 붙어 따라온다(긴 표를 다시 내리지 않게)
        · 확인 창 하나(지울 목록 날짜·구분·금액) → 한 건 지우기와 같은 길로 하나씩(「지우는 중… 3/7」) → 끝나면 알림 하나(실패가 섞이면 몇 건·왜)
        · 지울 수 없는 줄(잠긴 기간·다른 분 것)은 고르기 칸을 막고 까닭을 칸 풀이(title·화면 읽기)로
      고른 것은 화면을 다시 그려도 남고, 보이지 않게 된 줄(거르기·지워짐)은 고른 것에서 빠진다. */
@@ -7049,8 +7061,8 @@
   function mselBar(grp) {
     return '<div class="mselbar" data-mselbar="' + esc(grp) + '" role="region" aria-label="고른 줄" hidden>' +
       '<span class="mselt" aria-live="polite"></span><span class="sp"></span>' +
-      '<button type="button" class="btn sm" data-mselclear="' + esc(grp) + '">선택 풀기</button>' +
-      '<button type="button" class="btn sm pri" data-mseldel="' + esc(grp) + '">선택 지우기</button></div>';
+      '<button type="button" class="btn sm pri" data-mseldel="' + esc(grp) + '">선택 지우기</button>' +
+      '<button type="button" class="btn sm" data-mselclear="' + esc(grp) + '">선택 풀기</button></div>';   // [동작] [취소] 차례(2026-10-21 사용자 「바꾸기」 — 창 아래 단추와 같게)
   }
   function mselBoxes(grp) { return Array.prototype.slice.call(document.querySelectorAll('input[data-msel="' + grp + '"]')); }
   /** 고른 상태를 화면에 맞춘다 — 칸 체크 · 모두 고르기(일부면 반쯤) · 띠 · 고른 줄 색. 그린 뒤(afterPaint)와 고를 때마다. */
@@ -9746,11 +9758,13 @@ window.EduGuard = {
         var p = periodOfMode(mode);
         if (!p || !p.status) return null;
         var k = cycKey(toC(CR.defaultPeriod(kindOfMode(mode))));          // 기간 엔진(2026-10-20 연말 마감)
-        return { cyc: k, st: p.status(k) || '' };
+        var r = p.row ? p.row(k) : null;
+        // ro = 정정으로 다시 연 건(포털이 「반려됨」 대신 「정정 중」 — 2026-10-21)
+        return { cyc: k, st: p.status(k) || '', ro: !!(r && r.status === 'rejected' && reopenInfo(r)) };
       };
       // 포털 「오늘 할 일」(2026-10-20 디자인 v2) — 마감 화면이 그릴 때 센 남은 일(그때 시각 at 과 함께). 이 기간 것이 없으면 지난번 것을 그대로 둔다.
       var todo = CLOSE_TODO && CLOSE_TODO.cyc === cur ? CLOSE_TODO : (old.todo && old.todo.cyc === cur ? old.todo : null);
-      var h = { u: myName(), at: Date.now(), cyc: cur, st: a ? a.status : '', inbox: { d: n.d, x: n.x, c: n.c },
+      var h = { u: myName(), at: Date.now(), cyc: cur, st: a ? a.status : '', ro: !!(a && a.status === 'rejected' && reopenInfo(a)), inbox: { d: n.d, x: n.x, c: n.c },
         step: CYCKEY() === cur ? Math.min(stepNow(), 4) : (old.cyc === cur ? old.step : null), drv: usesDriving(myName()),
         xs: mod('x'), cs: mod('c'), todo: todo };
       sessionStorage.setItem('drv_portal_hint', JSON.stringify(h));
@@ -10652,8 +10666,20 @@ window.EduGuard = {
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
     // 메뉴 갈래도 지운다(2026-10-08) — 같은 탭에서 다른 사람이 로그인하면 앞사람의 갈래(개인경비)로 열리지 않게.
     try { sessionStorage.removeItem('drv_navmode'); } catch (e2) { }
+    tabMemClear();
     // 직접 로그아웃이면 포털 첫 화면, 로그인이 만료된 것이면 다시 로그인한 뒤 보던 화면으로 돌아오게.
     toPortal(e && e.type === 'click' ? '' : location.hash);
+  }
+  /** 이 탭에 남긴 사람에 딸린 화면 기억 — 펼친 결재 문서(apv.*) · 영수증 차례(drv.evsub.*)를 지운다(2026-10-21 매뉴얼 로봇:
+   *  로그아웃한 뒤 같은 탭에서 다른 사람으로 들어오면 앞사람이 펼쳐 둔 문서가 펼친 채 남았다). 열쇠도 사람마다라 지우지 못해도 섞이지는 않는다.
+   *  work.html 로그아웃(leave)도 같은 것을 지운다. */
+  function tabMemClear() {
+    try {
+      // 열쇠를 먼저 다 모은 뒤 지운다 — 지우면서 key(i) 를 돌면 차례가 바뀌어 하나씩 남았다
+      var ks = [];
+      for (var i = 0; i < sessionStorage.length; i++) ks.push(sessionStorage.key(i));
+      ks.forEach(function (k) { if (k && (k.indexOf('apv.') === 0 || k.indexOf('drv.evsub.') === 0)) sessionStorage.removeItem(k); });
+    } catch (e) { }
   }
   $('logoutBtn').addEventListener('click', signOut);
 

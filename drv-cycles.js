@@ -11,6 +11,9 @@
    · 보이는 사람 = 「권한 관리」가 보이는 사람(마스터 · 권한 주는 관리자 — driving-account whoami 의 can_manage_admin).
      다른 관리자는 메뉴가 없고 주소로 와도 들어오지 못한다(driving-app.js go·applyHash). 서버(cycle_admin_ok)가 한 번 더 막는다.
    · 결재 중·결재 완료가 하나라도 있는 기간은 바꿀 수 없다(서버 지킴 트리거 — 미리 보기 blocked 로 먼저 보인다). 반려·회수만 있으면 바꿀 수 있다.
+   · 이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘(한국시간)보다 앞으로 정할 수도 없다(2026-10-21 사용자 「마감일을 이미 지난 날로 당기지 못하게」 —
+     월간 리포트가 기간이 끝난 다음 날에만 나가서). 서버가 미리 보기·저장 모두 PAST_PERIOD 로 막고(details = {today, items} JSON) 이 화면이
+     쉬운 말로 그린다. 날짜 칸 min = 오늘과 고를 수 있는 첫날 중 늦은 날(지난 날을 고르기 어렵게 — 최종 판정은 서버).
    · 저장하면 C.reloadRules(답.cycle_rules)(웹 기간 엔진 cycle-rules.js — 본체에 없으면 window.CycleRules.set) → C.loadAll() —
      직원 화면·포털 마감 일정이 바로 새 기간이다.
    · 바꾼 기록 = cycle_rules_log 최근 20줄(언제 · 누가 · 바뀐 기간 전후 · 사유).
@@ -38,6 +41,10 @@
   function span(lo, hi) { return md(lo) + ' – ' + md(hi); }
   function kstNow() { return new Date(Date.now() + 9 * 3600e3); }
   function thisYear() { return kstNow().getUTCFullYear(); }
+  /** 오늘(한국시간) 'YYYY-MM-DD'. */
+  function todayK() { var d = kstNow(); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+  /** 날짜 칸 min — 오늘과 고를 수 있는 첫날(lo) 중 늦은 날. 끝날을 이미 지난 날로 정하지 못하게(2026-10-21 — 서버 PAST_PERIOD 가 최종 판정). */
+  function minOf(lo) { var t = todayK(); return t > lo ? t : lo; }
   /** 처음 고르는 해 — 1·2월이면 지난해(그 연말의 1월분·2월분이 아직 진행 중), 아니면 올해. */
   function defYear() { var d = kstNow(); return d.getUTCMonth() < 2 ? d.getUTCFullYear() - 1 : d.getUTCFullYear(); }
   /** 고칠 수 있는 해 — 올해 앞뒤 1년(서버 BAD_YEAR 와 같다). */
@@ -122,7 +129,8 @@
   };
 
   /* ══════════════════ 서버 ══════════════════ */
-  /** set_cycle_overrides — 오류는 PostgREST 400 { code:'P0001', message:'CYCLE_LOCKED' 등, details: 쉬운 말 }. */
+  /** set_cycle_overrides — 오류는 PostgREST 400 { code:'P0001', message:'CYCLE_LOCKED' 등, details: 쉬운 말 }.
+   *  PAST_PERIOD(2026-10-21)만 details 가 기계가 읽는 JSON 글자 {today, items}, hint 가 서버의 한국어 한 줄이다. */
   function rpc(body) {
     return C.apiRetry('/rest/v1/rpc/set_cycle_overrides', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
       return r.text().then(function (t) {
@@ -132,6 +140,7 @@
         var er = new Error(String((j && (j.message || j.error)) || ('HTTP ' + r.status)));
         er.code = j && typeof j.message === 'string' ? j.message : '';
         er.details = j && typeof j.details === 'string' ? j.details : '';
+        er.hint = j && typeof j.hint === 'string' ? j.hint : '';
         er.pg = j && j.code; er.status = r.status;
         throw er;
       });
@@ -144,12 +153,35 @@
     if (st === 401) return '로그인이 풀렸습니다. 다시 로그인해 주세요.';
     if (c === 'NOT_ALLOWED' || st === 403) return '마감 기간 설정은 권한 관리를 맡은 관리자만 바꿀 수 있습니다.';
     if (c === 'CYCLE_LOCKED') return '결재 중이거나 결재가 끝난 기간은 바꿀 수 없습니다' + (d ? ' — ' + d : '') + '. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
+    if (c === 'PAST_PERIOD') return pastText(e.details, e.hint);
     if (c === 'CARD_LOCKED') return '결재 중이거나 결재가 끝난 법인카드 줄이 다른 기간으로 옮겨 가야 해서 저장하지 못했습니다. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
     if (c === 'BAD_RANGE') return (d || '고를 수 있는 날짜 밖입니다') + '.';
     if (c === 'BAD_YEAR') return '이 해는 바꿀 수 없습니다 — 올해 앞뒤 1년만 바꿀 수 있습니다.';
     if (c === 'RULES_INVALID') return '기간이 서로 맞지 않아 저장하지 못했습니다' + (d ? ' — ' + d : '') + '.';
     if (st === 404 || e && e.pg === 'PGRST202') return '서버에 아직 마감 기간 설정이 없습니다. 서버 준비가 끝난 뒤 다시 해 주세요.';
     return '잠시 뒤 다시 해 주세요.';
+  }
+  /** PAST_PERIOD(2026-10-21 — 이미 끝난 기간·지난 끝날) → 쉬운 말.
+   *  details = {"today":"YYYY-MM-DD","items":[{kind,key,old_hi,hi,why:'ended'|'past'}]} JSON 글자(서버 cycle_past_violations).
+   *  읽지 못하면 서버 hint(한국어 한 줄), 그것도 없으면 한 줄로 뭉뚱그린다. */
+  function pastText(details, hint) {
+    var j = null;
+    try { j = details ? JSON.parse(details) : null; } catch (er) { j = null; }
+    var it = j && Array.isArray(j.items) ? j.items.filter(function (x) { return x && SYS[x.kind] && x.key; }) : [];
+    if (!it.length) return noDot(hint) ? noDot(hint) + '.' : '이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞으로 정할 수도 없습니다.';
+    var t = isYmd(j.today) ? md(j.today) : '';
+    var nm = function (x) { return SYS[x.kind].name + ' ' + keyShort(x.key); };
+    var ended = it.filter(function (x) { return x.why === 'ended'; }), past = it.filter(function (x) { return x.why !== 'ended'; });
+    var s = [];
+    if (ended.length) {
+      s.push('이미 끝난 기간은 바꿀 수 없습니다' + (t ? '(오늘 ' + t + ')' : '') + ' — ' +
+        ended.map(function (x) { return nm(x) + (isYmd(x.old_hi) ? '(' + md(x.old_hi) + ' 마감)' : ''); }).join(' · ') + '. 끝난 기간은 저장된 그대로 두세요.');
+    }
+    if (past.length) {
+      s.push('끝날을 오늘' + (t ? '(' + t + ')' : '') + '보다 앞으로 정할 수 없습니다 — ' +
+        past.map(function (x) { return nm(x) + (isYmd(x.hi) ? ' 끝 ' + md(x.hi) : ''); }).join(' · ') + '. 오늘이나 그 뒤 날짜로 골라 주세요.');
+    }
+    return s.join(' ');
   }
   function loadRules() {
     return C.apiRetry('/rest/v1/app_config?id=eq.1&select=*').then(function (r) {
@@ -322,13 +354,13 @@
     };
     return '<tr data-k="' + k + '">' +
       '<th scope="row" class="cys-sys"><b>' + esc(s.name) + '</b><span>기본 ' + esc(s.base) + '</span></th>' +
-      '<td data-l="12월분 끝"><div class="cys-v">' + dIn('D', L.d0, v.extra ? L.dx : L.d1, '12월분 끝', P.dec) +
+      '<td data-l="12월분 끝"><div class="cys-v">' + dIn('D', minOf(L.d0), v.extra ? L.dx : L.d1, '12월분 끝', P.dec) +
         '<span class="cys-err" id="cysDe-' + k + '">' + p.De + '</span></div></td>' +
       '<td data-l="12월 추가 기간"><div class="cys-v"><label class="cys-tg"><input type="checkbox" role="switch" id="cysX-' + k + '" data-cysf="X" data-k="' + k + '"' +
         (v.extra ? ' checked' : '') + (v.dec === L.d1 || ST.saving ? ' disabled' : '') + ' aria-label="' + esc(s.name + ' 12월 추가 기간(12월분 2차) 두기') + '" aria-describedby="cysXs-' + k + '">' +
         '<span class="cys-sw" aria-hidden="true"></span><span class="cys-tgt" id="cysXt-' + k + '" aria-hidden="true">' + p.Xt + '</span></label>' +
         '<span class="cys-sub" id="cysXs-' + k + '">' + p.Xs + '</span></div></td>' +
-      '<td data-l="1월분 끝"><div class="cys-v">' + dIn('J', L.j0, L.j1, '1월분 끝', P.jan) +
+      '<td data-l="1월분 끝"><div class="cys-v">' + dIn('J', minOf(L.j0), L.j1, '1월분 끝', P.jan) +
         '<span class="cys-sub" id="cysJs-' + k + '">' + p.Js + '</span><span class="cys-err" id="cysJe-' + k + '">' + p.Je + '</span></div></td>' +
       '<td data-l="2월분 시작"><div class="cys-v" id="cysF-' + k + '">' + p.F + '</div></td>' +
       '<td data-l="상태" class="cys-stc"><div class="cys-v" id="cysS-' + k + '">' + p.S + '</div></td></tr>';
@@ -339,6 +371,9 @@
     var di = $('cysD-' + k), xi = $('cysX-' + k), ji = $('cysJ-' + k);
     if (!di) return;
     di.max = v.extra ? L.dx : L.d1;
+    // 오늘보다 앞 날은 고르기 어렵게(창을 연 채 날이 바뀌어도 따라간다 — 최종 판정은 서버 PAST_PERIOD)
+    di.min = minOf(L.d0);
+    if (ji) ji.min = minOf(L.j0);
     if (di.value !== v.dec && document.activeElement !== di) di.value = v.dec;
     if (ji && ji.value !== v.jan && document.activeElement !== ji) ji.value = v.jan;
     if (xi) { xi.checked = !!v.extra; xi.disabled = v.dec === L.d1 || ST.saving; }
@@ -491,6 +526,7 @@
       '<li>고를 수 있는 날: 12월분 끝 12.10 ~ 12.31 · 1월분 끝 01.10 ~ 01.31. 2월분은 1월분 끝 다음 날부터입니다(자동).</li>' +
       '<li>12월 추가 기간(12월분 2차)은 12월분 끝 다음 날부터 12.31 까지 따로 상신·결재합니다. 그때 1월분은 01.01 부터입니다.</li>' +
       '<li>결재 중이거나 결재가 끝난 기간은 바꿀 수 없습니다. 반려·회수만 있으면 바꿀 수 있고, 다시 상신하면 새 기간으로 굳습니다.</li>' +
+      '<li>이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞 날짜로 정할 수도 없습니다(끝난 다음 날 나가는 월간 리포트·정산과 어긋나지 않게). 끝날을 오늘로 하는 것은 됩니다.</li>' +
       '<li>바꾸는 기간이 시작되기 전에(12월분은 ' + Y + '년 11월 19일까지) 정해 두면 가장 안전합니다.</li>' +
       '<li>앱(4.1.7 이상)은 다음에 열 때 새 기간을 받습니다. 그 전 앱은 화면의 기간 이름만 다르게 보이고, 금액·잠금은 서버가 정합니다.</li>' +
       '</ul></details></section>';

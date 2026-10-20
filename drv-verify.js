@@ -274,7 +274,8 @@
           (e.photo_path ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(C.photoUrl(e.photo_path)) + '">사진 크게</a>' : '') +
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') + '</div>';
       }).join('') + '</div>' +
-        '<div class="fhint" style="margin-top:8px">영수증의 금액·날짜·구분은 앱에서 고치거나, 여기서 지운 뒤 「증빙」에서 다시 올려 주세요.</div>';
+        // 메뉴 이름은 지금 왼쪽 메뉴 그대로 — 예전 이름 「증빙」은 없다(2026-10-21 매뉴얼 로봇)
+        '<div class="fhint" style="margin-top:8px">영수증의 금액·날짜·구분은 앱에서 고치거나, 여기서 지운 뒤 「2 영수증·통행료」에서 다시 올려 주세요.</div>';
     }
     C.openPanel('바로 고치기 — ' + it.title, (isAi(it) ? 'Gemini 가 사진을 읽어 찾은 항목 · ' : '') + '고친 뒤 검증·상신 화면에서 ① 「검증하기」를 다시 눌러 주세요',
       body, '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
@@ -301,6 +302,11 @@
   function whenText(iso) {
     var ms = Date.parse(iso);
     return isFinite(ms) ? C.ymd(ms) + ' ' + C.hm(ms) : '';
+  }
+  /** 결재 완료 출력 표의 짧은 날짜 「MM.DD HH:MM」 — 개인경비·법인카드 표의 finWhen 과 같다(2026-10-21) */
+  function finWhen(iso) {
+    var ms = Date.parse(iso);
+    return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : '';
   }
 
   /* ══════════════════ 검증 (개인) ══════════════════ */
@@ -543,11 +549,14 @@
   /** appr = 결재하는 분(남의 상신 건)이 본다 — 상신한 분께 하는 말은 빼고, 고치는 것은 상신한 분 몫이라고 한 줄. */
   function showItems(title, sub, v, appr) {
     var s = (v && v.summary) || {}, items = (v && (v.items || (v.result && v.result.items))) || [];
+    // AI 를 안 쓴 검증이면 한 줄 — 결재 문서 PDF 의 검증 쪽과 같은 말(sheetpdf.js). 법인카드는 사진이 없어 그 종류의 말(aiNote)을 쓴다.
+    //   예전 「Gemini 읽기 없음」은 법인카드 창에 늘 보였다(카드 검증은 ai:false 로 넘어온다 — 2026-10-21 매뉴얼 로봇).
+    var aiNote = !v ? '' : v.aiNote != null ? String(v.aiNote) : v.ai === false ? 'AI 사진 판독 없음(규칙 검증만)' : '';
     C.openPanel(title, sub,
       (appr ? '<div class="anote" style="margin-top:0">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</div>' : '') +
       '<div class="vsum">' + sumChip(s) +
       (v && (v.ran_at || v.created_at) ? '<span class="dim">' + esc(whenText(v.ran_at || v.created_at)) + ' 기준</span>' : '') +
-      (v && v.ai === false ? '<span class="dim">Gemini 읽기 없음</span>' : '') + '</div>' +
+      (aiNote ? '<span class="dim">' + esc(aiNote) + '</span>' : '') + '</div>' +
       itemsHtml(items.filter(function (i) { return i.level !== 'info'; }), false, appr) +
       (items.some(function (i) { return i.level === 'info'; })
         ? '<div class="vsub">참고</div>' + itemsHtml(items.filter(function (i) { return i.level === 'info'; }), false, appr) : ''),
@@ -1244,9 +1253,12 @@
             // 상태: 결재 완료 + 통행료 미확정 딱지(정산은 0원으로 끝났지만 알 수 있게 — 2026-10-19 사용성 2차) + 출력 딱지
             '<td><span class="st ok">결재 완료</span>' + (unkOf(a) ? ' <span class="unktag" title="통행료 미확정 ' + n0(unkOf(a)) + '건 — 0원으로 정산됨">미확정 ' + n0(unkOf(a)) + '</span>' : '') +
             (C.prints ? '<div class="prline">' + C.prints.badge('driving', a) + '</div>' : '') + '</td>' +
-            '<td class="dim">' + (a.closed_at ? '완료 ' + esc(whenText(a.closed_at)) : '—') + '</td>' +
+            // 1280 에서 출력 딱지가 길면(「출력 12회 · 마지막 … 이름」) 표가 칸보다 넓어 「정정 열기」가 밀려났다(2026-10-21 매뉴얼 로봇):
+            //   개인경비·법인카드 표(2026-10-20 AU6-M3)와 같게 날짜는 「MM.DD HH:MM」(전체는 title) · 결재선은 두 줄에서 말줄임(전체는 title).
+            //   PDF·엑셀·정정 열기 단추는 그대로 보인다(매뉴얼이 이 세 단추로 설명한다) — 딱지는 drv-prints.js 가 두 덩어리로 줄을 바꾼다.
+            '<td class="dim" style="white-space:nowrap"' + (a.closed_at ? ' title="결재 완료 ' + esc(whenText(a.closed_at)) + '">' + esc(finWhen(a.closed_at)) : '>—') + '</td>' +
             '<td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td class="el dim" data-l="결재선" title="' + esc(line) + '">' + esc(line) + '</td>' +
+            '<td class="el dim" data-l="결재선" title="' + esc(line) + '"><span style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">' + esc(line) + '</span></td>' +
             '<td class="n ract" style="white-space:nowrap"><button class="btn sm" data-fzpdf="' + a.id + '">PDF</button> ' +
             '<button class="btn sm" data-fzxlsx="' + a.id + '">엑셀</button> ' +
             // 정정 열기 · 관리자 반려 — 개인경비·법인카드 출력 화면과 같게(2026-10-14). 운행일지는 data-kind 없이(driving-app.js openApprAct 가 APPR 에서 찾는다).

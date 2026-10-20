@@ -2063,7 +2063,8 @@
     kinds: { expense: S0 },
     // range·status: 마감 뒤 며칠(GRACE_DAYS) 동안 처음 보일 기간·마감 띠(driving-app.js defCyc·graceBand, 2026-10-20)
     period: { mode: 'x', views: XVIEWS, current: xCurrent, span: xSpan, band: band, tag: tag, range: xRange,
-      status: function (k) { var a = myX(k); return a ? a.status : ''; } },
+      status: function (k) { var a = myX(k); return a ? a.status : ''; },
+      row: function (k) { return myX(k) || null; } },          // 포털 한 줄이 정정 열기를 「정정 중」으로 가른다(2026-10-21)
     load: loadWith,
     onGo: function (v, prev) {
       if (v === 'x_verify') FRESH = {};

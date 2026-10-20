@@ -787,6 +787,12 @@ footer .wrap{font-size:13px}
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
     ss('drv_navmode', null);            // 운행일지 메뉴 갈래(2026-10-08) — 다음 사람이 앞사람 갈래로 열리지 않게
     ss('drv_portal_hint', null);        // 카드의 내 상태 한 줄(아래 paintMine) — 다음 사람에게 남기지 않는다
+    // 운행일지 화면이 이 탭에 남긴 사람에 딸린 기억 — 펼친 결재 문서(apv.*) · 영수증 차례(drv.evsub.*)(2026-10-21, driving-app.js tabMemClear 와 같다)
+    //   열쇠를 먼저 다 모은 뒤 지운다(지우면서 key(i) 를 돌면 차례가 바뀌어 하나씩 남는다)
+    try {
+      var sks = []; for (var i = 0; i < sessionStorage.length; i++) sks.push(sessionStorage.key(i));
+      sks.forEach(function (sk) { if (sk && (sk.indexOf('apv.') === 0 || sk.indexOf('drv.evsub.') === 0)) sessionStorage.removeItem(sk); });
+    } catch (e) { }
     LIVE = null; STEPQ = null; document.body.removeAttribute('data-live');   // 로그인 직후 읽은 결재 상태(V3 B1)도
     ['mineD', 'mineX', 'mineC'].forEach(function (id) { var e = $(id); if (e) { e.hidden = true; e.textContent = ''; } });
     // 오늘 할 일·마감 일정·단계 막대(2026-10-20)도 비운다 — 다음 사람에게 남기지 않는다
@@ -818,7 +824,7 @@ footer .wrap{font-size:13px}
   function liveRead(m) {
     var at = ss(K_AT), who = m && m.username;
     if (!at || !who) return;
-    var now = Date.now(), R = deadlines(now), L = LIVE = { u: who, done: false, bad: {}, st: {}, inbox: {}, prev: {} };
+    var now = Date.now(), R = deadlines(now), L = LIVE = { u: who, done: false, bad: {}, st: {}, ro: {}, inbox: {}, prev: {} };
     document.body.removeAttribute('data-live');
     var hdr = { apikey: KEY, Authorization: 'Bearer ' + at }, wq = encodeURIComponent(who);
     var get = function (path) {
@@ -829,21 +835,25 @@ footer .wrap{font-size:13px}
       // pv = 마감 뒤 며칠이 지나 처음 보일 기간이 오늘 기간이 됐으면 바로 앞 기간(V3 U11 — 그 기간을 상신하지 않았으면 「오늘 할 일」에서 빠졌다)
       var k = x.k, t = APPR_T[k], cur = CR.current(DL_KIND[k], now), pv = cur && cur.key === x.key ? CR.prev(cur) : null;
       var keys = [x.key].concat(pv ? [pv.key] : []);
-      jobs.push(get(t + '?select=cycle,status,submitted_at&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
+      // steps 도 받는다 — 관리자가 정정으로 다시 연 건(상태는 rejected, 칸에 reopened_by)을 「반려됨」이 아니라 「정정 중」으로(2026-10-21 매뉴얼 로봇,
+      //   운행일지 화면 apprStatusText·reopenInfo 와 같은 판정)
+      jobs.push(get(t + '?select=cycle,status,submitted_at,steps&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
         .then(function (rows) {
-          var stOfKey = function (key) { var a = (rows || []).filter(function (r) { return r.cycle === key; })[0]; return a ? String(a.status || '') : ''; };
+          var rowOf = function (key) { return (rows || []).filter(function (r) { return r.cycle === key; })[0] || null; };
+          var stOfKey = function (key) { var a = rowOf(key); return a ? String(a.status || '') : ''; };
           L.st[k] = stOfKey(x.key);
+          L.ro[k] = reopened(rowOf(x.key));
           if (!pv) return;
           var ps = stOfKey(pv.key);
           if (ps === 'submitted' || ps === 'approved' || ps === 'draft') return;
-          var keep = function () { L.prev[k] = { key: pv.key, st: ps, hi: pv.hi }; };
+          var keep = function () { L.prev[k] = { key: pv.key, st: ps, hi: pv.hi, ro: reopened(rowOf(pv.key)) }; };
           if (ps === 'rejected' || ps === 'withdrawn') { keep(); return; }
           // 상신 전 — 그 기간에 올린 자료(운행·경비·카드 줄)가 하나라도 있을 때만(운행일지 화면 prevPending 과 같은 생각)
           return get(k === 'd' ? 'trips?select=id&deleted_at=is.null&username=eq.' + wq + '&start_time=gte.' + pv.loMs + '&start_time=lt.' + pv.endMs + '&limit=1'
             : k === 'x' ? 'expense_items?select=id&username=eq.' + wq + '&date_millis=gte.' + pv.loMs + '&date_millis=lt.' + pv.endMs + '&limit=1'
             : 'card_items?select=id&username=eq.' + wq + '&cycle=eq.' + encodeURIComponent(pv.key) + '&limit=1')
             .then(function (r2) { if (r2 && r2.length) keep(); }, function () { });
-        }).catch(function () { L.bad[k] = 1; delete L.st[k]; }));
+        }).catch(function () { L.bad[k] = 1; delete L.st[k]; delete L.ro[k]; }));
       // 지금 내 차례인 결재 건(결재선의 지금 칸 = 나) — 운행일지 결재함 inbox() 와 같은 판정
       jobs.push(get(t + '?select=cur_seq,steps&status=eq.submitted').then(function (rows) {
         L.inbox[k] = (rows || []).filter(function (a) { return (a.steps || []).some(function (s) { return s && s.seq === a.cur_seq && s.approver === who; }); }).length;
@@ -867,6 +877,20 @@ footer .wrap{font-size:13px}
     var s = hint[k + 's'];
     return s && s.cyc === x.key ? (s.st || '') : null;
   }
+  /** 관리자가 정정으로 다시 연 건인가 — 서버는 정정 열기를 status 'rejected' + 결재선 칸의 reopened_by 로 적는다(운행일지 화면 reopenInfo 와 같다). */
+  function reopened(a) {
+    return !!(a && a.status === 'rejected' && (a.steps || []).some(function (s) { return s && s.reopened_by; }));
+  }
+  /** 그 갈래 처음 보일 기간의 반려가 「정정 열기」였는가(2026-10-21 — 포털이 정정 중인 건을 「반려됨」이라 했다). stateOf 와 같은 차례(LIVE → hint). */
+  function reopenOf(k, x, hint, m) {
+    if (LIVE && LIVE.u === m.username && LIVE.st[k] !== undefined) return !!LIVE.ro[k];
+    if (!hint || !x) return false;
+    if (k === 'd') return hint.cyc === x.key && !!hint.ro;
+    var s = hint[k + 's'];
+    return !!(s && s.cyc === x.key && s.ro);
+  }
+  /** 반려된 기간 글 — 정정으로 연 것이면 「정정 중」(운행일지 결재함·마감 화면과 같은 말), 아니면 「반려됨」 */
+  function rejWord(ro) { return ro ? '정정 중' : '반려됨'; }
   /** 종류별 「결재할 것」 수 — 읽은 값(LIVE)이 먼저, 없으면 hint. */
   function inboxOf(hint, m) {
     var ib = (hint && hint.inbox) || {}, o = {};
@@ -895,12 +919,12 @@ footer .wrap{font-size:13px}
     var dParts = function (stepTxt) {
       if (!drv) return [];
       if (stepTxt === '결재 중' || stepTxt === '결재 완료') return [{ t: stepTxt }];
-      return [{ t: ddTxt('d'), hot: dSt !== null && dd.d && dd.d.dday <= 3 }, stepTxt ? { t: stepTxt, hot: stepTxt.indexOf('반려') === 0 } : null];
+      return [{ t: ddTxt('d'), hot: dSt !== null && dd.d && dd.d.dday <= 3 }, stepTxt ? { t: stepTxt, hot: /^(반려|정정)/.test(stepTxt) } : null];
     };
     var stTxt = function () {
       if (dSt === 'submitted') return '결재 중';
       if (dSt === 'approved') return '결재 완료';
-      if (dSt === 'rejected') return '반려됨 — 다시 상신';
+      if (dSt === 'rejected') return rejWord(reopenOf('d', dd.d, hint, m)) + ' — 다시 상신';
       if (!hint || hint.cyc !== cyc) return '';
       return hint.step ? STEP_NM[hint.step] || '' : '';
     };
@@ -909,7 +933,7 @@ footer .wrap{font-size:13px}
       var x = dd[k], st = x ? stateOf(k, x, hint, m) : null;
       if (st === 'submitted') return [{ t: '결재 중' }];
       if (st === 'approved') return [{ t: '결재 완료' }];
-      return [{ t: ddTxt(k), hot: st !== null && x && x.dday <= 3 }, st === 'rejected' ? { t: '반려됨 — 다시 상신', hot: true } : null];
+      return [{ t: ddTxt(k), hot: st !== null && x && x.dday <= 3 }, st === 'rejected' ? { t: rejWord(reopenOf(k, x, hint, m)) + ' — 다시 상신', hot: true } : null];
     };
     // 운행일지 단계(hint 가 없을 때 한 번 물어 둔 것 — 같은 사람·같은 기간)
     var sq = STEPQ && STEPQ.k === m.username + '|' + cyc ? STEPQ.st : null;
@@ -967,7 +991,11 @@ footer .wrap{font-size:13px}
         '<span class="cp ' + chip[0] + '">' + chip[1] + '</span></li>');
       if (st === 'submitted' || st === 'approved') return;            // 이미 상신했다 — 할 일이 아니다
       var quiet = st === null, due = [quiet ? '' : ddCls(x.dday), ddWord(x.dday)], until = x.dday < 0 ? mdOf(x.due + GRACE_DAYS * DAY) + '까지 상신' : '';
-      if (st === 'rejected') { rows.push({ k: k, t: KN[k] + ' ' + mon + ' 반려됨 — 고쳐서 다시 상신', s: '반려 사유는 들어가서 확인합니다', due: due, note: until, b: '다시 상신', href: VERIFY_OF[k] }); return; }
+      if (st === 'rejected') {
+        var ro = reopenOf(k, x, hint, m);
+        rows.push({ k: k, t: KN[k] + ' ' + mon + ' ' + rejWord(ro) + ' — 고쳐서 다시 상신', s: (ro ? '정정' : '반려') + ' 사유는 들어가서 확인합니다', due: due, note: until, b: '다시 상신', href: VERIFY_OF[k] });
+        return;
+      }
       if (k === 'd') {
         var td = hint && hint.todo && hint.todo.cyc === cycOfDue(x) ? hint.todo : null, at = td ? whenOf(td.at) + ' 기준' : '';
         if (td && td.list && td.list.length) {
@@ -995,7 +1023,7 @@ footer .wrap{font-size:13px}
       var p = LIVE.prev[k];
       if (!p || (k === 'd' && !drv)) return;
       var hi = Date.UTC(+p.hi.slice(0, 4), +p.hi.slice(5, 7) - 1, +p.hi.slice(8, 10)), past = Math.round((R.today - hi) / DAY);
-      late.push({ k: k, key: p.key, dday: -past, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' 반려됨 — 고쳐서 다시 상신' : p.st === 'withdrawn' ? ' 회수함 — 다시 상신' : ' 아직 상신 전'),
+      late.push({ k: k, key: p.key, dday: -past, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' ' + rejWord(p.ro) + ' — 고쳐서 다시 상신' : p.st === 'withdrawn' ? ' 회수함 — 다시 상신' : ' 아직 상신 전'),
         s: '마감이 지났습니다 — 늦었지만 지금 상신해 주세요', due: ['warn', ddWord(-past)], note: mdOf(hi) + ' 마감', b: '상신하러 가기', href: VERIFY_OF[k] + '/' + p.key });
     });
     rows = late.concat(rows);

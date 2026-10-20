@@ -456,6 +456,9 @@ tfoot td.n{font-variant-numeric:tabular-nums}
 .prb:hover{border-color:var(--ink-400);background:var(--sunken)}
 .prb.none{color:var(--warn);border-color:#EBD3A6;background:var(--warn-50)}
 .prb.done{color:var(--ok);border-color:#BFE3D3;background:var(--ok-50)}
+/* 「출력 N회 ·」 「마지막 … 이름」 두 덩어리 — 칸이 좁으면 그 사이에서 줄을 바꾼다(2026-10-21: 한 줄로만 늘어 1280 결재 완료 출력 표가 넘쳤다) */
+.prb.done{flex-wrap:wrap;column-gap:.3em;text-align:left}
+.prb > span{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prline{margin-top:4px}
 /* 결재 완료 출력 — 정산은 끝났지만 통행료 미확정이 있던 건(2026-10-19 사용성 2차) */
 .unktag{display:inline-block;font-size:12px;line-height:18px;padding:0 6px;border-radius:5px;color:var(--warn);background:var(--warn-50);border:1px solid #F1D9A7;font-weight:500;white-space:nowrap}
@@ -1336,6 +1339,10 @@ tr.msel-on td{background:var(--red-50)}
   font-size:12px;color:var(--warn);line-height:1.5}
 .ag-notes svg{margin-top:2px;flex:none}
 .ag-pick{white-space:nowrap}
+/* 「지난번 결재선 불러오기 — 이름 직책 (칸) → …」 — 결재선이 길면 한 줄로 늘어 창 오른쪽 밖으로 나갔다(2026-10-21 매뉴얼 로봇).
+   창 폭 안에서 줄을 바꾸고 글은 왼쪽 맞춤(높이는 글 줄 수만큼, 폰 44 등 최소 높이는 공통 규칙 그대로) */
+#btnPrevLine{max-width:100%;height:auto;white-space:normal;text-align:left;line-height:1.45;padding-top:6px;padding-bottom:6px;word-break:keep-all;overflow-wrap:anywhere}
+#btnPrevLine svg{flex:none;align-self:flex-start;margin-top:2px}
 /* 폰: 칸이 좁다(약 55px). 빈칸 안내 글자는 고른 칸에만 짧게, × 는 칸 위 모서리로 — 이름에 겹치지 않게. */
 @media (max-width:480px){
   /* 「센터·파트장」은 한 줄에 안 들어간다 — 가운뎃점 뒤에서 두 줄로, 모든 칸 머리를 두 줄 높이로 맞춘다 */
