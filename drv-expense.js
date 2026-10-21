@@ -251,8 +251,9 @@
     if (a && (a.status === 'submitted' || a.status === 'approved')) wantSums([a.id]);
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind x">개인경비</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
-      (a ? C.apprTrack(a) : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 상신하면 결재함으로 갑니다.</div>') +
-      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a, true) + (C.apvSlot ? C.apvSlot('expense', a) : '') : '') +
+      // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 상신 의견 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
+      (a ? C.apprTrack(a) + (C.opinions ? C.opinions(a) : '') : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 상신하면 결재함으로 갑니다.</div>') +
+      (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a, true) + (C.apvSlot ? C.apvSlot('expense', a, { ops: false }) : '') : '') +
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 경비를 고칠 수 없습니다. ' +
         (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
       // 반려·회수 뒤 — 어디서 다시 상신하는지(운행일지 띠와 같게, 2026-10-16 3차). 검증·상신 화면이 아니면 그리 가는 길도.

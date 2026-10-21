@@ -411,6 +411,9 @@
   var DRAFT = null;                   // 상신 창에서 편집 중인 결재선
   /** 진행 중인 상신(검증 → 상신). 창을 닫으면 token 이 지워져 뒤따르던 상신이 멈춘다. */
   var SUBMIT = { token: null, send: null };
+  /** 상신 창 「의견」에 적던 글 — 기간(종류:기간)마다. 결재선을 고쳐 창을 다시 그려도 그대로, 상신되면 지운다(2026-10-21).
+   *  SUB_NOTE_PREV[열쇠] = 이번 기간에 반려·회수된 건의 의견을 불러와 채웠다(안내 한 줄). */
+  var SUB_NOTE = {}, SUB_NOTE_PREV = {};
   /** 결재 확인 창에서 결재 문서·검증 결과를 열면 같은 패널을 덮어쓴다 — 돌아올 곳을 적어 둔다. */
   var APPR_BACK = null;
 
@@ -3237,6 +3240,32 @@
     return h + '</span></div>';
   }
 
+  /* ── 의견 모아 보기(2026-10-21 사용자 「결재할 때 의견란이 이미 있으니 영수증마다 따로 둘 필요 없고, 담당자부터 의견이 결재함 어딘가에 있기만 하면 된다」) ──
+     차례대로 — 담당(상신 의견: 서버가 그 상신의 요약 snapshot.note 에 굳힌 글) → 결재자마다 승인 의견(steps[].comment). 글이 있는 것만.
+     반려 사유는 넣지 않는다 — 반려된 문서는 상태 글(「반려 — 이름 · 사유」)·반려 띠가 이미 보인다(겹치지 않게).
+     세 결재 같은 조각: 결재함 「문서 보기」를 편 자리(apvSlot) · 승인·반려 창(「의견」 칸 위) · 상신한 본인의 결재 띠(apprStrip). */
+  function apprOpinions(a) {
+    var out = [];
+    if (!a) return out;
+    var note = a.snapshot && typeof a.snapshot.note === 'string' ? a.snapshot.note.trim() : '';
+    if (note) out.push({ who: nameOf(a.username), tag: '담당', at: a.submitted_at, txt: note });
+    (a.steps || []).slice().sort(function (x, y) { return x.seq - y.seq; }).forEach(function (s) {
+      var c = s && s.comment != null ? String(s.comment).trim() : '';
+      if (!c || s.result !== 'approved') return;
+      out.push({ who: stepWho(s) || nameOf(s.approver), tag: (s.box ? s.box + ' 칸 · ' : '') + '승인', at: s.acted_at, txt: c });
+    });
+    return out;
+  }
+  function opinionsHtml(a) {
+    var L = apprOpinions(a);
+    if (!L.length) return '';
+    return '<div class="aops" role="group" aria-label="의견"><div class="aoph">의견</div><ol class="aopl">' + L.map(function (o) {
+      var t = Date.parse(o.at || '');
+      return '<li><div class="aopw"><b>' + esc(o.who) + '</b> <span>' + esc(o.tag + (isFinite(t) ? ' · ' + noteTime(t) : '')) + '</span></div>' +
+        '<div class="aopt">' + esc(o.txt) + '</div></li>';
+    }).join('') + '</ol></div>';
+  }
+
   /* ── 상신 창 ── */
   /** 상신 창이 다루는 결재 문서 종류. '' = 운행일지, 'expense' = 개인경비(EXT.kinds). */
   var SUB_KIND = '';
@@ -3503,6 +3532,21 @@
       '결재는 왼쪽 칸부터 차례로 진행되고 <b>사업부장에서 끝납니다</b>' +
       (isDivHead(myName()) ? '. 「대표이사」 칸은 출력한 문서에 대표이사가 손으로 서명하는 빈칸입니다.</div>' : '(대표이사 칸은 빗금).</div>');
 
+    // 상신 의견(선택, 2026-10-21 사용자) — 결재 창의 「의견」 칸과 같은 모양. 보낸 글은 서버가 이 상신의 요약(snapshot.note)에 굳히고
+    //   결재선 모두가 결재함에서 본다. 결재선을 고쳐 창을 다시 그려도 적던 글은 그대로(SUB_NOTE). 다시 상신이면 그때 의견을 불러와 채운다.
+    var nk = myName() + '|' + draftKey();
+    if (SUB_NOTE[nk] === undefined) {
+      // 이번 기간에 반려·회수된 내 건의 의견(결재선과 달리 예전 칸 모양 건이어도 불러온다)
+      var nb = KD ? KD.mine(CYCKEY()) : myAppr();
+      var nprev = nb && (nb.status === 'rejected' || nb.status === 'withdrawn') && nb.snapshot && typeof nb.snapshot.note === 'string' ? nb.snapshot.note : '';
+      SUB_NOTE[nk] = nprev; SUB_NOTE_PREV[nk] = !!nprev;
+    }
+    h += '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="subNote">의견</label><div class="fbody">' +
+      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재하는 분께 남길 말(선택) — 예: 9/30 통행료 두 장은 왕복입니다">' +
+      esc(SUB_NOTE[nk]) + '</textarea>' +
+      '<div class="fhint">' + (SUB_NOTE_PREV[nk] ? '지난번 상신 때 남긴 의견을 불러왔습니다 — 고치거나 지울 수 있습니다. ' : '') +
+      '결재선 모두가 결재함에서 봅니다(300자까지).</div></div></div>';
+
     var warn = [];
     if (KD) warn = KH.warn || [];
     else {
@@ -3695,6 +3739,8 @@
         '고친 뒤 다시 상신하면 그때의 자료로 새로 고정됩니다.</div>' + apprTrack(a);
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
+        // 지금까지의 의견(담당 상신 의견 → 앞 결재자 승인 의견) — 「의견」 칸 바로 위(2026-10-21)
+        opinionsHtml(a) +
         '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="apprWhy">' +
         (act === 'approve' ? '의견' : act === 'reopen' ? '정정 사유' : '반려 사유') + '</label><div class="fbody">' +
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
@@ -4373,9 +4419,9 @@
     b.innerHTML = (on ? (turn ? '확인 항목 접기' : '접기') : (turn ? '확인 항목 ' + n0(n) + '건' : '자세히')) + ic('chev', 12);
   });
   /** 모듈이 그린 줄에 그 종류의 「결재 문서 PDF」 단추가 있을 때만 미리보기 자리(고정본이 없는 옛 건 등은 빠진다). */
-  function apvIfPdf(kind, a, html) {
+  function apvIfPdf(kind, a, html, opt) {
     var at = APV_PDFATTR[kind || ''];
-    return at && String(html || '').indexOf(at + '="') >= 0 ? apvSlot(kind, a) : '';
+    return at && String(html || '').indexOf(at + '="') >= 0 ? apvSlot(kind, a, opt) : '';
   }
 
   /* ── 결재 문서 미리보기(2026-10-12 사용자: 「눌러서 확인하는 것 말고 미리보기로」 — 카드 아래 전체 펼침) ──
@@ -4403,14 +4449,18 @@
   /** 결재 카드·결재 띠에 끼우는 미리보기 자리(모듈의 extra/apprExtra 가 「결재 문서 PDF」 줄 아래에 붙인다).
    *  2026-10-15 2차(「똑같은 내용 아니야? 버튼??」): 같은 문서를 보는 단추 셋(결재 문서 PDF·문서 펼치기·크게 보기) →
    *  「문서 보기」(그 자리에 펼침 · 펼친 쪽을 누르면 크게) + 「PDF 받기」(받기·인쇄 — 모듈 줄의 단추) 둘. */
-  function apvSlot(kind, a) {
+  function apvSlot(kind, a, opt) {
     if (!a || a.status === 'draft' || !apvProv(kind) || (kind && !APV_PDFATTR[kind])) return '';
     var sv = apvSaved(kind, a.id);
     // 내 차례 카드도 접은 채로 시작한다(2026-10-19 사용자 「한 건 한 건이 너무 두꺼워서」) — 펼친 것은 카드마다 기억
     var open = sv === '1';
+    // 의견(2026-10-21) — 펼친 문서 위에 차례대로(담당 → 결재자). 접힌 동안은 「의견 N」만. 상신한 본인의 결재 띠는 띠에 이미 있어 빼고 부른다(opt.ops === false)
+    var ops = opt && opt.ops === false ? '' : opinionsHtml(a), nOps = ops ? apprOpinions(a).length : 0;
     return '<div class="apv' + (open ? ' open' : '') + '" data-apv="' + esc(apvKey(kind, a)) + '" data-apvk="' + esc(kind || '') + '" data-apvid="' + esc(a.id) + '">' +
       '<div class="apvbar"><button type="button" class="btn sm" data-apvtog aria-expanded="' + open + '">' + (open ? '문서 접기' : '문서 보기') + '</button>' +
+      (nOps ? '<span class="apvopn" title="「문서 보기」를 누르면 의견을 봅니다">의견 ' + n0(nOps) + '</span>' : '') +
       '<span class="dim apvhint">쪽을 누르면 크게 봅니다</span></div>' +
+      (ops ? '<div class="apvops"' + (open ? '' : ' hidden') + '>' + ops + '</div>' : '') +
       '<div class="apvpages" aria-label="결재 문서 미리보기"' + (open ? '' : ' hidden') + '></div></div>';
   }
   function apvPagesHtml(pages, big) {
@@ -4561,6 +4611,7 @@
       t.setAttribute('aria-expanded', String(open));
       t.textContent = open ? '문서 접기' : '문서 보기';
       if (box) box.hidden = !open;
+      var opsBox = el.querySelector('.apvops'); if (opsBox) opsBox.hidden = !open;      // 의견도 같이 펴고 접는다(2026-10-21)
       try { sessionStorage.setItem(apvSsKey(el.dataset.apvk, el.dataset.apvid), open ? '1' : '0'); } catch (er) { }
       if (open) apvPaint(el);
       return;
@@ -5305,8 +5356,9 @@
     return '<section class="sect" style="margin-top:16px"><div class="astrip">' +
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
-      (a ? apprTrack(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선을 불러올 수도 있습니다.</div>') +
-      (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x); })(EXT.apprExtra(a)) : '') +
+      // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
+      (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선을 불러올 수도 있습니다.</div>') +
+      (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x, { ops: false }); })(EXT.apprExtra(a)) : '') +
       // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
       (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
         withdrawHow(a) + '</div>' : '') +
@@ -10725,9 +10777,14 @@ window.EduGuard = {
           steps: DRAFT.map(function (s) { return { approver: s.approver, box: s.box }; })
         };
         if (subKD) payload.kind = subKind;             // 개인경비 상신 — 서버가 그 기간 expense_items 를 굳힌다
+        // 상신 의견(선택, 2026-10-21) — 결재선처럼 보내는 순간의 칸에서 읽는다. 비었으면 보내지 않는다(서버도 빈 글은 의견 없음).
+        var nkey = myName() + '|' + (subKD ? subKind + ':' : '') + cyc0;
+        var noteEl = $('subNote'), noteTxt = String(noteEl ? noteEl.value : (SUB_NOTE[nkey] || '')).trim();
+        if (noteTxt) payload.note = noteTxt;
         var b = $('btnSubmitAnyway') || sb;
         if (document.contains(b)) { b.disabled = true; b.textContent = '상신하는 중…'; }
         callAppr(payload, '상신했습니다.').then(function (ok) {
+          if (ok) { delete SUB_NOTE[nkey]; delete SUB_NOTE_PREV[nkey]; }     // 올라간 의견은 결재 건에 있다 — 적던 글은 지운다
           // 상신되면 그 주기는 잠긴다 — 통행료 채우기에 쳐 둔 값은 더 저장할 수 없다.
           if (ok && subKD) delete DRAFT_KEEP[subKind + ':' + cyc0];
           else if (ok) { FILLS = {}; delete DRAFT_KEEP[cyc0]; }
@@ -10925,6 +10982,8 @@ window.EduGuard = {
   document.addEventListener('input', function (e) {
     if (e.target.closest && e.target.closest('#evList [data-evrow]')) evHpNotes();
     if (e.target.id === 'permQ') { PERMQ = e.target.value; permFilter(); return; }
+    // 상신 의견 — 적는 대로 맡아 둔다(결재선을 고쳐 창을 다시 그려도 그대로, 2026-10-21). 다시 그리지 않는다(한글 조합이 끊긴다).
+    if (e.target.id === 'subNote') { SUB_NOTE[myName() + '|' + draftKey()] = e.target.value; return; }
     if (e.target.id === 'apprQ') {
       // 창 전체를 다시 그리면 커서가 튀고 한글 조합이 끊긴다 — 후보 목록만 바꾼다.
       APPR_Q = e.target.value;
@@ -11919,6 +11978,8 @@ window.EduGuard = {
       // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
       fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
+      // 의견 모아 보기(2026-10-21) — 담당 상신 의견 → 결재자 승인 의견. 개인경비·법인카드 결재 띠도 같은 조각
+      opinions: opinionsHtml,
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
       // 마감 단계 진행 위치(2026-10-20 디자인 v2) — 검증 화면 단계 카드가 앞 단계 차례인지 본다(AU6-L9)
       stepNow: stepNow,
