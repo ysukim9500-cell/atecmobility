@@ -6343,7 +6343,10 @@
       rows.map(function (e) {
         var canDel = e.username === mine && !evLocked(e);
         var xl = XLH[e.id];
-        var line = md(e.date_millis) + ' ' + (e.category || '기타') + ' ' + n0(e.amount) + '원' + (isAll() && e.username !== mine ? ' ' + nameOf(e.username) : '');
+        // 계기판 사진은 금액이 없다(0원으로 저장) — 「0원」 대신 검증 때 사진에서 읽은 km, 없으면 「계기판 사진」(2026-10-21 사용자). 합계는 그대로(0원).
+        var odo = e.category === '계기판' && !(Number(e.amount) || 0), okm = odo ? evOdoKm(e) : null;
+        var amtTxt = odo ? (okm != null ? n0(okm) + ' km' : '사진') : n0(e.amount) + '원';
+        var line = md(e.date_millis) + ' ' + (e.category || '기타') + ' ' + amtTxt + (isAll() && e.username !== mine ? ' ' + nameOf(e.username) : '');
         return '<tr' + (xl ? ' data-evxl="' + esc(e.id) + '"' : '') + '><td class="m1' + (selOn ? ' mseltd' : '') + '">' +
           (selOn ? mselBox('ev', { id: String(e.id), amt: e.amount, line: line, why: evWhyNot(e) }) : '') +
           '<span class="lead">' + md(e.date_millis) + '</span>' +
@@ -6351,7 +6354,8 @@
           (isAll() ? whoCell(e.username).replace('<td class="whoc">', '<td class="whoc m1">') : '') +
           '<td class="m1"><span class="kind">' + esc(e.category || '기타') + '</span></td>' +
           '<td class="dim' + (e.vehicle_plate ? '' : ' mx') + '">' + esc(e.vehicle_plate || '—') + '</td>' +
-          '<td class="n total mr" data-u="원">' + n0(e.amount) + '</td>' +
+          (odo ? '<td class="n mr' + (okm != null ? ' total' : ' dim') + '" data-evkm>' + (okm != null ? amtTxt : '계기판 사진') + '</td>'
+            : '<td class="n total mr" data-u="원">' + n0(e.amount) + '</td>') +
           '<td class="el m2' + (e.memo ? '' : ' mx') + '" title="' + esc(e.memo || '') + '">' + esc(e.memo || '') + '</td>' +
           // 원본 장을 이 줄 사진으로 쓴 줄(photo_path = scan_path — 영수증 자리를 못 받아 오리지 않음, 2026-10-21)은 「원본」 하나만
           '<td class="n mact" style="white-space:nowrap">' + (e.photo_path && e.photo_path === e.scan_path ? ''
@@ -6374,6 +6378,11 @@
   var EVF = { cat: 'all' };
   function photoUrl(path) {
     return SB + '/storage/v1/object/public/evidence/' + String(path).split('/').map(encodeURIComponent).join('/');
+  }
+  /** 계기판 사진에서 읽은 km(검증 때 Gemini 가 읽은 것 — evidence_ai, 사진이 바뀌었거나 못 읽었으면 없음) · 없으면 null. */
+  function evOdoKm(e) {
+    var ai = aiOf(e);
+    return ai && ai.odometer_km != null && isFinite(Number(ai.odometer_km)) ? Math.round(Number(ai.odometer_km)) : null;
   }
 
 
@@ -6427,15 +6436,21 @@
     var r = cycleRange(CYC);
     var my = personOf(myName());
     var cars = myPlates();
-    $('pTitle').textContent = '영수증 올리기';
+    // 계기판 차례에서 열면 창 이름·안내도 계기판으로(2026-10-21 — 계기판 사진은 금액이 아니라 km 를 읽는다)
+    var odo = EVUP.defCat === '계기판';
+    $('pTitle').textContent = odo ? '계기판 사진 올리기' : '영수증 올리기';
     $('pSub').textContent = cycleName(CYC) + ' · ' + cycleSpan(CYC);
     $('pBody').innerHTML =
       '<div class="drop gemdrop" id="evDrop" style="margin:0 0 14px">' +
       '<div class="gemorb">' + gemSvg(28) + '</div>' +
       '<div class="gemchip">' + gemSvg(12) + 'Gemini 가 읽어 줍니다</div>' +
-      '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 구분·날짜·금액을 읽어 드립니다</div>' +
-      '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
-      '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>' +
+      (odo
+        ? '<div class="dt">계기판 사진을 올리면 <b class="gemtxt">Gemini</b> 가 km 를 읽어 드립니다</div>' +
+          '<div class="dd">JPG · PNG · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
+          '날짜는 <b>사진을 찍은 날</b>로 미리 넣습니다 — 맞는지 확인해 주세요</div>'
+        : '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 구분·날짜·금액을 읽어 드립니다</div>' +
+          '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
+          '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>') +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>' +
@@ -6581,20 +6596,24 @@
       chain = chain.then(function () {
         if (!live()) return;
         evNote('<b>' + esc(file.name) + '</b> 읽는 중…');
+        // 사진을 찍은 날 — 고른 파일 그대로에서 읽는다(줄인 그림은 캔버스를 거쳐 EXIF 가 빠진다). PDF 쪽은 없음(null).
+        var shotP = evShotOf(file);
         return fileToJpegs(file, function (n, total) {
           if (!live()) return;
           evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
             (total > 3 ? ' <span class="dim">(다른 탭으로 가시면 잠시 멈추고, 돌아오시면 이어집니다)</span>' : ''));
         }).then(function (blobs) {
-          if (!live()) return;
-          blobs.forEach(function (b, i) {
-            var pi = EVUP.pages.length;
-            EVUP.pages.push({
-              blob: b, url: URL.createObjectURL(b), ai: '',
-              name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : '')
+          return shotP.then(function (shot) {
+            if (!live()) return;
+            blobs.forEach(function (b, i) {
+              var pi = EVUP.pages.length;
+              EVUP.pages.push({
+                blob: b, url: URL.createObjectURL(b), ai: '', shot: shot,
+                name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : '')
+              });
+              EVUP.items.push(evBlankItem(pi));
+              fresh.push(pi);
             });
-            EVUP.items.push(evBlankItem(pi));
-            fresh.push(pi);
           });
         });
       });
@@ -6619,12 +6638,116 @@
   }
   /** 빈 줄 하나. 날짜는 오늘 — 단 오늘이 보는 기간 밖이면 비워 두고 고르게 한다(2026-10-20 AU2).
    *  예전엔 기간 안으로 당겨 넣어, 마감 뒤 5일(지난 기간을 보는 중)에 올린 오늘 영수증이 지난 기간 마지막 날로 조용히 들어갔다.
-   *  ★ 구분은 비워 둔다. 예전 기본값 '주유' 는 주차 영수증을 안 바꾸고 올리면 정산에서 빠지게 했다. */
+   *  ★ 구분은 비워 둔다. 예전 기본값 '주유' 는 주차 영수증을 안 바꾸고 올리면 정산에서 빠지게 했다.
+   *  줄의 안내는 셋으로 나눠 둔다(2026-10-21 — 계기판 줄은 금액 안내를 보이지 않는다): dh 날짜 · amtMiss 금액을 못 읽음 · hint 그 밖(흐림·자리).
+   *  dhShot = dh 가 사진 정보(찍은 날)에서 온 안내 — Gemini 가 한 일이 아니라 Gemini 딱지 없이 따로 보인다.
+   *  km = Gemini 가 읽은 계기판 km · dateBy = 날짜를 누가 넣었나(today 기본값 · shot 찍은 날 · ai · user). */
   function evBlankItem(pi) {
     var now = Date.now(), inside = now >= EVUP.lo && now < EVUP.hi;
-    return { page: pi, cat: EVUP.defCat || '', amt: '', memo: '', crop: null, ai: false,
-      date: inside ? ymd(now) : '',
-      hint: inside ? '' : '날짜를 골라 주세요 — 오늘은 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다' };
+    var it = { page: pi, cat: EVUP.defCat || '', amt: '', memo: '', crop: null, ai: false, km: null, amtMiss: false, hint: '',
+      date: inside ? ymd(now) : '', dateBy: inside ? 'today' : '', dhShot: false,
+      dh: inside ? '' : '날짜를 골라 주세요 — 오늘은 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다' };
+    // 계기판에는 날짜가 없다 — 사진을 찍은 날로(사진 날짜가 없는 PDF 쪽은 위 규칙 그대로)
+    if (it.cat === '계기판') evShotDate(it);
+    return it;
+  }
+
+  /* ── 사진을 찍은 날(2026-10-21 사용자 「계기판 사진 영수증 올리기는 금액·메모가 아니지 않나?」) ──
+     계기판에는 날짜가 없어 Gemini 가 날짜를 주지 못한다 — 계기판 줄은 사진을 찍은 날로 미리 채운다.
+     JPEG 의 EXIF DateTimeOriginal(없으면 DateTime)을 고른 파일 앞쪽에서 직접 읽고(작은 파서 — 외부 라이브러리 없음), 없으면 파일 날짜(lastModified).
+     못 읽으면 조용히 넘어간다(null). */
+  function exifTakenMs(file) {
+    var jpeg = /jpe?g$/i.test((file && file.type) || '') || /\.jpe?g$/i.test((file && file.name) || '');
+    if (!jpeg || !file.slice || !window.FileReader) return Promise.resolve(null);
+    return new Promise(function (ok) {
+      var fr = new FileReader();
+      fr.onload = function () { var ms = null; try { ms = exifDate(new DataView(fr.result)); } catch (e) { ms = null; } ok(ms); };
+      fr.onerror = function () { ok(null); };
+      try { fr.readAsArrayBuffer(file.slice(0, 262144)); } catch (e) { ok(null); }   // EXIF(APP1)는 파일 맨 앞 64KB 안 — 넉넉히 256KB
+    });
+  }
+  /** JPEG 앞쪽 바이트 → 찍은 시각(ms) · 없으면 null. 이음표(마커)를 따라가 APP1 「Exif」 를 찾는다(그림 자료 SOS 앞에서 멈춤). */
+  function exifDate(v) {
+    var n = v.byteLength, p = 2;
+    if (n < 12 || v.getUint16(0) !== 0xFFD8) return null;
+    while (p + 4 <= n) {
+      if (v.getUint8(p) !== 0xFF) return null;
+      var mk = v.getUint8(p + 1);
+      if (mk === 0xFF) { p++; continue; }                                   // 채움 바이트
+      if (mk === 0xD9 || mk === 0xDA) return null;                          // 끝 · 그림 자료 시작 — 그 뒤엔 EXIF 가 없다
+      if (mk === 0x01 || (mk >= 0xD0 && mk <= 0xD8)) { p += 2; continue; }  // 길이 없는 이음표
+      var len = v.getUint16(p + 2), seg = p + 4;
+      if (len < 2) return null;
+      if (mk === 0xE1 && len >= 16 && seg + 6 <= n && v.getUint32(seg) === 0x45786966 && v.getUint16(seg + 4) === 0) {
+        return exifTiff(v, seg + 6, Math.min(n, p + 2 + len));
+      }
+      p += 2 + len;
+    }
+    return null;
+  }
+  /** TIFF 머리(t) → IFD0(0x0132 DateTime · 0x8769 Exif IFD 자리) → Exif IFD(0x9003 DateTimeOriginal). 글 「YYYY:MM:DD HH:MM:SS」 — 시간대가 없어 한국 시각으로 읽는다. */
+  function exifTiff(v, t, end) {
+    if (t + 8 > end) return null;
+    var bo = v.getUint16(t), le = bo === 0x4949;
+    if (!le && bo !== 0x4D4D) return null;
+    var u16 = function (o) { return v.getUint16(o, le); }, u32 = function (o) { return v.getUint32(o, le); };
+    if (u16(t + 2) !== 42) return null;
+    var ifd = function (off) {
+      var o = t + off, out = {};
+      if (!off || o + 2 > end) return out;
+      for (var i = 0, cnt = u16(o); i < cnt && i < 256; i++) {
+        var e = o + 2 + i * 12;
+        if (e + 12 > end) break;
+        var tag = u16(e), type = u16(e + 2), num = u32(e + 4);
+        if (tag === 0x8769) out.exif = u32(e + 8);
+        else if ((tag === 0x0132 || tag === 0x9003) && type === 2 && num >= 19) out[tag] = u32(e + 8);   // 20바이트 글 — 4바이트가 넘으니 늘 자리값
+      }
+      return out;
+    };
+    var txt = function (off) {
+      if (off == null || t + off + 19 > end) return '';
+      for (var s = '', i = 0; i < 19; i++) s += String.fromCharCode(v.getUint8(t + off + i));
+      return s;
+    };
+    var at = function (s) {
+      var m = /^(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(s);
+      if (!m || +m[1] < 2000) return null;                                   // 「0000:00:00 00:00:00」 같은 빈 값
+      var ms = Date.parse(m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':' + m[6] + '+09:00');
+      return isFinite(ms) ? ms : null;
+    };
+    var d0 = ifd(u32(t + 4)), dx = d0.exif ? ifd(d0.exif) : {};
+    return at(txt(dx[0x9003])) || at(txt(d0[0x0132]));
+  }
+  /** 올린 파일을 찍은 날(ms) — 사진이면 EXIF, 없으면 파일 날짜. PDF(쪽을 그림으로 바꾼 장)는 null. 늘 이루어진다(실패하면 null). */
+  function evShotOf(file) {
+    if (!file || /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '')) return Promise.resolve(null);
+    return exifTakenMs(file).then(function (ms) {
+      if (ms != null) return ms;
+      var lm = Number(file.lastModified);
+      return isFinite(lm) && lm > 0 ? lm : null;
+    }, function () { return null; });
+  }
+  /** 계기판 줄 날짜 = 그 장을 찍은 날. 보는 기간 안이면 넣고, 밖이면 비운다(+ 까닭). 장에 찍은 날이 없으면(PDF 쪽) false — 부른 쪽 규칙 그대로. */
+  function evShotDate(it) {
+    var pg = EVUP.pages[it.page], ms = pg ? pg.shot : null;
+    if (ms == null || !isFinite(ms)) return false;
+    var day = ymd(ms), d0 = Date.parse(day + 'T00:00:00+09:00'), inside = d0 >= EVUP.lo && d0 < EVUP.hi;
+    it.date = inside ? day : '';
+    it.dateBy = inside ? 'shot' : '';
+    it.dh = inside ? '사진 정보의 찍은 날로 넣었습니다 — 맞는지 확인해 주세요'
+      : '찍은 날을 넣어 주세요 — 사진 정보의 날짜(' + day.replace(/-/g, '.') + ')가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다';   // 점 꼴 — 「2026-09-」에서 줄이 끊기지 않게
+    it.dhShot = true;
+    return true;
+  }
+  /** 줄 아래 안내 한 줄(Gemini 줄이면 딱지와 함께) — 계기판 줄에는 금액 안내가 없고 km 는 제 칸에 있다. 다른 구분이면 예전처럼 「계기판 N km」(Gemini 가 계기판으로 읽은 사진)도.
+   *  사진 정보로 넣은 날짜 안내(dhShot)는 여기 넣지 않는다 — 따로 딱지 없이 보인다(paintEvList). */
+  function evHintOf(it) {
+    var odo = it.cat === '계기판', p = [];
+    if (it.dh && !it.dhShot) p.push(it.dh);
+    if (!odo && it.km != null) p.push('계기판 ' + n0(it.km) + ' km');
+    if (!odo && it.amtMiss) p.push('금액을 읽지 못했습니다');
+    if (it.hint) p.push(it.hint);
+    return p.join(' · ');
   }
 
   function blobToB64(blob) {
@@ -6817,22 +6940,28 @@
               var it = evBlankItem(pi);
               it.ai = true; it.crop = crops[k];
               it.cat = KIND_CAT[x.kind] || EVUP.defCat || '';
+              it.dh = ''; it.dhShot = false; it.dateBy = '';
+              // 계기판 km — 줄에 담아 두고 계기판 칸에 보인다(저장하는 칸은 없다 — 서버 검증 A05 가 사진을 다시 읽어 운행일지 마지막 km 와 맞춰 본다)
+              it.km = x.odometer_km != null && isFinite(Number(x.odometer_km)) ? Math.round(Number(x.odometer_km)) : null;
               var hint = [];
               if (x.merchant) { it.memo = String(x.merchant).slice(0, 60); }
               if (x.date) {
                 var ms = Date.parse(x.date + 'T00:00:00+09:00');
-                if (isFinite(ms) && ms >= EVUP.lo && ms < EVUP.hi) it.date = x.date;
+                if (isFinite(ms) && ms >= EVUP.lo && ms < EVUP.hi) { it.date = x.date; it.dateBy = 'ai'; }
                 else {
                   // ★ 기본 날짜(오늘)로 두면 8월 영수증이 10월분 정산에 그대로 들어간다. 비워서 사람이 정하게 한다.
                   it.date = '';
-                  hint.push('사진의 날짜가 ' + x.date + ' 입니다 — ' + cycleName(CYC) + '(' + cycleSpan(CYC) +
-                    ') 영수증이 아니면 이 줄을 빼 주세요');
+                  it.dh = '사진의 날짜가 ' + x.date + ' 입니다 — ' + cycleName(CYC) + '(' + cycleSpan(CYC) +
+                    ') 영수증이 아니면 이 줄을 빼 주세요';
                 }
-              } else { it.date = ''; hint.push('날짜를 읽지 못했습니다 — 직접 넣어 주세요'); }
-              if (x.kind === 'odometer') {
-                if (x.odometer_km != null) hint.push('계기판 ' + n0(x.odometer_km) + ' km');
-              } else if (x.amount != null) it.amt = String(x.amount);
-              else hint.push('금액을 읽지 못했습니다');
+              } else if (!(it.cat === '계기판' && evShotDate(it))) {
+                // 날짜를 못 읽음 — 계기판(늘 날짜가 없다)이면 위 조건에서 사진을 찍은 날로 넣었다. 영수증이나 찍은 날이 없는 장(PDF 쪽)만 비운다.
+                it.date = ''; it.dh = '날짜를 읽지 못했습니다 — 직접 넣어 주세요';
+              }
+              if (x.kind !== 'odometer') {
+                if (x.amount != null) it.amt = String(x.amount);
+                else it.amtMiss = true;              // 「금액을 읽지 못했습니다」 — 계기판으로 바꾸면 보이지 않는다(evHintOf)
+              }
               if (x.legible === false) hint.push('글자가 흐립니다 — 직접 확인해 주세요');
               // 영수증 자리를 받지 못했으면 장 전체를 따로 올리지 않고 원본 장을 이 줄의 사진으로 쓴다(올리기 — 2026-10-21). 그렇다고 알린다.
               if (many && !crops[k]) hint.push('영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이 됩니다');
@@ -6883,7 +7012,8 @@
       if (!it) return;
       var g = function (sel) { var el = tr.querySelector(sel); return el ? el.value : null; };
       var c = g('[data-evcatsel]'); if (c != null) it.cat = c;
-      var d = g('[data-evdate]'); if (d != null) it.date = d;
+      // 날짜를 사람이 바꿨으면 기억한다 — 계기판으로 바꿀 때 사진을 찍은 날로 덮지 않게(2026-10-21)
+      var d = g('[data-evdate]'); if (d != null) { if (d !== it.date) it.dateBy = 'user'; it.date = d; }
       // 금액 — 숫자·쉼표만(2026-10-20 AU2 #9). 못 읽는 글은 지우지 않고 그대로 두고(amtBad) 올리기에서 막는다.
       var a = g('[data-evamt]');
       if (a != null) { var na = numIn(a); it.amtBad = na !== null && isNaN(na); it.amt = it.amtBad ? String(a) : na === null ? '' : String(na); }
@@ -6916,6 +7046,17 @@
     });
   }
 
+  /** 올리기 창 계기판 줄의 두 칸(2026-10-21 사용자 「계기판 사진 영수증 올리기는 금액·메모가 아니지 않나?」) — 금액 자리에 계기판 km(읽기만),
+   *  메모 자리에 안내 + 날짜 안내. km 는 저장하는 칸이 없다 — 서버 검증(A05)이 사진을 다시 읽어 운행일지 마지막 km 와 맞춰 본다(저장은 금액 0 · 메모 없음).
+   *  폰 카드에서는 칸 이름(data-l 「계기판 km」) 뒤에 값이 안 들어가면 아래 줄로 내려간다(flex-wrap — 표 칸일 때는 아무 일도 안 한다). */
+  function evOdoCells(it, hintHtml) {
+    return '<td class="n eva" data-l="계기판 km" data-evodo style="flex-wrap:wrap;row-gap:2px">' +
+      (it.km != null ? '<b class="evkm" style="white-space:nowrap">' + n0(it.km) + ' km</b>'
+        : '<span class="evkm dim" style="font-size:12px;line-height:1.45">읽지 못함 — 검증 때 다시 읽습니다</span>') + '</td>' +
+      '<td class="evm"><div class="evguide" style="font-size:12.5px;line-height:1.5;color:var(--ink-600)">검증 때 운행일지 마지막 km 와 맞춰 봅니다</div>' +
+      hintHtml + '</td>';
+  }
+
   function paintEvList() {
     var box = $('evList'); if (!box) return;
     var n = EVUP.items.length;
@@ -6933,10 +7074,13 @@
     var pageNo = {}, seq = 0;
     EVUP.items.forEach(function (it) { if (pageNo[it.page] == null) pageNo[it.page] = ++seq; });
     var prevPage = -1;
+    // 계기판 줄은 금액·메모 대신 계기판 km·안내(2026-10-21 사용자) — 머리도 줄에 맞춘다(모두 계기판 · 섞임 · 없음)
+    var nOdo = EVUP.items.filter(function (x) { return x.cat === '계기판'; }).length;
+    var thA = !nOdo ? '금액' : nOdo === n ? '계기판 km' : '금액 · 계기판 km', thM = !nOdo ? '메모' : nOdo === n ? '안내' : '메모 · 안내';
 
     box.innerHTML = '<div class="panel"><div class="scroll" data-rows style="max-height:46vh">' +
       '<table class="evup"><thead><tr><th style="width:64px">사진</th><th>구분</th><th>날짜</th>' +
-      '<th class="n">금액</th><th>메모</th><th></th></tr></thead><tbody>' +
+      '<th class="n">' + thA + '</th><th>' + thM + '</th><th></th></tr></thead><tbody>' +
       EVUP.items.map(function (it, i) {
         var pg = EVUP.pages[it.page] || {}, first = it.page !== prevPage;
         prevPage = it.page;
@@ -6950,6 +7094,11 @@
             '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
             '<td class="n evx"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
         }
+        // 사진 정보로 넣은 날짜 안내는 Gemini 딱지 없이(Gemini 가 한 일이 아니다) — 그것이 있으면 「가 채웠습니다」 줄은 내지 않는다(안내 줄이 셋이 되지 않게)
+        var ht = evHintOf(it), shot = it.dhShot ? it.dh : '';
+        var hintHtml = (shot ? '<div class="evhint" data-evshot>' + esc(shot) + '</div>' : '') +
+          (ht ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(ht) + '</div>'
+            : (it.ai && !shot ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : ''));
         return '<tr data-evrow="' + i + '" class="' + (first ? 'pgfirst' : '') + (it.ai ? ' evai' : '') + '">' +
           '<td class="evth">' + thumb + '</td>' +
           '<td class="evc"><select class="inp' + (it.cat ? '' : ' need') + '" data-evcatsel style="width:108px" aria-label="' + (i + 1) + '번째 구분">' +
@@ -6959,19 +7108,19 @@
           }).join('') + '</select></td>' +
           '<td class="evd"><input class="inp' + (it.date ? '' : ' need') + '" type="date" data-evdate style="width:148px" value="' + esc(it.date) +
           '" min="' + ymd(EVUP.lo) + '" max="' + ymd(EVUP.hi - 1) + '" aria-label="' + (i + 1) + '번째 날짜"></td>' +
-          '<td class="n eva" data-l="금액"><input class="inp num' + (it.amtBad ? ' need" aria-invalid="true" data-numbad="1' : '') + '" data-evamt inputmode="numeric" style="width:100px" ' +
-          'placeholder="원" aria-label="' + (i + 1) + '번째 금액" value="' + esc(it.amtBad ? it.amt : it.amt ? n0(it.amt) : '') + '"></td>' +
-          '<td class="evm"><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
-          esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' +
-          (it.hint ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(it.hint) + '</div>'
-            : (it.ai ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : '')) +
-          '<div class="evhint hpdup" data-evhp hidden></div></td>' +
+          (it.cat === '계기판' ? evOdoCells(it, hintHtml)
+            : '<td class="n eva" data-l="금액"><input class="inp num' + (it.amtBad ? ' need" aria-invalid="true" data-numbad="1' : '') + '" data-evamt inputmode="numeric" style="width:100px" ' +
+              'placeholder="원" aria-label="' + (i + 1) + '번째 금액" value="' + esc(it.amtBad ? it.amt : it.amt ? n0(it.amt) : '') + '"></td>' +
+              '<td class="evm"><input class="inp" data-evmemo maxlength="60" style="width:100%" placeholder="선택" value="' +
+              esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' + hintHtml +
+              '<div class="evhint hpdup" data-evhp hidden></div></td>') +
           '<td class="n evx" style="white-space:nowrap">' +
           '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
-      n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · 영수증 ' + n0(n) + '건' +
+      n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · ' +
+      (nOdo < n ? '영수증 ' + n0(n - nOdo) + '건' + (nOdo ? ' · ' : '') : '') + (nOdo ? '계기판 사진 ' + n0(nOdo) + '건' : '') +
       (running ? ' · <b class="gemtxt">Gemini 가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
     evHpNotes();
     if (b) {
@@ -6983,6 +7132,25 @@
     // 채울 빈 칸이 있을 때만 보인다.
     if (f) f.hidden = n < 2 || running > 0 || !EVUP.items.some(function (x, i) { return i && (!x.cat || (!x.date && !x.ai)); });
   }
+  /* 구분을 바꾸면 그 줄을 다시 그린다(2026-10-21) — 계기판 ↔ 주유·주차·통행료는 칸이 다르다(계기판 km·안내 ↔ 금액·메모).
+     칸 모양이 그대로인 바꿈(주차 ↔ 통행료)은 다시 그리지 않는다. 그리기 전에 쳐 둔 값을 담아(evRead) 계기판으로 갔다 돌아와도
+     금액·메모가 남고, 표 스크롤과 그 구분 칸 초점을 지킨다. 계기판이 되면 날짜가 비었거나 아직 오늘(기본값) 그대로일 때만
+     사진을 찍은 날로 넣는다(고른 날짜·Gemini 가 읽은 날짜는 그대로). 서버로 올리는 중에는 손대지 않는다. */
+  document.addEventListener('change', function (e) {
+    var s = e.target;
+    if (!s || !s.matches || !s.matches('#evList [data-evcatsel]') || EV_SENDING) return;
+    var tr = s.closest('[data-evrow]'), odo = s.value === '계기판';
+    if (!tr || odo === !!tr.querySelector('[data-evodo]')) return;
+    var i = +tr.dataset.evrow;
+    evRead();
+    var it = EVUP.items[i];
+    if (it && odo && (!it.date || (it.dateBy === 'today' && it.date === ymd(Date.now())))) evShotDate(it);
+    var sc = document.querySelector('#evList [data-rows]'), top = sc ? sc.scrollTop : 0;
+    paintEvList();
+    sc = document.querySelector('#evList [data-rows]'); if (sc) sc.scrollTop = top;
+    var ns = document.querySelector('#evList [data-evrow="' + i + '"] [data-evcatsel]');
+    if (ns) { try { ns.focus({ preventScroll: true }); } catch (er) { ns.focus(); } }
+  });
 
   function runEvUpload() {
     if (EVUP.busy) { toast('아직 파일을 읽는 중입니다. 잠시만 기다려 주세요.'); return; }
@@ -7006,11 +7174,14 @@
       if (ms < EVUP.lo || ms >= EVUP.hi) {
         bad(' 날짜가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다.', '[data-evdate]'); return;
       }
+      it.ms = ms;
+      // 계기판 사진은 금액 칸이 없다(2026-10-21) — 금액을 보지 않고 0 으로 올린다(계기판으로 바꾸기 전에 쳐 둔 금액·메모는 올리지 않는다)
+      if (it.cat === '계기판') { it.amtN = 0; continue; }
       if (it.amtBad) { bad('의 금액에 숫자가 아닌 글자가 있습니다 — ' + NUM_BAD + '.', '[data-evamt]'); return; }
       var amt = Number(it.amt || 0);
       if (!isFinite(amt) || amt < 0 || amt > 5000000) { bad('의 금액이 범위를 벗어났습니다.', '[data-evamt]'); return; }
-      if (!amt && it.cat !== '계기판') { bad('의 금액을 넣어 주세요. 계기판 사진만 0원이어도 됩니다.', '[data-evamt]'); return; }
-      it.ms = ms; it.amtN = Math.round(amt);
+      if (!amt) { bad('의 금액을 넣어 주세요. 계기판 사진만 0원이어도 됩니다.', '[data-evamt]'); return; }
+      it.amtN = Math.round(amt);
     }
 
     EVUP.busy = true; EV_SENDING = true;
@@ -7056,7 +7227,7 @@
               date_millis: it.ms, category: it.cat, amount: it.amtN,
               // ★ captured_at 을 0 으로 두면 앱의 사진 정리(cleanupEvidenceServer,
               //   captured_at < cutoff)가 웹에서 올린 사진을 다음 동기화에 바로 지운다.
-              memo: it.memo, captured_at: Date.now(), photo_path: path,
+              memo: it.cat === '계기판' ? '' : it.memo, captured_at: Date.now(), photo_path: path,
               scan_path: pg.multi ? pg.scanPath : null
             })
           }).then(function (ins) {
@@ -10358,7 +10529,8 @@ window.EduGuard = {
         nu.cat = src0.cat; nu.date = src0.date;
         EVUP.items.splice(ai0 + 1, 0, nu);
         paintEvList();
-        var ne = document.querySelector('[data-evrow="' + (ai0 + 1) + '"] [data-evamt]');
+        var ne = document.querySelector('[data-evrow="' + (ai0 + 1) + '"] [data-evamt]') ||
+          document.querySelector('[data-evrow="' + (ai0 + 1) + '"] [data-evcatsel]');   // 계기판 줄은 금액 칸이 없다(2026-10-21)
         if (ne) ne.focus();
       }
       return;
