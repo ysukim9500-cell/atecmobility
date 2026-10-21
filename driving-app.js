@@ -1360,6 +1360,9 @@
       var rows = MC.days.map(function (d) {
         var aiNote = [];
         d.ev.forEach(function (e) {
+          // 한 장에 여러 영수증을 찍어 올린 줄(원본 scan_path)은 오려 낸 사진이 어긋나거나 장 전체라 사진 금액을 대조하지 않는다
+          //   (2026-10-21 손승호 10월분 — 입력은 원본과 같은데 「사진엔 1,000원(입력 1,900원)」. 서버 driving-verify A10 과 같은 규칙)
+          if (e.scan_path) return;
           var ai = aiOf(e);
           if (ai && ai.amount != null && isFinite(Number(ai.amount)) && Math.round(Number(ai.amount)) !== Number(e.amount))
             aiNote.push('사진엔 ' + won(Math.round(Number(ai.amount))) + ' (입력 ' + won(e.amount) + ')');
