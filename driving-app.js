@@ -1361,7 +1361,10 @@
         var aiNote = [];
         d.ev.forEach(function (e) {
           // 한 장에 여러 영수증을 찍어 올린 줄(원본 scan_path)은 오려 낸 사진이 어긋나거나 장 전체라 사진 금액을 대조하지 않는다
-          //   (2026-10-21 손승호 10월분 — 입력은 원본과 같은데 「사진엔 1,000원(입력 1,900원)」. 서버 driving-verify A10 과 같은 규칙)
+          //   (2026-10-21 직원 10월분 사례 — 입력은 원본과 같은데 「사진엔 1,000원(입력 1,900원)」).
+          //   서버는 이제 원본 장을 한 번 읽어 검증할 때마다 그때 입력값으로 줄마다 짝지어 대조한다(driving-verify.ts 원본 장 짝짓기 — 원본에
+          //   없는 줄은 A11, 같은 영수증 두 줄은 A06). evidence_ai 에 남은 줄마다 값은 읽을 때 짝지은 것이라 줄을 고친 뒤엔 낡을 수 있어,
+          //   여기서는 그대로 건너뛰고 검증 화면(A11·A06)이 알린다.
           if (e.scan_path) return;
           var ai = aiOf(e);
           if (ai && ai.amount != null && isFinite(Number(ai.amount)) && Math.round(Number(ai.amount)) !== Number(e.amount))
@@ -6325,10 +6328,12 @@
           '<td class="dim' + (e.vehicle_plate ? '' : ' mx') + '">' + esc(e.vehicle_plate || '—') + '</td>' +
           '<td class="n total mr" data-u="원">' + n0(e.amount) + '</td>' +
           '<td class="el m2' + (e.memo ? '' : ' mx') + '" title="' + esc(e.memo || '') + '">' + esc(e.memo || '') + '</td>' +
-          '<td class="n mact" style="white-space:nowrap">' + (e.photo_path
-            ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>'
+          // 원본 장을 이 줄 사진으로 쓴 줄(photo_path = scan_path — 영수증 자리를 못 받아 오리지 않음, 2026-10-21)은 「원본」 하나만
+          '<td class="n mact" style="white-space:nowrap">' + (e.photo_path && e.photo_path === e.scan_path ? ''
+            : e.photo_path ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>'
             : '<span class="dim" style="font-size:11.5px">사진 없음</span>') +
-          (e.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="스캔한 A4 원본" href="' +
+          (e.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="' +
+            (e.photo_path === e.scan_path ? '영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진입니다' : '스캔한 A4 원본') + '" href="' +
             esc(photoUrl(e.scan_path)) + '">원본</a>' : '') +
           // 잘못 올린 것을 못 지우면 정산 금액이 부풀어 오른 채로 남는다.
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') +
@@ -6374,6 +6379,7 @@
   function evFreeUrls() {
     EVUP.pages.forEach(function (p) { if (p.url) URL.revokeObjectURL(p.url); });
     EVUP.items.forEach(function (it) { if (it.crop && it.crop.url) URL.revokeObjectURL(it.crop.url); });
+    evCropReset();                         // 오리느라 풀어 둔 마지막 장 그림도 놓는다
   }
 
   /** Gemini 반짝임(같은 색감의 모양 — 공식 로고 파일 아님). 그라데이션 id 는 부를 때마다 새로. */
@@ -6604,25 +6610,147 @@
       fr.readAsDataURL(blob);
     });
   }
-  /** 장에서 영수증 한 건이 있는 자리만 오려 낸다. box = [ymin, xmin, ymax, xmax] (0~1000). 가장자리에 여유를 둔다. */
-  function evCrop(pageUrl, box) {
-    return new Promise(function (ok) {
+  /** 장 그림을 한 번 풀어 회색조로 둔다 — 영수증마다 오릴 때 같은 장을 다시 풀지 않는다. { img, W, H, g(Uint8Array | null) } · 못 읽으면 null.
+   *  마지막 한 장만 들고 있는다(창을 닫으면 evCropReset 이 비운다). */
+  var EVPG = { url: '', p: null };
+  function evPage(pageUrl) {
+    if (EVPG.url === pageUrl && EVPG.p) return EVPG.p;
+    var p = new Promise(function (ok) {
       var img = new Image();
       img.onload = function () {
-        var W = img.naturalWidth, H = img.naturalHeight, pad = 0.025;
-        var x0 = Math.max(0, (box[1] / 1000 - pad) * W), y0 = Math.max(0, (box[0] / 1000 - pad) * H);
-        var x1 = Math.min(W, (box[3] / 1000 + pad) * W), y1 = Math.min(H, (box[2] / 1000 + pad) * H);
-        var w = Math.round(x1 - x0), h = Math.round(y1 - y0);
-        if (w < 40 || h < 40) { ok(null); return; }
+        var W = img.naturalWidth, H = img.naturalHeight, g = null;
+        try {
+          var cv = document.createElement('canvas');
+          cv.width = W; cv.height = H;
+          var cx = cv.getContext('2d');
+          cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H);
+          cx.drawImage(img, 0, 0);
+          var d = cx.getImageData(0, 0, W, H).data;
+          g = new Uint8Array(W * H);
+          for (var i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+        } catch (e) { g = null; }            // 회색조를 못 만들면 테두리 맞춤 없이 상자대로 오린다
+        ok({ img: img, W: W, H: H, g: g });
+      };
+      img.onerror = function () { ok(null); };
+      img.src = pageUrl;
+    });
+    EVPG = { url: pageUrl, p: p };
+    return p;
+  }
+  function evCropReset() { EVPG = { url: '', p: null }; }
+  /**
+   * 영수증 상자(px)를 장에 그려진 칸 테두리에 맞춘다(2026-10-21 — 하이패스 「영수증 출력」처럼 영수증마다 옅은 회색 사각형이 있는 격자 장).
+   *   Gemini 상자는 촘촘한 장에서 어긋난다(옆 영수증과 섞임 · 왼쪽이 잘려 연도가 안 보임 — 2026-10-21 직원 10월분 사례). 상자 변마다 ± 30% 안에서
+   *   상자 길이 가운데 70%를 거의 끊김 없이(75% 이상) 지나는 선을 찾아, 상자 변에 가장 가까운 선을 고른다. 그 안쪽에 선이 또 있고
+   *   둘 사이가 비었으면(칸 사이 빈틈 — 바깥 선은 옆 칸 테두리) 안쪽 선으로 옮긴다. 네 변이 다 있고, 크기가 상자의 0.6~1.6배이고,
+   *   상자와 반 넘게 겹치고, 네 변이 그 사각형 길이로 다시 재도 선일 때만 쓴다 — 아니면 null(상자 + 작은 여유로 오린다).
+   *   돌려주는 것: 테두리 선 바로 안쪽 [x0, y0, x1, y1) (x1·y1 은 들어가지 않음).
+   */
+  function evSnap(G, bx0, by0, bx1, by1) {
+    var W = G.W, H = G.H, g = G.g, R = 3, D = 14, TH = 0.75;
+    if (!g) return null;
+    var bw = bx1 - bx0, bh = by1 - by0;
+    if (bw < 60 || bh < 60) return null;
+    // 선 세기 — 세로선: x 열이 [a, b) 줄에서(두 줄마다) 양옆 R 칸보다 D 이상 어두운 비율(x±1 까지 — 살짝 기운 선)
+    var vS = function (x, a, b) {
+      var n = 0, hit = 0;
+      for (var y = a; y < b; y += 2) {
+        n++;
+        for (var dx = -1; dx <= 1; dx++) {
+          var c = y * W + x + dx, v = g[c];
+          if (v + D <= g[c - R] && v + D <= g[c + R]) { hit++; break; }
+        }
+      }
+      return n ? hit / n : 0;
+    };
+    var hS = function (y, a, b) {
+      var n = 0, hit = 0;
+      for (var x = a; x < b; x += 2) {
+        n++;
+        for (var dy = -1; dy <= 1; dy++) {
+          var c = (y + dy) * W + x, v = g[c];
+          if (v + D <= g[c - R * W] && v + D <= g[c + R * W]) { hit++; break; }
+        }
+      }
+      return n ? hit / n : 0;
+    };
+    // 진한 글자가 있는가 — 두 선 사이 띠가 비었는지(칸 사이 빈틈) 볼 때
+    var inked = function (x0, y0, x1, y1) {
+      var n = 0, k = 0;
+      for (var y = y0; y < y1; y += 2) for (var x = x0; x < x1; x += 2) { n++; if (g[y * W + x] < 150) k++; }
+      return n ? k / n : 0;
+    };
+    var cx = function (v) { return Math.max(R + 2, Math.min(W - R - 3, Math.round(v))); };
+    var cy = function (v) { return Math.max(R + 2, Math.min(H - R - 3, Math.round(v))); };
+    // [from, to] 안에서 세기 TH 이상인 열(행)을 이어 붙여 선 목록 { a, b }(선 두께)
+    var lines = function (from, to, s) {
+      var out = [], cur = null;
+      for (var p = from; p <= to; p++) {
+        if (s(p) < TH) continue;
+        if (cur && p - cur.b <= 2) cur.b = p; else { cur = { a: p, b: p }; out.push(cur); }
+      }
+      return out;
+    };
+    var my0 = cy(by0 + 0.15 * bh), my1 = cy(by1 - 0.15 * bh), mx0 = cx(bx0 + 0.15 * bw), mx1 = cx(bx1 - 0.15 * bw);
+    var mw = 0.3 * bw, mh = 0.3 * bh;
+    var Ls = lines(cx(bx0 - mw), cx(bx0 + mw), function (x) { return vS(x, my0, my1); });
+    var Rs = lines(cx(bx1 - mw), cx(bx1 + mw), function (x) { return vS(x, my0, my1); });
+    var Ts = lines(cy(by0 - mh), cy(by0 + mh), function (y) { return hS(y, mx0, mx1); });
+    var Bs = lines(cy(by1 - mh), cy(by1 + mh), function (y) { return hS(y, mx0, mx1); });
+    if (!Ls.length || !Rs.length || !Ts.length || !Bs.length) return null;
+    var mid = function (l) { return (l.a + l.b) / 2; };
+    /** 상자 변(edge)에 가장 가까운 선 → 안쪽(dir +1 = 값이 커지는 쪽)에 선이 또 있고 사이가 비었으면 안쪽 선으로. */
+    var pick = function (list, edge, dir, blank) {
+      var best = list.slice().sort(function (p, q) { return Math.abs(mid(p) - edge) - Math.abs(mid(q) - edge); })[0];
+      for (var guard = 0; guard < 4; guard++) {
+        var inner = list.filter(function (l) { return dir > 0 ? l.a > best.b : l.b < best.a; })
+          .sort(function (p, q) { return dir > 0 ? p.a - q.a : q.b - p.b; })[0];
+        if (!inner || !blank(best, inner)) break;
+        best = inner;
+      }
+      return best;
+    };
+    var L = pick(Ls, bx0, 1, function (o, i) { return inked(o.b + 2, my0, i.a - 1, my1) < 0.002; });
+    var Rr = pick(Rs, bx1, -1, function (o, i) { return inked(i.b + 2, my0, o.a - 1, my1) < 0.002; });
+    var T = pick(Ts, by0, 1, function (o, i) { return inked(mx0, o.b + 2, mx1, i.a - 1) < 0.002; });
+    var B = pick(Bs, by1, -1, function (o, i) { return inked(mx0, i.b + 2, mx1, o.a - 1) < 0.002; });
+    var x0 = L.b + 1, x1 = Rr.a, y0 = T.b + 1, y1 = B.a;
+    var w = x1 - x0, h = y1 - y0;
+    if (w < 0.6 * bw || w > 1.6 * bw || h < 0.6 * bh || h > 1.6 * bh) return null;
+    var ix = Math.min(x1, bx1) - Math.max(x0, bx0), iy = Math.min(y1, by1) - Math.max(y0, by0);
+    if (ix <= 0 || iy <= 0 || ix * iy < 0.5 * bw * bh) return null;
+    // 네 변이 정말 그 사각형을 두르는가 — 사각형 자기 길이(가운데 80%)로 다시 잰다(선 두께 안에서 가장 센 열·행)
+    var ry0 = cy(y0 + 0.1 * h), ry1 = cy(y1 - 0.1 * h), rx0 = cx(x0 + 0.1 * w), rx1 = cx(x1 - 0.1 * w);
+    var best = function (l, s) { var m = 0; for (var p = l.a; p <= l.b; p++) m = Math.max(m, s(p)); return m; };
+    if (best(L, function (x) { return vS(x, ry0, ry1); }) < 0.7 || best(Rr, function (x) { return vS(x, ry0, ry1); }) < 0.7 ||
+        best(T, function (y) { return hS(y, rx0, rx1); }) < 0.7 || best(B, function (y) { return hS(y, rx0, rx1); }) < 0.7) return null;
+    return [x0, y0, x1, y1];
+  }
+  /** 장에서 영수증 한 건이 있는 자리만 오려 낸다. box = [ymin, xmin, ymax, xmax] (0~1000).
+   *  칸 테두리가 그려진 장이면 테두리 안쪽에 맞추고(evSnap — 옆 영수증이 섞이지 않고 가장자리가 잘리지 않게), 아니면 상자에 작은 여유(1.2%,
+   *  예전 2.5% — 촘촘한 장에서 옆 영수증까지 들어갔다)를 둔다. 돌려주는 것: { blob, url, rect: [x0, y0, x1, y1) px, snap } · 못 오리면 null. */
+  function evCrop(pageUrl, box) {
+    return evPage(pageUrl).then(function (G) {
+      if (!G) return null;
+      var W = G.W, H = G.H, pad = 0.012, s = null;
+      try { s = evSnap(G, box[1] / 1000 * W, box[0] / 1000 * H, box[3] / 1000 * W, box[2] / 1000 * H); } catch (e) { s = null; }
+      var x0, y0, x1, y1;
+      if (s) { x0 = s[0]; y0 = s[1]; x1 = s[2]; y1 = s[3]; }
+      else {
+        x0 = Math.max(0, (box[1] / 1000 - pad) * W); y0 = Math.max(0, (box[0] / 1000 - pad) * H);
+        x1 = Math.min(W, (box[3] / 1000 + pad) * W); y1 = Math.min(H, (box[2] / 1000 + pad) * H);
+      }
+      x0 = Math.round(x0); y0 = Math.round(y0);
+      var w = Math.round(x1 - x0), h = Math.round(y1 - y0);
+      if (w < 40 || h < 40) return null;
+      return new Promise(function (ok) {
         var cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
         var cx = cv.getContext('2d');
         cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
-        cx.drawImage(img, x0, y0, w, h, 0, 0, w, h);
-        cv.toBlob(function (b) { ok(b ? { blob: b, url: URL.createObjectURL(b) } : null); }, 'image/jpeg', 0.9);
-      };
-      img.onerror = function () { ok(null); };
-      img.src = pageUrl;
+        cx.drawImage(G.img, x0, y0, w, h, 0, 0, w, h);
+        cv.toBlob(function (b) { ok(b ? { blob: b, url: URL.createObjectURL(b), rect: [x0, y0, x0 + w, y0 + h], snap: !!s } : null); }, 'image/jpeg', 0.9);
+      });
     });
   }
   /**
@@ -6681,6 +6809,8 @@
               } else if (x.amount != null) it.amt = String(x.amount);
               else hint.push('금액을 읽지 못했습니다');
               if (x.legible === false) hint.push('글자가 흐립니다 — 직접 확인해 주세요');
+              // 영수증 자리를 받지 못했으면 장 전체를 따로 올리지 않고 원본 장을 이 줄의 사진으로 쓴다(올리기 — 2026-10-21). 그렇다고 알린다.
+              if (many && !crops[k]) hint.push('영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이 됩니다');
               it.hint = hint.join(' · ');
               return it;
             });
@@ -6881,12 +7011,17 @@
         var pg = EVUP.pages[it.page];
         var key = base + i;                        // client_key(bigint) · 경로에도 쓴다
         var path = mine + '/' + key + '.jpg';
+        // ★ 한 장에 여러 영수증인데 이 줄은 오린 그림이 없다(Gemini 가 자리를 안 줌·직접 더한 줄) — 예전엔 장 전체를 이 줄 사진으로
+        //   또 올려, 12줄이 모두 같은 장 그림이었다(2026-10-21 직원 10월분 사례). 이제는 따로 올리지 않고 원본 장(scan_path)을 이 줄 사진으로
+        //   가리킨다(photo_path = scan_path — 목록에 「원본」만 보이고, 지울 때는 원본을 다른 줄이 안 쓸 때만 지운다).
+        var useScan = !!pg.multi && !(it.crop && it.crop.blob);
         var scanP = Promise.resolve();
         if (pg.multi && !pg.scanPath) {
           var sp = mine + '/scan/' + key + '.jpg';
           scanP = upload(sp, pg.blob, (i + 1) + '번째 원본').then(function () { pg.scanPath = sp; });
         }
         return scanP.then(function () {
+          if (useScan) { path = pg.scanPath; return; }
           return upload(path, (it.crop && it.crop.blob) || pg.blob, (i + 1) + '번째 파일');
         }).then(function () {
           return apiRetry('/rest/v1/evidences', {
@@ -6902,7 +7037,8 @@
           }).then(function (ins) {
             if (!ins.ok) return ins.text().then(function (t) {
               // 파일만 올라간 채로 두지 않는다(다시 누르면 새 키로 또 올라가 파일이 둘이 된다).
-              return apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' })
+              //   원본 장을 가리킨 줄(useScan)은 지우지 않는다 — 같은 장의 다른 줄이 그 원본을 쓴다.
+              return (useScan ? Promise.resolve() : apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }))
                 .catch(function () {})
                 .then(function () { throw new Error((i + 1) + '번째 기록: ' + (t || ins.status)); });
             });
@@ -7002,6 +7138,8 @@
             .then(function (r3) { return r3.ok; }, function () { return false; })
           : Promise.resolve(true);
         if (!e.photo_path) return scanP;
+        // 원본 장을 이 줄 사진으로 쓴 줄(영수증 자리를 못 받음 — 2026-10-21)은 사진 = 원본이다. 원본은 위에서(남은 줄이 없을 때만) 지운다.
+        if (e.photo_path === e.scan_path) return scanP;
         // 앱이 올린 파일은 anon 경로라 웹 권한으로 못 지울 수 있다. 결과를 보고 말한다.
         return apiRetry('/storage/v1/object/evidence/' + e.photo_path, { method: 'DELETE' })
           .then(function (r2) { return r2.ok; }, function () { return false; })
@@ -11421,7 +11559,7 @@ window.EduGuard = {
       /** 검증을 돌린 뒤 — 영수증 화면의 사진 판독(evidence_ai)을 다시 받게 한다. */
       aiReset: function () { AIR = {}; AIR_ASKED = {}; },
       // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
-      fileToJpegs: fileToJpegs, evCrop: evCrop, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
+      fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,
       // 마감 단계 진행 위치(2026-10-20 디자인 v2) — 검증 화면 단계 카드가 앞 단계 차례인지 본다(AU6-L9)

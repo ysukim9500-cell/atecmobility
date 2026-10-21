@@ -197,6 +197,10 @@
   }
   function photoLink(it, label) {
     if (!it.photo_path) return '<span class="dim" style="font-size:11.5px">사진 없음</span>';
+    // 원본 장을 이 줄 사진으로 쓴 줄(photo_path = scan_path — 영수증 자리를 못 받아 오리지 않음, 2026-10-21)은 「원본」 하나만
+    if (it.scan_path && it.photo_path === it.scan_path) {
+      return '<a class="btn sm" target="_blank" rel="noopener" title="영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진입니다" href="' + esc(C.photoUrl(it.scan_path)) + '">원본</a>';
+    }
     return '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(C.photoUrl(it.photo_path)) + '">' + (label || '사진') + '</a>' +
       (it.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="스캔한 A4 원본" href="' + esc(C.photoUrl(it.scan_path)) + '">원본</a>' : '');
   }
@@ -349,6 +353,8 @@
    *  결재 중·완료 기간은 상신 때 굳힌 검증(고정본), 아니면 마지막 검증(expense_verifications). 줄마다 그 검증 항목이 가리킨 것으로:
    *  사진 없음(X01) · 금액 다름(X02 — 「12,000원으로 읽음」) · 못 읽음·영수증 아님(X05) · 날짜 다름(X04 — 「10.02로 읽음」) · 아직 안 읽음(X00) ·
    *  상호 다름(X03, 참고) · 그 밖 = 맞음. 검증한 뒤 올리거나 고친 줄은 「다시 검증」, 검증한 적이 없으면 「검증 전」.
+   *  2026-10-21 한 장에 여러 영수증을 올린 줄(원본 scan_path): 원본에 없음(X10 — 원본 장에서 그 날짜·금액 영수증을 찾지 못함) ·
+   *  대조 생략(X11 — 원본 장 파일이 없음). 서버 _shared/expense-verify.ts 원본 장 짝짓기.
    *  { by: { 줄id: [딱지 종류, 글, 풀이] } } — 결과를 받는 중이면 null(받으면 다시 그린다). */
   function aiCol(rows, a) {
     var u = me(), cyc = C.state().CYCKEY, v = null, at = 0;
@@ -364,7 +370,7 @@
       v = row ? ((row.result && row.result.items) || []) : null;
       at = row ? (Date.parse(row.created_at || '') || 0) : 0;
     }
-    var hit = {}, PRI = ['X01', 'X02', 'X05', 'X04', 'X00', 'X03'];
+    var hit = {}, PRI = ['X01', 'X02', 'X10', 'X05', 'X04', 'X00', 'X11', 'X03'];
     (v || []).forEach(function (it) {
       var code = String(it.code || '').slice(0, 3);
       if (PRI.indexOf(code) < 0) return;
@@ -384,6 +390,8 @@
         else if (x.code === 'X05') c = ['warn', /영수증으로 보이지/.test(String(x.it.title || '')) ? '영수증 아님' : '못 읽음', d];
         else if (x.code === 'X04') c = ['warn', (m = /사진의 날짜는\s*\d{4}-(\d{2})-(\d{2})/.exec(d)) ? m[1] + '.' + m[2] + '로 읽음' : '날짜 다름', d];
         else if (x.code === 'X00') c = ['neu', '아직 안 읽음', d];
+        else if (x.code === 'X10') c = [x.it.level === 'bad' ? 'bad' : 'warn', '원본에 없음', d];
+        else if (x.code === 'X11') c = ['neu', '대조 생략', d];
         else c = ['neu', '상호 다름', d];
       } else if (!it.photo_path) c = ['bad', '사진 없음', '영수증 사진이 없는 줄입니다'];
       else c = ['ok', '맞음', 'AI 가 읽은 금액·날짜가 적은 값과 같습니다'];
@@ -447,6 +455,7 @@
   function freeUrls() {
     XUP.pages.forEach(function (p) { if (p.url) URL.revokeObjectURL(p.url); });
     XUP.items.forEach(function (it) { if (it.crop && it.crop.url) URL.revokeObjectURL(it.crop.url); });
+    if (C.evCropReset) C.evCropReset();      // 오리느라 풀어 둔 마지막 장 그림도 놓는다(2026-10-21)
   }
   function xNote(m) { var el = $('xNote'); if (el) el.innerHTML = m; }
   function openUpload(day) {
@@ -565,6 +574,8 @@
                     it.date = ''; hint.push('날짜를 읽지 못했습니다 — 직접 넣어 주세요');
                   }
                   if (x.legible === false || x.kind === 'unreadable') hint.push('글자가 흐립니다 — 직접 확인해 주세요');
+                  // 영수증 자리를 받지 못했으면 장 전체를 따로 올리지 않고 원본 장을 이 줄의 사진으로 쓴다(올리기 — 2026-10-21). 그렇다고 알린다.
+                  if (many && !crops[k]) hint.push('영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이 됩니다');
                   it.hint = hint.join(' · ');
                   return it;
                 });
@@ -693,12 +704,18 @@
         var att = it.tries = (it.tries || 0) + 1;
         var pg = session.pages[it.page], key = it.key, sfx = att > 1 ? '-' + att : '';
         var path = mine + '/exp/' + key + sfx + '.jpg';
+        // ★ 한 장에 여러 영수증인데 이 줄은 오린 그림이 없다(Gemini 가 자리를 안 줌·직접 더한 줄) — 장 전체를 따로 또 올리지 않고
+        //   원본 장(scan_path)을 이 줄 사진으로 가리킨다(photo_path = scan_path, 2026-10-21 — 운행일지 올리기와 같은 규칙).
+        var useScan = !!pg.multi && !(it.crop && it.crop.blob);
         var scanP = Promise.resolve();
         if (pg.multi && !pg.scanPath) {
           var sp = mine + '/exp/scan/' + key + sfx + '.jpg';
           scanP = upload(sp, pg.blob).then(function () { pg.scanPath = sp; });
         }
-        return scanP.then(function () { return upload(path, (it.crop && it.crop.blob) || pg.blob); }).then(function () {
+        return scanP.then(function () {
+          if (useScan) { path = pg.scanPath; return; }
+          return upload(path, (it.crop && it.crop.blob) || pg.blob);
+        }).then(function () {
           return rest('/rest/v1/expense_items', {
             method: 'POST', headers: { Prefer: 'return=representation' },
             body: JSON.stringify({
@@ -714,12 +731,13 @@
             //   · 줄이 있다 → 올라간 것으로 친다. 그 줄이 이번 사진을 안 가리키면(앞 시도 사진) 이번 사진만 지운다.
             //   · 줄이 없다 → 사진만 남기지 않게 지우고 실패로.
             //   · 묻지도 못했다 → 아무것도 지우지 않고 실패로(남는 사진 한 장이 빈 증빙보다 낫다).
+            //   · 원본 장을 가리킨 줄(useScan)은 어느 경우에도 지우지 않는다 — 같은 장의 다른 줄이 그 원본을 쓴다.
             return existing(key).then(function (row) {
               if (row) {
-                if (row.photo_path !== path) C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { });
+                if (row.photo_path !== path && !useScan) C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { });
                 return;
               }
-              return C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' }).catch(function () { })
+              return (useScan ? Promise.resolve() : C.apiRetry('/storage/v1/object/evidence/' + path, { method: 'DELETE' })).catch(function () { })
                 .then(function () { throw e; });
             }, function () { throw e; });
           }).then(function () { done++; });
@@ -968,7 +986,7 @@
   }
   var LV = { bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
   var VITEMS = [];
-  function isAiItem(it) { return /^X0[2-5]/.test(String(it && it.code || '')) || /^X06/.test(String(it && it.code || '')) && /승인번호/.test(String(it.detail || '')); }
+  function isAiItem(it) { return /^X(0[2-5]|10)/.test(String(it && it.code || '')) || /^X06/.test(String(it && it.code || '')) && /승인번호/.test(String(it.detail || '')); }
   function itemsHtml(items, links) {
     if (!items || !items.length) return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">확인이 필요한 항목이 없습니다.</div></div></div>';
     return '<div class="panel vlist">' + items.map(function (it) {
