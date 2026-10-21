@@ -1136,8 +1136,11 @@
     var me = myName(), out = {};
     if (!me || isMulti() || myCycLocked()) return out;
     var r = cycleRange(CYC), M = moneyOf(me, r, ALL_TRIPS, ALL_EVID);
+    // 같은 금액 영수증 확인을 기다리는 날(2026-10-21 통행료 버그 2 — 맞춰보기 표 그 줄 「확인」)도 센다
+    var dupD = dupFillDays(M).filter(function (x) { return x.ask.length && x.d.show; });
     ['주차', '통행료'].forEach(function (c) {
-      out[c] = M[c].days.filter(function (d) { return d.show && (d.st === 'no_receipt' || d.st === 'mismatch' || d.st === 'no_trip' || d.twice); }).length;
+      out[c] = M[c].days.filter(function (d) { return d.show && (d.st === 'no_receipt' || d.st === 'mismatch' || d.st === 'no_trip' || d.twice); }).length +
+        dupD.filter(function (x) { return x.cat === c; }).length;
     });
     var biz = ALL_TRIPS.filter(function (t) { return t.username === me && !t.deleted_at && (t.purpose || '') === BUSINESS && t.start_time >= r.lo && t.start_time < r.hi; });
     var claim = Math.round(biz.reduce(function (a, t) { return a + tripFuel(t); }, 0));
@@ -1273,7 +1276,7 @@
        · 주유: 주유 영수증 합계 ≥ 청구 유류비(업무 거리 × 단가).
        · 계기판: 계기판 사진 숫자 ≥ 운행일지 최종 km.
      사진에서 읽은 숫자(AI)는 「검증하기」를 한 번 돌려야 생긴다(evidence_ai). 없으면 그렇게 안내한다. */
-  var AIR = {}, AIR_ASKED = {};
+  var AIR = {}, AIR_ASKED = {}, AIR_DONE = {};
   /** 주차·통행료 맞춰보기 표를 접어 둘지(구분마다 — 기본은 접음, 2026-10-15 2차). false 면 펼침. */
   var MFOLD = {};
   function loadAiReads() {
@@ -1284,9 +1287,12 @@
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (rows) {
         (rows || []).forEach(function (x) { AIR[x.evidence_id] = x; });
+        AIR_DONE[k] = 1;
         if (VIEW === 'evid' && !$('panel').classList.contains('open')) render();
-      }).catch(function () { delete AIR_ASKED[k]; });
+      }).catch(function () { delete AIR_ASKED[k]; AIR_DONE[k] = 1; });
   }
+  /** 사진 판독(evidence_ai)을 한 번 받아 봤는가(받았거나 못 받았거나) — 영수증 적기가 같은 금액 영수증의 시각(원본 장 판독)을 보기 전에 기다린다(2026-10-21). */
+  function airReady() { return !!AIR_DONE[myName() + '|' + CYCKEY()]; }
   /** 이 영수증 사진에서 AI 가 읽은 결과(사진이 바뀌었으면 없음으로). */
   function aiOf(e) {
     var x = AIR[e.id];
@@ -1366,12 +1372,20 @@
           var a = d.amt[t.id] || 0, f = d.fill[t.id] || 0;
           return '<button type="button" class="mtrip" data-edit="' + t.id + '" title="이 운행 고치기"><span class="mt">' + esc(hm(t.start_time)) + '</span>' +
             '<span class="mp">' + esc(t.visit_place || placeShort(t.end_address) || '방문처 없음') + '</span>' +
-            (a ? ' <span class="dim">· ' + word + ' ' + n0(a) + '</span>' : f ? ' <span class="dim">· 영수증 ' + n0(f) + ' 넣음</span>'
+            (a ? ' <span class="dim">· ' + word + ' ' + n0(a) + '</span>' : f ? ' <span class="dim">· 영수증 ' + n0(f) + (DUPD[d.day] ? ' 넣을 차례(확인 전)' : ' 넣음') + '</span>'
               : isUnkHere(t) ? ' <span class="dim mtunk">· 통행료 모름</span>' : '') + '</button>';
         }).join('');
         return show + (pick.length > 3 ? '<div class="dim">외 ' + (pick.length - 3) + '건</div>' : '');
       };
-      var nBad = 0, nNoTrip = 0, nOld = 0, nOk = 0, nTwice = 0, nAi = 0;
+      var nBad = 0, nNoTrip = 0, nOld = 0, nOk = 0, nTwice = 0, nAi = 0, nDupF = 0;
+      // 같은 금액 영수증(2026-10-21 통행료 버그 2) — 영수증으로 채울 날인데 시각으로 못 가른 같은 금액 묶음이 있으면 영수증 적기가 적지 않고 묻는다.
+      //   그 줄: 결과 「같은 금액 영수증 N장 — 확인」 + 줄 끝 「확인」(확인 창 openDupFill). 결재 중·완료 기간은 예전 그대로(적지도 묻지도 않는다).
+      var DUPD = {};
+      if (canLink) MC.days.forEach(function (d) {
+        if (d.st !== 'filled' || d.twice) return;
+        var g = window.MoneyRule.sameAmt(d.ev, evTimeOf).filter(function (x) { return !x.sep; });
+        if (g.length) DUPD[d.day] = g;
+      });
       // 다음 날 날짜로 올라온 전날 영수증 — 두 번 정산 의심(2026-10-20 사용자 결정 ② · money-rule.js d.twice = 서버 R14). 자동으로 옮기지 않고 그 줄에 안내만.
       var twMd = function (d) { return d.twice.prev.slice(5).replace('-', '.'); };
       var twTxt = function (d) {
@@ -1396,12 +1410,15 @@
         // 결과 글은 할 일이 보이게(웹 8차, 2026-10-17 「직원이 쉽게」)
         //   금액 다름 + 「모름」 운행 + 증빙이 남는 날(2026-10-21) — 「금액 다름 — 이 날 모름 운행 HH:MM 에 금액을 넣으세요(제안 X원)」
         var sgd = sgOf(d), sgGo = !!(sgd && sgd.diff > 0);
+        var dupG = d.show ? DUPD[d.day] || [] : [], dupN = dupG.reduce(function (s, g) { return s + g.ev.length; }, 0);
         var res = !d.show ? '<span class="dim">10월분 전 — 확인 안 함</span>'
           : d.st === 'no_receipt' ? bad(myCycLocked() ? '영수증 없음' : isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
           : d.st === 'mismatch' ? bad(sgGo ? '금액 다름 — ' + window.TollSuggest.rowSay(sgd) : '금액 다름 — 운행 금액이나 영수증을 확인')
           : d.st === 'no_trip' ? warnR('운행 없는 날 — 정산에서 빠짐')
           : d.st === 'filled' && d.twice ? warnR('두 번 정산 의심') +
             '<div class="mtw" data-twice="' + esc(d.twice.prev) + '">' + esc(twTxt(d)) + '</div>'
+          : dupG.length ? warnR('같은 금액 영수증 ' + n0(dupN) + '장 — 확인') +
+            '<div class="mtw" data-dupday="' + esc(d.day) + '">' + esc('같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) 「확인」에서 골라 주세요 — 고를 때까지 운행 ' + word + '는 비워 두고, 정산에는 영수증 합계가 들어갑니다') + '</div>'
           : d.st === 'filled' ? ok('맞음 · 영수증 금액을 넣음')
           : ok('맞음');
         if (aiNote.length) res += ' ' + bad('사진 금액과 다름');
@@ -1415,10 +1432,12 @@
         if (!d.show) nOld++;
         var isTwice = d.show && d.st === 'filled' && !!d.twice;
         if (isTwice) nTwice++;
-        if (d.show && (d.st === 'match' || d.st === 'filled') && !aiNote.length && !isTwice) nOk++;
+        var isDupF = dupG.length > 0;
+        if (isDupF) nDupF++;
+        if (d.show && (d.st === 'match' || d.st === 'filled') && !aiNote.length && !isTwice && !isDupF) nOk++;
         // 줄을 누르면 여는 운행 — 「모름」 운행에 금액을 넣으라고 하는 날은 그 운행(제안이 있는 운행 먼저), 아니면 예전대로
         var tgt = sgGo ? sgTrip(sgd) : d.target;
-        var flag = isBad || (d.show && d.st === 'no_trip') || isTwice;
+        var flag = isBad || (d.show && d.st === 'no_trip') || isTwice || isDupF;
         // 줄 끝 단추(2026-10-20 디자인 v2, P_Evid) — 영수증 없음 → 올리기(영수증 올리기 창) · 금액 다름 → 고치기(그 운행 고치기 창) ·
         //   운행 없는 날·두 번 정산 의심 → 「다른 운행에 붙이기」(예전엔 결과 칸 안 — 같은 단추를 줄 끝으로 옮김). 결재 중·완료 기간은 없다.
         var linkB = function (id) { return '<button type="button" class="btn sm mlinkb" data-evlink="' + esc(cat) + '" data-evlinkid="' + esc(String(id)) + '">다른 운행에 붙이기</button>'; };
@@ -1426,7 +1445,8 @@
           : d.st === 'no_receipt' ? '<button type="button" class="btn sm" data-evupcat="' + esc(cat) + '">' + ic('upload', 13) + '올리기</button>'
           : d.st === 'mismatch' && tgt ? '<button type="button" class="btn sm" data-edit="' + tgt.id + '">' + ic('edit', 13) + '고치기</button>'
           : d.st === 'no_trip' && d.ev.length ? linkB(d.ev[0].id)
-          : d.st === 'filled' && d.twice && d.twice.ev.length ? linkB(d.twice.ev[0].id) : '';
+          : d.st === 'filled' && d.twice && d.twice.ev.length ? linkB(d.twice.ev[0].id)
+          : isDupF ? '<button type="button" class="btn sm" data-dupfill="' + esc(cat + '|' + d.day) + '">' + ic('check', 13) + '확인</button>' : '';
         return '<tr class="' + (flag ? 'flagged' : 'mok') + (tgt ? ' mclick' : '') + '"' +
           (tgt ? ' data-edit="' + tgt.id + '" title="눌러서 이 날 운행 고치기"' : '') + ' data-mday="' + esc(d.day) + '" data-mst="' + esc(d.st) + '">' +
           '<td style="white-space:nowrap">' + esc(dn(d.day)) + '</td>' +
@@ -1439,14 +1459,15 @@
       if (!MC.days.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없습니다' : '통행료·통행료 영수증이 없습니다', '', '') + xlHtml;
       // ── 한 줄 요약 + 「자세히 보기」(2026-10-15 2차 「영수증 한 번에 맞추기」) ──
       //   칸 많은 표는 접어 두고, 문제 있는 날(영수증 없음·금액 다름·운행 없는 영수증)만 펼쳐 보인다.
-      var fold = MFOLD[cat] !== false, nFlag = nBad + nNoTrip + nTwice;
+      var fold = MFOLD[cat] !== false, nFlag = nBad + nNoTrip + nTwice + nDupF;
       var fillTrips = Object.keys(MC.byTrip).filter(function (id) { return MC.byTrip[id].fill > 0; }).length;
       var parts = [];
       if (fillTrips) parts.push('영수증 금액을 넣은 운행 <em>' + n0(fillTrips) + '건</em>');
       if (nBad) parts.push('확인할 날 <em>' + n0(nBad) + '일</em>');
       if (MS.noTripShowN) parts.push('운행 없는 날 영수증 <em>' + n0(MS.noTripShowN) + '장</em>(정산에서 빠짐)');
       if (nTwice) parts.push('두 번 정산 의심 <em>' + n0(nTwice) + '일</em>');
-      if (!nBad && !MS.noTripShowN && !nTwice) parts.push(fillTrips ? '나머지는 모두 맞습니다' : (isToll ? '통행료 증빙이 모두 맞습니다' : '주차비 영수증이 모두 맞습니다'));
+      if (nDupF) parts.push('같은 금액 영수증 확인 <em>' + n0(nDupF) + '일</em>');
+      if (!nBad && !MS.noTripShowN && !nTwice && !nDupF) parts.push(fillTrips ? '나머지는 모두 맞습니다' : (isToll ? '통행료 증빙이 모두 맞습니다' : '주차비 영수증이 모두 맞습니다'));
       // 할 일 — 동사로(웹 8차)
       var how = [];
       if (MS.none) how.push(isToll ? '「영수증 없음」 날은 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요(실제로 안 냈으면 그 줄을 눌러 통행료를 「없음」으로)'
@@ -1465,6 +1486,8 @@
       if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
       if (nTwice) how.push('「두 번 정산 의심」 날은 영수증 금액이 전날 운행 금액과 같습니다 — 전날 운행 영수증을 다음 날 날짜로 올렸으면 그 줄의 「다른 운행에 붙이기」로 전날 운행에 이어 주세요(그대로 두면 전날 운행 금액과 이 영수증이 둘 다 정산됩니다). ' +
         '그 날 운행 영수증이 맞으면 줄을 눌러 그 운행 ' + word + '를 적어 주세요 — 그러면 이 표시가 없어집니다');
+      if (nDupF) how.push('「같은 금액 영수증」 날은 운행 ' + word + '가 비어 영수증 금액을 넣을 차례인데 같은 금액 영수증이 여러 장입니다 — 그 줄의 「확인」에서 ' +
+        '실제로 여러 번 냈으면(왕복 등) 「합계 적기」, 같은 영수증을 두 번 올렸으면 「한 번만 적기」를 골라 주세요(겹친 영수증은 아래 내역에서 지웁니다)');
       // 결재 중·결재 완료 기간 — 고칠 수 없으니 할 일 대신 한 줄(2026-10-19 마지막 검증)
       if (myCycLocked() && how.length) how = [lockWhy(me) + ' 이 기간에는 영수증·운행을 고칠 수 없습니다. 고쳐야 하면 결재하는 분에게 반려를 요청하세요'];
       var rule = '증빙이 있는 날은 「맞음」입니다. 정산에는 <b>운행 금액</b>이 들어가고 영수증은 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
@@ -1480,6 +1503,7 @@
       if (nAi) line.push('사진 금액과 다름 ' + n0(nAi) + '일');
       if (MS.noTripShowN) line.push('운행 없는 날 영수증 ' + n0(MS.noTripShowN) + '장');
       if (nTwice) line.push('두 번 정산 의심 ' + n0(nTwice) + '일');
+      if (nDupF) line.push('같은 금액 영수증 ' + n0(nDupF) + '일');
       var hideHow = fold && line.length > 0 && !myCycLocked();
       var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? ' — 줄의 단추로 바로 처리합니다. 설명은 「자세히 보기」에 있습니다.' : '') + '</div>' : '';
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
@@ -1488,7 +1512,7 @@
         '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th><th><span class="sr">할 일</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
         (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었습니다 — 「자세히 보기」로 볼 수 있습니다.</div>' : '');
-      return box(!nBad && !nNoTrip && !nTwice, parts.join(' · '),
+      return box(!nBad && !nNoTrip && !nTwice && !nDupF, parts.join(' · '),
         // 올린 영수증 합이 정산과 왜 다른지 한 마디(2026-10-17 모르는 로봇 「영수증 7,500원인데 정산 4,400원 — 잘못 들어간 줄」)
         '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) +
           // 하이패스 이용내역으로 맞춘 금액도 증빙으로 보이게(모르는 로봇 3회차 — 「올린 영수증 1,100원」만 보여 나머지가 증빙 없는 것처럼 읽혔다)
@@ -5136,6 +5160,13 @@
         ' — 전날 운행 영수증이면 「다른 운행에 붙이기」로 이어 주세요',
       b1: { t: '다른 운행에 붙이기', a: 'data-evlink="' + tw[0].cat + '" data-evlinkid="' + esc(String(tw[0].d.twice.ev[0].id)) + '"', i: 'link' },
       b2: { t: '영수증 보기', a: 'data-evstep="' + tw[0].cat + '"', i: 'eye' }, nx: '두 번 정산 의심' });
+    // 같은 금액 영수증(2026-10-21 통행료 버그 2) — 영수증으로 채울 날인데 같은 금액 영수증이 여러 장 → 영수증 적기가 적기 전에 묻는다
+    var dq = myCycLocked() ? [] : dupFillDays(M).filter(function (x) { return x.ask.length && x.d.show; });
+    if (dq.length) list.push({ k: 'dupfill', sev: 'warn', t: '같은 금액 영수증 확인 ' + n0(dq.length) + '일',
+      d: dq.slice(0, 2).map(function (x) { return dayDow(x.d.day) + ' ' + x.cat + ' ' + x.ask.map(function (g) { return won0(g.a) + ' ' + n0(g.ev.length) + '장'; }).join(' · '); }).join(' / ') +
+        (dq.length > 2 ? ' 외 ' + n0(dq.length - 2) + '일' : '') + ' — 같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지 골라 주세요',
+      b1: { t: '확인하기', a: 'data-dupfill="' + esc(dq[0].cat + '|' + dq[0].d.day) + '"', i: 'check' },
+      b2: { t: '영수증 보기', a: 'data-evstep="' + dq[0].cat + '"', i: 'eye' }, nx: '같은 금액 영수증' });
     // 통행료 미확정(R02) — 자동 계산이 안 된 업무 운행
     var unk = S.trips.filter(function (t) { return isUnknownToll(t) && (t.purpose || '') === BUSINESS; }).sort(function (a, b) { return a.start_time - b.start_time; });
     if (unk.length) list.push({ k: 'unk', sev: 'warn', t: '통행료 미확정 운행 ' + n0(unk.length) + '건',
@@ -5162,6 +5193,7 @@
     CATS.slice().reverse().forEach(function (cat) {
       var sh = M[cat].days.filter(function (d) { return d.show && (d.T || d.R || d.H); });
       if (!sh.length || sh.some(function (d) { return d.st === 'no_receipt' || d.st === 'mismatch' || d.st === 'no_trip' || d.twice; })) return;
+      if (dq.some(function (x) { return x.cat === cat; })) return;          // 같은 금액 영수증 확인이 남은 구분
       done.push({ t: cat + ' 증빙 ' + n0(sh.length) + '일 맞음', d: sh.slice(0, 5).map(function (d) { return dayDow(d.day); }).join(' · ') + (sh.length > 5 ? ' 외 ' + n0(sh.length - 5) + '일' : '') });
     });
     if (claim > 0 && claim <= paid + 1) done.push({ t: '주유 영수증 ' + n0(fuelEv.length) + '장', d: '주유 영수증 ' + won0(paid) + ' ≥ 청구 유류비 ' + won0(claim) });
@@ -5203,17 +5235,21 @@
    *  증빙 = 그날 금액 규칙 v3 결과(통행료·주차 중 나쁜 쪽): 영수증 없음 · 금액 다름 · 두 번 정산 의심 · 맞음 / 통행료 미확정 / 업무가 아니거나 금액 없는 날 —. */
   function closeTripTable(rows, M) {
     if (!rows.length) return blank('이 기간에 운행 기록이 없습니다.', null, 'list');
-    var flags = flaggedIds(), of = {}, RK = { no_receipt: 4, mismatch: 3, twice: 2, ok: 1 };
+    var flags = flaggedIds(), of = {}, RK = { no_receipt: 4, mismatch: 3, twice: 2, dup: 2, ok: 1 };
+    // 같은 금액 영수증 확인을 기다리는 날(2026-10-21 통행료 버그 2) — 「맞음」 대신 「같은 금액 확인」
+    var dupDay = {};
+    if (M && !myCycLocked()) dupFillDays(M).forEach(function (x) { if (x.ask.length) dupDay[x.cat + '|' + x.d.day] = 1; });
     ['통행료', '주차'].forEach(function (cat) {
       ((M && M[cat] && M[cat].days) || []).forEach(function (d) {
-        var k = !d.show ? '' : d.st === 'no_receipt' ? 'no_receipt' : d.st === 'mismatch' ? 'mismatch' : d.twice ? 'twice' : d.st === 'match' || d.st === 'filled' ? 'ok' : '';
+        var k = !d.show ? '' : d.st === 'no_receipt' ? 'no_receipt' : d.st === 'mismatch' ? 'mismatch' : d.twice ? 'twice' : dupDay[cat + '|' + d.day] ? 'dup'
+          : d.st === 'match' || d.st === 'filled' ? 'ok' : '';
         if (k) d.trips.forEach(function (t) {
           if (!(d.amt[t.id] > 0) && !(d.fill[t.id] > 0)) return;          // 그날 금액이 없는 운행에는 붙이지 않는다
           if (!of[t.id] || RK[k] > RK[of[t.id]]) of[t.id] = k;
         });
       });
     });
-    var CH = { no_receipt: ['영수증 없음', 'bad'], mismatch: ['금액 다름', 'warn'], twice: ['두 번 정산 의심', 'warn'], ok: ['맞음', 'ok'] };
+    var CH = { no_receipt: ['영수증 없음', 'bad'], mismatch: ['금액 다름', 'warn'], twice: ['두 번 정산 의심', 'warn'], dup: ['같은 금액 확인', 'warn'], ok: ['맞음', 'ok'] };
     var evCell = function (t) {
       if ((t.purpose || '') !== BUSINESS) return '<span class="dim">—</span>';
       if (isUnknownToll(t)) return '<span class="dchip warn">통행료 미확정</span>';
@@ -10492,7 +10528,11 @@ window.EduGuard = {
     }
     // 줄 전체를 누르면 그 운행 고치기 — 단 줄 안의 「다른 운행에 붙이기」(두 번 정산 의심 줄, 2026-10-20)는 그 단추가 먼저다(아래 data-evlink)
     //   줄 끝 「올리기」(영수증 없음, 2026-10-20 디자인 v2)도 그 단추가 먼저다(아래 data-evupcat — 영수증 올리기 창)
-    if ((el = e.target.closest('[data-edit]')) && !e.target.closest('[data-evlink]') && !e.target.closest('[data-evupcat]')) { openEdit(el.dataset.edit); return; }
+    //   줄 끝 「확인」(같은 금액 영수증, 2026-10-21)도 그 단추가 먼저다(아래 data-dupfill — 확인 창)
+    if ((el = e.target.closest('[data-edit]')) && !e.target.closest('[data-evlink]') && !e.target.closest('[data-evupcat]') && !e.target.closest('[data-dupfill]')) { openEdit(el.dataset.edit); return; }
+    // 같은 금액 영수증 확인 창(2026-10-21 통행료 버그 2) — 맞춰보기 표 그 줄 · 마감 화면 남은 일의 「확인」 · 창 아래 [적기]
+    if ((el = e.target.closest('[data-dupfill]'))) { var dfp = String(el.dataset.dupfill).split('|'); openDupFill(dfp[0], dfp[1]); return; }
+    if (e.target.closest('#btnDupGo')) { dupFillGo(); return; }
     if (e.target.closest('#btnSaveTrip')) { saveTrip(e.target.closest('#btnSaveTrip').dataset.id); return; }
     if (e.target.closest('#btnAddTrip')) { openCreate(); return; }
     /* ── 하이패스 대조 ── */
@@ -10877,6 +10917,8 @@ window.EduGuard = {
     if (e.target.matches && e.target.matches('input.num[inputmode="numeric"]')) numMark(e.target);
     if (e.target.closest && e.target.closest('#evList [data-evrow]')) evHpNotes();   // 구분·날짜를 바꾸면 하이패스 안내도 다시(웹 8차)
     if (e.target.matches && e.target.matches('[data-tspick],#tsAll')) { tsPick(e.target); return; }   // 통행료 맞추기 제안 창 고르기(2026-10-21)
+    // 같은 금액 영수증 확인 창 — 고르면 [적기]가 풀린다(2026-10-21 통행료 버그 2)
+    if (e.target.matches && e.target.matches('input[name="dupfill"]')) { var dg = $('btnDupGo'); if (dg) dg.disabled = false; return; }
     if (e.target.id === 'signFile') {
       var f = e.target.files && e.target.files[0];
       e.target.value = '';
@@ -11307,17 +11349,49 @@ window.EduGuard = {
          지금은 「웹 직접 입력」으로 적히고, batch·note 에 「영수증」과 영수증 번호를 남긴다(서버에 mode 'receipt' 가 생기면 바꿀 것).
        · 주차: trip-edit patch parking_cost.
      결재가 올라간(잠긴) 기간·운행은 적지 않는다. 적지 않아도 정산·엑셀·결재 금액은 같다(moneyOf 가 이미 영수증 금액을 넣는다).
-     같은 값은 한 번만 시도한다(AUTOFILL_TRIED) — 실패해도 화면을 다시 그릴 때마다 되풀이하지 않는다. */
+     같은 값은 한 번만 시도한다(AUTOFILL_TRIED) — 실패해도 화면을 다시 그릴 때마다 되풀이하지 않는다.
+     ★ 같은 금액 영수증이 2장 이상인 날(2026-10-21 통행료 버그 2 — money-rule.js sameAmt)은 적지 않고 직원에게 묻는다(openDupFill):
+       「두 번 낸 것 맞음(왕복 등) → 합계 적기」 / 「같은 영수증이 겹침 → 한 번만 적기」. 예전엔 합계를 적어 그날이 「맞음」이 되고 검증 R08 이
+       참고로 내려가 중복이 정산에 굳었다(직원 사례: 14분 운행 1건에 1,700원 영수증 3장 → 운행 5,100원). 영수증 시각이 모두 있고 서로 다르면
+       별개 영수증으로 보고 묻지 않고 합계를 적는다(글에 「시각이 다른 영수증」). 고른 것은 저장 글(fillNote)에 남아 서버 검증이 읽는다(_shared/fill-mark.ts). */
   var AUTOFILL_TRIED = {}, AUTOFILL_BUSY = false;
+  var DUPF_ASKED = {}, DUPF = null;        // 같은 금액 영수증 확인 창 — 이 탭에서 저절로 띄운 날(한 번씩) · 열린 창
   var EVUNDO = null, EVLINK_UNDO = null;   // 지우기·붙이기 확인 창의 「되돌릴 운행 금액」(2026-10-20 AU2 ①)
+  /** 이 영수증의 시각(money-rule rcptTime — 원본 장 판독 시각 · 영수증 날짜의 시각). */
+  function evTimeOf(e) { return window.MoneyRule.rcptTime(e, AIR[e.id] || null); }
+  /** 영수증으로 채울 날 중 같은 금액 영수증이 2장 이상인 날 — [{ cat, d, G: 묶음(sameAmt), ask: 시각으로 못 가른 묶음 }](두 번 정산 의심인 날은 뺀다). */
+  function dupFillDays(M) {
+    var out = [];
+    ['주차', '통행료'].forEach(function (cat) {
+      ((M && M[cat] && M[cat].days) || []).forEach(function (d) {
+        if (d.st !== 'filled' || d.twice) return;
+        var G = window.MoneyRule.sameAmt(d.ev, evTimeOf);
+        if (G.length) out.push({ cat: cat, d: d, G: G, ask: G.filter(function (g) { return !g.sep; }) });
+      });
+    });
+    return out;
+  }
+  /** 그날 운행에 적을 것 — [{ cat, id, amount, note, say }](money-rule fillPlan·fillNote). 내 것·안 잠긴 운행·서버 범위 안만. */
+  function fillItemsOf(cat, d, mode, G, how) {
+    var me = myName(), byId = {};
+    ALL_TRIPS.forEach(function (t) { byId[String(t.id)] = t; });
+    return window.MoneyRule.fillPlan(d, mode, G).map(function (p) {
+      var t = byId[String(p.tripId)];
+      if (!t || t.username !== me || apprLocked(t) || !(p.amount > 0)) return null;
+      if (p.amount > (cat === '통행료' ? TOLL_MAX : 300000)) return null;   // 서버 범위 밖 — 적지 않는다(정산은 그대로 영수증 금액)
+      // 근거 = 그 운행 줄을 채운 영수증(money-rule fillEv) — 나중에 그 영수증을 지우거나 옮기면 이 금액을 되돌린다(2026-10-20 AU2 ①)
+      return { cat: cat, id: Number(p.tripId), amount: p.amount, note: window.MoneyRule.fillNote(cat, p.ids, how),
+        say: d.day.slice(5).replace('-', '.') + ' ' + cat + ' ' + n0(p.amount) + '원' };
+    }).filter(Boolean);
+  }
   function autoFillEv() {
     if (AUTOFILL_BUSY || !LOADED || isAll() || isMulti() || !myName() || VIEW !== 'evid') return;
     var me = myName();
     if (cycleLocked(me)) return;
     var r = cycleRange(CYC), M = moneyOf(me, r, ALL_TRIPS, ALL_EVID);
-    var byId = {};
-    ALL_TRIPS.forEach(function (t) { byId[String(t.id)] = t; });
-    var tolls = [], parks = [], tried = [];
+    var tolls = [], parks = [], tried = [], asks = [];
+    // 같은 금액 영수증의 시각은 원본 장 판독(evidence_ai)에도 있다 — 받기 전이면 그런 날은 이번에 건너뛴다(받으면 다시 그려 다시 본다)
+    var air = airReady();
     ['주차', '통행료'].forEach(function (cat) {
       M[cat].days.forEach(function (d) {
         if (d.st !== 'filled') return;
@@ -11325,29 +11399,30 @@ window.EduGuard = {
         //   적으면 그 날 운행 금액이 생겨 「맞음」이 되고 의심 표시가 사라진 채 두 번 정산이 운행 기록에 굳는다. 정산 금액은 그대로(영수증으로 채움) —
         //   작성자가 전날 운행에 잇거나(「다른 운행에 붙이기」), 그 날 운행 영수증이 맞으면 운행 금액을 직접 적는다.
         if (d.twice) return;
-        Object.keys(d.fill).forEach(function (id) {
-          var amt = Math.round(d.fill[id]), t = byId[String(id)];
-          if (!t || t.username !== me || apprLocked(t) || !(amt > 0)) return;
-          var key = me + '|' + cat + '|' + id + '|' + amt;
+        // 같은 금액 영수증이 2장 이상 — 시각으로 가르지 못하면 묻는다(위 머리 주석). 모두 시각이 달라 별개면 합계 + 「시각이 다른 영수증」.
+        var G = window.MoneyRule.sameAmt(d.ev, evTimeOf), ask = G.filter(function (g) { return !g.sep; });
+        if (ask.length) { if (air) asks.push({ cat: cat, d: d, G: G, ask: ask }); return; }
+        fillItemsOf(cat, d, 'sum', G, G.length ? 'apart' : '').forEach(function (p) {
+          var key = me + '|' + cat + '|' + p.id + '|' + p.amount;
           if (AUTOFILL_TRIED[key]) return;
           AUTOFILL_TRIED[key] = 1; tried.push(key);
-          var say = d.day.slice(5).replace('-', '.') + ' ' + cat + ' ' + n0(amt) + '원';
-          // 근거 = 그 운행 줄을 채운 영수증(money-rule fillEv) — 나중에 그 영수증을 지우거나 옮기면 이 금액을 되돌린다(2026-10-20 AU2 ①)
-          var refs = '#' + ((d.fillEv && d.fillEv[id]) || d.ev.map(function (e) { return e.id; })).join(',#');
-          if (cat === '통행료') {
-            if (amt > TOLL_MAX) return;                    // 서버 범위 밖 — 적지 않는다(정산은 그대로 영수증 금액)
-            tolls.push({ id: Number(id), amount: amt, note: '영수증 ' + refs, say: say });
-          } else {
-            if (amt > 300000) return;
-            parks.push({ id: Number(id), amount: amt, note: FILL_NOTE + ' ' + refs, say: say });
-          }
+          (cat === '통행료' ? tolls : parks).push(p);
         });
       });
     });
-    if (!tolls.length && !parks.length) return;
+    if (tolls.length || parks.length) { fillSafe(tolls, parks, tried); return; }
+    // 물을 날 — 그 구분 차례를 보고 있고 다른 창이 없을 때 하나씩 저절로 연다(이 탭에서 날마다 한 번). 닫아도 그 줄 「확인」으로 다시 연다.
+    var q = asks.filter(function (x) { return EV_SUBS[evSub()] === x.cat && !DUPF_ASKED[dupKey(x.cat, x.d)]; })[0];
+    if (q && !$('panel').classList.contains('open')) { DUPF_ASKED[dupKey(q.cat, q.d)] = 1; openDupFill(q.cat, q.d.day); }
+  }
+  /** 물은 날 열쇠 — 사람·구분·날·그날 영수증(바뀌면 다시 묻는다). */
+  function dupKey(cat, d) { return myName() + '|' + cat + '|' + d.day + '|' + d.ev.map(function (e) { return e.id; }).join(','); }
+  /** ★ 적기 직전에 그 운행들을 서버에서 다시 읽어, 지금도 금액이 비어 있는 것만 적는다(2026-10-16 검증로봇 —
+   *  화면에 받아 둔 묵은 자료로 판단해, 그 사이 앱·다른 탭에서 확정된 통행료·주차비를 영수증 금액으로 덮어쓸 수 있었다).
+   *  다시 읽지 못하면 적지 않는다(다음에 화면을 그릴 때 다시 해 본다 — tried 를 지운다). opt = writeFill 의 알림 글(ok·miss). */
+  function fillSafe(tolls, parks, tried, opt) {
+    var me = myName();
     AUTOFILL_BUSY = true;
-    // ★ 적기 직전에 그 운행들을 서버에서 다시 읽어, 지금도 금액이 비어 있는 것만 적는다(2026-10-16 검증로봇 —
-    //   화면에 받아 둔 묵은 자료로 판단해, 그 사이 앱·다른 탭에서 확정된 통행료·주차비를 영수증 금액으로 덮어쓸 수 있었다).
     var ids = tolls.concat(parks).map(function (p) { return p.id; });
     apiRetry('/rest/v1/trips?select=id,username,deleted_at,toll_cost,toll_status,toll_source,parking_cost&id=in.(' + ids.join(',') + ')')
       .then(function (x) { return x.ok ? x.json() : Promise.reject(new Error('HTTP ' + x.status)); })
@@ -11364,14 +11439,20 @@ window.EduGuard = {
         };
         tolls = tolls.filter(still('통행료'));
         parks = parks.filter(still('주차'));
-        if (!tolls.length && !parks.length) { AUTOFILL_BUSY = false; if (stale) { TRIP_CACHE = {}; AUDIT = null; loadAll(); } return; }
-        writeFill(tolls, parks);
-      }, function () {                                  // 다시 읽지 못하면 적지 않는다(다음에 화면을 그릴 때 다시 해 본다)
+        if (!tolls.length && !parks.length) {
+          AUTOFILL_BUSY = false;
+          if (opt && opt.miss) toast(opt.miss, true);
+          if (stale) { TRIP_CACHE = {}; AUDIT = null; loadAll(); }
+          return;
+        }
+        writeFill(tolls, parks, opt);
+      }, function () {
         AUTOFILL_BUSY = false;
-        tried.forEach(function (k) { delete AUTOFILL_TRIED[k]; });
+        (tried || []).forEach(function (k) { delete AUTOFILL_TRIED[k]; });
+        if (opt && opt.miss) toast('서버에서 운행을 다시 읽지 못했습니다 — 잠시 뒤 그 줄의 「확인」을 다시 눌러 주세요(아무것도 적지 않았습니다).', true);
       });
   }
-  function writeFill(tolls, parks) {
+  function writeFill(tolls, parks, opt) {
     var notes = tolls.concat(parks).map(function (p) { return p.say; });
     var ok = 0, fail = 0;
     var tollStep = !tolls.length ? Promise.resolve() :
@@ -11388,10 +11469,79 @@ window.EduGuard = {
     tollStep.then(function () { return parkStep(0); }).then(function () {
       AUTOFILL_BUSY = false;
       if (!ok) { if (fail) toast('영수증 금액을 운행에 적지 못했습니다(정산 금액은 그대로 영수증 금액이 들어갑니다).', true); return; }
-      toastOk('영수증 금액을 운행에 넣었습니다: ' + notes.slice(0, 4).join(' · ') + (notes.length > 4 ? ' 외 ' + (notes.length - 4) + '건' : ''),
-        fail ? fail + '건은 적지 못했습니다(정산 금액은 그대로 영수증 금액이 들어갑니다)' : null);
+      toastOk(opt && opt.ok ? opt.ok(notes) : '영수증 금액을 운행에 넣었습니다: ' + notes.slice(0, 4).join(' · ') + (notes.length > 4 ? ' 외 ' + (notes.length - 4) + '건' : ''),
+        fail ? fail + '건은 적지 못했습니다(정산 금액은 그대로 영수증 금액이 들어갑니다)' : (opt && opt.sub) || null);
       TRIP_CACHE = {}; AUDIT = null;
       loadAll();
+    });
+  }
+  /* ── 같은 금액 영수증 확인 창(2026-10-21 통행료 버그 2) ──
+     영수증으로 채울 날(운행 금액 없음)에 같은 금액 영수증이 2장 이상이면 영수증 적기가 적지 않고 여기서 묻는다. 고르는 것은 둘:
+       · 「두 번 낸 것 맞음(왕복 등) → 합계 적기」 — 그날 영수증 합계를 운행에 적고 저장 글에 「두 번 낸 것 맞음 — 직원 확인」(검증 R08 은 참고)
+       · 「같은 영수증이 겹침 → 한 번만 적기」 — 같은 금액 묶음은 한 장만 세어 적는다(글 「같은 영수증 겹침 — 한 번만」). 그날은 금액 다름이 되고
+         겹친 영수증을 지우면 맞음 — 지울 때 되돌리기는 이 운행 금액을 건드리지 않는다(근거 #id 가 남긴 한 장뿐).
+     창 아래 [적기] [취소](웹 전체 규칙 — footOrder). 고르기 전에는 [적기]가 막혀 있다. 취소하면 그대로 두고, 그 줄의 「확인」으로 다시 연다
+     (그동안 정산은 규칙대로 영수증 합계 — 검증 R08 은 확인). */
+  function openDupFill(cat, day) {
+    var me = myName();
+    if (!me || isMulti() || cycleLocked(me)) return;
+    var M = moneyOf(me, cycleRange(CYC), ALL_TRIPS, ALL_EVID);
+    var x = dupFillDays(M).filter(function (y) { return y.cat === cat && y.d.day === day; })[0];
+    if (!x || !x.ask.length) { toast('이 날은 확인할 같은 금액 영수증이 없습니다 — 화면을 새로 고쳤습니다.'); render(); return; }
+    var d = x.d, word = cat === '주차' ? '주차비' : '통행료', w = function (v) { return n0(v) + '원'; };
+    var sum = fillItemsOf(cat, d, 'sum', x.G, 'paid'), once = fillItemsOf(cat, d, 'once', x.G, 'once');
+    var tot = function (l) { return l.reduce(function (s, p) { return s + p.amount; }, 0); };
+    if (!sum.length) { toast('이 날 운행에 영수증 금액을 적을 수 없습니다(본인 운행이 아니거나 결재 중입니다).', true); return; }
+    DUPF = { cat: cat, day: day, key: dupKey(cat, d), sum: sum, once: once };
+    var nDup = x.ask.reduce(function (s, g) { return s + g.ev.length; }, 0);
+    var DOW = ['일', '월', '화', '수', '목', '금', '토'], p = day.split('-'), dw = DOW[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay()];
+    var evLi = x.ask.map(function (g) {
+      return '<li><b>' + esc(w(g.a)) + ' × ' + n0(g.ev.length) + '장</b> <span class="dim">' + g.ev.map(function (e) {
+        var t = evTimeOf(e);
+        return esc((e.memo ? String(e.memo).slice(0, 16) + ' ' : '') + (t ? t + ' ' : '') + '#' + e.id) +
+          (e.photo_path ? ' <a target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>' : '') +
+          (e.scan_path ? ' <a target="_blank" rel="noopener" href="' + esc(photoUrl(e.scan_path)) + '">원본</a>' : '');
+      }).join(' · ') + '</span></li>';
+    }).join('');
+    var tripTxt = d.trips.filter(function (t) { return sum.some(function (q) { return String(q.id) === String(t.id); }); })
+      .map(function (t) { return hm(t.start_time) + ' ' + (t.visit_place || placeShort(t.end_address) || '운행'); }).join(' · ');
+    var opt = function (v, title, sub) {
+      return '<label class="dupopt"><input type="radio" name="dupfill" value="' + v + '"><span><b>' + esc(title) + '</b><span class="dim">' + esc(sub) + '</span></span></label>';
+    };
+    var body = '<div class="anote warn" style="margin-top:0">이 날은 운행 ' + word + '가 비어 있어 영수증 금액을 운행에 넣습니다. 그런데 <b>같은 금액 영수증이 ' + n0(nDup) + '장</b> 있습니다 — ' +
+        '같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) 골라 주세요.</div>' +
+      '<ul class="dupev">' + evLi + '</ul>' +
+      '<div class="dim" style="font-size:12.5px;margin:6px 0 10px">넣을 운행: ' + esc(tripTxt || '그날 첫 업무 운행') + ' · 사진이 같은 영수증이면 겹친 것입니다(같은 원본에서 오린 두 장도 겹칠 수 있습니다).</div>' +
+      '<div class="dupopts" role="radiogroup" aria-label="같은 금액 영수증">' +
+        opt('sum', (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음(왕복 등) → 합계 ' + w(tot(sum)) + ' 적기', '영수증 ' + n0(d.ev.length) + '장 모두 정산합니다') +
+        opt('once', '같은 영수증이 겹침 → 한 번만 ' + w(tot(once)) + ' 적기', '겹친 영수증은 적은 뒤 아래 내역에서 지워 주세요(그대로 두면 「금액 다름」으로 남습니다)') +
+      '</div>';
+    openPanel('같은 금액 영수증 확인', md(Date.parse(day + 'T00:00:00+09:00')) + '(' + dw + ') · ' + cat, body,
+      '<span style="flex:1"></span><button class="btn pri" id="btnDupGo" disabled>적기</button><button class="btn" data-close>취소</button>');
+  }
+  /** [적기] — 고른 쪽으로 그날 운행에 적는다(적기 직전에 다시 읽어 그날 영수증·운행 금액이 그대로일 때만). */
+  function dupFillGo() {
+    var S0 = DUPF, me = myName();
+    if (!S0 || !me) return;
+    var c = document.querySelector('input[name="dupfill"]:checked');
+    if (!c) { toast('둘 중 하나를 골라 주세요.', true); return; }
+    if (AUTOFILL_BUSY) { toast('영수증 금액을 적는 중입니다 — 잠시 뒤 다시 눌러 주세요.', true); return; }
+    // 창을 연 뒤 영수증·운행이 바뀌었으면 적지 않는다(다시 묻는다)
+    var M = moneyOf(me, cycleRange(CYC), ALL_TRIPS, ALL_EVID);
+    var x = dupFillDays(M).filter(function (y) { return y.cat === S0.cat && y.d.day === S0.day; })[0];
+    if (!x || dupKey(x.cat, x.d) !== S0.key) { DUPF = null; closePanel(); toast('그 사이 이 날 영수증이 바뀌었습니다 — 다시 확인해 주세요.', true); render(); return; }
+    var once = c.value === 'once', items = once ? S0.once : S0.sum;
+    DUPF = null; closePanel();
+    var tolls = items.filter(function (p) { return p.cat === '통행료'; }), parks = items.filter(function (p) { return p.cat === '주차'; });
+    var amt = items.reduce(function (s, p) { return s + p.amount; }, 0), dd = S0.day.slice(5).replace('-', '.');
+    var nGone = x.ask.reduce(function (s, g) { return s + g.ev.length - 1; }, 0), nDup = x.ask.reduce(function (s, g) { return s + g.ev.length; }, 0);
+    fillSafe(tolls, parks, [], {
+      miss: '이 날 운행 금액이 그 사이 정해져 적지 않았습니다 — 표를 새로 고쳤습니다.',
+      ok: function () {
+        return once ? '운행에 한 번만 넣었습니다: ' + dd + ' ' + S0.cat + ' ' + n0(amt) + '원'
+          : '영수증 금액을 운행에 넣었습니다: ' + dd + ' ' + S0.cat + ' ' + n0(amt) + '원(' + (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음)';
+      },
+      sub: once ? '겹친 영수증 ' + n0(nGone) + '장은 아래 내역에서 지워 주세요 — 그대로 두면 「금액 다름」으로 남습니다' : null
     });
   }
 
@@ -11513,7 +11663,8 @@ window.EduGuard = {
     var trips = ALL_TRIPS.filter(function (t) { var s = Number(t.start_time); return t.username === me && !t.deleted_at && s >= r.lo && s < r.hi; });
     var evid = ALL_EVID.filter(function (e) { var d = Number(e.date_millis); return e.username === me && d >= r.lo && d < r.hi; });
     try {
-      return window.TollSuggest.plan({ trips: trips, evid: evid, money: M || moneyOf(me, r, ALL_TRIPS, ALL_EVID), toll: function (t) { return tollNeed(t).a; }, day: ymd });
+      // timeOf: 같은 금액 영수증을 가르는 시각 — 영수증 적기와 같은 것(원본 장 판독 시각 · 영수증 날짜의 시각, 2026-10-21 통행료 버그 2)
+      return window.TollSuggest.plan({ trips: trips, evid: evid, money: M || moneyOf(me, r, ALL_TRIPS, ALL_EVID), toll: function (t) { return tollNeed(t).a; }, day: ymd, timeOf: evTimeOf });
     } catch (e) { console.error('통행료 제안을 만들지 못했습니다:', e); return null; }
   }
   /** 「제안 보기·맞추기」 창 — 날짜·운행 시각·방문처 → 제안(금액/없음)·근거, 줄마다 고르기 칸(기본 모두 고름), 아래 [N건 맞추기] [취소]. */

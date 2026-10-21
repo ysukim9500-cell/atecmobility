@@ -28,6 +28,11 @@
         · L > 200,000(통행료 상한) → 직접 고르기
      ⑤ 결재 중·완료(잠긴) 기간은 제안하지 않는다(locked).
      ⑥ 「모름」으로 되돌린 운행에 하이패스로 맞춘 금액(toll_hipass)이 남아 있으면 그 금액이 그 운행의 증빙 — ①·② 날은 그 금액, ③·④ 날은 모두 직접 고르기.
+     ⑦ 같은 금액 영수증 여러 장(2026-10-21 통행료 버그 2 — 웹 영수증 적기와 같은 규칙 money-rule sameAmt): 그날 같은 금액 영수증이 2장 이상이고
+        시각으로 가르지 못하면(모두 시각이 있고 서로 달라야 별개 — 같은 원본 장에서 오린 두 장이라는 것만으로는 별개가 아님) 같은 영수증을 두 번
+        올린 것일 수 있다. 그 영수증이 운행 금액이 되면 그날이 「맞음」이 되어 중복이 정산에 굳는다 — 그래서 두 번 세지 않는다:
+        · ③ 채움인 날 → 모두 직접 고르기(영수증 적기가 맞춰보기 표 그 줄 「확인」에서 「두 번 낸 것 맞음 / 한 번만」을 묻는다)
+        · ④ 금액 다름인 날 → 남는 영수증(또는 묶음을 못 정했으면 남는 후보 모두)이 그런 묶음에 들면 모두 직접 고르기
    제안을 그대로 확정하면 그날은 규칙 v3 로 「맞음」이 된다(④: T + L 에서 U − N' = D 는 하이패스 부분합) — 시험 web/test/toll-suggest.test.js.
    금액 다름 안내(unkTips) — 그날 미확정 운행이 있으면 영수증 지우기 권유를 빼고, 증빙이 남으면 「모름 운행에 금액을」 하나로 짚는다.
      서버 _shared/driving-verify.ts R10 의 unkTips 와 같은 글자(시험 web/test/toll-suggest-parity.test.mjs).
@@ -161,8 +166,10 @@
     return null;
   }
 
-  /** 하루 풀기 — d = money-rule 통행료 하루(없으면 증빙도 운행 금액도 없는 날), U = 그날 미확정 업무 운행(시각 순). */
-  function solve(k, d, U, linkTo) {
+  /** 같은 금액 묶음 한 마디 — 「1,800원 2장」. */
+  function grpSay(g) { return won(g.a) + ' ' + g.ev.length + '장'; }
+  /** 하루 풀기 — d = money-rule 통행료 하루(없으면 증빙도 운행 금액도 없는 날), U = 그날 미확정 업무 운행(시각 순), timeOf = 영수증 시각(⑦). */
+  function solve(k, d, U, linkTo, timeOf) {
     var info = { day: k, st: d ? d.st : 'none', unk: U, items: [], left: null, diff: null, ev: [],
       T: d ? Math.round(d.T || 0) : 0, H: d ? Math.round(d.H || 0) : 0, R: d ? Math.round(d.R || 0) : 0 };
     var mk = function (t, kind, amount, why, say, ev) {
@@ -191,9 +198,17 @@
     var known = d.trips.filter(function (t) { return d.amt[t.id] > 0; });
     var inKnown = function (ms) { return known.some(function (t) { return inWin(ms, t); }); };
     var ev = d.ev.slice().sort(byId);
+    // ⑦ 시각으로 가르지 못한 같은 금액 영수증 묶음(같은 영수증을 두 번 올렸을 수 있음)
+    var dupG = MR.sameAmt(ev, timeOf).filter(function (g) { return !g.sep; });
+    var dupSay0 = function (G) {
+      return '같은 금액 영수증 ' + G.map(grpSay).join(' · ') + '이 있습니다 — 같은 영수증을 두 번 올렸으면 하나를 지우고, 실제로 여러 번 냈으면(왕복 등) ';
+    };
     // ③ 영수증으로 채움 — 채우는 운행은 규칙대로(제안하지 않음), 나머지는 남는 영수증 없음
     if (d.st === 'filled') {
       if (d.twice) return pickAll('twice', '두 번 정산 의심인 날입니다 — 맞춰보기 표의 그 줄 안내를 먼저 보세요', ev);
+      if (dupG.length) return pickAll('dupfill', '같은 금액 영수증 ' + dupG.map(grpSay).join(' · ') + '이 있어 영수증 금액을 운행에 넣기 전에 확인합니다 — ' +
+        '맞춰보기 표 그 줄의 「확인」에서 「합계 적기」(실제로 여러 번 냄) 또는 「한 번만 적기」(같은 영수증이 겹침)를 골라 주세요',
+        [].concat.apply([], dupG.map(function (g) { return g.ev; })));
       var tgts = d.trips.filter(function (t) { return d.fill[t.id] > 0; });
       U.forEach(function (t) {
         var f = Math.round(d.fill[t.id] || 0);
@@ -248,6 +263,11 @@
     var rest = ev.filter(function (e) { return !isDup(e); });
     var lf = leftSet(rest, L, U, known, linkTo);
     if (!lf) return pickAll('partial', '남는 증빙 ' + won(L) + '이 영수증 금액과 맞지 않습니다 — 다른 운행 통행료가 틀렸을 수 있습니다', rest);
+    // ⑦ 남는 영수증(묶음을 못 정했으면 남는 후보 모두)이 같은 금액 묶음에 들면 — 제안하면 중복이 운행 금액이 된다. 직접 고르기.
+    var cand = lf.set && !lf.tie ? lf.set : rest;
+    var risky = dupG.filter(function (g) { return g.ev.some(function (e) { return cand.some(function (c) { return same(c.id, e.id); }); }); });
+    if (risky.length) return pickAll('same', dupSay0(risky) + '그 운행 통행료를 직접 넣어 주세요',
+      [].concat.apply([], risky.map(function (g) { return g.ev; })));
     var named = !!(lf.set && !lf.tie);
     info.ev = named ? lf.set : [];
     var dupSay = D > 0 ? '(하이패스와 같은 영수증 ' + won(D) + '은 한 번만 셈)' : '';
@@ -273,6 +293,7 @@
    * @param o.evid   그 사람의 영수증(이 기간)
    * @param o.money  (선택) 같은 자료의 MoneyRule.compute 결과 — 없으면 여기서 센다
    * @param o.toll · o.day · o.link  (선택) compute 와 같다
+   * @param o.timeOf (선택) 영수증 → 시각 'HH:MM' | null(⑦ 같은 금액 묶음 가르기 — 웹은 원본 장 판독 시각까지). 없으면 영수증 날짜의 시각(money-rule rcptTime)
    * @param o.locked 그 기간이 결재 중·완료 — 제안하지 않는다
    * @return { locked, items: [Item…날짜·시각 순], days: { 'YYYY-MM-DD': DayInfo }, n: { unk, none, amount, pick, auto } }
    *   Item = { trip, day, kind: 'none'(없음 0원) | 'amount'(금액) | 'pick'(직접 고르기 — 제안 없음) | 'auto'(영수증으로 채움 — 규칙대로 들어감),
@@ -297,9 +318,10 @@
       return t && (e.username == null || t.username == null || t.username === e.username) ? t : null;
     };
     var unk = {};
+    var timeOf = o.timeOf || function (e) { return MR.rcptTime(e, null); };
     trips.filter(isUnk).sort(byTime).forEach(function (t) { var k = day(Number(t.start_time)); (unk[k] = unk[k] || []).push(t); });
     Object.keys(unk).sort().forEach(function (k) {
-      var info = solve(k, dayOf[k], unk[k], linkTo);
+      var info = solve(k, dayOf[k], unk[k], linkTo, timeOf);
       out.days[k] = info;
       info.items.forEach(function (it) { out.items.push(it); out.n.unk++; out.n[it.kind]++; });
     });

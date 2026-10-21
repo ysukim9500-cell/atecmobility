@@ -480,10 +480,77 @@
     return out;
   }
 
+  /* ── 같은 금액 영수증 여러 장(2026-10-21 통행료 버그 2) ──
+     웹 영수증 적기(driving-app.js autoFillEv)는 운행 금액이 비어 있는 날(filled) 영수증 금액을 운행에 실제로 적는다. 그날 같은 금액 영수증이
+     2장 이상(같은 영수증을 두 번 올렸을 수 있음)인데 합계를 적으면 그날이 「맞음」이 되어 서버 검증 R08 이 참고로 내려가고 중복이 정산에 굳었다
+     (직원 사례: 14분 운행 1건에 1,700원 영수증 3장 → 운행 5,100원). 이제 그런 날은 적기 전에 직원에게 묻는다 —
+     「두 번 낸 것 맞음(왕복 등) → 합계 적기」 / 「같은 영수증이 겹침 → 한 번만 적기」. 영수증 시각이 모두 있고 서로 다르면 별개 영수증으로 보고
+     묻지 않고 합계를 적는다. ★ 같은 원본 장에서 오린 두 줄이라는 것만으로는 별개로 보지 않는다(오린 자리가 겹친 사례가 있었다).
+     적을 때 글(fillNote)에 그 확인을 남기고, 서버 검증(_shared/fill-mark.ts)이 그 글로 그날 「맞음」을 믿을지 정한다(같은 글자 — 시험 r08-parity).
+     통행료 맞추기 제안(toll-suggest.js)도 같은 묶음(sameAmt)으로 남는 영수증을 두 번 세지 않는다. */
+  var FILL_NOTE = '영수증 금액 반영', PAID_TWICE = '두 번 낸 것 맞음', TIME_APART = '시각이 다른 영수증', ONCE = '같은 영수증 겹침';
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  /**
+   * 영수증 시각 'HH:MM' | null — ① 원본 장 판독(Gemini, via 'scan_page')이 그 줄에 짝지어 읽은 거래 시각(그 줄 사진·원본이 그대로일 때)
+   * ② 영수증 날짜에 시각이 있으면(KST 자정이 아님 — 하이패스 인쇄 PDF·앱에서 운행과 함께 넣은 영수증 등) 그 시각. 없으면 null.
+   * ai = 그 영수증의 evidence_ai 줄({ photo_path, result }) 또는 null.
+   */
+  function rcptTime(e, ai) {
+    if (!e) return null;
+    var r = ai && ai.result && ai.photo_path === e.photo_path ? ai.result : null;
+    if (r && r.via === 'scan_page' && e.scan_path && r.scan_path === e.scan_path && /^\d{2}:\d{2}$/.test(String(r.time || ''))) return String(r.time);
+    var ms = Number(e.date_millis);
+    if (isFinite(ms) && (ms + KST) % 864e5 !== 0) { var d = new Date(ms + KST); return pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()); }
+    return null;
+  }
+  /**
+   * 같은 금액 영수증 묶음 — ev = 하루·한 구분의 영수증, timeOf(e) → 'HH:MM' | null(영수증 시각 — 없으면 묶음은 늘 묻는다).
+   * 돌려주는 것: [{ a: 금액, ev: [영수증(id 순)], sep: 모든 영수증에 시각이 있고 서로 다름(별개 영수증) }] — 2장 이상인 금액만, 금액 순.
+   */
+  function sameAmt(ev, timeOf) {
+    var by = {};
+    (ev || []).forEach(function (e) { var a = Math.round(Number(e && e.amount) || 0); if (a > 0) (by[a] = by[a] || []).push(e); });
+    return Object.keys(by).map(Number).sort(function (x, y) { return x - y; }).filter(function (a) { return by[a].length > 1; }).map(function (a) {
+      var l = by[a].slice().sort(function (x, y) { return (Number(x.id) || 0) - (Number(y.id) || 0); });
+      var tm = l.map(function (e) { return timeOf ? timeOf(e) : null; });
+      return { a: a, ev: l, sep: tm.every(function (t) { return !!t; }) && tm.every(function (t, i) { return tm.indexOf(t) === i; }) };
+    });
+  }
+  /**
+   * 영수증으로 채우는 날(d.st 'filled')에 운행 줄마다 적을 금액 — mode 'sum' = 모두(규칙 그대로 · d.fill 과 같다) ·
+   * 'once' = 시각으로 가르지 못한 같은 금액 묶음(groups — sameAmt)은 한 장만(묶음마다 id 가 가장 작은 것) 센다.
+   * 돌려주는 것: [{ tripId, amount, ids: [그 줄을 채운 영수증 id] }] (그날 업무 운행 차례 · 금액이 0 인 줄은 뺀다)
+   */
+  function fillPlan(d, mode, groups) {
+    if (!d || d.st !== 'filled') return [];
+    var drop = {}, amt = {};
+    if (mode === 'once') (groups || []).forEach(function (g) { if (!g.sep) g.ev.slice(1).forEach(function (e) { drop[String(e.id)] = 1; }); });
+    (d.ev || []).forEach(function (e) { amt[String(e.id)] = Number(e.amount) || 0; });
+    var out = [];
+    (d.trips || []).forEach(function (t) {
+      var ids = ((d.fillEv && d.fillEv[t.id]) || []).filter(function (id) { return !drop[String(id)]; });
+      var a = Math.round(ids.reduce(function (s, id) { return s + (amt[String(id)] || 0); }, 0));
+      if (ids.length && a > 0) out.push({ tripId: t.id, amount: a, ids: ids });
+    });
+    return out;
+  }
+  /**
+   * 영수증 적기의 저장 글 — 통행료: toll-apply note(→ toll_evidence_json.note) · 주차: trip-edit note(→ 수정 기록 note).
+   *   how: '' 그대로 · 'paid' 직원이 「두 번 낸 것 맞음」 · 'apart' 시각이 다른 영수증 · 'once' 같은 영수증 겹침 — 한 번만.
+   *   통행료 「영수증(…) #id,#id」 · 주차 「영수증 금액 반영(…) #id,#id」 — #id 는 그 운행 줄을 채운 영수증(지우기·옮기기 때 되돌리기가 읽는다).
+   *   서버 _shared/fill-mark.ts 가 같은 글자를 읽는다(PAID_TWICE · TIME_APART 이면 「맞음」을 믿음).
+   */
+  function fillNote(cat, ids, how) {
+    var tag = how === 'paid' ? '(' + PAID_TWICE + ' — 직원 확인)' : how === 'apart' ? '(' + TIME_APART + ')' : how === 'once' ? '(' + ONCE + ' — 한 번만)' : '';
+    return (cat === '주차' ? FILL_NOTE : '영수증') + tag + ' #' + (ids || []).join(',#');
+  }
+
   /** 결과 글자(표·검증 공통). */
   var LABEL = { no_receipt: '영수증 없음', mismatch: '금액 다름', match: '일치', filled: '영수증으로 채움', no_trip: '운행 없는 영수증(정산 제외)' };
 
   return { compute: compute, hpPair: hpPair, hipassOf: hipassOf, subsetSums: subsetSums, gapOf: gapOf, adviceOf: adviceOf, receiptHome: receiptHome, tollOf: tollOf, tripAmt: tripAmt, ymdK: ymdK, LABEL: LABEL, TOLL_MAX: TOLL_MAX, BUSINESS: BUSINESS,
     twicePick: twicePick, prevDay: prevDay, fillUndo: fillUndo,
+    rcptTime: rcptTime, sameAmt: sameAmt, fillPlan: fillPlan, fillNote: fillNote,
+    FILL_NOTE: FILL_NOTE, PAID_TWICE: PAID_TWICE, TIME_APART: TIME_APART,
     HIPASS_SOURCE: HIPASS_SOURCE, FROM: FROM, VERSION: 3 };
 });
