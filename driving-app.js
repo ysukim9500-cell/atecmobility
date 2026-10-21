@@ -1215,10 +1215,19 @@
       if (unk.length) {
         var unkLock = cycleLocked(myName());
         var unkSorted = unk.slice().sort(function (x, y) { return x.start_time - y.start_time; });
-        main += '<div class="hpnote" data-tollunk style="margin-top:12px">' + ic('ticket', 15) + '<span><b>통행료 미확정 ' + n0(unk.length) + '건</b> — ' +
+        // 통행료 맞추기 제안(2026-10-21 사용자 결정 「제안 + 한 번 눌러 확정」 — toll-suggest.js): 맨 위 한 줄 「… 제안: 없음 X건 · 금액 Y건 [제안 보기·맞추기]」.
+        //   정산 규칙은 그대로 — 창에서 고른 줄만 운행 고치기와 같은 길(trip-edit)로 적는다. 결재 중·완료 기간은 제안하지 않는다.
+        //   ★ 단추는 빨강(.pri)이 아니다 — 이 차례 카드의 빨간 단추는 하나(올리기 또는 「다음」, 2026-10-20 디자인 v2)
+        var SGn = unkLock ? null : tollSugPlan();
+        var sugLine = SGn && SGn.n.unk ? '<span class="tsline" data-tollsug><span class="tsl"><b>통행료 미확정 ' + n0(unk.length) + '건</b> — 영수증·하이패스로 맞춘 제안: ' +
+          '없음 ' + n0(SGn.n.none) + '건 · 금액 ' + n0(SGn.n.amount) + '건' + (SGn.n.pick ? ' · 직접 고르기 ' + n0(SGn.n.pick) + '건' : '') +
+          (SGn.n.auto ? ' · 영수증으로 채움 ' + n0(SGn.n.auto) + '건' : '') + '</span>' +
+          '<button type="button" class="btn sm tsopen" data-tollsugopen>' + ic('check', 13) + '제안 보기·맞추기</button></span>' : '';
+        main += '<div class="hpnote' + (sugLine ? ' tsnote' : '') + '" data-tollunk style="margin-top:12px">' + ic('ticket', 15) + '<span>' +
+          (sugLine || '<b>통행료 미확정 ' + n0(unk.length) + '건</b> — ') +
           (unkLock ? lockWhy(myName()) + ' 고칠 수 없습니다. 이 운행들의 통행료는 0원으로 정산됩니다.'
-            : '자동 계산이 안 된 업무 운행입니다. 통행료를 냈으면 영수증 사진이나 하이패스 이용내역 PDF를 올리세요(그날 운행 금액이 없으면 영수증 금액이 들어갑니다). ' +
-              '안 냈으면 아래 운행을 눌러 통행료 「없음」으로 고치면 됩니다.' +
+            : (sugLine ? '<span class="tsrest">' : '') + '자동 계산이 안 된 업무 운행입니다. 통행료를 냈으면 영수증 사진이나 하이패스 이용내역 PDF를 올리세요(그날 운행 금액이 없으면 영수증 금액이 들어갑니다). ' +
+              '안 냈으면 아래 운행을 눌러 통행료 「없음」으로 고치면 됩니다.' + (sugLine ? '</span>' : '') +
               '<span class="unklist">' + unkSorted.slice(0, 12).map(function (t) {
                 return '<button type="button" class="btn sm" data-edit="' + t.id + '" title="이 운행 고치기">' + esc(md(t.start_time) + ' ' + hm(t.start_time)) +
                   ' · ' + esc(t.visit_place || placeShort(t.end_address) || '방문처 없음') + '</button>';
@@ -1318,7 +1327,7 @@
 
     if (cat === '주차' || cat === '통행료') {
       // 금액 규칙 v3(2026-10-15 사용자) — 정산·엑셀·PDF·결재 금액과 같은 계산(moneyOf → money-rule.js) 하나를 그대로 보인다.
-      var MC = moneyOf(me, r, ALL_TRIPS, ALL_EVID)[cat], MS = MC.sum;
+      var MM0 = moneyOf(me, r, ALL_TRIPS, ALL_EVID), MC = MM0[cat], MS = MC.sum;
       // 기간 경계에 걸친 이은 영수증 — 금액은 그대로, 문구만(2026-10-17 사용자). 이 구분 것만.
       var XL0 = xlinkOf(me, r), XL = { here: XL0.here.filter(function (x) { return x.e.category === cat; }), there: XL0.there.filter(function (x) { return x.e.category === cat; }) };
       var xlHtml = !(XL.here.length + XL.there.length) ? '' :
@@ -1328,6 +1337,12 @@
         (XL.here.length + XL.there.length > 5 ? '<span class="xlitem dim">외 ' + n0(XL.here.length + XL.there.length - 5) + '장</span>' : '') + '</span></div>';
       var word = cat === '주차' ? '주차비' : '통행료', isToll = cat === '통행료';
       var warnR = function (t) { return '<span class="mres warn">' + esc(t) + '</span>'; };
+      // 통행료 맞추기 제안(2026-10-21 — toll-suggest.js) — 금액 다름인 날에 「모름」 운행이 있으면(그날 다른 운행에 금액이 있어 영수증이 채우지 못한 운행)
+      //   그 줄 안내 「이 날 모름 운행 HH:MM 에 금액을 넣으세요(제안 X원)」 · 고치기·줄 누르기 = 그 운행 · 자세히 보기에 영수증 지우기 권유 없음(서버 R10 과 같은 글자).
+      //   결재 중·완료 기간·모듈 없음이면 예전 그대로(SG 없음).
+      var SG = isToll ? tollSugPlan(MM0) : null;
+      var sgOf = function (d) { var g = SG && d.st === 'mismatch' && SG.days[d.day]; return g && g.unk.length ? g : null; };
+      var sgTrip = function (g) { var it = g.items.filter(function (x) { return x.kind === 'amount'; })[0] || g.items[0]; return it ? it.trip : g.unk[0]; };
       // 운행 없는 날 영수증 → 그 줄에만 작은 「다른 운행에 붙이기」(웹 8차 — 예전 큰 「다른 운행에 붙이기」 단추)
       var canLink = !cycleLocked(me) && !isMulti();
       // 그날 업무 운행 — 시각 · 방문처 · 그 운행의 금액. 줄마다 눌러서 그 운행 고치기 창(수기로 고치기).
@@ -1340,13 +1355,16 @@
       };
       var tripsTxt = function (d) {
         if (!d.trips.length) return '<span class="dim">그날 업무 운행 없음</span>';
-        var pick = d.trips.filter(function (t) { return d.amt[t.id] > 0 || d.fill[t.id] > 0; });
+        // 금액 다름인 날의 「모름」 운행도 보인다(2026-10-21 — 금액을 넣을 곳이 그 운행인데 줄에 없었다)
+        var g = sgOf(d), isUnkHere = function (t) { return !!g && g.unk.some(function (u) { return String(u.id) === String(t.id); }); };
+        var pick = d.trips.filter(function (t) { return d.amt[t.id] > 0 || d.fill[t.id] > 0 || isUnkHere(t); });
         if (!pick.length) pick = d.trips;
         var show = pick.slice(0, 3).map(function (t) {
           var a = d.amt[t.id] || 0, f = d.fill[t.id] || 0;
           return '<button type="button" class="mtrip" data-edit="' + t.id + '" title="이 운행 고치기"><span class="mt">' + esc(hm(t.start_time)) + '</span>' +
             '<span class="mp">' + esc(t.visit_place || placeShort(t.end_address) || '방문처 없음') + '</span>' +
-            (a ? ' <span class="dim">· ' + word + ' ' + n0(a) + '</span>' : f ? ' <span class="dim">· 영수증 ' + n0(f) + ' 넣음</span>' : '') + '</button>';
+            (a ? ' <span class="dim">· ' + word + ' ' + n0(a) + '</span>' : f ? ' <span class="dim">· 영수증 ' + n0(f) + ' 넣음</span>'
+              : isUnkHere(t) ? ' <span class="dim mtunk">· 통행료 모름</span>' : '') + '</button>';
         }).join('');
         return show + (pick.length > 3 ? '<div class="dim">외 ' + (pick.length - 3) + '건</div>' : '');
       };
@@ -1373,9 +1391,11 @@
         // 「10월분부터」(2026-10-15 추가 결정) — 09-21 전 날은 금액만 보이고 결과(영수증 없음·금액 다름·운행 없는 영수증)는 내지 않는다
         if (!d.show) aiNote = [];
         // 결과 글은 할 일이 보이게(웹 8차, 2026-10-17 「직원이 쉽게」)
+        //   금액 다름 + 「모름」 운행 + 증빙이 남는 날(2026-10-21) — 「금액 다름 — 이 날 모름 운행 HH:MM 에 금액을 넣으세요(제안 X원)」
+        var sgd = sgOf(d), sgGo = !!(sgd && sgd.diff > 0);
         var res = !d.show ? '<span class="dim">10월분 전 — 확인 안 함</span>'
           : d.st === 'no_receipt' ? bad(myCycLocked() ? '영수증 없음' : isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
-          : d.st === 'mismatch' ? bad('금액 다름 — 운행 금액이나 영수증을 확인')
+          : d.st === 'mismatch' ? bad(sgGo ? '금액 다름 — ' + window.TollSuggest.rowSay(sgd) : '금액 다름 — 운행 금액이나 영수증을 확인')
           : d.st === 'no_trip' ? warnR('운행 없는 날 — 정산에서 빠짐')
           : d.st === 'filled' && d.twice ? warnR('두 번 정산 의심') +
             '<div class="mtw" data-twice="' + esc(d.twice.prev) + '">' + esc(twTxt(d)) + '</div>'
@@ -1393,7 +1413,8 @@
         var isTwice = d.show && d.st === 'filled' && !!d.twice;
         if (isTwice) nTwice++;
         if (d.show && (d.st === 'match' || d.st === 'filled') && !aiNote.length && !isTwice) nOk++;
-        var tgt = d.target;
+        // 줄을 누르면 여는 운행 — 「모름」 운행에 금액을 넣으라고 하는 날은 그 운행(제안이 있는 운행 먼저), 아니면 예전대로
+        var tgt = sgGo ? sgTrip(sgd) : d.target;
         var flag = isBad || (d.show && d.st === 'no_trip') || isTwice;
         // 줄 끝 단추(2026-10-20 디자인 v2, P_Evid) — 영수증 없음 → 올리기(영수증 올리기 창) · 금액 다름 → 고치기(그 운행 고치기 창) ·
         //   운행 없는 날·두 번 정산 의심 → 「다른 운행에 붙이기」(예전엔 결과 칸 안 — 같은 단추를 줄 끝으로 옮김). 결재 중·완료 기간은 없다.
@@ -1430,9 +1451,13 @@
       if (MS.diff) how.push('「금액 다름」 날은 운행 금액과 증빙(하이패스 이용내역·영수증)이 다릅니다 — 줄을 누르면 그 운행을, 아래 내역에서 영수증을 고칠 수 있고, 고치기 전까지는 운행 금액으로 정산됩니다');
       // 금액 다름인 날 — 하루 단위 차이와 상황만(2026-10-19 버그 사냥 B2·B7·B8). 특정 운행 금액(「X원으로 고쳐」)은 제안하지 않는다 —
       //   그대로 따르면 두 번 정산될 수 있다. 문구는 money-rule.js adviceOf(서버 driving-verify R10 과 같은 글자).
+      //   그날 「모름」 운행이 있으면(2026-10-21) toll-suggest.js unkTips — 영수증 지우기 권유 없이 「모름 운행에 금액을」(서버 R10 과 같은 글자) + 제안 금액.
       MC.days.filter(function (d) { return d.show && d.st === 'mismatch'; }).slice(0, 3).forEach(function (d) {
         var a = window.MoneyRule.adviceOf(d, cat);
-        if (a) how.push(dn(d.day) + ' ' + a.head + ': ' + a.tips.join(' / '));
+        if (!a) return;
+        var g = sgOf(d), tips = g ? window.TollSuggest.unkTips(a.tips, g.unk.map(function (t) { return hm(t.start_time); }), d.gap ? d.gap.diff : 0) : a.tips;
+        var sug = g && g.diff > 0 ? g.items.filter(function (x) { return x.kind === 'amount'; }).map(function (x) { return hm(x.trip.start_time) + ' ' + won(x.amount); }) : [];
+        how.push(dn(d.day) + ' ' + a.head + ': ' + tips.join(' / ') + (sug.length ? ' — 제안 ' + sug.join(' · ') + '(위 「제안 보기·맞추기」에서 한 번에 넣을 수 있습니다)' : ''));
       });
       if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
       if (nTwice) how.push('「두 번 정산 의심」 날은 영수증 금액이 전날 운행 금액과 같습니다 — 전날 운행 영수증을 다음 날 날짜로 올렸으면 그 줄의 「다른 운행에 붙이기」로 전날 운행에 이어 주세요(그대로 두면 전날 운행 금액과 이 영수증이 둘 다 정산됩니다). ' +
@@ -9114,11 +9139,25 @@ window.EduGuard = {
   /** 키보드(화살표)로 고르는 중인가 — 그때 금액 칸으로 포커스를 옮기면 고르기 묶음 밖으로 튀어 나머지 칩으로 못 간다(2026-10-16 5차).
    *  마우스·손가락으로 누르면 :focus-visible 이 아니다 → 예전처럼 금액 칸으로. */
   function kbdPick(el) { try { return el.matches(':focus-visible'); } catch (e) { return false; } }
-  function tollEditHint(pick, first, srcTxt) {
+  function tollEditHint(pick, first, srcTxt, other) {
     var now = srcTxt && pick === first ? '지금 값: ' + esc(srcTxt) + ' · ' : '';
     if (pick === 'none') return now + '통행료가 없는 운행으로 저장합니다(0원). ' + RCP_FILL['통행료'];
-    if (pick === 'unknown') return now + '「모름」은 0원으로 잡힙니다(영수증이 있으면 영수증 금액).';
+    if (pick === 'unknown') return now + unkTollHint(other);
     return now + '1 ~ 200,000원 · 자동으로 채운 금액이 틀렸으면 고치세요.';
+  }
+  /** 「모름」 안내(2026-10-21) — 예전 「(영수증이 있으면 영수증 금액)」은 그날 다른 운행에 통행료가 있으면 틀렸다(규칙 v3: 운행 금액이 있는 날
+   *  영수증은 대조만 — 「모름」 운행은 0원으로 정산). other = 그날 다른 업무 운행에 통행료 금액이 있는가(otherTollOn). */
+  function unkTollHint(other) {
+    return other ? '「모름」은 0원으로 정산됩니다 — 이 날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행을 채우지 않습니다. 영수증이 있으면 「금액 입력」에 그 금액을 넣어 주세요.'
+      : '「모름」은 0원으로 잡힙니다 — 이 날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어갑니다(이 운행에 이은 영수증이면 이 운행, 아니면 그날 첫 운행). 이 운행 영수증이면 「금액 입력」에 넣는 것이 정확합니다.';
+  }
+  /** 같은 사람·같은 날(KST)의 다른 업무 운행에 통행료 금액이 있는가 — 있으면 그날 영수증은 「모름」 운행을 채우지 않는다(금액 규칙 v3). */
+  function otherTollOn(t, who, dayKey) {
+    var u = who || (t && t.username), k = dayKey || (t ? ymd(t.start_time) : '');
+    return !!u && !!k && ALL_TRIPS.some(function (x) {
+      return x.username === u && !x.deleted_at && (x.purpose || '') === BUSINESS && (!t || String(x.id) !== String(t.id)) &&
+        ymd(x.start_time) === k && tollNeed(x).a > 0;
+    });
   }
   function parkEditHint(pick) {
     return pick === 'amount' ? '1 ~ 300,000원 · 그날 주차 영수증과 대조합니다(정산에는 운행 금액이 들어갑니다).'
@@ -9158,14 +9197,14 @@ window.EduGuard = {
       (E0.park ? n0(E0.park) : '') + '"><span class="unit">원</span></div>',
       '<span id="eParkHint">' + parkEditHint(E0.park ? 'amount' : 'none') + '</span>');
 
-    var srcTxt = tollSrcText(t);
+    var srcTxt = tollSrcText(t), othToll = otherTollOn(t);
     h += fld('통행료',
       '<div class="radios" role="radiogroup" aria-label="통행료"><label class="radio"><input type="radio" name="eToll" value="none"' + (E0.toll === 'none' ? ' checked' : '') + '><span>없음</span></label>' +
       '<label class="radio"><input type="radio" name="eToll" value="amount"' + (E0.toll === 'amount' ? ' checked' : '') + '><span>금액 입력</span></label>' +
       '<label class="radio"><input type="radio" name="eToll" value="unknown"' + (E0.toll === 'unknown' ? ' checked' : '') + '><span>모름</span></label></div>' +
       '<div style="margin-top:9px" id="eTollBox"' + (E0.toll === 'amount' ? '' : ' hidden') + '><input class="inp num" id="eToll" inputmode="numeric" placeholder="금액" value="' +
       (E0.toll === 'amount' ? n0(E0.tollAmt) : '') + '"><span class="unit">원</span></div>',
-      '<span id="eTollHint">' + tollEditHint(E0.toll, E0.toll, srcTxt) + '</span>');
+      '<span id="eTollHint">' + tollEditHint(E0.toll, E0.toll, srcTxt, othToll) + '</span>');
     // 아래 안내는 통행료 고르기 바로 아래에 둔다 — 창 맨 아래에 있으면 1280×800 에서 창을 내려야 보였다(2026-10-16 6차)
     h += '</div>' + '<div class="anote" id="eNote" style="margin:-4px 0 16px">고친 내용은 <b>서버가 다시 검사</b>합니다. ' +
       '통행료를 고치면 <b>사람이 정한 값</b>으로 기록돼 <b>자동 계산</b>(길찾기·하이패스 요금)이 덮어쓰지 않습니다. ' +
@@ -9194,7 +9233,7 @@ window.EduGuard = {
     document.querySelectorAll('input[name="eToll"]').forEach(function (x) { x.addEventListener('change', function () {
       $('eTollBox').hidden = this.value !== 'amount';
       // 안내도 고른 값에 맞춘다 — 「없음」을 골라도 「지금 값: 1,100원…」이 남아 있었다(2026-10-16 4차).
-      var hn = $('eTollHint'); if (hn) hn.innerHTML = tollEditHint(this.value, E0.toll, srcTxt);
+      var hn = $('eTollHint'); if (hn) hn.innerHTML = tollEditHint(this.value, E0.toll, srcTxt, othToll);
       if (this.value === 'amount' && !kbdPick(this)) $('eToll').focus();
     }); });
 
@@ -9444,7 +9483,10 @@ window.EduGuard = {
     var pick = (document.querySelector('input[name="cToll"]:checked') || {}).value || '';
     var rt = CF.route, toll = rt && rt.toll > 0 ? rt.toll : 0;
     var head = pick === 'none' ? '통행료가 없는 운행으로 넣습니다(0원). ' + RCP_FILL['통행료']
-      : pick === 'unknown' ? '「모름」은 0원으로 잡히고, 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다(영수증이 있으면 영수증 금액).'
+      // 「(영수증이 있으면 영수증 금액)」은 그날 다른 운행에 통행료가 있으면 틀렸다(2026-10-21) — 그날 상황대로
+      : pick === 'unknown' ? '「모름」은 0원으로 잡히고, 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다. ' +
+        (otherTollOn(null, CF.who, CF.date) ? '이 날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행을 채우지 않으니, 영수증이 있으면 「금액 입력」에 그 금액을 넣어 주세요.'
+          : '이 날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어갑니다.')
         : pick === 'amount' ? '1 ~ 200,000원 · 통행료 영수증도 올려 주세요(검증에서 대조합니다).'
           : '「모름」은 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다';
     var route = !rt ? '' : toll
@@ -10260,6 +10302,9 @@ window.EduGuard = {
     if ((el = e.target.closest('[data-mfold]'))) { var mfc = el.dataset.mfold; MFOLD[mfc] = MFOLD[mfc] === false; render(); return; }
     if ((el = e.target.closest('[data-evlink]'))) { openEvLink(el.dataset.evlink, el.dataset.evlinkid); return; }
     if (e.target.closest('#btnEvLinkSave')) { saveEvLink(); return; }
+    // 통행료 맞추기 제안(2026-10-21) — 통행료 차례 한 줄의 「제안 보기·맞추기」 · 창 아래 [N건 맞추기]
+    if (e.target.closest('[data-tollsugopen]')) { openTollSug(); return; }
+    if (e.target.closest('#btnTsApply')) { tsApply(); return; }
     if ((el = e.target.closest('[data-trip]'))) { openTrip(el.dataset.trip); return; }
     // ★ 인쇄 버튼은 직원 행(data-person) 안에 들어 있다. 같은 핸들러 안에서
     //   행 검사가 먼저 돌면 인쇄 대신 화면 이동이 일어난다(stopPropagation 은
@@ -10602,6 +10647,7 @@ window.EduGuard = {
     // 금액·계기판 칸(운행일지·개인경비 모두) — 칸을 떠날 때 숫자·쉼표 밖의 글자가 있으면 바로 표시(2026-10-20 AU2 #9). 막는 것은 저장 단추가 한다.
     if (e.target.matches && e.target.matches('input.num[inputmode="numeric"]')) numMark(e.target);
     if (e.target.closest && e.target.closest('#evList [data-evrow]')) evHpNotes();   // 구분·날짜를 바꾸면 하이패스 안내도 다시(웹 8차)
+    if (e.target.matches && e.target.matches('[data-tspick],#tsAll')) { tsPick(e.target); return; }   // 통행료 맞추기 제안 창 고르기(2026-10-21)
     if (e.target.id === 'signFile') {
       var f = e.target.files && e.target.files[0];
       e.target.value = '';
@@ -11217,6 +11263,146 @@ window.EduGuard = {
     if (!u) return '';
     return (u.ok ? ' 운행에 넣었던 금액 ' + n0(u.ok) + '건도 되돌렸습니다.' : '') +
       (u.fail ? ' ' + n0(u.fail) + '건은 되돌리지 못했습니다 — 그 운행을 눌러 금액을 직접 고쳐 주세요.' : '');
+  }
+
+  /* ══════════════════ 통행료 맞추기 제안(2026-10-21 사용자 결정 「제안 + 한 번 눌러 확정」) ══════════════════
+     통행료 미확정·「모름」 업무 운행에 그날 영수증·하이패스 기록으로 맞춘 값(없음 0원 / 금액)을 제안하고(계산: toll-suggest.js — money-rule.js 결과를 읽기만),
+     직원이 창에서 고른 줄만 적는다. 정산 규칙은 그대로다.
+       · 저장 = 운행 고치기와 같은 길 — trip-edit patch.toll { mode: 'amount', amount(0 = 없음 → FREE_CONFIRMED · 금액 → MANUAL), note }.
+         서버(trip-edit · toll-apply)는 통행료 출처를 「웹 직접 입력」 하나로 정해 적는다(받는 출처 값이 없다 — 자동 계산이 덮지 않게 보호 트리거가 이 값을 본다).
+         그래서 출처는 「웹 직접 입력」 그대로이고, 근거(toll_evidence_json.note)에 「영수증 맞춤 제안 — …원: 남는 영수증 … #영수증번호」를 남겨 가린다.
+       · 적기 직전에 그 운행들을 서버에서 다시 읽어 지금도 「모름」인 것만 적는다(그 사이 앱·다른 탭이 정했으면 건너뜀 — 영수증 적기 autoFillEv 와 같은 원칙).
+       · 결재 중·완료(잠긴) 기간은 제안하지 않는다(서버 trip-edit 도 막는다). */
+  var TSUG = null;     // 열린 제안 창 { items, busy }
+  /** 본인 · 지금 기간의 제안(toll-suggest.js plan). 잠긴 기간·여러 기간·모듈 없음이면 null. M = 같은 자료의 moneyOf 결과(있으면 다시 세지 않는다). */
+  function tollSugPlan(M) {
+    var me = myName();
+    if (!window.TollSuggest || !me || isMulti() || cycleLocked(me)) return null;
+    var r = cycleRange(CYC);
+    var trips = ALL_TRIPS.filter(function (t) { var s = Number(t.start_time); return t.username === me && !t.deleted_at && s >= r.lo && s < r.hi; });
+    var evid = ALL_EVID.filter(function (e) { var d = Number(e.date_millis); return e.username === me && d >= r.lo && d < r.hi; });
+    try {
+      return window.TollSuggest.plan({ trips: trips, evid: evid, money: M || moneyOf(me, r, ALL_TRIPS, ALL_EVID), toll: function (t) { return tollNeed(t).a; }, day: ymd });
+    } catch (e) { console.error('통행료 제안을 만들지 못했습니다:', e); return null; }
+  }
+  /** 「제안 보기·맞추기」 창 — 날짜·운행 시각·방문처 → 제안(금액/없음)·근거, 줄마다 고르기 칸(기본 모두 고름), 아래 [N건 맞추기] [취소]. */
+  function openTollSug() {
+    var me = myName();
+    if (!me || isMulti()) return;
+    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없습니다.', true); return; }
+    var P = tollSugPlan();
+    if (!P) { toast('통행료 제안을 만들지 못했습니다 — 화면을 새로 고친 뒤 다시 눌러 주세요.', true); return; }
+    if (!P.items.length) { toast('통행료 미확정 운행이 없습니다.'); return; }
+    TSUG = { items: P.items, busy: false };
+    var DOW = ['일', '월', '화', '수', '목', '금', '토'];
+    var dn = function (k) { var p = k.split('-'), x = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return p[1] + '.' + p[2] + '(' + DOW[x.getUTCDay()] + ')'; };
+    var can = P.n.none + P.n.amount, groups = [];
+    P.items.forEach(function (it, i) {
+      var g = groups[groups.length - 1];
+      if (!g || g.day !== it.day) groups.push(g = { day: it.day, list: [] });
+      g.list.push({ it: it, i: i });
+    });
+    var w = function (v) { return n0(v) + '원'; };
+    var row = function (x) {
+      var it = x.it, t = it.trip, sel = it.kind === 'none' || it.kind === 'amount';
+      var place = t.visit_place || placeShort(t.end_address) || '방문처 없음';
+      var val = it.kind === 'amount' ? '<span class="tsv amt">' + w(it.amount) + '</span>'
+        : it.kind === 'none' ? '<span class="tsv none">없음(0원)</span>'
+        : it.kind === 'auto' ? '<span class="tsv auto">영수증으로 채움 ' + w(it.amount) + '</span>'
+        : '<span class="tsv pick">직접 고르기</span>';
+      // 직접 고르기 줄 — 근거 글에 영수증이 안 나왔으면 그날 남는 영수증을 한 줄 더(그 운행들과 남는 영수증만 보인다)
+      var evLine = it.kind === 'pick' && it.ev.length && it.say.indexOf(window.TollSuggest.evSay(it.ev[0])) < 0
+        ? '<div class="tse">이 날 영수증: ' + esc(it.ev.map(window.TollSuggest.evSay).join(' · ')) + '</div>' : '';
+      return '<li class="tsr k-' + it.kind + '" data-tsrow="' + esc(String(t.id)) + '">' +
+        (sel ? '<label class="tsc"><input type="checkbox" data-tspick="' + x.i + '" checked aria-label="' +
+            esc(md(t.start_time) + ' ' + hm(t.start_time) + ' ' + place + ' — ' + (it.kind === 'amount' ? w(it.amount) : '없음') + ' 맞추기') + '"></label>'
+          : '<span class="tsc" aria-hidden="true"></span>') +
+        '<div class="tsb"><div class="tst"><b>' + esc(hm(t.start_time)) + '</b> ' + esc(place) + '</div>' +
+        '<div class="tss">' + val + '<span class="tsw">' + esc(it.say) + '</span></div>' + evLine + '</div>' +
+        (it.kind === 'pick' ? '<button type="button" class="btn sm tsedit" data-edit="' + esc(String(t.id)) + '">' + ic('edit', 13) + '직접 고치기</button>' : '') +
+        '</li>';
+    };
+    var body = '<div class="anote" style="margin-top:0">영수증·하이패스 기록으로 통행료 「모름」(미확정) 운행을 맞춘 제안입니다. <b>정산 규칙은 그대로</b>이고, ' +
+      '고른 줄만 그 운행의 통행료로 적습니다(운행 고치기와 같은 「직접 입력」 · 근거 「영수증 맞춤 제안」). 「직접 고르기」 줄은 그 운행을 고쳐 금액을 정해 주세요.</div>' +
+      (can ? '<label class="tsall"><input type="checkbox" id="tsAll" checked> 제안 ' + n0(can) + '건 모두 고르기</label>'
+        : '<div class="anote">바로 맞출 제안이 없습니다 — 아래 운행을 직접 고쳐 주세요.</div>') +
+      '<div class="tsgrps">' + groups.map(function (g) {
+        return '<div class="tsgrp"><div class="tsday">' + esc(dn(g.day)) + '</div><ul class="tslist">' + g.list.map(row).join('') + '</ul></div>';
+      }).join('') + '</div>';
+    openPanel('통행료 맞추기 제안', cycleName(CYC) + ' · 미확정 ' + n0(P.items.length) + '건', body,
+      '<span style="flex:1"></span><button class="btn pri" id="btnTsApply"' + (can ? '' : ' disabled') + '>' + n0(can) + '건 맞추기</button>' +
+      '<button class="btn" data-close>취소</button>');
+  }
+  /** 고르기 칸이 바뀌면 — 「모두 고르기」(반쯤 표시)와 아래 단추 「N건 맞추기」만 고쳐 쓴다(창을 다시 그리지 않는다). */
+  function tsPick(el) {
+    if (!TSUG) return;
+    var boxes = [].slice.call(document.querySelectorAll('[data-tspick]'));
+    if (el && el.id === 'tsAll') boxes.forEach(function (b) { b.checked = el.checked; });
+    var on = boxes.filter(function (b) { return b.checked; }).length, all = $('tsAll');
+    if (all) { all.checked = on > 0 && on === boxes.length; all.indeterminate = on > 0 && on < boxes.length; }
+    var btn = $('btnTsApply');
+    if (btn && !TSUG.busy) { btn.textContent = n0(on) + '건 맞추기'; btn.disabled = !on; }
+  }
+  /** [N건 맞추기] — 고른 줄을 운행 고치기와 같은 trip-edit 로 적는다(셋씩 나란히). 끝나면 알림 「N건을 맞췄습니다」 · 표 다시 계산. */
+  function tsApply() {
+    var S0 = TSUG, me = myName();
+    if (!S0 || S0.busy || !me) return;
+    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없습니다.', true); return; }
+    var picked = S0.items.filter(function (it, i) {
+      var c = document.querySelector('[data-tspick="' + i + '"]');
+      return c && c.checked && (it.kind === 'none' || it.kind === 'amount');
+    });
+    if (!picked.length) { toast('맞출 줄을 하나 이상 골라 주세요.', true); return; }
+    S0.busy = true;
+    var btn = $('btnTsApply'), say = function (s) { var b = $('btnTsApply'); if (b) b.textContent = s; };
+    var lockUi = function (on) {
+      if (btn) btn.disabled = on;
+      [].slice.call(document.querySelectorAll('[data-tspick],#tsAll')).forEach(function (c) { c.disabled = on; });
+    };
+    lockUi(true); say('확인하는 중…');
+    // 적기 직전에 서버에서 다시 읽는다 — 지금도 「모름」(미확정)이고 본인 것만 적는다
+    var ids = picked.map(function (it) { return Number(it.trip.id); }), chunks = [];
+    for (var i = 0; i < ids.length; i += 80) chunks.push(ids.slice(i, i + 80));
+    Promise.all(chunks.map(function (c) {
+      return apiRetry('/rest/v1/trips?select=id,username,deleted_at,purpose,toll_cost,toll_status&id=in.(' + c.join(',') + ')')
+        .then(function (x) { return x.ok ? x.json() : Promise.reject(new Error('HTTP ' + x.status)); });
+    })).then(function (parts) {
+      var fresh = {};
+      [].concat.apply([], parts).forEach(function (t) { fresh[String(t.id)] = t; });
+      var still = picked.filter(function (it) { var f = fresh[String(it.trip.id)]; return !!f && f.username === me && window.TollSuggest.isUnk(f); });
+      var R = { ok: 0, fail: 0, stale: picked.length - still.length }, next = 0, done = 0;
+      var worker = function () {
+        if (next >= still.length) return Promise.resolve();
+        var it = still[next++];
+        var body = { id: Number(it.trip.id), patch: { toll: { mode: 'amount', amount: it.amount, note: it.note } }, note: it.note };
+        return apiRetry('/functions/v1/trip-edit', { method: 'POST', body: JSON.stringify(body) })
+          .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, j: j }; }, function () { return { ok: false, j: null }; }); })
+          .then(function (x) {
+            if (!(x.ok && x.j && x.j.ok)) { R.fail++; return; }
+            R.ok++;
+            // 서버가 되돌려 준 값으로 갈아끼운다(운행 고치기 saveTrip 과 같다) — 다시 받기 전에도 표가 바로 맞게
+            var row = x.j.row || {}, t = ALL_TRIPS.filter(function (y) { return String(y.id) === String(it.trip.id); })[0];
+            if (t) Object.keys(row).forEach(function (k) { if (k !== 'id') t[k] = row[k]; });
+          }, function () { R.fail++; })
+          .then(function () { done++; say('맞추는 중… ' + n0(done) + '/' + n0(still.length)); return worker(); });
+      };
+      say('맞추는 중… 0/' + n0(still.length));
+      return Promise.all([worker(), worker(), worker()]).then(function () { return R; });
+    }).then(function (R) {
+      if (TSUG === S0) TSUG = null;
+      closePanel();
+      var warn = [];
+      if (R.stale) warn.push(n0(R.stale) + '건은 그 사이 통행료가 정해져 건너뛰었습니다');
+      if (R.fail) warn.push(n0(R.fail) + '건은 저장하지 못했습니다 — 그 운행을 눌러 직접 고쳐 주세요');
+      if (R.ok) toastOk(n0(R.ok) + '건을 맞췄습니다.', warn.join(' · ') || null);
+      else toast((warn.join(' · ') || '맞춘 운행이 없습니다') + '.', true);
+      AUDIT = null; TRIP_CACHE = {};
+      paintPills(); render();
+      loadAll();                                   // 서버 값으로 다시 받아 표·합계를 다시 센다
+    }, function () {
+      S0.busy = false; lockUi(false); tsPick(null);
+      toast('서버에서 운행을 다시 읽지 못했습니다 — 잠시 뒤 다시 눌러 주세요(아무것도 바꾸지 않았습니다).', true);
+    });
   }
 
   /** 「다른 운행에 붙이기」 창 — 이번 주기 내 영수증(주차·통행료)마다 어느 운행 것인지 고른다. */
