@@ -529,7 +529,8 @@
         c.row([
           { w: W[0], t: LEVEL[it.level] || it.level, size: 8, align: 'center', bold: it.level === 'bad' },
           { w: W[1], t: it.title || '', size: 8, wrap: true, maxLines: 4, padX: 1.6 * MM, bold: it.level === 'bad' },
-          { w: W[2], t: it.detail || '', size: 8, wrap: true, maxLines: 12, padX: 1.6 * MM }
+          // 결재 문서에는 끝의 「다시 검증하면 …」(직원만 할 수 있는 일)을 싣지 않는다 — drv-verify.js noRecheck 와 같은 규칙(2026-10-21)
+          { w: W[2], t: String(it.detail || '').replace(/\s*[—-]?\s*다시 검증하면[^.。]*[.。]?\s*$/, ''), size: 8, wrap: true, maxLines: 12, padX: 1.6 * MM }
         ], { onBreak: brk, minH: 6 * MM });
       });
       c.y += 3 * MM;

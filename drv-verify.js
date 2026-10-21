@@ -211,10 +211,32 @@
   /** 지금 화면의 검증 항목(「바로 고치기」가 번호로 찾는다). */
   var VITEMS = [];
   /** links 가 참이면 항목마다 '고치러 가기' 버튼을 붙인다(본인 검증 화면에서만). */
-  /** 결재하는 분이 보는 검증 결과 — 상신한 분께 하는 말(「영수증을 올려 주세요」 등)로 끝나는 문장은 뺀다(2026-10-16 3차). */
+  /** 상신 뒤에 보이는 검증 글 — 끝의 「다시 검증하면 …」 문장(직원만 할 수 있는 일)은 뗀다. 서버(driving-verify.ts A00·A12 ·
+   *  expense-verify.ts X00)가 그 문장을 늘 본문 맨 끝에 둔다(2026-10-21 문구 다듬기). 잠긴 기간·결재하는 분·굳힌 결과 창이 쓴다
+   *  (같은 식: drv-expense.js lockedVerify · sheetpdf.js 결재 문서 검증 쪽 — 시험 supabase/functions/_shared/verify-wording_test.ts · harness plans/wording.mjs). */
+  function noRecheck(d) { return String(d || '').replace(/\s*[—-]?\s*다시 검증하면[^.。]*[.。]?\s*$/, ''); }
+  /** 목록 문장 안의 괄호 안내(「…(… 고쳐 주세요)」)를 괄호째 뗀다 — 괄호가 겹쳐도 바깥 괄호째. 닫히지 않은 괄호는 그대로 둔다. */
+  function noAskParen(s) {
+    var out = '', depth = 0, start = -1;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (c === '(') { if (!depth) start = i; depth++; }
+      else if (c === ')' && depth) {
+        if (!--depth && !/(주세요|하세요|지우세요)\.?$/.test(s.slice(start + 1, i).trim())) out += s.slice(start, i + 1);
+      } else if (!depth) out += c;
+    }
+    return depth ? out + s.slice(start) : out;
+  }
+  /** 결재하는 분이 보는 검증 결과 — 상신한 분께 하는 말(「영수증을 올려 주세요」 등)로 끝나는 문장은 뺀다(2026-10-16 3차).
+   *  끝의 「다시 검증하면 …」 문장도 뺀다(2026-10-21 — 결재하는 분은 다시 검증할 수 없다).
+   *  목록 문장(「…: 10.08 …」)은 괄호 안내만 떼고 남긴다(2026-10-21 — 「금액이 영수증과 다름」은 목록이 「…(… 고쳐 주세요)」로 끝나
+   *  문장째 빠져, 결재하는 분이 어느 날이 얼마 다른지 못 봤다). */
   function apprDetail(d) {
-    var parts = String(d || '').split(/\.\s+/), keep = parts.filter(function (p) { return !/(주세요|하세요|지우세요)[.)]?$/.test(p.trim()); });
-    return keep.length === parts.length ? String(d || '') : keep.join('. ').replace(/([^.])$/, '$1.');
+    d = noRecheck(d);
+    var parts = d.split(/\.\s+/), keep = parts.map(function (p) { return p.indexOf(':') >= 0 ? noAskParen(p) : p; })
+      .filter(function (p) { return !/(주세요|하세요|지우세요)[.)]?$/.test(p.trim()); });
+    var same = keep.length === parts.length && keep.every(function (p, i) { return p === parts[i]; });
+    return same ? d : keep.join('. ').replace(/([^.])$/, '$1.');
   }
   function itemsHtml(items, links, appr) {
     if (!items || !items.length) {
@@ -422,7 +444,7 @@
     if (f === undefined) wantSummaries([a.id]);
     var v = f && f.verify, s = (v && v.summary) || {};
     var items = ((v && (v.items || (v.result && v.result.items))) || []).map(function (i) {
-      return /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: String(i.detail).replace(/\s*[—-]?\s*다시 검증하면[^.。]*[.。]?\s*$/, '') }) : i;
+      return /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: noRecheck(i.detail) }) : i;
     });
     var verdict, clean = '';
     if (f === undefined) verdict = FZFAIL[fk] ? '상신 때 검증 결과를 불러오지 못했습니다 — 잠시 뒤 다시 열어 주세요' : '상신 때 검증 결과를 불러오는 중…';
@@ -549,9 +571,12 @@
     };
   }
 
-  /** appr = 결재하는 분(남의 상신 건)이 본다 — 상신한 분께 하는 말은 빼고, 고치는 것은 상신한 분 몫이라고 한 줄. */
-  function showItems(title, sub, v, appr) {
-    var s = (v && v.summary) || {}, items = (v && (v.items || (v.result && v.result.items))) || [];
+  /** appr = 결재하는 분(남의 상신 건)이 본다 — 상신한 분께 하는 말은 빼고, 고치는 것은 상신한 분 몫이라고 한 줄.
+   *  frozen = 상신 때 굳힌 결과(다시 검증할 수 없다) — 상신한 분 본인이 봐도 끝의 「다시 검증하면 …」 문장은 뗀다(2026-10-21). */
+  function showItems(title, sub, v, appr, frozen) {
+    var s = (v && v.summary) || {}, items = ((v && (v.items || (v.result && v.result.items))) || []).map(function (i) {
+      return frozen && /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: noRecheck(i.detail) }) : i;
+    });
     // AI 를 안 쓴 검증이면 한 줄 — 결재 문서 PDF 의 검증 쪽과 같은 말(sheetpdf.js). 법인카드는 사진이 없어 그 종류의 말(aiNote)을 쓴다.
     //   예전 「Gemini 읽기 없음」은 법인카드 창에 늘 보였다(카드 검증은 ai:false 로 넘어온다 — 2026-10-21 매뉴얼 로봇).
     var aiNote = !v ? '' : v.aiNote != null ? String(v.aiNote) : v.ai === false ? 'AI 사진 판독 없음(규칙 검증만)' : '';
@@ -671,7 +696,8 @@
       '</div>';
   }
 
-  /** 「영수증 없음」(R06) 내용에서 날짜·금액만 — 서버 문구 「…(합계 4,400원): 10.05 1,100원, 10.07 3,300원. 자동 계산…」. 없으면 ''. */
+  /** 「영수증 없음」(R06) 내용에서 날짜·금액만 — 서버 문구 「… 영수증이 없습니다: 10.05 1,100원, 10.07 3,300원(합계 4,400원). 자동 계산…」
+   *  (2026-10-21 문구 다듬기 전 굳힌 글 「…(합계 4,400원): 10.05 1,100원, …」도 같은 답). 없으면 ''. */
   function noRcpDays(detail) {
     var d = String(detail || ''), m = /:\s*((?:\d{2}\.\d{2} [\d,]+원(?:, )?)+(?: 외 \d+건)?)/.exec(d), t = /\(합계 ([\d,]+원)\)/.exec(d);
     return m ? m[1] + (t ? ' (합계 ' + t[1] + ')' : '') : '';
@@ -783,9 +809,12 @@
         // 결재하는 분에게는 상신자가 할 일(내용)을 빼지만, 영수증 없는 날(R06)은 그날 날짜·금액만 보인다.
         var days = asApprover && i.code === 'R06' ? noRcpDays(i.detail) : '';
         // 통행료 미확정(R02)도 결재하는 분에게 그날과 「0원으로 정산」을 보인다(2026-10-16 6차 — 「모두 확정」으로 보이던 건)
-        if (asApprover && i.code === 'R02') { var ud = /:\s*(.+)$/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' · ' : '') + '0원으로 정산됩니다'; }
+        //   날짜 목록만 — 서버 문구 「… 업무 운행입니다: 10.03, 10.05. 냈으면 …」(2026-10-21 다듬기 뒤 목록 뒤에 할 일이 붙는다 · 예전 「…: 10.03, 10.05」도 같은 답)
+        if (asApprover && i.code === 'R02') { var ud = /:\s*((?:\d{2}\.\d{2}(?:, )?)+(?: 외 \d+건)?)/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' · ' : '') + '0원으로 정산됩니다'; }
+        // 상신한 분 본인 — 결재 중이라 다시 검증할 수 없다: 끝의 「다시 검증하면 …」은 뗀다(2026-10-21)
+        var dt = noRecheck(i.detail);
         return '<li class="' + i.level + '"' + (i.code === 'R06' ? ' data-norcp="1"' : '') + '><b>' + esc(i.title || '') + '</b>' +
-          (days ? ' — ' + esc(days) : i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
+          (days ? ' — ' + esc(days) : dt && !asApprover ? ' — ' + esc(dt.slice(0, 110)) + (dt.length > 110 ? '…' : '') : '') + '</li>';
       }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 「검증」 딱지를 눌러 전부 보기</li>' : '') +
         (asApprover ? '<li class="more">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') +
       '</div>';
@@ -1136,13 +1165,13 @@
       return;
     }
     if ((el = e.target.closest('[data-vshow]'))) {
-      var S2 = C.state(), r = FZV[keyOf(el.dataset.vshow, S2.CYCKEY)] || ROWS[keyOf(el.dataset.vshow, S2.CYCKEY)];   // 상신 때 굳힌 결과가 먼저
-      if (r) showItems(C.nameOf(el.dataset.vshow) + ' 검증 결과', cycName(S2.CYCKEY), r);
+      var S2 = C.state(), fzv = FZV[keyOf(el.dataset.vshow, S2.CYCKEY)], r = fzv || ROWS[keyOf(el.dataset.vshow, S2.CYCKEY)];   // 상신 때 굳힌 결과가 먼저
+      if (r) showItems(C.nameOf(el.dataset.vshow) + ' 검증 결과', cycName(S2.CYCKEY), r, false, !!fzv);
       return;
     }
     if ((el = e.target.closest('[data-fzverify]'))) {
       var a = apprById(el.dataset.fzverify), f = a && FZSUM[fzKey(a)];
-      if (f && f.verify) showItems(C.nameOf(a.username) + ' 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify, a.username !== C.myName());
+      if (f && f.verify) showItems(C.nameOf(a.username) + ' 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify, a.username !== C.myName(), true);
       return;
     }
     if ((el = e.target.closest('[data-fzpdf]'))) { pdfFrozen(el.dataset.fzpdf); return; }

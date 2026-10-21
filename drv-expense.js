@@ -355,7 +355,7 @@
    *  사진 없음(X01) · 금액 다름(X02 — 「12,000원으로 읽음」) · 못 읽음·영수증 아님(X05) · 날짜 다름(X04 — 「10.02로 읽음」) · 아직 안 읽음(X00) ·
    *  상호 다름(X03, 참고) · 그 밖 = 맞음. 검증한 뒤 올리거나 고친 줄은 「다시 검증」, 검증한 적이 없으면 「검증 전」.
    *  2026-10-21 한 장에 여러 영수증을 올린 줄(원본 scan_path): 원본에 없음(X10 — 원본 장에서 그 날짜·금액 영수증을 찾지 못함) ·
-   *  대조 생략(X11 — 원본 장 파일이 없음). 서버 _shared/expense-verify.ts 원본 장 짝짓기.
+   *  비교 못 함(X11 — 원본 장 파일이 없음, 2026-10-21 「대조 생략」에서 쉬운 말로). 서버 _shared/expense-verify.ts 원본 장 짝짓기.
    *  { by: { 줄id: [딱지 종류, 글, 풀이] } } — 결과를 받는 중이면 null(받으면 다시 그린다). */
   function aiCol(rows, a) {
     var u = me(), cyc = C.state().CYCKEY, v = null, at = 0;
@@ -387,12 +387,13 @@
       else if (hs.length) {
         var x = hs[0], d = String(x.it.detail || '');
         if (x.code === 'X01') c = ['bad', '사진 없음', d];
-        else if (x.code === 'X02') c = ['bad', (m = /사진(?:에서 읽은 금액)?\s*([\d,]+)원/.exec(d)) ? m[1] + '원으로 읽음' : '금액 다름', d];
+        // 서버 문구 「입력 N원, 사진의 금액 M원」(2026-10-21 다듬기) · 그 전에 굳힌 「사진에서 읽은 금액 M원」도 같은 답
+        else if (x.code === 'X02') c = ['bad', (m = /사진(?:에서 읽은 금액|의 금액)?\s*([\d,]+)원/.exec(d)) ? m[1] + '원으로 읽음' : '금액 다름', d];
         else if (x.code === 'X05') c = ['warn', /영수증으로 보이지/.test(String(x.it.title || '')) ? '영수증 아님' : '못 읽음', d];
         else if (x.code === 'X04') c = ['warn', (m = /사진의 날짜는\s*\d{4}-(\d{2})-(\d{2})/.exec(d)) ? m[1] + '.' + m[2] + '로 읽음' : '날짜 다름', d];
         else if (x.code === 'X00') c = ['neu', '아직 안 읽음', d];
         else if (x.code === 'X10') c = [x.it.level === 'bad' ? 'bad' : 'warn', '원본에 없음', d];
-        else if (x.code === 'X11') c = ['neu', '대조 생략', d];
+        else if (x.code === 'X11') c = ['neu', '비교 못 함', d];
         else c = ['neu', '상호 다름', d];
       } else if (!it.photo_path) c = ['bad', '사진 없음', '영수증 사진이 없는 줄입니다'];
       else c = ['ok', '맞음', 'AI 가 읽은 금액·날짜가 적은 값과 같습니다'];
@@ -1981,7 +1982,7 @@
     if ((el = e.target.closest('[data-xfzxlsx]'))) { xlsxFrozen(el.dataset.xfzxlsx); return; }
     if ((el = e.target.closest('[data-xfzverify]'))) {
       var a = apprById(el.dataset.xfzverify), f = a && FZSUM[fzKey(a)];
-      if (f && f.verify) C.vx.showItems(C.nameOf(a.username) + ' 개인경비 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify, a.username !== C.myName());
+      if (f && f.verify) C.vx.showItems(C.nameOf(a.username) + ' 개인경비 검증 결과', cycName(a.cycle) + ' · 상신 시점', f.verify, a.username !== C.myName(), true);   // 굳힌 결과 — 끝의 「다시 검증하면 …」은 뗀다
       return;
     }
     if ((el = e.target.closest('[data-xcat]'))) { XL.cat = el.dataset.xcat; C.render(); return; }
