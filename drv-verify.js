@@ -1201,9 +1201,21 @@
      금액 요약표(CSV). 결재 중·아직 상신 안 한 사람도 같이 보여 누구를 챙겨야 하는지 알게 한다.
      문서는 모두 상신 때 저장한 고정본(driving_frozen)으로 만든다 — 결재자가 본 그 문서다. */
   var FINSEL = {}, FINJOB = null;
+  // 고르기 · 이 팀 모두 고르기 · 이름으로 찾기는 화면을 다시 그리지 않고 그 자리에서 맞춘다(C.fin — driving-app.js, 2026-10-23).
+  //   예전엔 고를 때마다 C.render() 로 화면 전체를 다시 그려 22줄 넘는 표의 안쪽 스크롤이 맨 위로 갔다(관리자 신고).
+  //   C.fin 이 없는 앞 판 driving-app.js 와 섞여 실려도(배포 직후 캐시) 이 모듈(검증·상신 화면 포함)이 죽지 않게 — 그때는 예전 그대로(finOld).
+  var FIN = C.fin || finOld();
+  FIN.reg('driving', { sel: function () { return FINSEL; }, busy: function () { return !!FINJOB; } });
+  /** C.fin 이 없을 때 — 팀 칸·찾기 없이 예전처럼(묶음은 이름 순, 고르면 다시 그림 — 아래 change 처리기). 개인경비·법인카드도 같은 모양. */
+  function finOld() {
+    var nil = function () { return ''; };
+    return { old: true, reg: nil, row: nil, box: nil, all: nil, grp: nil, bar: nil, none: nil, fileTag: nil, sync: nil, match: function () { return true; },
+      order: function (l, gu) { return { list: l.slice().sort(function (x, y) { return C.nameOf(gu(x)).localeCompare(C.nameOf(gu(y)), 'ko'); }), team: '' }; } };
+  }
   /** 보이는 줄 중 고른 것(2026-10-14) — 「출력 안 한 것만」으로 숨은 줄은 고른 채 남아 있어도 세지·묶지 않는다. */
   function finPicked(rows) { return rows.filter(function (a) { return FINSEL[a.id]; }); }
-  function finVisible(a) { return !C.prints || C.prints.keep('driving', a); }
+  /** 보이는 줄인가 — 「출력 안 한 것만」(2026-10-14) + 이름으로 찾기(2026-10-23). 고른 수·묶어 받기가 화면과 같은 판정. */
+  function finVisible(a) { return (!C.prints || C.prints.keep('driving', a)) && FIN.match('driving', a.username); }
   /** 결재 완료 출력 세 표가 같이 쓰는 앞 열(2026-10-19 사용성 2차 #12) */
   var FIN_HEAD = '<th>파트·센터</th><th>이름</th><th>상태</th>';
   /** 상신 때 통행료 미확정 수(snapshot.toll_unknown) */
@@ -1236,7 +1248,8 @@
     // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로 결재 완료 전체).
     //   고른 수·전체 선택·묶어 받기도 보이는 줄만 센다 — 숨은 줄이 묶음에 몰래 들어가지 않게.
     var shown = C.prints ? done.filter(function (a) { return C.prints.keep('driving', a); }) : done;
-    var nSel = finPicked(shown).length;
+    // 표에는 shown 을 다 그리고 이름 찾기에 안 맞는 줄은 C.fin 이 그 자리에서 숨긴다(치는 동안 다시 그리지 않게) — 고른 수는 보이는 줄만.
+    var vis = shown.filter(finVisible), nSel = finPicked(vis).length;
 
     var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
     var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력합니다');
@@ -1257,7 +1270,7 @@
 
     // ── 결재 완료 — 출력 ──
     var tools = done.length
-      ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
+      ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-finpdf data-finbtn="driving"' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) +
         (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
         '<button class="btn sm" data-fincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' +
         (C.prints ? C.prints.onlyBtn('driving') : '')
@@ -1267,20 +1280,21 @@
       : done.length
       // 세 표(결재 완료·결재 중·챙겨야 할 사람)가 같은 열 순서 — 팀 묶음 + 파트·센터 · 이름 · 상태(2026-10-19 사용성 2차 #12).
       //   「전체 선택」은 표 머리 첫 칸(예전: 표 밖 단추 줄).
-      ? '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
-        '<th class="fchk"><label class="finall"><input type="checkbox" id="finAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label></th>' +
+      // 2026-10-23: 표 위 이름 찾기 · 팀 머리 줄 「이 팀 모두 고르기」 · 고르기는 다시 그리지 않음(C.fin) · 다시 그려도 안쪽 스크롤 그대로(data-keep)
+      ? FIN.bar('driving') + '<div class="panel"><div class="scroll" data-rows data-keep="fin"><table class="rcard ftab" data-fin="driving"><thead><tr>' +
+        '<th class="fchk"><label class="finall"><input type="checkbox" id="finAll"' + FIN.all('driving') + (nSel && nSel === vis.length ? ' checked' : '') + '> 전체 선택</label></th>' +
         FIN_HEAD + '<th>날짜</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
         C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
-          return C.orgGroupRow(g, 8, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') +
+          return C.orgGroupRow(g, 8, '합계 <b>' + C.won(g.list.reduce(function (s2, a) { return s2 + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>', FIN.grp('driving', g)) +
             g.list.map(doneRow).join('');
-        }).join('') + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td>' +
+        }).join('') + FIN.none(8) + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td>' +
         '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
     function doneRow(a) {
           var p = S.USERS[a.username] || {};
           var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
-          return '<tr><td><input type="checkbox" data-finsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') +
-            ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
+          return '<tr' + FIN.row('driving', a.id, a.username, (a.snapshot || {}).cost) + '><td><input type="checkbox" data-finsel="' + a.id + '"' + FIN.box('driving', a.id) +
+            (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             // 상태: 결재 완료 + 통행료 미확정 딱지(정산은 0원으로 끝났지만 알 수 있게 — 2026-10-19 사용성 2차) + 출력 딱지
             '<td><span class="st ok">결재 완료</span>' + (unkOf(a) ? ' <span class="unktag" title="통행료 미확정 ' + n0(unkOf(a)) + '건 — 0원으로 정산됨">미확정 ' + n0(unkOf(a)) + '</span>' : '') +
@@ -1298,7 +1312,7 @@
     }
 
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr>' +
         FIN_HEAD + '<th>날짜</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
         C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 7, '') + g.list.map(goingRow).join(''); }).join('') +
         '</tbody></table></div></div>');
@@ -1316,7 +1330,7 @@
       var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)', cls: a.status === 'rejected' ? 'bad' : 'warn' }; })
         .concat(notYet.map(function (u) { return { u: u, st: '미상신', cls: 'warn' }; }));
       h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '',
-        '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' + FIN_HEAD + '<th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
+        '<div class="panel"><div class="scroll" data-rows data-keep="fin-todo"><table class="rcard ftab"><thead><tr>' + FIN_HEAD + '<th class="n">이번 기간 운행</th><th>검증</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 5, '') + g.list.map(function (x) {
             var vr = ROWS[keyOf(x.u, cyc)], vs = vr && vr.summary;
@@ -1339,8 +1353,9 @@
   function finBundle() {
     var S = C.state();
     var ids = Object.keys(FINSEL);
-    var list = ids.map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); })
-      .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
+    // 보이는 줄 중 고른 것만(출력 안 한 것만 · 이름으로 찾기) · 차례는 표에 보이는 차례 — 팀 → 파트·센터 → 이름(2026-10-23, 예전엔 이름 순만)
+    var ord = FIN.order(ids.map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); }), function (a) { return a.username; });
+    var list = ord.list;
     if (!list.length || FINJOB) return;
     // ★ 한 번에 묶는 인원 상한(2026-10-07 검증로봇 R15) — 사진이 든 PDF 를 모두 메모리에 쌓았다가 합치므로
     //   전원(66명·사진 약 700장)을 한 번에 묶으면 브라우저 탭이 메모리 부족으로 꺼질 수 있다.
@@ -1351,7 +1366,7 @@
     }
     var job = FINJOB = { stop: false };
     var cname = cycName(S.CYCKEY);
-    C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + n0(list.length) + '명',
+    C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="finNote" role="status">준비하는 중…</div>' +
       '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
@@ -1403,7 +1418,7 @@
             .then(function (src) { return out.copyPages(src, src.getPageIndices()); })
             .then(function (pages) { pages.forEach(function (pg) { out.addPage(pg); }); });
         });
-        return chain.then(function () { out.setTitle('운행기록부 결재 완료본 ' + cname); return out.save(); })
+        return chain.then(function () { out.setTitle('운행기록부 결재 완료본 ' + cname + (ord.team ? ' ' + ord.team : '')); return out.save(); })
           .then(function (bytes) { return { bytes: bytes, pages: out.getPageCount() }; });
       });
     }).then(function (res) {
@@ -1412,7 +1427,8 @@
       var blob = new Blob([res.bytes], { type: 'application/pdf' });
       PDF_URLS.forEach(function (u) { URL.revokeObjectURL(u); });
       var url = URL.createObjectURL(blob); PDF_URLS = [url];
-      var file = '운행기록부_결재완료_' + S.CYCKEY + '_' + parts.length + '명.pdf';
+      // 한 팀만 골랐으면 파일 이름에 팀 이름(2026-10-23 팀별로 뽑기) — 운행기록부_결재완료_2026-09_○○팀_5명.pdf
+      var file = '운행기록부_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
         '<div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
         (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) +
@@ -1463,13 +1479,15 @@
     C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
   }
 
-  // 결재 완료 출력 — 고르기 칸
-  document.addEventListener('change', function (e) {
+  // 결재 완료 출력 — 고르기 칸 · 전체 선택 · 이 팀 모두 고르기는 C.fin(driving-app.js)이 받는다(2026-10-23).
+  //   예전 이 처리기는 고를 때마다 C.render() 로 화면 전체를 다시 그려 표 안쪽 스크롤이 맨 위로, 초점이 body 로 갔다.
+  //   전체 선택은 그대로 보이는 줄만(「출력 안 한 것만」 2026-10-14 + 이름으로 찾기) 고른다.
+  //   아래는 C.fin 이 없는 앞 판 driving-app.js 와 섞여 실렸을 때만 — 예전 그대로.
+  if (FIN.old) document.addEventListener('change', function (e) {
     var t = e.target;
     if (t.matches && t.matches('[data-finsel]')) { if (t.checked) FINSEL[t.dataset.finsel] = 1; else delete FINSEL[t.dataset.finsel]; C.render(); return; }
     if (t.id === 'finAll') {
       var S = C.state();
-      // 보이는 줄만(2026-10-14 — 「출력 안 한 것만」이 켜져 있으면 출력 안 한 문서만 고른다)
       S.APPR.forEach(function (a) {
         if (a.cycle === S.CYCKEY && a.status === 'approved' && C.orgMatch(a.username) && finVisible(a)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; }
       });

@@ -184,7 +184,8 @@
     }
     if ((el = e.target.closest('[data-pronly]'))) {
       var k = el.dataset.pronly;
-      if (KINDS[k]) { ONLY[k] = !ONLY[k]; C.render(); }
+      // 거르기를 바꾸면 목록 자체가 달라진다 — 표 안쪽 스크롤은 맨 위에서(다른 다시 그리기는 그 자리 그대로, 2026-10-23)
+      if (KINDS[k]) { ONLY[k] = !ONLY[k]; if (C.keepDrop) C.keepDrop(); C.render(); }
     }
   });
 

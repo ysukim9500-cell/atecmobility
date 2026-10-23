@@ -376,7 +376,10 @@
     return from === periodOf(v);
   }
   /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
-  function notifyGo(v, prev) { EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } }); }
+  function notifyGo(v, prev) {
+    FINQ = {};                     // 결재 완료 출력 이름 찾기 — 화면을 옮기면 비운다(2026-10-23)
+    EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } });
+  }
   var LOADED = false, LOADING = false, AUDIT = null;
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
   /** driving-account 가 알려 주는 것 — 권한 관리를 할 수 있는 계정인가.
@@ -703,6 +706,7 @@
     }
     FILLS = {};                          // 주기가 바뀌면 구간 키가 의미를 잃는다 — 여기서만 버린다(바꾸기 전에 unsavedFills 로 막는다)
     DATEF = { from: '', to: '' }; PAGES = {};
+    FINQ = {};                           // 결재 완료 출력 이름 찾기 — 기간을 바꾸면 비운다(2026-10-23)
     EXT.onCycle.forEach(function (fn) { try { fn(); } catch (e) { } });
     openCyclePop(false);
     paintCycle();
@@ -3172,9 +3176,10 @@
     });
     return out.sort(function (a, b) { return a.rank - b.rank || orgName(a.p).localeCompare(orgName(b.p), 'ko'); });
   }
-  /** 묶음 제목 줄. right = 오른쪽에 붙일 합계 등. */
-  function orgGroupRow(g, cols, right) {
-    return '<tr class="ogrp"><td colspan="' + cols + '"><div><b>' + esc(orgName(g.p)) + '</b>' +
+  /** 묶음 제목 줄. right = 오른쪽에 붙일 합계 등. lead = 팀 이름 앞에 둘 것(결재 완료 출력 「이 팀 모두 고르기」 칸 finGrp, 2026-10-23) —
+   *  있으면 줄에 팀 열쇠(data-gk = orgGroups 의 사업부|팀)를 단다. */
+  function orgGroupRow(g, cols, right, lead) {
+    return '<tr class="ogrp"' + (lead ? ' data-gk="' + esc(g.k) + '"' : '') + '><td colspan="' + cols + '"><div>' + (lead || '') + '<b>' + esc(orgName(g.p)) + '</b>' +
       (g.p.team && g.p.div ? '<span class="od">' + esc(g.p.div) + '</span>' : '') +
       '<span class="on">' + n0(g.list.length) + '명</span>' + (right ? '<span class="or">' + right + '</span>' : '') + '</div></td></tr>';
   }
@@ -4743,6 +4748,7 @@
     });
     apvMount();
     mselSync();             // 여러 줄 골라 지우기 — 고른 칸·띠를 다시 맞춘다(2026-10-19)
+    finSyncAll();           // 결재 완료 출력 — 찾기·팀 칸 반쯤·전체 선택·묶기 단추(2026-10-23)
   }
   /** 하이패스 대조 — 고른 건수·합계와 확정 버튼만 제자리에서 고쳐 쓴다. */
   function paintHpCount() {
@@ -7629,6 +7635,140 @@
     done: function () { AUDIT = null; loadAll(); }
   });
 
+  /* ══════════════════ 결재 완료 출력 — 고르기 · 팀 고르기 · 이름으로 찾기(세 화면 공통, 2026-10-23) ══════════════════
+     관리자 「아래쪽 하나를 고르면 위로 올라간다 — 고른 자리 그대로」 · 「팀별로 뽑을 수 있게」 · 「이름으로 검색」.
+     예전엔 칸 하나를 고를 때마다 화면 전체를 다시 그렸다(C.render → #inner innerHTML 통째 교체). 줄이 22개를 넘는 표는
+     자기 스크롤 상자(.scroll.tall)라 새로 만든 상자가 맨 위(scrollTop 0)에서 시작했고, 누른 칸도 새로 만들어져 초점이 body 로 갔다.
+     이제 고르기·찾기는 다시 그리지 않고 그 자리에서 고르기 칸 · 팀 칸 · 전체 선택 · 묶기 단추 · 찾은 수만 맞춘다(finSync).
+       표 table[data-fin="driving|expense|card"] · 줄 tr[data-frow](finRow) · 고르기 칸 input[data-fid](finBox)
+       팀 머리 줄 orgGroupRow(…, finGrp) — 그 팀의 보이는 줄 모두 고르기·풀기, 일부만 골랐으면 반쯤(indeterminate)
+       전체 선택 input[data-finall] · 묶기 단추 [data-finbtn] · 찾기 칸 input[data-finq] · 지우기 [data-finqx](Esc 도)
+     「보이는 줄」 = 표에 있는 줄(「출력 안 한 것만」으로 거른 뒤) 중 찾기에 맞는 줄. 고른 수 · 전체 선택 · 팀 고르기 · 묶어 받기는 이것만 센다 —
+     숨은 줄은 고른 채 남아도 묶음에 몰래 들어가지 않는다(「출력 안 한 것만」과 같은 원칙). 고른 것 자체는 모듈이 가진다(finReg 의 sel).
+     찾는 말은 화면을 옮기거나 기간을 바꾸면 비운다(notifyGo · setPeriod). */
+  var FINK = {}, FINQ = {};
+  /** def: { sel: function () → 고른 것 { 결재번호: 1 }, busy: function () → 묶는 중인가 } */
+  function finReg(kind, def) { FINK[kind] = def; }
+  /** 찾는 이름들 — 띄어 쓰거나 쉼표로 여러 명(그중 하나라도 이름에 들어 있으면 보인다). */
+  function finWords(kind) { return String(FINQ[kind] || '').toLowerCase().split(/[\s,]+/).filter(Boolean); }
+  function finHit(words, name) {
+    var n = String(name || '').toLowerCase().replace(/\s+/g, '');
+    return !words.length || words.some(function (w) { return n.indexOf(w) >= 0; });
+  }
+  /** 그 사람이 찾기에 맞는가 — 묶어 받기·고른 수가 화면과 같은 판정을 쓴다. */
+  function finMatch(kind, u) { return finHit(finWords(kind), nameOf(u)); }
+  /** 줄(tr)에 붙일 것 — 팀 열쇠(orgGroups 와 같은 사업부|팀) · 이름 · 금액(찾는 중 팀 합계) */
+  function finRow(kind, id, u, amt) {
+    var p = orgPath(u);
+    return ' data-frow="' + esc(id) + '" data-fgk="' + esc(p.div + '|' + p.team) + '" data-fname="' + esc(nameOf(u)) + '" data-famt="' + (Number(amt) || 0) + '"';
+  }
+  /** 고르기 칸(input)에 붙일 것. data-fk — 화면을 다시 그려도 초점이 그 칸으로 돌아온다(keepRestore). */
+  function finBox(kind, id) { return ' data-fid="' + esc(id) + '" data-fk="fin:' + esc(kind) + ':' + esc(id) + '"'; }
+  function finAllAttr(kind) { return ' data-finall="' + esc(kind) + '" data-fk="finall:' + esc(kind) + '"'; }
+  /** 팀 묶음 머리 줄 맨 앞 「이 팀 모두 고르기」 칸 */
+  function finGrp(kind, g) {
+    var nm = orgName(g.p);
+    return '<label class="mselhit fgrp" title="' + esc(nm) + ' 모두 고르기"><input type="checkbox" data-fingrp="' + esc(kind) + '" data-gk="' + esc(g.k) + '"' +
+      ' data-fk="fing:' + esc(kind) + ':' + esc(g.k) + '" aria-label="' + esc(nm) + ' 모두 고르기"></label>';
+  }
+  /** 표 위 찾기 칸 */
+  function finBar(kind) {
+    var q = FINQ[kind] || '';
+    return '<div class="finbar"><label class="field finq">' + ic('search', 15) +
+      '<input data-finq="' + esc(kind) + '" data-fk="finq:' + esc(kind) + '" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="이름으로 찾기"' +
+      ' value="' + esc(q) + '" title="이름 일부만 쳐도 됩니다 · 여러 명은 띄어서 · Esc 로 지우기" aria-label="이름으로 찾기 — 여러 명은 띄어서">' +
+      '<button type="button" class="permx finqx" data-finqx="' + esc(kind) + '" aria-label="찾기 지우기"' + (q ? '' : ' hidden') + '>' + ic('close', 12) + '</button></label>' +
+      '<span class="finqn" data-finqn="' + esc(kind) + '" aria-live="polite"></span></div>';
+  }
+  /** 찾는 이름이 없을 때 표 안 한 줄(finSync 가 보인다) */
+  function finNone(cols) {
+    return '<tr class="finnone" hidden><td colspan="' + cols + '"><div class="blank" style="padding:22px 0"><div class="t">찾는 이름이 없습니다.</div>' +
+      '<div class="d">이름 일부만 쳐도 됩니다. 여러 명은 띄어서 칩니다.</div></div></td></tr>';
+  }
+  /** 묶음 차례 = 표에 보이는 차례(팀 → 파트·센터 → 이름). team = 고른 사람이 모두 한 팀이면 그 팀 이름(파일 이름), 아니면 ''. */
+  function finOrder(list, getU) {
+    var by = list.slice().sort(function (x, y) { return nameOf(getU(x)).localeCompare(nameOf(getU(y)), 'ko'); });
+    var gs = orgGroups(by, getU, true);
+    return { list: [].concat.apply([], gs.map(function (g) { return g.list; })), team: gs.length === 1 ? orgName(gs[0].p) : '' };
+  }
+  /** 파일 이름에 넣을 팀 이름(파일 이름에 못 쓰는 글자·띄어쓰기 뺌 — 금액 요약표의 보는 범위와 같게) */
+  function finFileTag(team) { var s = String(team || '').replace(/[\\/:*?"<>|\s]+/g, ''); return s ? '_' + s : ''; }
+  /** 고른 상태·찾기를 화면에 맞춘다 — 다시 그리지 않는다. 그린 뒤(afterPaint)와 고르기·찾기 때마다. */
+  function finSync(kind) {
+    var d = FINK[kind]; if (!d) return;
+    var t = document.querySelector('#inner table[data-fin="' + kind + '"]');
+    var sel = d.sel() || {}, words = finWords(kind), G = {}, vis = 0, nSel = 0, all = 0;
+    if (t) {
+      Array.prototype.forEach.call(t.querySelectorAll('tbody tr[data-frow]'), function (tr) {
+        var id = tr.dataset.frow, ok = finHit(words, tr.dataset.fname), on = !!sel[id], b = tr.querySelector('input[data-fid]');
+        var g = G[tr.dataset.fgk] || (G[tr.dataset.fgk] = { n: 0, s: 0, amt: 0 });
+        all++;
+        tr.hidden = !ok;
+        if (b) b.checked = on;
+        if (!ok) return;
+        vis++; g.n++; g.amt += Number(tr.dataset.famt) || 0;
+        if (on) { nSel++; g.s++; }
+      });
+      Array.prototype.forEach.call(t.querySelectorAll('tbody tr.ogrp[data-gk]'), function (tr) {
+        var g = G[tr.dataset.gk] || { n: 0, s: 0, amt: 0 }, b = tr.querySelector('input[data-fingrp]');
+        tr.hidden = !g.n;                                   // 찾는 사람이 없는 팀은 머리 줄도 숨긴다
+        if (b) { b.checked = g.n > 0 && g.s === g.n; b.indeterminate = g.s > 0 && g.s < g.n; }
+        // 팀 사람 수·합계 = 보이는 줄(찾는 중이면 찾은 사람만 — 「출력 안 한 것만」 때처럼)
+        var on = tr.querySelector('.on'), sum = tr.querySelector('.or b');
+        if (on) on.textContent = n0(g.n) + '명';
+        if (sum) sum.textContent = won(g.amt);
+      });
+      var none = t.querySelector('tr.finnone'); if (none) none.hidden = vis > 0 || !all;
+      Array.prototype.forEach.call(t.querySelectorAll('input[data-finall]'), function (a) {
+        a.disabled = !vis; a.checked = vis > 0 && nSel === vis; a.indeterminate = nSel > 0 && nSel < vis;
+      });
+    }
+    var busy = !!(d.busy && d.busy());
+    Array.prototype.forEach.call(document.querySelectorAll('#inner [data-finbtn="' + kind + '"]'), function (b) {
+      var lab = nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기';
+      b.disabled = !nSel || busy;
+      b.classList.toggle('pri', nSel > 0);
+      if (b.textContent !== lab) b.innerHTML = ic('dl', 13) + esc(lab);
+    });
+    var qn = document.querySelector('#inner [data-finqn="' + kind + '"]');
+    if (qn) qn.textContent = words.length ? '찾은 ' + n0(vis) + '명' + (nSel ? ' · 그중 고른 ' + n0(nSel) + '명' : '') : '';
+    var qx = document.querySelector('#inner [data-finqx="' + kind + '"]'); if (qx) qx.hidden = !words.length;
+  }
+  function finSyncAll() { Object.keys(FINK).forEach(finSync); }
+  function finClear(kind, focus) {
+    FINQ[kind] = '';
+    var i = document.querySelector('#inner input[data-finq="' + kind + '"]');
+    if (i) { i.value = ''; if (focus) { try { i.focus({ preventScroll: true }); } catch (er) { } } }
+    finSync(kind);
+  }
+  document.addEventListener('change', function (e) {
+    var b = e.target;
+    if (!b || !b.matches || !b.matches('input[data-fid],input[data-finall],input[data-fingrp]')) return;
+    var t = b.closest('table[data-fin]'), kind = t && t.dataset.fin, d = kind && FINK[kind];
+    if (!d) return;
+    var sel = d.sel(), on = b.checked;
+    if (b.matches('input[data-fid]')) { if (on) sel[b.dataset.fid] = 1; else delete sel[b.dataset.fid]; }
+    else {
+      // 전체 선택 · 이 팀 모두 고르기 — 보이는 줄만(찾기·「출력 안 한 것만」으로 숨은 줄은 건드리지 않는다)
+      var gk = b.matches('input[data-fingrp]') ? b.dataset.gk : null;
+      Array.prototype.forEach.call(t.querySelectorAll('tbody tr[data-frow]'), function (tr) {
+        if (tr.hidden || (gk != null && tr.dataset.fgk !== gk)) return;
+        if (on) sel[tr.dataset.frow] = 1; else delete sel[tr.dataset.frow];
+      });
+    }
+    finSync(kind);
+  });
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.matches || !t.matches('input[data-finq]')) return;
+    FINQ[t.dataset.finq] = t.value;              // 치는 동안 다시 그리지 않는다 — 줄만 숨긴다(한글 조합·커서 그대로)
+    finSync(t.dataset.finq);
+  });
+  document.addEventListener('click', function (e) {
+    var x = e.target.closest && e.target.closest('[data-finqx]');
+    if (x) finClear(x.dataset.finqx, true);
+  });
+
 
   /* ══════════════════ 안전교육 ══════════════════ */
   /* 안전교육 — 앱과 같은 화면·같은 규칙(2026-10-14 사용자: 「웹에서도 시청·이수, %도 앱하고 동일하게」).
@@ -10212,6 +10352,40 @@ window.EduGuard = {
       sessionStorage.setItem('drv_portal_hint', JSON.stringify(h));
     } catch (e) { }
   }
+  /* ── 같은 화면을 다시 그려도 그 자리 그대로(2026-10-23 결재 완료 출력) ──
+     render 는 #inner 를 통째로 바꾼다 — 자기 스크롤 상자(.scroll.tall)는 새로 만들어져 맨 위에서 시작하고, 누르던 칸의 초점은 body 로 간다.
+     고르기는 이제 다시 그리지 않지만(finSync), 출력 기록 딱지(drv-prints repaint)·묶어 받기·자료 다시 받기는 여전히 다시 그린다 —
+     그때 data-keep 상자의 스크롤과 data-fk 칸의 초점(글 칸이면 커서까지)을 되돌린다. 바라는 상자·칸만 표시한다(다른 화면은 예전 그대로).
+     화면이나 기간이 바뀌었으면 맨 위에서. keepDrop() = 다음 한 번은 지키지 않는다(거르기를 바꿔 목록 자체가 달라질 때). */
+  var KEEP_AT = '';
+  function keepSave() {
+    var at = VIEW + '|' + CYCKEY(), inner = $('inner');
+    if (at !== KEEP_AT || !inner) return null;
+    var k = { box: {}, fk: '', sel: null };
+    Array.prototype.forEach.call(inner.querySelectorAll('[data-keep]'), function (b) {
+      if (b.scrollTop || b.scrollLeft) k.box[b.getAttribute('data-keep')] = [b.scrollTop, b.scrollLeft];
+    });
+    var ae = document.activeElement;
+    if (ae && ae !== document.body && inner.contains(ae) && ae.getAttribute('data-fk')) {
+      k.fk = ae.getAttribute('data-fk');
+      try { if (typeof ae.selectionStart === 'number') k.sel = [ae.selectionStart, ae.selectionEnd]; } catch (e) { }
+    }
+    return k;
+  }
+  function keepRestore(k) {
+    KEEP_AT = VIEW + '|' + CYCKEY();
+    if (!k) return;
+    var inner = $('inner');
+    Array.prototype.forEach.call(inner.querySelectorAll('[data-keep]'), function (b) {
+      var v = k.box[b.getAttribute('data-keep')]; if (v) { b.scrollTop = v[0]; b.scrollLeft = v[1]; }
+    });
+    var ae = document.activeElement;
+    if (k.fk && (!ae || ae === document.body)) {
+      var f = Array.prototype.filter.call(inner.querySelectorAll('[data-fk]'), function (n) { return n.getAttribute('data-fk') === k.fk; })[0];
+      if (f) { try { f.focus({ preventScroll: true }); if (k.sel && f.setSelectionRange) f.setSelectionRange(k.sel[0], k.sel[1]); } catch (e) { } }
+    }
+  }
+  function keepDrop() { KEEP_AT = ''; }
   function render() {
     // 운전 안 하는 사람은 결재함·개인경비·내 계정만 — 다른 화면 주소로 와도 그리로 돌린다.
     var nd = noDriving();
@@ -10231,6 +10405,7 @@ window.EduGuard = {
       if (VIEW !== 'inbox' && inbox().length) { VIEW = 'inbox'; applyScope(); writeHash(); }
     }
     if (ME) paintCycle();          // 화면마다 기간 규칙이 다를 수 있다(개인경비 20~19일)
+    var keep = keepSave();         // 같은 화면을 다시 그리면 표 상자 스크롤·초점 그대로(2026-10-23)
     // 적재가 실패했으면 스켈레톤 대신 사유와 다시 시도 버튼을 보여 준다.
     $('inner').innerHTML = LOAD_ERR
       ? '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
@@ -10254,6 +10429,7 @@ window.EduGuard = {
     // 드롭존은 화면을 다시 그릴 때마다 새로 생기므로 그때마다 연결한다.
     bindDrop($('hpDrop'), hpFiles);
     afterPaint();
+    keepRestore(keep);             // .tall(자기 스크롤)·찾기로 숨긴 줄이 정해진 뒤에 되돌린다
     noteFocusCard();
     // 정렬 머리를 눌러 다시 그렸으면 그 머리로 포커스를 돌려준다(키보드로 누르던 자리를 잃지 않게).
     if (SORT_FOCUS) {
@@ -11078,6 +11254,8 @@ window.EduGuard = {
       e.preventDefault(); e.target.click(); return;
     }
     if (e.key === 'Escape') {
+      // 결재 완료 출력 이름 찾기 — Esc 로 비운다(비어 있으면 아래 원래 동작, 2026-10-23)
+      if (e.target.matches && e.target.matches('input[data-finq]') && e.target.value) { e.preventDefault(); finClear(e.target.dataset.finq, false); return; }
       if (!$('cycPop').hidden) { openCyclePop(false); return; }
       if (NOTE.open) {
         openNotePop(false);
@@ -12140,7 +12318,11 @@ window.EduGuard = {
       // 관리 현황 「챙길 사람」 + 팀즈 알림 보내기(2026-10-20 D2) — 개인경비·법인카드 현황도 같은 조각
       follow: followCard,
       // 여러 줄 골라 지우기(2026-10-19) — 개인경비·법인카드 내역 표도 같은 모양·같은 확인 창
-      mselDef: mselDef, mselAll: mselAll, mselAllLine: mselAllLine, mselBox: mselBox, mselBar: mselBar, mselSync: mselSync
+      mselDef: mselDef, mselAll: mselAll, mselAllLine: mselAllLine, mselBox: mselBox, mselBar: mselBar, mselSync: mselSync,
+      // 결재 완료 출력 고르기·팀 고르기·이름 찾기(2026-10-23) — 세 화면이 같은 칸·같은 규칙(다시 그리지 않고 그 자리에서)
+      fin: { reg: finReg, row: finRow, box: finBox, all: finAllAttr, grp: finGrp, bar: finBar, none: finNone,
+        match: finMatch, order: finOrder, fileTag: finFileTag, sync: finSync },
+      keepDrop: keepDrop
     };
     (window.DrvExtQ || []).forEach(function (make) {
       var x;

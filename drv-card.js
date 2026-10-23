@@ -1457,6 +1457,16 @@
     C.toast('CSV 를 내려받습니다(' + n0(rows.length) + '건).');
   }
   var FINSEL = {}, FINJOB = null;
+  // 고르기 · 이 팀 모두 고르기 · 이름으로 찾기는 다시 그리지 않고 그 자리에서(C.fin — 운행일지 결재 완료 출력과 같게, 2026-10-23).
+  //   FINSEL 은 기간을 바꾸면 새 객체가 된다(onCycle) — 그래서 고른 것은 함수로 넘긴다.
+  //   C.fin 이 없는 앞 판 driving-app.js 와 섞여 실려도(배포 직후 캐시) 죽지 않게 — 그때는 예전 그대로(finOld, 아래 change 처리기).
+  var FIN = C.fin || finOld();
+  FIN.reg('card', { sel: function () { return FINSEL; }, busy: function () { return !!FINJOB; } });
+  function finOld() {
+    var nil = function () { return ''; };
+    return { old: true, reg: nil, row: nil, box: nil, all: nil, grp: nil, bar: nil, none: nil, fileTag: nil, sync: nil, match: function () { return true; },
+      order: function (l, gu) { return { list: l.slice().sort(function (x, y) { return C.nameOf(gu(x)).localeCompare(C.nameOf(gu(y)), 'ko'); }), team: '' }; } };
+  }
   /** 결재 완료 출력 표의 날짜 — 「10.14 15:20」(한국시간, 2026-10-20 AU6-M3, 개인경비와 같게). */
   function finWhen(iso) { var ms = Date.parse(iso); return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : ''; }
   function viewAdminFinal() {
@@ -1477,7 +1487,8 @@
     Object.keys(FINSEL).forEach(function (k) { if (!ok[k]) delete FINSEL[k]; });
     // 「출력 안 한 것만」(2026-10-14) — 표에 보이는 줄만 거른다(위 숫자·합계는 그대로). 고른 수·전체 선택·묶어 받기도 보이는 줄만.
     var shown = C.prints ? done.filter(function (a) { return C.prints.keep('card', a); }) : done;
-    var nSel = shown.filter(function (a) { return FINSEL[a.id]; }).length;
+    // 이름으로 찾기(2026-10-23) — 표에는 shown 을 다 그리고 안 맞는 줄은 C.fin 이 그 자리에서 숨긴다. 고른 수는 보이는 줄만.
+    var vis = shown.filter(finVisible), nSel = vis.filter(function (a) { return FINSEL[a.id]; }).length;
     var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
     var h = head('법인카드 결재 완료 출력', '결재가 끝난 지출결의서를 모아 출력합니다');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + '</div>' +
@@ -1486,18 +1497,20 @@
       fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려', n0(nRej) + '<small>명</small>', '고쳐서 다시 상신해야 함', nRej > 0) +
       fact('미상신', n0(notYet.length + nWd) + '<small>명</small>', nWd ? '이번 달 카드 내역이 있는데 상신 전(회수 ' + n0(nWd) + '명 포함)' : '이번 달 카드 내역이 있는데 상신 전', notYet.length + nWd > 0) + '</div></div>';
-    var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
+    var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf data-finbtn="card"' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('card') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
       ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
-      : done.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr>' +
+      // 2026-10-23: 표 위 이름 찾기 · 팀 머리 줄 「이 팀 모두 고르기」 · 고르기는 다시 그리지 않음(C.fin) · 다시 그려도 안쪽 스크롤 그대로(data-keep)
+      : done.length ? FIN.bar('card') + '<div class="panel"><div class="scroll" data-rows data-keep="fin"><table class="rcard ftab" data-fin="card"><thead><tr>' +
       // 세 표 같은 열 순서(팀 묶음 + 파트·센터 · 이름 · 상태) · 「전체 선택」은 표 머리 첫 칸(2026-10-19 사용성 2차 #12, 운행일지와 같게)
-      '<th class="fchk"><label class="finall"><input type="checkbox" id="cFinAll"' + (nSel && nSel === shown.length ? ' checked' : '') + '> 전체 선택</label></th>' +
+      '<th class="fchk"><label class="finall"><input type="checkbox" id="cFinAll"' + FIN.all('card') + (nSel && nSel === vis.length ? ' checked' : '') + '> 전체 선택</label></th>' +
       '<th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
       C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
-        return C.orgGroupRow(g, 9, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>') + g.list.map(function (a) {
+        return C.orgGroupRow(g, 9, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>', FIN.grp('card', g)) + g.list.map(function (a) {
           var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
-          return '<tr><td><input type="checkbox" data-cfinsel="' + a.id + '"' + (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
+          return '<tr' + FIN.row('card', a.id, a.username, (a.snapshot || {}).cost) + '><td><input type="checkbox" data-cfinsel="' + a.id + '"' + FIN.box('card', a.id) +
+            (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td><span class="st ok">결재 완료</span>' + (C.prints ? '<div class="prline">' + C.prints.badge('card', a) + '</div>' : '') + '</td>' +
             // 1280 에서 표가 칸보다 넓던 것(2026-10-20 AU6-M3, 개인경비와 같게): 날짜 「MM.DD HH:MM」 · 결재선 두 줄 말줄임 · 단추 셋은 「⋯」 하나
@@ -1508,10 +1521,10 @@
               ['data-cfzpdf="' + a.id + '"', 'PDF 받기'], ['data-cfzxlsx="' + a.id + '"', '엑셀 받기'],
               ['data-appr="reopen" data-kind="card" data-id="' + a.id + '"', '정정 열기', true]]) + '</td></tr>';
         }).join('');
-      }).join('') + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
+      }).join('') + FIN.none(9) + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
         C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 8, '') + g.list.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
           return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td><span class="st warn">결재 중</span></td>' +
@@ -1522,7 +1535,7 @@
     }
     if (back.length || notYet.length) {
       var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)' }; }).concat(notYet.map(function (u) { return { u: u, st: '미상신' }; }));
-      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 달 카드</th></tr></thead><tbody>' +
+      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-todo"><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 달 카드</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
             var p = by[x.u] || { n: 0, sum: 0 };
@@ -1548,12 +1561,13 @@
   /** 고른 결재 완료 건을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 이어 붙인다(한 번에 20명까지). */
   function finBundle() {
     var S = C.state();
-    var list = Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); })   // 보이는 줄만(2026-10-14)
-      .sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
+    // 보이는 줄만(출력 안 한 것만 2026-10-14 · 이름으로 찾기 2026-10-23) · 차례는 표에 보이는 차례 — 팀 → 파트·센터 → 이름(예전엔 이름 순만)
+    var ord = FIN.order(Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); }), function (a) { return a.username; });
+    var list = ord.list;
     if (!list.length || FINJOB) return;
     if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true); return; }
     var job = FINJOB = {};
-    C.openPanel('법인카드 결재 완료본 묶어 받기', cycName(S.CYCKEY) + ' · ' + n0(list.length) + '명',
+    C.openPanel('법인카드 결재 완료본 묶어 받기', cycName(S.CYCKEY) + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="cFinNote" role="status">준비하는 중…</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('cFinNote'); if (el) el.textContent = t; };
@@ -1565,7 +1579,9 @@
       note((i + 1) + ' / ' + list.length + ' · ' + C.nameOf(a.username) + ' 님 문서를 만드는 중…');
       return fetchFrozen(a).then(function (fz) {
         if (!fz) { skipped.push(C.nameOf(a.username)); return; }
-        var d = frozenDoc(a, fz);
+        // 결재 완료본 묶음에는 검증 결과 쪽을 넣지 않는다(2026-10-23 사용자 — 2명 이상 묶으면 「검증 결과」 쪽이 끼어 나왔다).
+        //   한 사람씩 받는 결재 완료본(frozenOpts)·운행일지 묶음(drv-verify.js finBundle)과 같은 규칙(2026-10-14).
+        var d = Object.assign({}, frozenDoc(a, fz), { verify: null });
         return C.fillSigns(d).then(C.vx.ensureLibs).then(function (lib) {
           return window.SheetPdf.buildCard(d, { PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold });
         }).then(function (res) {
@@ -1586,7 +1602,7 @@
           chain = chain.then(function () { return P.PDFDocument.load(b); }).then(function (src) { return out.copyPages(src, src.getPageIndices()); })
             .then(function (pages) { pages.forEach(function (pg) { out.addPage(pg); }); });
         });
-        return chain.then(function () { out.setTitle('법인카드 지출결의 결재 완료본 ' + cycName(S.CYCKEY)); return out.save(); })
+        return chain.then(function () { out.setTitle('법인카드 지출결의 결재 완료본 ' + cycName(S.CYCKEY) + (ord.team ? ' ' + ord.team : '')); return out.save(); })
           .then(function (bytes) { return { bytes: bytes, pages: out.getPageCount() }; });
       });
     }).then(function (res) {
@@ -1595,7 +1611,7 @@
       if (!res || !$('cFinNote')) { C.render(); return; }
       var blob = new Blob([res.bytes], { type: 'application/pdf' }), url = URL.createObjectURL(blob);
       C.vx.setPdfUrls([url]);
-      var file = '법인카드_결재완료_' + S.CYCKEY + '_' + parts.length + '명.pdf';
+      var file = '법인카드_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';   // 한 팀만이면 팀 이름(2026-10-23)
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div><div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
         (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) + ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '') +
         (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인 필요: ' + esc(checks.join(' · ')) + '</span></div>' : '') +
@@ -1667,14 +1683,17 @@
     if (t.id === 'cCancelDel') { if (CUP && CUP.res) { CUP.delCancel = t.checked; paintPreview(); } return; }     // 전액 취소된 승인 같이 지우기(2026-10-20)
     if (t.id === 'cWho') { CL.who = t.value; C.render(); var w = $('cWho'); if (w) w.focus(); return; }
     if (t.id === 'cCat') { CL.cat = t.value; C.render(); var w2 = $('cCat'); if (w2) w2.focus(); return; }
+    // 결재 완료 출력 고르기 칸 · 전체 선택 · 이 팀 모두 고르기는 C.fin(driving-app.js)이 받는다 — 다시 그리지 않는다(2026-10-23).
+    //   C.fin 이 없는 앞 판 driving-app.js 와 섞여 실렸을 때만 아래 예전 처리(고르면 다시 그림).
+    if (!FIN.old) return;
     if (t.matches && t.matches('[data-cfinsel]')) { if (t.checked) FINSEL[t.dataset.cfinsel] = 1; else delete FINSEL[t.dataset.cfinsel]; C.render(); return; }
     if (t.id === 'cFinAll') {
-      // 보이는 줄만(2026-10-14 — 「출력 안 한 것만」이 켜져 있으면 출력 안 한 문서만 고른다)
       cycAppr().forEach(function (a) { if (a.status === 'approved' && C.orgMatch(a.username) && finVisible(a)) { if (t.checked) FINSEL[a.id] = 1; else delete FINSEL[a.id]; } });
       C.render();
     }
   });
-  function finVisible(a) { return !C.prints || C.prints.keep('card', a); }
+  /** 보이는 줄인가 — 「출력 안 한 것만」(2026-10-14) + 이름으로 찾기(2026-10-23). 고른 수·묶어 받기가 화면과 같은 판정. */
+  function finVisible(a) { return (!C.prints || C.prints.keep('card', a)) && FIN.match('card', a.username); }
 
   var K0 = {
     tag: '법인카드', mode: 'c',

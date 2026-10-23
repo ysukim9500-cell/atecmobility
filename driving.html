@@ -1502,6 +1502,22 @@ select.abox{border:1px solid var(--ink-200);border-radius:var(--r-xs);padding:5p
 .drop .dd{font-size:12.5px;color:var(--ink-500);margin-top:4px}
 .drop label.btn{cursor:pointer}
 .finall{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-600);margin-right:6px;cursor:pointer}
+/* 결재 완료 출력 — 표 위 이름 찾기 · 팀 머리 줄 「이 팀 모두 고르기」(2026-10-23, driving-app.js C.fin — 세 화면 같은 모양) */
+.finbar{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:0 0 10px}
+.finbar .finq{flex:0 1 340px;min-width:0;height:42px;border-radius:var(--r-sm);border-color:var(--ink-200)}
+.finbar .finq:focus-within{border-color:var(--red);box-shadow:0 0 0 3px var(--red-50)}
+.finbar .finq input{font-size:14px;flex:1;width:auto;min-width:0;align-self:stretch}
+.finbar .finqx{width:30px;height:30px;margin-right:-6px;background:none}
+.finbar .finqx svg{box-sizing:content-box;padding:5px;border-radius:999px;background:var(--ink-100)}
+.finqn{font-size:12.5px;color:var(--ink-600)}
+.finqn:empty{display:none}
+tr.ogrp .fgrp{align-self:center}
+table.rcard tr.finnone td{flex:1 1 100%}
+@media screen and (max-width:900px){
+  .finbar .finq{flex:1 1 100%}
+  .finbar .finqx{width:44px;height:44px;margin:-2px -12px -2px 0}      /* 누름 영역 44(동그라미는 22 그대로) */
+  tr.ogrp .fgrp{margin-right:-10px}                                      /* 팀 이름 = 아래 줄 칸과 같은 자리(누름 영역 44 는 그대로) */
+}
 /* 영수증 올리기 — Gemini (2026-10-06) */
 /* 2026-10-20 디자인 v2 「AI처럼 보이지 않게」 — 무지개 테두리·빛나는 움직임 대신 점선 상자(영수증 화면 끌어 놓기와 같은 모양). Gemini 는 작은 딱지(.gemchip)만 */
 .drop.gemdrop{border:1.5px dashed var(--ink-300);background:var(--ink-50)}
