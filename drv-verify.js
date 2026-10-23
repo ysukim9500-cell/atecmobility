@@ -174,7 +174,10 @@
     // 2026-10-20 — R14(두 번 정산 의심 — 다음 날 날짜로 올라온 전날 영수증)도 2단계 그 차례로(그 줄에 「다른 운행에 붙이기」)
     R14: ['evid', '영수증에서 보기'],
     // 2026-10-21 — A11(한 장에 여러 영수증을 올린 원본 장에서 그 날짜·금액 영수증을 찾지 못함 — 서버 driving-verify.ts 원본 장 짝짓기)
-    A11: ['evid', '영수증에서 보기']
+    A11: ['evid', '영수증에서 보기'],
+    // 2026-10-23 — R15(하이패스 영수증 원본 없음 — 서버 driving-verify.ts): 고칠 것은 운행이 아니라 하이패스 이용내역 PDF 를 다시 올리는 것.
+    //   통행료 차례의 「하이패스 이용내역 PDF 올리기」와 같은 하이패스 화면(#/hipass)으로 보낸다(R11·R12 처럼 올리는 단추)
+    R15: ['hipass', '하이패스 PDF 올리기']
   };
   /** R13(운행 없는 주차·통행료 영수증)이 가리키는 영수증의 구분 — 통행료만이면 통행료 차례, 아니면 주차 차례부터. */
   function r13Cat(it) {
@@ -252,7 +255,8 @@
       if (links && it.code === 'R02') go = '<button class="btn sm vgo" data-evstep="통행료">통행료 차례로' + ic('chev', 12) + '</button>';
       else if (links && (it.code === 'R13' || it.code === 'R14')) { var sc = r13Cat(it); go = '<button class="btn sm vgo" data-evstep="' + sc + '">' + sc + ' 차례로' + ic('chev', 12) + '</button>'; }
       // 주유 영수증·계기판 사진이 모자란 것은 고칠 기록이 아니라 올릴 것이 없는 것 — 영수증 화면으로 보낸다.
-      else if (fx && (it.code === 'R11' || it.code === 'R12')) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
+      //   하이패스 원본이 없는 것(R15, 2026-10-23)도 — 운행 고치기 창(바로 고치기)이 아니라 하이패스 화면에서 이용내역 PDF 를 다시 올린다.
+      else if (fx && (it.code === 'R11' || it.code === 'R12' || it.code === 'R15')) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
       else if (links && nRef) {
         VITEMS.push(it);
         go = '<button class="btn sm vgo vfix" data-vfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>';
@@ -697,7 +701,8 @@
   }
 
   /** 「영수증 없음」(R06) 내용에서 날짜·금액만 — 서버 문구 「… 영수증이 없습니다: 10.05 1,100원, 10.07 3,300원(합계 4,400원). 자동 계산…」
-   *  (2026-10-21 문구 다듬기 전 굳힌 글 「…(합계 4,400원): 10.05 1,100원, …」도 같은 답). 없으면 ''. */
+   *  (2026-10-21 문구 다듬기 전 굳힌 글 「…(합계 4,400원): 10.05 1,100원, …」도 같은 답). 없으면 ''.
+   *  「하이패스 영수증 원본 없음」(R15, 2026-10-23)도 같은 꼴 — 「… 하이패스 영수증 원본(PDF)이 없습니다: 10.05 3,300원(합계 3,300원). …」 */
   function noRcpDays(detail) {
     var d = String(detail || ''), m = /:\s*((?:\d{2}\.\d{2} [\d,]+원(?:, )?)+(?: 외 \d+건)?)/.exec(d), t = /\(합계 ([\d,]+원)\)/.exec(d);
     return m ? m[1] + (t ? ' (합계 ' + t[1] + ')' : '') : '';
@@ -759,7 +764,8 @@
     if (s.toll_unknown && !hasR02) checks.push(['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 정산)']);
     // 영수증 없음(R06)·금액 다름(R10)·운행 없는 영수증(R13)이 남았으면 「✓ 통행료 모두 확정」을 달지 않는다(2026-10-16 3차 — 같은 카드에 ✓ 와 「영수증 없는 통행료 3일」이 같이 떴다)
     //   두 번 정산 의심(R14, 2026-10-20)도 — 통행료 영수증일 수 있다(어느 구분인지는 상세에만 있다)
-    var tollIssue = items.some(function (i) { return ((i.code === 'R06' || i.code === 'R10') && /통행료/.test(i.title || '')) || i.code === 'R13' || (i.code === 'R14' && /통행료/.test(i.detail || '')); });
+    //   하이패스 영수증 원본 없음(R15, 2026-10-23)도 — 늘 통행료다
+    var tollIssue = items.some(function (i) { return ((i.code === 'R06' || i.code === 'R10') && /통행료/.test(i.title || '')) || i.code === 'R13' || (i.code === 'R14' && /통행료/.test(i.detail || '')) || i.code === 'R15'; });
     if (!s.toll_unknown && !hasR02 && !tollIssue) checks.push(['ok', '통행료 모두 확정']);
     // rate_miss 는 단가가 없던 「분기-지역」 목록이다(예: 2026-4-수도권). 빈 목록이면 문제없음.
     var rm = Array.isArray(s.rate_miss) ? s.rate_miss : (Number(s.rate_miss) > 0 ? [String(s.rate_miss) + '건'] : []);
@@ -807,7 +813,8 @@
       '<div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
         // 결재하는 분에게는 상신자가 할 일(내용)을 빼지만, 영수증 없는 날(R06)은 그날 날짜·금액만 보인다.
-        var days = asApprover && i.code === 'R06' ? noRcpDays(i.detail) : '';
+        //   하이패스 영수증 원본 없는 날(R15, 2026-10-23)도 같은 꼴 — 날짜·금액과 합계만(「… 다시 올려 주세요」는 상신자 몫)
+        var days = asApprover && (i.code === 'R06' || i.code === 'R15') ? noRcpDays(i.detail) : '';
         // 통행료 미확정(R02)도 결재하는 분에게 그날과 「0원으로 정산」을 보인다(2026-10-16 6차 — 「모두 확정」으로 보이던 건)
         //   날짜 목록만 — 서버 문구 「… 업무 운행입니다: 10.03, 10.05. 냈으면 …」(2026-10-21 다듬기 뒤 목록 뒤에 할 일이 붙는다 · 예전 「…: 10.03, 10.05」도 같은 답)
         if (asApprover && i.code === 'R02') { var ud = /:\s*((?:\d{2}\.\d{2}(?:, )?)+(?: 외 \d+건)?)/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' · ' : '') + '0원으로 정산됩니다'; }
@@ -878,7 +885,7 @@
       }).catch(function () { return null; });
   }
 
-  /** 저장소 파일을 바이트 그대로 받는다(하이패스 이용내역 원본 PDF — 공개 bucket evidence 의 <아이디>/hipass/…pdf, 2026-10-23). 못 받으면 null. */
+  /** 저장소 파일을 바이트 그대로 받는다(하이패스 영수증 원본 PDF — 공개 bucket evidence 의 <아이디>/hipass/…pdf, 2026-10-23). 못 받으면 null. */
   function loadRaw(path) {
     var url = C.SB + '/storage/v1/object/public/evidence/' + String(path).split('/').map(encodeURIComponent).join('/');
     return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
@@ -907,7 +914,7 @@
     return { scanPaths: scanPaths, nImg: o.nImg != null ? o.nImg : n };
   }
   /** 운행기록부 PDF 한 권 — 결재 완료 한 사람 PDF · 결재 완료 묶음 · 상신 전 미리보기·결재 중 문서가 모두 이 길로 만든다(2026-10-23 「세 길 같은 결과」).
-   *  서명 채우기 → 인쇄 준비(C.pdfPrep — 하이패스 이용내역 줄 · 사진 판독 시각) → SheetPdf.build. onImg() 는 사진 하나 받을 때마다(진행 글). */
+   *  서명 채우기 → 인쇄 준비(C.pdfPrep — 하이패스 영수증 줄 · 사진 판독 시각) → SheetPdf.build. onImg() 는 사진 하나 받을 때마다(진행 글). */
   function sheetBuild(doc, meta, verify, onImg) {
     var sp = pdfImgs({ doc: doc }).scanPaths;
     return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve())
@@ -919,7 +926,12 @@
         return window.SheetPdf.build(d, {
           PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
           loadImage: function (p) { return loadPhoto(p, sp[p] ? 2000 : 1500).then(function (b) { if (onImg) onImg(); return b; }); },
-          loadFile: loadRaw
+          loadFile: loadRaw,
+          // 하이패스 영수증 원본 PDF 의 영수증 목록(웹 hipass.js — 올릴 때와 같은 해석기 · 인쇄 화면 PDF 는 pdf.js) — 사진 영수증이 그 PDF 에 있는지 맞춘다(「PDF만」 2026-10-23)
+          parseHipass: function (bytes) {
+            if (!window.Hipass || !window.Hipass.parsePdf) return Promise.resolve(null);
+            return window.Hipass.parsePdf(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), { pdfjs: C.loadPdfJs || null });
+          }
         });
       });
   }
@@ -942,11 +954,18 @@
       });
     });
   }
-  /** 하이패스 근거를 못 넣은 까닭 한 줄(sheetpdf issues 'hipass') — 「원본 PDF 1개 · 이용내역 줄 못 받은 운행 2건」. */
+  /** 하이패스 근거를 못 넣은 까닭 한 줄(sheetpdf issues 'hipass') — 「원본 PDF 1개 · 원본 없음 3줄 · 원본 확인 못 한 운행 2건 · 영수증 줄 못 받은 운행 2건」.
+   *  원본 PDF = 경로는 있는데 싣지 못한 원본 파일(못 받음·지문 다름·남의 폴더) · 원본 없음 = 원본 경로가 없는 하이패스 줄(2026-10-23) ·
+   *  원본 확인 못 한 운행 = 인쇄 준비가 지금 운행을 받지 못해 원본이 있는지 모르는 결재본 운행(2026-10-23 검토 — 관리자가 아닌 결재자 등).
+   *  원본 파일 글에는 자료의 경로가 그대로 들어간다 — 세는 글은 처음부터 끝까지 맞춰 본다(경로 글자로 숫자를 꾸밀 수 없게). 「이용내역」은 앞 판 sheetpdf.js(캐시). */
   function hipWhy(list) {
-    var files = list.filter(function (i) { return /원본/.test(i.msg || ''); }).length;
-    var m = list.map(function (i) { return /줄을 받지 못한 운행 (\d+)건/.exec(i.msg || ''); }).filter(Boolean)[0];
-    return [files ? '원본 PDF ' + files + '개' : '', m ? '이용내역 줄 못 받은 운행 ' + m[1] + '건' : ''].filter(Boolean).join(' · ');
+    var NO = /^하이패스 영수증 원본 없음 (\d+)줄$/, UNK = /^하이패스 영수증 원본을 확인하지 못한 운행 (\d+)건$/;
+    var noOrig = list.map(function (i) { return NO.exec(i.msg || ''); }).filter(Boolean)[0];
+    var unk = list.map(function (i) { return UNK.exec(i.msg || ''); }).filter(Boolean)[0];
+    var files = list.filter(function (i) { var s = i.msg || ''; return /원본/.test(s) && !NO.test(s) && !UNK.test(s); }).length;
+    var m = list.map(function (i) { return /^하이패스 (?:영수증|이용내역) 줄을 받지 못한 운행 (\d+)건$/.exec(i.msg || ''); }).filter(Boolean)[0];
+    return [files ? '원본 PDF ' + files + '개' : '', noOrig ? '원본 없음 ' + noOrig[1] + '줄' : '',
+      unk ? '원본 확인 못 한 운행 ' + unk[1] + '건' : '', m ? '영수증 줄 못 받은 운행 ' + m[1] + '건' : ''].filter(Boolean).join(' · ');
   }
   function makePdf(o) {
     // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
@@ -972,7 +991,7 @@
       var img = res.issues.filter(function (i) { return i.kind === 'image'; });
       var gly = res.issues.filter(function (i) { return i.kind === 'glyph'; });
       var cut = res.issues.filter(function (i) { return i.kind === 'cut'; });      // 개인경비 증빙 설명을 「…」로 줄인 곳
-      var hip = res.issues.filter(function (i) { return i.kind === 'hipass'; });   // 하이패스 이용내역 원본 PDF·줄을 못 받음(2026-10-23)
+      var hip = res.issues.filter(function (i) { return i.kind === 'hipass'; });   // 하이패스 영수증 원본 PDF·줄을 못 받음 · 원본 없는 줄 · 원본을 확인하지 못한 운행(2026-10-23)
       var chk = '';
       if (!over.length && !img.length && !gly.length && !cut.length && !hip.length) {
         chk = '<div class="pdfok">' + ic('check', 15) + '<span>문서 점검 완료 — 잘린 글자·빠진 사진 없음</span></div>';
@@ -982,7 +1001,7 @@
             img.length ? '불러오지 못한 사진 ' + img.length + '장' : '',
             gly.length ? '글꼴에 없어 ? 로 바꾼 글자 ' + gly.length + '종' : '',
             cut.length ? '길어서 「…」로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : '',
-            hip.length ? '확인 필요: 하이패스 이용내역 근거를 다 넣지 못함(' + esc(hipWhy(hip)) + ')' : ''].filter(Boolean).join(' · ') +
+            hip.length ? '확인 필요: 하이패스 영수증 근거를 다 넣지 못함(' + esc(hipWhy(hip)) + ')' : ''].filter(Boolean).join(' · ') +
           ' — 열어서 확인해 주세요.</span></div>';
       }
       // 문서 총계(장별 총계의 합)가 상신 때 서버가 집계한 금액과 같은가 — 다르면 결재 카드와 문서가 다른 숫자를 말한다.
@@ -1122,7 +1141,8 @@
         // 영수증까지 넣어 집계한 것은 version 2 부터다. 그 전 것은 기준이 달라 견주지 않는다.
         expect: snap.version >= 2 ? snap.cost : null,
         prints: done ? { kind: 'driving', ids: [a.id] } : null,
-        meta: { name: name, cycleName: cname, mark: mark,
+        // closedAt — 결재 완료 시각(쪽 아래 「완료 …」와 같은 값). 상신 뒤 덧붙인 하이패스 원본이 결재 완료 뒤인지 가른다(sheetpdf lateText, 2026-10-23)
+        meta: { name: name, cycleName: cname, mark: mark, closedAt: done ? a.closed_at || null : null,
           docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (done && a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') }
       };
   }
@@ -1411,8 +1431,9 @@
         if (!fz) { skipped.push(C.nameOf(a.username)); return; }
         var doc = frozenDoc(a, fz);
         var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
-        // 한 사람 PDF(frozenOpts → buildPdf)와 같은 길(sheetBuild — 서명 · 인쇄 준비(하이패스 이용내역 줄) · 근거 쪽) · 결재 완료본 묶음은 검증 결과 쪽 없음(2026-10-14)
-        return sheetBuild(doc, { name: name, cycleName: cycName(a.cycle), mark: '',
+        // 한 사람 PDF(frozenOpts → buildPdf)와 같은 길(sheetBuild — 서명 · 인쇄 준비(하이패스 영수증 줄) · 근거 쪽) · 결재 완료본 묶음은 검증 결과 쪽 없음(2026-10-14)
+        //   closedAt — frozenOpts 와 같게(상신 뒤 덧붙인 하이패스 원본의 「결재 완료 뒤 덧붙임」, 2026-10-23)
+        return sheetBuild(doc, { name: name, cycleName: cycName(a.cycle), mark: '', closedAt: a.closed_at || null,
           docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') }, null).then(function (res) {
           parts.push(res.bytes); partIds.push(a.id);
           var snap = a.snapshot || {}, why = [];
@@ -1423,7 +1444,7 @@
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
           if (img) why.push('불러오지 못한 사진 ' + img + '장');
           var hip = (res.issues || []).filter(function (x) { return x.kind === 'hipass'; });
-          if (hip.length) why.push('하이패스 이용내역 근거를 다 넣지 못함(' + hipWhy(hip) + ')');
+          if (hip.length) why.push('하이패스 영수증 근거를 다 넣지 못함(' + hipWhy(hip) + ')');
           if (why.length) checks.push(name + ' — ' + why.join(', '));
         });
       }).catch(function () { skipped.push(C.nameOf(a.username)); })
@@ -1718,11 +1739,13 @@
       more: Math.max(0, biz.length - 6),
       photos: ev.map(function (e) { return { id: e.id, src: C.photoUrl(e.photo_path), kind: AIM_KIND[e.category] || ((e.category || '') + ' 영수증') }; }) };
   }
-  /** 운행일지 검증 결과 → 운행 줄 딱지(서버 R06·R10·R14·R02 와 그 밖의 확인 항목 refs.trips). */
+  /** 운행일지 검증 결과 → 운행 줄 딱지(서버 R06·R10·R15·R14·R02 와 그 밖의 확인 항목 refs.trips). */
   function drvChips(row) {
     return aimChipsFrom((row && row.result && row.result.items) || [], 'trips', function (it) {
       if (it.code === 'R06') return ['영수증 없음', 'bad', 6];
       if (it.code === 'R10') return ['금액 다름', 'bad', 5];
+      // 하이패스 영수증 원본 없음(R15, 2026-10-23) — 금액 다름보다 아래(같은 운행에 둘 다면 금액 다름), 그 밖의 불일치보다 위
+      if (it.code === 'R15') return ['하이패스 원본 없음', 'bad', 4.5];
       if (it.code === 'R14') return ['두 번 정산 의심', 'warn', 4];
       if (it.code === 'R02') return ['통행료 미확정', 'warn', 3];
       if (it.level === 'bad') return ['확인 필요', 'bad', 2];

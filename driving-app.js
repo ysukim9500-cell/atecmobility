@@ -4754,15 +4754,11 @@
   function paintHpCount() {
     HP.groups.forEach(function (g, gi) {
       var picked = (g.matched || []).filter(function (m) { return m.pick; });
-      // ★ 금액은 m.sum 이다. 예전에는 m.amount 를 더해서(그런 필드가 없다)
-      //   체크를 아무리 해도 합계가 늘 ₩0 으로 보였다.
-      var sum = picked.reduce(function (a, m) { return a + (Number(m.sum) || 0); }, 0);
-      var todo = (g.matched || []).filter(function (m) { return !hpDone(m); });
+      // 합계는 금액을 맞추는 것만 · 원본만 붙이기(keep)는 따로 센다(2026-10-23 hpSumHtml · hpBtnText)
       var lab = $('hpSum' + gi);
-      if (lab) lab.innerHTML = '남은 것 <b>' + n0(todo.length) + '건</b> · ' +
-        '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum);
+      if (lab) lab.innerHTML = hpSumHtml(g);
       var btn = document.querySelector('[data-hpapply="' + gi + '"]');
-      if (btn) { btn.disabled = !picked.length; btn.textContent = n0(picked.length) + '건 확정하기'; }
+      if (btn) { btn.disabled = !picked.length; btn.textContent = hpBtnText(picked); }
     });
   }
   /** 입력칸에 넣을 계기판 값. 비어 있으면 빈 문자열(n0 은 '—' 를 돌려준다). */
@@ -9200,7 +9196,6 @@ window.EduGuard = {
 
     HP.groups.forEach(function (g, gi) {
       var picked = (g.matched || []).filter(function (e) { return e.pick; });
-      var sum = picked.reduce(function (s, e) { return s + e.sum; }, 0);
       // ★ 값이 이미 영수증과 같은 줄은 손댈 것이 없다. 표에서 빼고 접어 둔다.
       //   안 빼면 확정해도 표가 그대로라 아무 일도 안 일어난 것처럼 보인다.
       var todo = (g.matched || []).filter(function (e) { return !hpDone(e); });
@@ -9271,22 +9266,28 @@ window.EduGuard = {
         todo.forEach(function (e) {
           var ei = g.matched.indexOf(e);          // 체크박스 키는 원래 자리를 쓴다
           var t = e.trip;
-          var now = e.kind === 'new' ? '<span class="st warn">미확정</span>'
+          // 원본만 붙이기(keep, 2026-10-23) — 이미 하이패스로 맞춘 금액 그대로 · 원본 PDF 만 붙인다
+          var keep = e.kind === 'keep';
+          var now = keep ? '<span class="st ok">확정 ' + n0(t.toll_cost) + '</span>'
+            : e.kind === 'new' ? '<span class="st warn">미확정</span>'
             : (e.who === 'person'
               ? '<span class="st bad">직접 넣은 ' + n0(t.toll_cost) + '</span>'
               : '<span class="dim">자동 ' + n0(t.toll_cost) + '</span>');
-          var diff = e.diff == null ? '<span class="dim">—</span>'
+          var diff = keep ? '<span class="st ok">그대로</span>'
+            : e.diff == null ? '<span class="dim">—</span>'
             : e.diff === 0 ? '<span class="st ok">같음</span>'
               : '<b style="color:' + (e.diff > 0 ? 'var(--ok)' : 'var(--red)') + '">' +
                 (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
-          h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '">' +
+          h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '"' + (keep ? ' data-hpkeep' : '') + '>' +
             '<td class="m1 hpck"><label class="mselhit"><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
-            ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + ' 운행 확정하기') + '"' +
+            ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + (keep ? ' 운행 원본 붙이기' : ' 운행 확정하기')) + '"' +
             (e.pick ? ' checked' : '') +
             (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></label></td>' +
             '<td class="m1 hpwhen"><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
             (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
+            // 원본만 붙이기 — 폰에서도 보이게 운행 칸에(차이 칸은 「그대로」)
+            (keep ? '<div class="hpkeepl" data-hpkeepl>원본만 붙이기 — 금액은 그대로</div>' : '') +
             // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
             (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있습니다 — 확정해도 한 번만 셉니다</div>' : '') + '</td>' +
             '<td data-l="지금">' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
@@ -9312,10 +9313,9 @@ window.EduGuard = {
         h += unHtml;
 
         h += '<div class="hpact">' +
-          '<span class="dim" id="hpSum' + gi + '">남은 것 <b>' + n0(todo.length) + '건</b> · ' +
-          '선택 <b>' + n0(picked.length) + '건</b> · 합계 ' + won(sum) + '</span>' +
+          '<span class="dim" id="hpSum' + gi + '">' + hpSumHtml(g) + '</span>' +
           '<button class="btn pri" data-hpapply="' + gi + '"' + (picked.length ? '' : ' disabled') + '>' +
-          n0(picked.length) + '건 확정하기</button></div>';
+          hpBtnText(picked) + '</button></div>';
       }
       h += '</section>';
     });
@@ -9416,6 +9416,83 @@ window.EduGuard = {
     return null;
   }
 
+  /* ── 이미 맞춘 운행에 원본만 붙이기(2026-10-23 관리자 「영수증은 없고 내역만 있으면 안 된다」 · 사용자 「이미 맞춘 운행에 PDF 를 다시 올리면 원본이 붙게」) ──
+     원본 보관(hpKeep) 전에 맞췄거나 보관을 못 한 운행은 이용내역 줄에 pdf 가 없다. 같은 PDF 를 다시 올리면 「이미 하이패스로 맞춘 값」(same)이라
+     아무것도 안 보내 원본이 영영 안 붙었다. 이제 같음(same) 운행 중 내 운행·안 잠긴 것은 근거(toll_evidence_json — 운행 목록에는 없어 따로 받는다)를 보고,
+     읽은 기록과 같은 줄에 pdf 가 없으면 「원본만 붙이기 — 금액은 그대로」(keep)로 바꿔 기본으로 고른다(hipass.js needPdf — 서버와 같은 짝짓기).
+     확정하면 그 줄만 toll-apply 원본 붙이기(attach)로 보낸다 — 서버는 pdf·page 만 넣는다(금액·상태·출처·하이패스 몫 그대로).
+     ★ 내 운행만: 결재 문서 출력은 그 문서 주인 폴더의 원본만 싣는다 — 관리자가 남의 운행에 자기 폴더 원본을 붙이면 문서에 안 실리고
+       그 줄은 「원본 있음」이 돼 주인이 올려도 못 붙인다(서버도 막는다). 잠긴 운행은 예전처럼 손대지 않는다.
+     2026-10-23 오후: 서버는 관리자 「하이패스 대조 (전체)」 확정(items)에서도 남의 운행 줄의 pdf 를 버린다(toll-apply evidence.ts) ·
+       줄에 운행 주인 폴더의 원본이 아닌 pdf(그 전에 남은 관리자 폴더 경로 등)가 있으면 「없음」으로 보고 주인이 다시 올리면 바꿔 넣는다 ·
+       출구 글은 끝이 같으면 같은 영업소(PDF 꼴마다 다르다) — hipass.js needPdf(운행 주인 아이디를 넘긴다)와 서버 attachPdf 가 같은 규칙. */
+  var HP_ATTACH_NOPATH = '원본을 보관하지 못해 붙이지 못했습니다 — 다시 올려 주세요';
+  // 30초를 기다려도 원본 보관(hpKeep)이 안 끝났다 — 실패가 아니라 아직 올리는 중이다(2026-10-23 오후). 그 줄은 고른 채 두고 다시 누르게 한다.
+  var HP_ATTACH_SLOW = '원본 PDF 를 아직 보관하는 중입니다 — 잠시 뒤 「원본 붙이기」를 다시 눌러 주세요';
+  /** 이미 맞춘(same) 내 운행·안 잠긴 것의 근거를 받아 HP.ej 에 둔다(이미 받은 운행은 다시 안 받는다).
+   *  → Promise<참|거짓>(하나라도 못 받으면 거짓 — 그 운행은 same 그대로, 거절하지 않는다). */
+  function hpScanKeep(groups) {
+    var me = myName(), cache = HP.ej = HP.ej || {}, ids = [];
+    (groups || []).forEach(function (g) {
+      (g.matched || []).forEach(function (e) {
+        var id = e.trip && e.trip.id;
+        if (e.kind !== 'same' || e.locked || !me || id == null || e.trip.username !== me) return;
+        if (Object.prototype.hasOwnProperty.call(cache, String(id)) || ids.indexOf(id) >= 0) return;
+        ids.push(id);
+      });
+    });
+    var parts = [];
+    for (var i = 0; i < ids.length; i += 80) parts.push(ids.slice(i, i + 80));
+    return Promise.all(parts.map(function (part) {
+      return apiRetry('/rest/v1/trips?select=id,toll_evidence_json&id=in.(' + part.map(function (x) { return encodeURIComponent(String(x)); }).join(',') + ')')
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (rows) {
+          (Array.isArray(rows) ? rows : []).forEach(function (x) { if (x && x.id != null) cache[String(x.id)] = x.toll_evidence_json; });
+          return true;
+        }, function (e) { console.warn('하이패스 — 이미 맞춘 운행의 근거를 받지 못함:', e && e.message); return false; });
+    })).then(function (oks) { return oks.every(Boolean); });
+  }
+  /** 받아 둔 근거로 — 같음(same) 내 운행·안 잠긴 것 중 원본 없는 같은 줄이 있으면 keep 으로 바꾸고 고른다(e.need = 붙일 기록). 늘 잠금 표시(hpMarkLocked) 뒤에. */
+  function hpMarkKeep(groups) {
+    var me = myName(), cache = HP.ej || {};
+    (groups || []).forEach(function (g) {
+      (g.matched || []).forEach(function (e) {
+        if (e.kind !== 'same' || e.locked || !me || !e.trip || e.trip.username !== me) return;
+        var k = String(e.trip.id);
+        if (!Object.prototype.hasOwnProperty.call(cache, k) || !window.Hipass.needPdf) return;
+        // 운행 주인(= 나) 폴더의 원본이 있는 줄만 「있음」 — 남의 폴더 경로는 「없음」이라 다시 붙인다(2026-10-23 오후, 서버 attachPdf 와 같은 owner)
+        var need = window.Hipass.needPdf(cache[k], e.lines, e.trip.username);
+        if (need.length) { e.kind = 'keep'; e.pick = true; e.need = need; }
+      });
+    });
+    return groups;
+  }
+  function hpKeepCount(groups) {
+    return (groups || []).reduce(function (s, g) { return s + (g.matched || []).filter(function (e) { return e.kind === 'keep'; }).length; }, 0);
+  }
+  /** 확정 단추 글 — 금액을 맞추는 것만이면 예전 그대로 「N건 확정하기」, 원본만 붙이는 것(keep)이 있으면 따로 센다. */
+  function hpBtnText(picked) {
+    var k = picked.filter(function (e) { return e.kind === 'keep'; }).length, n = picked.length - k;
+    return !k ? n0(n) + '건 확정하기' : !n ? n0(k) + '건 원본 붙이기' : n0(n) + '건 확정 · 원본 ' + n0(k) + '건 붙이기';
+  }
+  /** 카드 아래 한 줄 — 남은 것 · 선택 · 합계(금액을 맞추는 것만 — 원본만 붙이는 것은 금액이 그대로라 따로 센다) */
+  function hpSumHtml(g) {
+    var picked = (g.matched || []).filter(function (m) { return m.pick; });
+    var todo = (g.matched || []).filter(function (m) { return !hpDone(m); });
+    var keep = picked.filter(function (m) { return m.kind === 'keep'; }).length;
+    // ★ 금액은 m.sum 이다. 예전에는 m.amount 를 더해서(그런 필드가 없다) 체크를 아무리 해도 합계가 늘 ₩0 으로 보였다.
+    var sum = picked.reduce(function (a, m) { return a + (m.kind === 'keep' ? 0 : (Number(m.sum) || 0)); }, 0);
+    return '남은 것 <b>' + n0(todo.length) + '건</b> · 선택 <b>' + n0(picked.length) + '건</b>' +
+      (!keep || picked.length > keep ? ' · 합계 ' + won(sum) : '') +             // 원본만 붙이기뿐이면 합계(₩0)는 빼고
+      (keep ? ' · 원본만 붙이기 <b>' + n0(keep) + '건</b>(금액 그대로)' : '');
+  }
+  /** 확정이 다 된 뒤 한 줄 — 금액 확정만이면 예전 글 그대로. back = 통행료 차례로 돌아갈 때 */
+  function hpOkMsg(a, k, back) {
+    if (!k) return a + '건 확정했습니다' + (back ? ' — 통행료에 반영됐습니다.' : '.');
+    if (!a) return '원본 ' + k + '건을 붙였습니다 — 금액은 그대로입니다.';
+    return a + '건 확정 · 원본 ' + k + '건을 붙였습니다' + (back ? ' — 통행료에 반영됐습니다.' : '.');
+  }
+
   function hpFiles(files) {
     // ★ 운행을 다 못 받은 상태로 대조하면 "맞는 운행이 없습니다" 가 되고,
     //   로드가 끝나도 다시 맞추지 않아 PDF 를 또 올려야 했다.
@@ -9431,6 +9508,7 @@ window.EduGuard = {
     }
     HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…';
     HP.pdfJob = null; HP.pdfDone = false; HP.keepNote = '';         // 앞서 올린 PDF 의 보관 일은 버린다(그 기록도 새로 읽는다)
+    HP.ej = {};                                                       // 이미 맞춘 운행의 근거(원본 붙이기, 2026-10-23)도 새로 받는다
     render();
     var lists = [], recs = [], done = 0, bad = 0, warns = [], dup = 0;
     Array.prototype.forEach.call(files, function (f, fi) {
@@ -9468,10 +9546,23 @@ window.EduGuard = {
           // 지금 보는 기간 밖의 기록 수(2026-10-20 AU2 #7) — 그 기간 화면에서 올리라고 한 줄 더한다(카드마다 아래 「이 기간 밖의 기록」에 목록)
           var nOut = recs.filter(function (r) { return !hpInView(r); }).length;
           // 다음에 할 일까지 한 줄로(웹 8차 — 「확정하기」를 눌러야 증빙이 된다는 것을 몰랐다)
-          HP.note = n0(recs.length) + '건을 읽었습니다.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐습니다.' : '') + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
-            (nOut ? ' 지금 보는 기간(' + viewSpan() + ') 밖의 기록 ' + n0(nOut) + '건은 그 기간 화면에서 올려 주세요.' : '') +
-            (isAll() ? '' : ' 아래 운행이 맞으면 「확정하기」를 누르세요 — 확정하면 그날 통행료 증빙이 되고 통행료 차례로 돌아갑니다.');
-          render();
+          var base = n0(recs.length) + '건을 읽었습니다.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐습니다.' : '') + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
+            (nOut ? ' 지금 보는 기간(' + viewSpan() + ') 밖의 기록 ' + n0(nOut) + '건은 그 기간 화면에서 올려 주세요.' : '');
+          var how = isAll() ? '' : ' 아래 운행이 맞으면 「확정하기」를 누르세요 — 확정하면 그날 통행료 증빙이 되고 통행료 차례로 돌아갑니다.';
+          HP.note = base + how;
+          // 이미 맞춘 운행 중 원본이 없는 것 → 「원본만 붙이기」(2026-10-23). 근거를 받은 뒤에 그린다 —
+          //   먼저 그리면 「이 카드는 다 확정됐습니다」가 보였다가 표로 바뀐다(받는 동안은 「읽는 중」 그대로 · 10초가 넘으면 기다리지 않는다).
+          var hp0 = HP, grs = HP.groups;
+          Promise.race([hpScanKeep(grs), new Promise(function (ok) { setTimeout(function () { ok(false); }, 10000); })]).then(function (ok) {
+            if (HP !== hp0 || HP.groups !== grs) return;              // 그 사이 다른 PDF 를 올렸거나 기간을 바꿨다
+            hpMarkKeep(grs);
+            var nk = hpKeepCount(grs), nfix = grs.reduce(function (s, g) { return s + (g.matched || []).filter(function (e) { return !hpDone(e) && e.kind !== 'keep'; }).length; }, 0);
+            // 원본만 붙이기뿐이면 「확정하기」 대신 그 단추 이름으로
+            if (nk) HP.note = base + (nfix ? how : '') + ' 이미 맞춘 운행 ' + n0(nk) + '건은 원본 PDF 만 붙입니다(금액은 그대로)' +
+              (nfix || isAll() ? '.' : ' — 아래 「원본 붙이기」를 누르세요.');
+            if (!ok) { HP.noteBad = true; HP.note += ' 이미 맞춘 운행에 원본이 붙어 있는지 확인하지 못했습니다 — 다시 올려 주세요.'; }
+            render();
+          });
         });
     });
   }
@@ -9508,16 +9599,30 @@ window.EduGuard = {
       $('panel').classList.add('open');
       return;
     }
+    // 금액을 맞추는 것(fix — 예전 그대로 toll-apply items) · 원본만 붙이는 것(keep — toll-apply attach, 2026-10-23).
+    //   서버는 한 요청에 한 가지만 받는다 — 확정 먼저, 그다음 붙이기. 확정이 실패하면 예전처럼 거기서 멈춘다(아무것도 안 바뀐다).
+    var fix = picked.filter(function (e) { return e.kind !== 'keep'; }), keep = picked.filter(function (e) { return e.kind === 'keep'; });
+    var label = hpBtnText(picked);
     var hbtn = document.querySelector('[data-hpapply="' + gi + '"]');
-    if (hbtn) { hbtn.disabled = true; hbtn.textContent = '확정 중…'; }
+    if (hbtn) { hbtn.disabled = true; hbtn.textContent = fix.length ? '확정 중…' : '붙이는 중…'; }
 
-    // 원본 PDF 보관(hpKeep)이 끝나기를 기다린다(30초까지 — 넘으면 그 줄들은 pdf 없이). 보관은 거절하지 않는다.
+    // 원본 PDF 보관(hpKeep)이 끝나기를 기다린다(30초까지 — 넘으면 확정 줄들은 pdf 없이 · 원본만 붙이기는 보내지 않고 다시 누르게). 보관은 거절하지 않는다.
     var job = HP.pdfJob;
     var kept = job ? Promise.race([job, new Promise(function (ok) { setTimeout(function () { ok(null); }, 30000); })]) : Promise.resolve(null);
-    toast(job && !HP.pdfDone ? '원본 PDF 를 보관하는 중입니다 — 끝나면 바로 확정합니다…' : '확정 중입니다…');
+    toast(job && !HP.pdfDone ? '원본 PDF 를 보관하는 중입니다 — 끝나면 바로 확정합니다…' : fix.length ? '확정 중입니다…' : '원본을 붙이는 중입니다…');
+    var post = function (body) {
+      return apiRetry('/functions/v1/toll-apply', { method: 'POST', body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
+    };
+    // R — sent: 서버가 하나라도 받아 처리했나 · err: 확정(items) 실패 · applied·attached: 서버가 센 수 · skipped: 서버가 건너뛴 것(확정·붙이기) ·
+    //     local: 웹이 못 보낸 붙이기(원본을 보관하지 못함 · 아직 보관하는 중)·붙이기 요청 실패 · part: 일부 줄만 보낸 붙이기 · att: 보낸 붙이기 · attSkip: 붙이기 응답의 건너뜀
+    var R = { sent: false, err: '', applied: 0, attached: 0, skipped: [], rows: [], warning: null, local: [], part: 0, att: [], attSkip: null };
     kept.then(function (k) {
       var paths = (k && k.paths) || [];
-      var items = picked.map(function (e) {
+      // 보관 일은 늘 { paths, … } 로 끝난다(거절하지 않는다) — k 가 없으면 30초 안에 안 끝난 것, 아직 올리는 중이지 실패가 아니다(2026-10-23 오후).
+      //   그때 원본만 붙이기는 「아직 보관하는 중」으로 남긴다 — 그 줄은 고른 채(받아 둔 근거 HP.ej 를 지우지 않는다), 다시 누르면 끝난 보관으로 붙는다.
+      var slow = !k && !!job;
+      var items = fix.map(function (e) {
         return {
           id: e.trip.id, amount: e.sum,
           note: '카드 ' + (g.card4 || '?') + ' · ' + (g.plate || ''),
@@ -9531,47 +9636,79 @@ window.EduGuard = {
           }),
         };
       });
-      return apiRetry('/functions/v1/toll-apply', {
-        method: 'POST', body: JSON.stringify({ items: items, batch: HP.batch })
-      });
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (res) {
-        if (!res.ok || !res.j || !res.j.ok) {
-          if (hbtn) { hbtn.disabled = false; hbtn.textContent = n0(picked.length) + '건 확정하기'; }
-          toast((res.j && res.j.error) || '확정하지 못했습니다.', true); return;
-        }
-        // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다.
-        (res.j.rows || []).forEach(function (row) {
-          var t = ALL_TRIPS.filter(function (x) { return x.id === row.id; })[0];
-          if (t) { t.toll_cost = row.toll_cost; t.toll_status = row.toll_status; t.toll_source = row.toll_source; if ('toll_hipass' in row) t.toll_hipass = row.toll_hipass; }
+      // 원본 붙이기 — 원본 없는 같은 줄(e.need)마다 그 기록이 나온 보관한 PDF·쪽. 보관한 원본이 없으면 보내지 않는다(까닭을 알린다 —
+      //   아직 보관하는 중(slow)이면 다시 누르라고, 보관을 못 했으면 다시 올리라고).
+      keep.forEach(function (e) {
+        var ls = [];
+        (e.need || []).forEach(function (r) {
+          var s = hpSrcOf(r, paths), pg = s ? (s.page != null ? Number(s.page) : Number(r.page)) : NaN;
+          if (s && pg >= 1 && Math.floor(pg) === pg) ls.push({ at: r.atText, office: r.office, entry: r.entryOffice || null, amount: r.amount, page: pg, pdf: s.pdf });
         });
-        AUDIT = null;
-        TRIP_CACHE = {};
-        var skipped = (res.j.skipped || []);
-        var applied = Number(res.j.applied) || 0;
-        if (res.j.warning) toast(res.j.warning, true);
-        // ★ 0건이면 '반영했다' 로 읽히면 안 된다. 왜 못 했는지를 앞세운다.
-        else if (!applied) toast(skipped.length
-          ? '한 건도 확정되지 않았습니다 — ' + skipped[0].why
-          : '한 건도 확정되지 않았습니다.', true);
-        else if (skipped.length) toast(applied + '건 확정 · ' + skipped.length + '건은 건너뛰었습니다 (' +
-          skipped[0].why + ')', true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
-        else toast(applied + '건 확정했습니다.');
-        // 남은 것만 다시 계산
-        hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
-        paintPills();
-        // 모든 카드를 다 맞췄으면 영수증 › 통행료 차례로 돌아가 반영된 금액을 보여 준다(2026-10-14 사용자).
-        // 건너뛴 것·경고가 있으면 여기 남아 까닭을 보게 한다.
-        var left = HP.groups.some(function (x) { return x.plate && (x.matched || []).some(function (e) { return !hpDone(e); }); });
-        if (applied && !skipped.length && !res.j.warning && !left) { tollBack(applied + '건 확정했습니다 — 통행료에 반영됐습니다.'); return; }
-        render();
-        // 통째로 다시 그리면 스크롤이 맨 위로 간다 — 눌렀던 카드로 돌려놓는다.
-        var card = document.querySelector('[data-hpcard="' + gi + '"]');
-        if (card) card.scrollIntoView({ block: 'start' });
-      }).catch(function () {
-        if (hbtn) { hbtn.disabled = false; hbtn.textContent = n0(picked.length) + '건 확정하기'; }
-        toast('서버에 연결하지 못했습니다.', true);
+        if (!ls.length) { R.local.push({ id: e.trip.id, why: slow ? HP_ATTACH_SLOW : HP_ATTACH_NOPATH }); return; }
+        if (ls.length < (e.need || []).length) R.part++;
+        R.att.push({ id: e.trip.id, lines: ls });
       });
+      var first = items.length ? post({ items: items, batch: HP.batch }).then(function (res) {
+        if (!res.ok || !res.j || !res.j.ok) { R.err = (res.j && res.j.error) || '확정하지 못했습니다.'; return; }
+        R.sent = true; R.applied = Number(res.j.applied) || 0; R.warning = res.j.warning || null;
+        R.skipped = R.skipped.concat(res.j.skipped || []); R.rows = R.rows.concat(res.j.rows || []);
+      }) : Promise.resolve();
+      return first.then(function () {
+        if (R.err || !R.att.length) return;
+        return post({ attach: R.att, batch: HP.batch }).then(function (res) {
+          if (!res.ok || !res.j || !res.j.ok) {
+            var why = (res.j && res.j.error) || '원본을 붙이지 못했습니다';
+            R.local = R.local.concat(R.att.map(function (a) { return { id: a.id, why: why }; })); return;
+          }
+          R.sent = true; R.attached = Number(res.j.attached) || 0; R.attSkip = res.j.skipped || [];
+          R.skipped = R.skipped.concat(R.attSkip); R.rows = R.rows.concat(res.j.rows || []);
+        }, function () { R.local = R.local.concat(R.att.map(function (a) { return { id: a.id, why: '서버에 연결하지 못했습니다' }; })); });
+      });
+    }).then(function () {
+      if (!R.sent) {
+        // 서버가 아무것도 처리하지 않았다(확정 실패 · 붙일 원본이 없음 · 붙이기 실패) — 예전처럼 단추를 살리고 까닭만
+        if (hbtn) { hbtn.disabled = false; hbtn.textContent = label; }
+        toast(R.err || (R.local.length ? endDot(R.local[0].why) : '확정하지 못했습니다.'), true); return;
+      }
+      // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다(원본 붙이기는 금액이 그대로 — 같은 값).
+      R.rows.forEach(function (row) {
+        var t = ALL_TRIPS.filter(function (x) { return x.id === row.id; })[0];
+        if (t) { t.toll_cost = row.toll_cost; t.toll_status = row.toll_status; t.toll_source = row.toll_source; if ('toll_hipass' in row) t.toll_hipass = row.toll_hipass; }
+      });
+      AUDIT = null;
+      TRIP_CACHE = {};
+      // 원본을 붙인 운행은 받아 둔 근거를 버린다 — 다시 맞춰도 같음(same)으로 끝나고, 다음에 올리면 새로 받는다
+      if (R.attSkip) {
+        var no = R.attSkip.map(function (x) { return String(x.id); });
+        R.att.forEach(function (a) { if (no.indexOf(String(a.id)) < 0 && HP.ej) delete HP.ej[String(a.id)]; });
+      }
+      var A = R.applied, K = R.attached, skipped = R.skipped.concat(R.local);
+      var part = R.part ? ' (원본을 보관하지 못한 줄은 못 붙였습니다 — 다시 올려 주세요)' : '';
+      var did = A && K ? A + '건 확정 · 원본 ' + K + '건 붙임' : K ? '원본 ' + K + '건 붙임' : A + '건 확정';
+      if (R.warning) toast(R.warning, true);
+      // ★ 0건이면 '반영했다' 로 읽히면 안 된다. 왜 못 했는지를 앞세운다.
+      else if (!A && !K) toast((fix.length ? '한 건도 확정되지 않았습니다' : '원본을 한 건도 붙이지 못했습니다') + (skipped.length
+        ? ' — ' + skipped[0].why
+        : '.'), true);
+      else if (skipped.length) toast(did + ' · ' + skipped.length + '건은 건너뛰었습니다 (' +
+        skipped[0].why + ')' + part, true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
+      else if (part) toast(hpOkMsg(A, K, false) + part, true);
+      else toast(hpOkMsg(A, K, false));
+      // 남은 것만 다시 계산(원본만 붙이기는 받아 둔 근거로 다시 표시 — 붙인 운행은 위에서 버려 같음으로 끝난다)
+      hpMarkKeep(hpMarkLocked([window.Hipass.assign(g, TRIPS)]));
+      paintPills();
+      // 모든 카드를 다 맞췄으면 영수증 › 통행료 차례로 돌아가 반영된 금액을 보여 준다(2026-10-14 사용자).
+      // 건너뛴 것·경고가 있으면 여기 남아 까닭을 보게 한다.
+      var left = HP.groups.some(function (x) { return x.plate && (x.matched || []).some(function (e) { return !hpDone(e); }); });
+      if ((A || K) && !skipped.length && !R.warning && !R.part && !left) { tollBack(hpOkMsg(A, K, true)); return; }
+      render();
+      // 통째로 다시 그리면 스크롤이 맨 위로 간다 — 눌렀던 카드로 돌려놓는다.
+      var card = document.querySelector('[data-hpcard="' + gi + '"]');
+      if (card) card.scrollIntoView({ block: 'start' });
+    }).catch(function () {
+      if (hbtn) { hbtn.disabled = false; hbtn.textContent = label; }
+      toast('서버에 연결하지 못했습니다.', true);
+    });
   }
 
   /* ══════════════════ 상세 패널 ══════════════════ */
@@ -11256,7 +11393,15 @@ window.EduGuard = {
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
       var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
       g.plate = e.target.value || null;
-      hpMarkLocked([window.Hipass.assign(g, TRIPS)]);
+      // 원본만 붙이기(2026-10-23) — 받아 둔 근거로 바로 표시하고, 새로 맞은 이미 맞춘 운행의 근거는 받아 와서 바뀌었을 때만 다시 그린다
+      hpMarkKeep(hpMarkLocked([window.Hipass.assign(g, TRIPS)]));
+      var hpc = HP, hgs = HP.groups, hpl = g.plate;
+      hpScanKeep([g]).then(function () {
+        if (HP !== hpc || HP.groups !== hgs || g.plate !== hpl) return;
+        var k0 = hpKeepCount([g]);
+        hpMarkKeep([g]);
+        if (hpKeepCount([g]) !== k0) render();
+      });
       render(); return;
     }
     if (e.target.id === 'cPlate') {
@@ -12287,7 +12432,7 @@ window.EduGuard = {
    * 결재 문서의 근거 재료(2026-10-23 관리자 신고 — 하이패스 근거 누락 · 원본 장 줄이 「통행료」 쪽에 없음 · 순서 · 표 금액과 맞춰 볼 줄 없음).
    * sheetpdf.js 가 「통행료 근거」 한 흐름 · 사진 쪽 차례 · 원본 부록으로 그린다. 지금 전역(고정본이면 withFrozen 안)에서 만든다.
    * ★ 금액은 다시 세지 않는다 — 날마다 값은 moneyOf(금액 규칙 v3) 그대로, 표 칸 값은 이 문서의 장(sheets)에서 읽는다.
-   *   인쇄할 때 받아야 하는 것(하이패스 이용내역 줄 · 사진 판독 시각 · 찍은 시각)은 pdfPrep 이 채운다.
+   *   인쇄할 때 받아야 하는 것(하이패스 영수증 줄·원본 경로 · 사진 판독 시각 · 찍은 시각)은 pdfPrep 이 채운다.
    */
   function evMaterial(mine, r, sheets, legacy) {
     var M = moneyOf(mine, r);
@@ -12343,9 +12488,15 @@ window.EduGuard = {
   /**
    * 인쇄 준비(2026-10-23) — 근거 재료(doc.ev)에 인쇄할 때만 받는 것을 채운다. 모두 읽기만 하는 GET 이고, 못 받아도 문서는 만든다.
    * 세 길(결재 완료 한 사람 PDF · 결재 완료 묶음 · 상신 전 미리보기·결재 중 문서)이 모두 이것을 거친다 — 같은 자료면 같은 문서.
-   *   ① 하이패스 이용내역 줄 — 자료의 운행에 toll_evidence_json 칸이 없으면(이미 결재된 10월분 고정본 · 지금 자료) 지금 줄을 받는다.
+   *   ① 하이패스 영수증 줄 — 자료의 운행에 toll_evidence_json 칸이 없으면(이미 결재된 10월분 고정본 · 지금 자료) 지금 줄을 받는다.
    *      그 운행의 toll_cost·toll_status·toll_source(·toll_hipass)가 자료와 같을 때만 쓴다 — 다르면 「결재 뒤 바뀐 운행」(줄을 싣지 않음).
-   *      결재 기간은 잠겨 있어 보통 같다. 못 받으면(권한·연결) 「이용내역 줄을 받지 못함」 + 문서 점검 「확인 필요」.
+   *      결재 기간은 잠겨 있어 보통 같다. 못 받으면(권한·연결) 「하이패스 영수증 줄을 받지 못함」 + 문서 점검 「확인 필요」.
+   *   ①-2 결재본 줄은 있는데 원본 경로(pdf)가 없는 줄(금액 0 줄은 빼고)이 있으면 — 결재본 문서만(미리보기는 자료 그대로) 지금 운행도 받아
+   *      (같은 주소·같은 묶음), 금액 칸이 결재본과 같을 때만 같은 줄(시각·출구 영업소·금액, 둘 다 있으면 입구)의 pdf·page 를 인쇄 재료에만 옮긴다(2026-10-23 —
+   *      10월분 원본은 관리자가 모아 지금 운행 줄에 붙인다). 결재본 자료는 고치지 않는다 — 고친 줄만 새로 만들고, 옮긴 줄 차례는 t.late(「상신 뒤 덧붙임」).
+   *      금액이 다르면 결재본 줄 그대로(「원본 없음」). 지금 운행을 못 받으면(관리자가 아닌 결재자는 남의 운행을 읽지 못해 빈 목록 · 연결 실패)
+   *      원본이 있는지 모른다 — 인쇄 재료에 t.lateMiss 를 적어 그 줄은 「확인 못 함」 + 문서 점검 「원본을 확인하지 못한 운행 N건」(2026-10-23 검토 —
+   *      예전에는 조용히 「원본 없음」이었다). 결재본 자료(t.ej 가 가리키는 것)는 그대로 — t 는 이 인쇄의 재료다.
    *   ② 사진 판독(evidence_ai) — 영수증 시각(원본 장 줄이면 그 장 판독에서 짝지은 영수증의 시각) · 원본 장 안 자리 · 그 장 영수증 수 · 계기판 km.
    *      사진이 바뀐 판독은 쓰지 않는다. 볼 수 있는 사람만(본인·관리자) — 못 보면 찍은 시각, 그것도 없으면 그날 맨 뒤.
    *   ③ 찍은 시각(captured_at) — 지금 자료(EVID)에는 그 칸이 없다(고정본에는 있다).
@@ -12361,19 +12512,65 @@ window.EduGuard = {
     var byId = {};
     ev.items.forEach(function (e) { byId[String(e.id)] = e; });
     var jobs = [];
-    chunks(ev.trips.filter(function (t) { return t.hp > 0 && t.ej === undefined; })).forEach(function (part) {
+    // ①-2 — 근거 줄(sheetpdf tollFlow 와 같은 규칙: lines 가 비어 있지 않으면 그것, 아니면 prev.lines) · 줄 금액(원)
+    var linesOf = function (ej) {
+      if (!ej || typeof ej !== 'object') return null;
+      if (Array.isArray(ej.lines) && ej.lines.length) return { list: ej.lines, prev: false };
+      var pv = ej.prev && typeof ej.prev === 'object' ? ej.prev : null;
+      return pv && Array.isArray(pv.lines) && pv.lines.length ? { list: pv.lines, prev: true } : null;
+    };
+    var amtOf = function (l) { return Math.round(Number(l && l.amount) || 0); };
+    var noPdf = function (l) { return !!l && typeof l === 'object' && !l.pdf && amtOf(l) > 0; };
+    var own = function (o) { var c = {}, k; for (k in o) if (Object.prototype.hasOwnProperty.call(o, k)) c[k] = o[k]; return c; };
+    /** 결재본 줄(t.ej)에 지금 줄(cur — 지금 운행의 toll_evidence_json)의 원본 경로를 옮긴다. t.ej 가 가리키는 결재본은 그대로 두고 새 근거를 만든다. */
+    var latePdf = function (t, cur) {
+      var L = linesOf(t.ej), cu = cur && typeof cur === 'object' ? cur : null;
+      if (!L || !cu) return;
+      var cp = cu.prev && typeof cu.prev === 'object' ? cu.prev : null;
+      var pool = [].concat(Array.isArray(cu.lines) ? cu.lines : [], cp && Array.isArray(cp.lines) ? cp.lines : [])
+        .filter(function (c) { return !!c && typeof c === 'object' && typeof c.pdf === 'string' && !!c.pdf; });
+      if (!pool.length) return;
+      var str = function (v) { return v == null ? '' : String(v).trim(); };
+      var idx = [];
+      var list = L.list.map(function (l, i) {
+        if (!noPdf(l) || !str(l.at)) return l;
+        var hit = pool.filter(function (c) {
+          return str(c.at) === str(l.at) && str(c.office) === str(l.office) && amtOf(c) === amtOf(l) &&
+            (!str(c.entry) || !str(l.entry) || str(c.entry) === str(l.entry));
+        })[0];
+        if (!hit) return l;
+        var o = own(l);
+        o.pdf = hit.pdf;
+        if (hit.page != null && hit.page !== '') o.page = hit.page; else delete o.page;
+        idx.push(i);
+        return o;
+      });
+      if (!idx.length) return;
+      var ej = own(t.ej);
+      if (L.prev) { ej.prev = own(t.ej.prev); ej.prev.lines = list; } else ej.lines = list;
+      t.ej = ej; t.late = idx;
+    };
+    var late = ev.frozen ? ev.trips.filter(function (t) { var L = t.hp > 0 && t.line === 'frozen' ? linesOf(t.ej) : null; return !!L && L.list.some(noPdf); }) : [];
+    chunks(ev.trips.filter(function (t) { return t.hp > 0 && t.ej === undefined; }).concat(late)).forEach(function (part) {
       jobs.push(get('/rest/v1/trips?select=id,toll_cost,toll_status,toll_source,toll_hipass,toll_evidence_json&id=in.(' + idList(part) + ')').then(function (rows) {
         var by = {};
         (rows || []).forEach(function (x) { by[String(x.id)] = x; });
         part.forEach(function (t) {
           var x = by[String(t.id)];
-          if (!x) { t.line = 'nofetch'; return; }
-          var same = num(x.toll_cost) === t.fz.c && String(x.toll_status || '') === t.fz.s && String(x.toll_source || '') === t.fz.src &&
+          var same = !!x && num(x.toll_cost) === t.fz.c && String(x.toll_status || '') === t.fz.s && String(x.toll_source || '') === t.fz.src &&
             (t.fz.h === undefined || num(x.toll_hipass) === t.fz.h);
+          // ①-2 결재본 줄이 있는 운행 — 줄은 결재본 그대로. 금액이 같을 때만 원본 경로를 옮기고, 다르면 그대로 둔다(「원본 없음」).
+          //   못 받았으면(빈 목록 — 볼 권한 없음 · 지운 운행) 원본이 있는지 모른다: t.lateMiss(「확인 못 함」). 옮기다 깨져도(지금 근거 꼴 이상) 같다.
+          if (t.line === 'frozen') {
+            if (!x) t.lateMiss = true;
+            else if (same) { try { latePdf(t, ejOf(x.toll_evidence_json)); } catch (e) { t.lateMiss = true; } }
+            return;
+          }
+          if (!x) { t.line = 'nofetch'; return; }
           if (!same) { t.line = 'stale'; return; }
           t.ej = ejOf(x.toll_evidence_json); t.line = 'live';
         });
-      }, function () { part.forEach(function (t) { t.line = 'nofetch'; }); }));
+      }, function () { part.forEach(function (t) { if (t.line === 'frozen') t.lateMiss = true; else t.line = 'nofetch'; }); }));
     });
     chunks(ev.items.filter(function (e) { return e.photo; })).forEach(function (part) {
       jobs.push(get('/rest/v1/evidence_ai?select=evidence_id,photo_path,result&evidence_id=in.(' + idList(part) + ')').then(function (rows) {
@@ -12533,6 +12730,8 @@ window.EduGuard = {
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
       // pdfPrep — 인쇄 준비(하이패스 이용내역 줄 · 사진 판독 시각, 2026-10-23). PDF 를 만드는 세 길이 모두 pdfDocFor 다음에 부른다.
       pdfDocFor: pdfDocFor, pdfPrep: pdfPrep, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
+      // pdf.js 불러오기 — 결재 문서 PDF 가 하이패스 영수증 원본(「영수증 출력」 화면을 인쇄한 PDF)의 영수증을 읽을 때(drv-verify parseHipass, 2026-10-23)
+      loadPdfJs: loadPdfJs,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
       BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes, liveSign: liveSign,

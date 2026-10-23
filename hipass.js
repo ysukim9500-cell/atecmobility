@@ -222,7 +222,8 @@
   /**
    * 하이패스 PDF 원본을 보관할 저장소 경로(2026-10-23 — driving-app.js hpKeep):
    *   <아이디>/hipass/<파일 시각 KST YYYYMMDD-HHmmss>-<SHA-256 앞 16자(소문자)>.pdf
-   * 서버 toll-apply 는 이 꼴(_shared/toll-evidence.ts hipassPdfOk)이고 부른 사람 폴더일 때만 줄의 pdf 를 남긴다(시험 web/test/hipass-keep.test.mjs).
+   * 서버 toll-apply 는 이 꼴(_shared/toll-evidence.ts hipassPdfOk)이고 부른 사람 폴더일 때만 줄의 pdf 를 남긴다(시험 web/test/hipass-keep.test.mjs) —
+   * 그 운행이 부른 사람 것일 때만이다(2026-10-23 오후 — 관리자 「하이패스 대조 (전체)」로 남의 운행을 맞추면 pdf 는 버리고 줄만 남긴다).
    * 아이디를 경로로 쓸 수 없으면(빈칸·/·\·?·#·%·제어 문자 · 「.」·「..」 · 64자 넘음) · 시각·지문이 이상하면 null.
    */
   function keepPath(user, ms, sha256hex) {
@@ -233,6 +234,72 @@
     var d = new Date(t + 9 * 3600e3), p = function (n) { return (n < 10 ? '0' : '') + n; };
     return u + '/hipass/' + d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + '-' +
       p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + '-' + h.slice(0, 16) + '.pdf';
+  }
+
+  /**
+   * 하이패스 PDF 원본 경로 꼴인가(2026-10-23 오후) — 서버 _shared/toll-evidence.ts hipassPdfOk 와 같은 규칙(시험 web/test/hipass-attach.test.mjs):
+   *   `<아이디>/hipass/<YYYYMMDD-HHmmss>-<16자 소문자 16진>.pdf`(조각 셋 · 120자까지) · 아이디 조각에 빈칸·제어 문자·\·?·#·% 없음 ·
+   *   「.」·「..」 아님 · 64자까지. owner 를 주면 그 아이디의 폴더일 때만(빈 값이면 늘 거짓). 안 주면 꼴만 본다.
+   */
+  function pdfOk(v, owner) {
+    if (typeof v !== 'string' || v.length > 120) return false;
+    var p = v.split('/');
+    if (p.length !== 3 || p[1] !== 'hipass' || !/^\d{8}-\d{6}-[0-9a-f]{16}\.pdf$/.test(p[2])) return false;
+    // eslint-disable-next-line no-control-regex
+    if (!p[0] || p[0].length > 64 || p[0] === '.' || p[0] === '..' || /[\s\\?#%\u0000-\u001f\u007f]/.test(p[0])) return false;
+    return owner === undefined ? true : (!!owner && p[0] === owner);
+  }
+  /** a 가 b 로 끝나는가(옛 문법만 — String endsWith 대신) */
+  function endsW(a, b) { return a.length >= b.length && a.slice(a.length - b.length) === b; }
+  /**
+   * 출구(영업소)가 같은가(2026-10-23 오후) — 같은 글이거나, 둘 다 비어 있지 않고 한쪽이 다른 쪽으로 끝난다(서버 sameOffice 와 같다).
+   * 같은 영수증이라도 한국도로공사 PDF(parseDirect)는 「서울고속도로통일로영업소」, 영수증 출력 화면을 인쇄한 PDF(parsePrint)는 「통일로영업소」로 읽힌다.
+   */
+  function sameOffice(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    return a === b || (a !== '' && b !== '' && (endsW(a, b) || endsW(b, a)));
+  }
+
+  /**
+   * 이미 맞춘 운행에 원본만 붙이기(2026-10-23 — driving-app.js hpMarkKeep · hpApply): 운행 근거(toll_evidence_json)의 이용내역 줄 중
+   * 원본(pdf)이 아직 없는 줄과 같은 통과 기록을 고른다. 서버 toll-apply 원본 붙이기(_shared/toll-evidence.ts attachPdf)와 같은 규칙이다 —
+   *   · owner = 운행 주인 아이디(서버 attachPdf 의 owner — 원본이 있어야 할 폴더). 비면 아무것도 안 고른다(서버도 안 붙인다)
+   *   · 줄 = 근거의 lines(비어 있지 않으면) 아니면 prev.lines(서버 hipassLinesOf) · 앞 50줄 · 근거가 객체가 아니면 줄 없음
+   *   · 같은 기록 = 통과 시각(atText ↔ at)·금액(amount)이 같고 출구(office)가 같고(sameOffice — 끝이 같아도, 2026-10-23 오후),
+   *     둘 다 입구가 있으면 입구(entryOffice ↔ entry)도 같다(글자는 서버 clipLines 꼴 — 제어 문자 → 빈칸 · 120자 — 로 견준다)
+   *   · owner 폴더의 원본(pdfOk(pdf, owner))이 이미 있는 줄은 안 고른다 — 남의 폴더 경로·꼴이 아닌 글은 「없음」이라 고른다(2026-10-23 오후 —
+   *     예전 관리자 「하이패스 대조 (전체)」가 남긴 관리자 폴더 경로는 결재 문서·R15 가 「원본 없음」으로 보는데 주인이 못 붙였다) ·
+   *     pdf·page 를 더하면 키가 12개를 넘는 줄은 안 고른다
+   *   · 줄 하나에 기록 하나. 한 기록과 같은 줄이 여럿이면(같은 통과가 근거에 두 번 적힘 — 읽을 때 시각·금액·영업소가 같으면 한 기록이다)
+   *     그 줄을 모두 고르고 그 기록을 줄 수만큼 돌려준다 — 서버는 받은 줄 하나에 근거 줄 하나씩 붙이므로, 한 번 올리면 다 붙는다.
+   * 시험 web/test/hipass-attach.test.mjs(서버와 맞춰 본다). 돌려주는 것: 고른 기록(recs 차례 · 같은 기록이 거듭 나올 수 있다).
+   */
+  function needPdf(ej, recs, owner) {
+    var ob = function (v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : null; };
+    // eslint-disable-next-line no-control-regex
+    var nm = function (v) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, 120) : null; };
+    var who = typeof owner === 'string' ? owner : '';
+    if (!who) return [];
+    var o = ob(ej), pv = o && ob(o.prev);
+    var ls = o && Array.isArray(o.lines) && o.lines.length ? o.lines
+      : pv && Array.isArray(pv.lines) && pv.lines.length ? pv.lines : [];
+    ls = ls.slice(0, 50);
+    var used = [], out = [];
+    (recs || []).forEach(function (r) {
+      if (!r) return;
+      var at = nm(r.atText), office = nm(r.office), entry = nm(r.entryOffice);
+      if (at === null || office === null || typeof r.amount !== 'number' || !isFinite(r.amount)) return;
+      for (var i = 0; i < ls.length; i++) {
+        var x = ob(ls[i]);
+        if (!x || used[i] || pdfOk(x.pdf, who)) continue;
+        if (nm(x.at) !== at || !sameOffice(nm(x.office), office) || typeof x.amount !== 'number' || x.amount !== r.amount) continue;
+        var xe = nm(x.entry);
+        if (xe && entry && xe !== entry) continue;
+        if (Object.keys(x).length + ('pdf' in x ? 0 : 1) + ('page' in x ? 0 : 1) > 12) continue;
+        used[i] = true; out.push(r);
+      }
+    });
+    return out;
   }
   function mergeFiles(lists) {
     var seen = new Set(), out = [], removed = 0;
@@ -465,5 +532,5 @@
     return g;
   }
 
-  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles, recKey: recKey, keepPath: keepPath };
+  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles, recKey: recKey, keepPath: keepPath, needPdf: needPdf, pdfOk: pdfOk };
 })(window);
