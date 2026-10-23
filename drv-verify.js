@@ -878,6 +878,13 @@
       }).catch(function () { return null; });
   }
 
+  /** 저장소 파일을 바이트 그대로 받는다(하이패스 이용내역 원본 PDF — 공개 bucket evidence 의 <아이디>/hipass/…pdf, 2026-10-23). 못 받으면 null. */
+  function loadRaw(path) {
+    var url = C.SB + '/storage/v1/object/public/evidence/' + String(path).split('/').map(encodeURIComponent).join('/');
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .then(function (b) { return new Uint8Array(b); }).catch(function () { return null; });
+  }
+
   var PDF_URLS = [], PDF_JOB = null;
   /** 문서 상태 표시(meta.mark) 별 결과 창 안내문. */
   var MARK_NOTE = {
@@ -893,38 +900,53 @@
    *         expect(상신 때 집계한 총액 — 문서 총계와 다르면 알린다) }
    */
   function pdfImgs(o) {
-    var scanPaths = {};
-    (o.doc.scans || []).forEach(function (s) { scanPaths[s.path] = 1; });
-    return { scanPaths: scanPaths, nImg: o.nImg != null ? o.nImg : Object.keys(scanPaths).length + (o.doc.photos || []).length };
+    var scanPaths = {}, SP = window.SheetPdf, doc = o.doc || {};
+    // 근거 재료(ev, 2026-10-23)가 있으면 sheetpdf 가 실을 사진만 센다(계기판은 차마다 한 장 · 오린 사진 · 원본 장)
+    (SP && SP.scanPaths ? SP.scanPaths(doc) : (doc.scans || []).map(function (s) { return s.path; })).forEach(function (p) { scanPaths[p] = 1; });
+    var n = SP && SP.imagePaths ? SP.imagePaths(doc).length : Object.keys(scanPaths).length + (doc.photos || []).length;
+    return { scanPaths: scanPaths, nImg: o.nImg != null ? o.nImg : n };
+  }
+  /** 운행기록부 PDF 한 권 — 결재 완료 한 사람 PDF · 결재 완료 묶음 · 상신 전 미리보기·결재 중 문서가 모두 이 길로 만든다(2026-10-23 「세 길 같은 결과」).
+   *  서명 채우기 → 인쇄 준비(C.pdfPrep — 하이패스 이용내역 줄 · 사진 판독 시각) → SheetPdf.build. onImg() 는 사진 하나 받을 때마다(진행 글). */
+  function sheetBuild(doc, meta, verify, onImg) {
+    var sp = pdfImgs({ doc: doc }).scanPaths;
+    return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve())
+      .then(function () { return C.pdfPrep ? C.pdfPrep(doc) : doc; })
+      .then(ensureLibs).then(function (lib) {
+        var d = {}, k;
+        for (k in doc) d[k] = doc[k];
+        d.meta = meta; d.verify = verify || null;
+        return window.SheetPdf.build(d, {
+          PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
+          loadImage: function (p) { return loadPhoto(p, sp[p] ? 2000 : 1500).then(function (b) { if (onImg) onImg(); return b; }); },
+          loadFile: loadRaw
+        });
+      });
   }
   /**
    * PDF 바이트만 만든다(창을 건드리지 않는다). makePdf(「결재 문서 PDF」)와 결재 카드 미리보기(2026-10-12)가
    * 같은 길로 만든다 — 미리보기가 단추로 받는 문서와 달라질 수 없게. note(t) 는 진행 글(없어도 된다).
    */
   function buildPdf(o, note) {
-    var im = pdfImgs(o), scanPaths = im.scanPaths, nImg = im.nImg, loaded = 0;
+    var nImg = pdfImgs(o).nImg, loaded = 0;
     note = note || function () { };
+    if (!o.build) {
+      note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
+      return sheetBuild(o.doc, o.meta, o.verify, function () { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); });
+    }
     // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
     return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
       note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
-      if (o.build) {
-        return o.build(lib, function (p) {
-          return loadPhoto(p, 1500).then(function (b) { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); return b; });
-        });
-      }
-      return window.SheetPdf.build({
-        meta: o.meta, sheets: o.doc.sheets, verify: o.verify || null,
-        scans: o.doc.scans, photos: o.doc.photos
-      }, {
-        PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
-        loadImage: function (p) {
-          return loadPhoto(p, scanPaths[p] ? 2000 : 1500).then(function (b) {
-            loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg);
-            return b;
-          });
-        }
+      return o.build(lib, function (p) {
+        return loadPhoto(p, 1500).then(function (b) { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); return b; });
       });
     });
+  }
+  /** 하이패스 근거를 못 넣은 까닭 한 줄(sheetpdf issues 'hipass') — 「원본 PDF 1개 · 이용내역 줄 못 받은 운행 2건」. */
+  function hipWhy(list) {
+    var files = list.filter(function (i) { return /원본/.test(i.msg || ''); }).length;
+    var m = list.map(function (i) { return /줄을 받지 못한 운행 (\d+)건/.exec(i.msg || ''); }).filter(Boolean)[0];
+    return [files ? '원본 PDF ' + files + '개' : '', m ? '이용내역 줄 못 받은 운행 ' + m[1] + '건' : ''].filter(Boolean).join(' · ');
   }
   function makePdf(o) {
     // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
@@ -950,15 +972,17 @@
       var img = res.issues.filter(function (i) { return i.kind === 'image'; });
       var gly = res.issues.filter(function (i) { return i.kind === 'glyph'; });
       var cut = res.issues.filter(function (i) { return i.kind === 'cut'; });      // 개인경비 증빙 설명을 「…」로 줄인 곳
+      var hip = res.issues.filter(function (i) { return i.kind === 'hipass'; });   // 하이패스 이용내역 원본 PDF·줄을 못 받음(2026-10-23)
       var chk = '';
-      if (!over.length && !img.length && !gly.length && !cut.length) {
+      if (!over.length && !img.length && !gly.length && !cut.length && !hip.length) {
         chk = '<div class="pdfok">' + ic('check', 15) + '<span>문서 점검 완료 — 잘린 글자·빠진 사진 없음</span></div>';
       } else {
         chk = '<div class="awarn">' + ic('alert', 15) + '<span>' +
           [over.length ? '글자가 칸에 꽉 찬 곳 ' + over.length + '곳(' + esc(over[0].page + '쪽') + ' 등)' : '',
             img.length ? '불러오지 못한 사진 ' + img.length + '장' : '',
             gly.length ? '글꼴에 없어 ? 로 바꾼 글자 ' + gly.length + '종' : '',
-            cut.length ? '길어서 「…」로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : ''].filter(Boolean).join(' · ') +
+            cut.length ? '길어서 「…」로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : '',
+            hip.length ? '확인 필요: 하이패스 이용내역 근거를 다 넣지 못함(' + esc(hipWhy(hip)) + ')' : ''].filter(Boolean).join(' · ') +
           ' — 열어서 확인해 주세요.</span></div>';
       }
       // 문서 총계(장별 총계의 합)가 상신 때 서버가 집계한 금액과 같은가 — 다르면 결재 카드와 문서가 다른 숫자를 말한다.
@@ -1073,9 +1097,15 @@
       return buildPdf(frozenOpts(a, fz)).then(function (res) { return res.bytes; });
     });
   }
+  /** 고정본 → 기록부·근거 재료. 사진 지문(driving_frozen.photo_meta — 상신 때 저장소의 etag·크기)을 근거 재료에 얹는다(같은 사진 가르기, 2026-10-23). */
+  function frozenDoc(a, fz) {
+    var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
+    if (doc && doc.ev) doc.ev.photoMeta = fz.photo_meta && typeof fz.photo_meta === 'object' ? fz.photo_meta : null;
+    return doc;
+  }
   /** 고정본 → makePdf 재료(창 제목·파일 이름 포함). */
   function frozenOpts(a, fz) {
-      var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
+      var doc = frozenDoc(a, fz);
       var done = a.status === 'approved';
       var mark = done ? '' : a.status === 'submitted' ? 'pending' : a.status === 'rejected' ? 'rejected' : 'withdrawn';
       var cname = cycName(a.cycle);
@@ -1379,20 +1409,11 @@
       note((i + 1) + ' / ' + list.length + ' · ' + C.nameOf(a.username) + ' 님 문서를 만드는 중…');
       return fetchFrozen(a).then(function (fz) {
         if (!fz) { skipped.push(C.nameOf(a.username)); return; }
-        var doc = C.withFrozen(fz.data, function () { return C.pdfDocFor(a.username, a); });
-        var vv = null;                  // 결재 완료본 묶음 — 검증 결과 쪽은 넣지 않는다(2026-10-14 사용자)
+        var doc = frozenDoc(a, fz);
         var name = (fz.data.user && fz.data.user.name) || C.nameOf(a.username);
-        return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
-          return window.SheetPdf.build({
-            meta: { name: name, cycleName: cycName(a.cycle), mark: '',
-              docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') },
-            sheets: doc.sheets, verify: vv ? { ranAt: whenText(vv.ran_at), ai: !!vv.ai, summary: vv.summary, items: vv.items || [] } : null,
-            scans: doc.scans, photos: doc.photos
-          }, {
-            PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
-            loadImage: function (p) { return loadPhoto(p, 1500); }
-          });
-        }).then(function (res) {
+        // 한 사람 PDF(frozenOpts → buildPdf)와 같은 길(sheetBuild — 서명 · 인쇄 준비(하이패스 이용내역 줄) · 근거 쪽) · 결재 완료본 묶음은 검증 결과 쪽 없음(2026-10-14)
+        return sheetBuild(doc, { name: name, cycleName: cycName(a.cycle), mark: '',
+          docNo: '결재 #' + a.id + ' · 상신 ' + whenText(fz.frozen_at) + (a.closed_at ? ' · 완료 ' + whenText(a.closed_at) : '') }, null).then(function (res) {
           parts.push(res.bytes); partIds.push(a.id);
           var snap = a.snapshot || {}, why = [];
           var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
@@ -1401,6 +1422,8 @@
           }
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
           if (img) why.push('불러오지 못한 사진 ' + img + '장');
+          var hip = (res.issues || []).filter(function (x) { return x.kind === 'hipass'; });
+          if (hip.length) why.push('하이패스 이용내역 근거를 다 넣지 못함(' + hipWhy(hip) + ')');
           if (why.length) checks.push(name + ' — ' + why.join(', '));
         });
       }).catch(function () { skipped.push(C.nameOf(a.username)); })

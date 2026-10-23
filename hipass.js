@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  *  하이패스 영수증 PDF → 운행 배분  (브라우저에서 전부 처리)
  *
- *  PDF 는 서버로 올리지 않는다. 브라우저가 직접 읽어 (일시·금액·영업소·카드뒷4자리)만
- *  뽑고, 이미 받아둔 운행 목록에 맞춘다. 반영은 사람이 확인한 것만 toll-apply 로 보낸다.
+ *  읽기는 브라우저가 직접 한다 — (일시·금액·영업소·카드뒷4자리)만 뽑고, 이미 받아둔 운행 목록에 맞춘다.
+ *  반영은 사람이 확인한 것만 toll-apply 로 보낸다. 기록을 읽은 PDF 원본은 증빙 저장소에 따로 보관한다
+ *  (2026-10-23 — driving-app.js hpKeep, 줄마다 그 원본 경로를 pdf 로 보낸다. 이 파일은 저장소를 건드리지 않는다).
  *
  *  PDF 구조 (한국도로공사 영수증 출력물)
  *    · 한 페이지에 영수증이 4열 × N행 격자
@@ -215,11 +216,29 @@
    * 열쇠: 통과 시각 · 금액 · 영업소 · 카드 끝 4자리. lists = 파일마다 읽은 기록 배열(파일 순서대로).
    * 돌려주는 것: { recs: 합친 기록(시각 순), removed: 뺀 건수 }
    */
+  /** 파일끼리 같은 기록인지 보는 열쇠(mergeFiles) — 웹 원본 보관(driving-app.js hpFiles)이 기록마다 든 파일을 찾을 때도 쓴다(2026-10-23). */
+  function recKey(r) { return r.at + '|' + r.amount + '|' + (r.office || '') + '|' + (r.card4 || ''); }
+
+  /**
+   * 하이패스 PDF 원본을 보관할 저장소 경로(2026-10-23 — driving-app.js hpKeep):
+   *   <아이디>/hipass/<파일 시각 KST YYYYMMDD-HHmmss>-<SHA-256 앞 16자(소문자)>.pdf
+   * 서버 toll-apply 는 이 꼴(_shared/toll-evidence.ts hipassPdfOk)이고 부른 사람 폴더일 때만 줄의 pdf 를 남긴다(시험 web/test/hipass-keep.test.mjs).
+   * 아이디를 경로로 쓸 수 없으면(빈칸·/·\·?·#·%·제어 문자 · 「.」·「..」 · 64자 넘음) · 시각·지문이 이상하면 null.
+   */
+  function keepPath(user, ms, sha256hex) {
+    var u = String(user || ''), h = String(sha256hex || '').toLowerCase(), t = Number(ms);
+    // eslint-disable-next-line no-control-regex
+    if (!u || u.length > 64 || u === '.' || u === '..' || /[\s\/\\?#%\u0000-\u001f\u007f]/.test(u)) return null;
+    if (!/^[0-9a-f]{16,}$/.test(h) || !isFinite(t) || t <= 0) return null;
+    var d = new Date(t + 9 * 3600e3), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return u + '/hipass/' + d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + '-' +
+      p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + '-' + h.slice(0, 16) + '.pdf';
+  }
   function mergeFiles(lists) {
     var seen = new Set(), out = [], removed = 0;
     (lists || []).forEach(function (rs) {
       (rs || []).forEach(function (r) {
-        var k = r.at + '|' + r.amount + '|' + (r.office || '') + '|' + (r.card4 || '');
+        var k = recKey(r);
         if (seen.has(k)) { removed++; return; }
         seen.add(k); out.push(r);
       });
@@ -446,5 +465,5 @@
     return g;
   }
 
-  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles };
+  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles, recKey: recKey, keepPath: keepPath };
 })(window);

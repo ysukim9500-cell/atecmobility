@@ -6699,10 +6699,12 @@
         }).then(function (blobs) {
           return shotP.then(function (shot) {
             if (!live()) return;
+            // PDF 에서 나온 장인가(2026-10-23) — 영수증이 하나뿐인 장도 오릴지 가른다(evScanPages · 폰 사진은 그대로)
+            var fromPdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
             blobs.forEach(function (b, i) {
               var pi = EVUP.pages.length;
               EVUP.pages.push({
-                blob: b, url: URL.createObjectURL(b), ai: '', shot: shot,
+                blob: b, url: URL.createObjectURL(b), ai: '', shot: shot, pdf: fromPdf,
                 name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : '')
               });
               EVUP.items.push(evBlankItem(pi));
@@ -6995,6 +6997,13 @@
       });
     });
   }
+  /** Gemini 상자(box_2d [ymin, xmin, ymax, xmax], 0~1000)가 장 넓이의 절반 아래인가 — 영수증 하나뿐인 PDF 장을 오릴지(2026-10-23). 꼴이 이상하면 거짓. */
+  function evSmallBox(b) {
+    if (!b || b.length !== 4) return false;
+    var y0 = Number(b[0]), x0 = Number(b[1]), y1 = Number(b[2]), x1 = Number(b[3]);
+    if (![y0, x0, y1, x1].every(function (v) { return isFinite(v) && v >= 0 && v <= 1000; }) || y1 <= y0 || x1 <= x0) return false;
+    return (y1 - y0) * (x1 - x0) <= 0.5 * 1000 * 1000;
+  }
   /**
    * 새로 들어온 장들을 AI 에게 한 장씩 보여 주고, 찾은 영수증마다 줄을 만든다.
    * AI 가 못 읽거나 서버가 막으면 그 장은 그냥 손으로 넣는 줄로 남는다(올리기를 막지 않는다).
@@ -7025,8 +7034,12 @@
           recs = recs.filter(function (x) { return x && x.kind !== 'unreadable' || recs.length === 1; });
           if (!recs.length) { pg.ai = 'none'; return; }
           var many = recs.length > 1;
+          // 영수증이 하나뿐인 장도 오린다(2026-10-23) — PDF 한 쪽(A4)에 영수증 한 장이 작게 있으면(하이패스 「영수증 출력」 한 건 등)
+          //   장 전체가 그 줄 사진이 됐다. PDF 에서 나온 장이고 상자가 장 넓이의 절반 아래일 때만 — 폰으로 찍은 영수증 한 장(장을 거의 채움)은
+          //   예전처럼 그대로 올린다(원본을 따로 올리지 않는다). 오리면 원본 장은 scan_path 로 그대로 남는다(runEvUpload).
+          var one = recs.length === 1 && !!pg.pdf && evSmallBox(recs[0].box_2d);
           return Promise.all(recs.map(function (x) {
-            return (many && x.box_2d) ? evCrop(pg.url, x.box_2d) : Promise.resolve(null);
+            return ((many || one) && x.box_2d) ? evCrop(pg.url, x.box_2d) : Promise.resolve(null);
           })).then(function (crops) {
             if (EVUP !== session || pg.ai !== 'run') return;
             evRead();
@@ -7284,9 +7297,10 @@
     var base = Date.now();
     // 한 장에 영수증이 둘 이상이면 그 장(A4 원본)을 따로 한 번 올리고, 줄마다 scan_path 로 가리킨다.
     // 결재 문서에는 원본 한 장이 통째로 실린다.
-    var perPage = {};
-    EVUP.items.forEach(function (x) { perPage[x.page] = (perPage[x.page] || 0) + 1; });
-    EVUP.pages.forEach(function (p, pi) { if (perPage[pi] > 1) p.multi = true; });
+    //   영수증 하나뿐인 PDF 장을 오렸으면(2026-10-23 evScanPages) 그 장도 — 오린 그림이 photo_path, 원본 장은 scan_path 로 그대로.
+    var perPage = {}, cropped = {};
+    EVUP.items.forEach(function (x) { perPage[x.page] = (perPage[x.page] || 0) + 1; if (x.crop && x.crop.blob) cropped[x.page] = 1; });
+    EVUP.pages.forEach(function (p, pi) { if (perPage[pi] > 1 || cropped[pi]) p.multi = true; });
     var upload = function (path, blob, label) {
       return apiRetry('/storage/v1/object/evidence/' + path, {
         method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob
@@ -8581,12 +8595,16 @@ window.EduGuard = {
       var rate = rateOf(t);
       var day = ymd(t.start_time);
       var mv = SM.row(t);
+      // 통행료 칸 출처(PDF 표시만 — 2026-10-23): 영 = 영수증으로 채운 금액 · 하 = 하이패스 이용내역으로 맞춘 통행료(규칙 v3 하이패스 몫이 있는 업무 운행)
+      var ta = tollNeed(t).a;
+      var tollMark = mv.evToll > 0 ? '영'
+        : (t.purpose || '') === BUSINESS && !t.deleted_at && ta > 0 && window.MoneyRule && window.MoneyRule.hipassOf(t, ta) > 0 ? '하' : '';
       out.push({
         date: day, start: dong(t.start_address), end: dong(t.end_address),
         visit: t.visit_place || '', purpose: t.purpose || '', manual: !!t.is_manual,
         odoS: g, odoE: hh, rate: rate, parking: mv.park, toll: mv.toll,
         // 영수증으로 채운 금액(표시용 — 엑셀 칸 값은 parking·toll 그대로)
-        evPark: mv.evPark, evToll: mv.evToll
+        evPark: mv.evPark, evToll: mv.evToll, tollMark: tollMark
       });
       // 지역별 분해 — FuelCost.km 규칙(역행이면 0)을 그대로 쓴다.
       var km = Math.max(0, hh - g);
@@ -9176,6 +9194,8 @@ window.EduGuard = {
 
     if (HP.note) h += '<div class="hpnote' + (HP.noteBad ? ' warn' : '') + '">' +
       ic(HP.noteBad ? 'alert' : 'check', 16) + '<span>' + esc(HP.note) + '</span></div>';
+    // 원본 PDF 를 보관하지 못했을 때만(2026-10-23 hpKeep) — 맞추기·확정은 그대로 된다
+    if (HP.keepNote) h += hpKeepHtml();
     if (!HP.groups.length) return h;
 
     HP.groups.forEach(function (g, gi) {
@@ -9315,11 +9335,93 @@ window.EduGuard = {
     });
   }
 
+  /* ── 하이패스 이용내역 PDF 원본 보관(2026-10-23 사용자 「하이패스 이용내역 PDF 원본도 앞으로 보관」) ──
+     예전에는 PDF 를 브라우저가 읽기만 하고 버려 결재 문서에 하이패스 통행료의 근거가 하나도 안 실렸다(저장소에 PDF 0개).
+     이제 기록을 읽은 PDF 만 증빙 저장소(evidence)에 올린다 — <내 아이디>/hipass/<파일 시각 KST YYYYMMDD-HHmmss>-<SHA-256 앞 16자>.pdf
+     (파일 시각 = 고른 파일의 lastModified — 같은 파일은 늘 같은 경로라, 이미 있으면 다시 올리지 않고 그대로 쓴다).
+     확정(toll-apply)할 때 줄마다 그 줄이 나온 PDF 의 경로를 pdf 로 실어 보낸다(page 는 그 PDF 안 쪽 번호) — 서버는 내 폴더의 경로만 남기고,
+     상신 때 결재본에 굳히고 그 PDF 를 지우거나 덮어쓰지 못하게 막는다. 결재 문서 출력이 맨 뒤에 원본 쪽을 붙인다.
+     보관에 실패해도(15MB 넘음 · 저장소가 PDF 를 안 받음 · 네트워크) 맞추기·확정은 그대로 — 안내만 한다(그 줄에 pdf 가 없을 뿐). */
+  var HP_PDF_MAX = 15 * 1024 * 1024;
+  var HP_KEEP_FAIL = '원본 PDF 를 보관하지 못했습니다 — 맞춘 금액은 그대로 저장됩니다.';
+  var HP_KEEP_BIG = '원본 PDF 가 15MB 를 넘어 보관하지 않았습니다 — 맞춘 금액은 그대로 저장됩니다.';
+  function hpHex(buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('');
+  }
+  /** 저장소 주소의 경로 — 조각마다 인코딩 */
+  function hpObj(path) { return String(path).split('/').map(encodeURIComponent).join('/'); }
+  /** PDF 하나 올리기 → 그 경로 · 이미 있으면(같은 파일을 전에 올림) 덮지 않고 그대로 쓴다 · 못 올리면 거절.
+   *  x-upsert 없이 올린다 — 있는 객체면 저장소가 「Duplicate」(409)로 거절한다. 결재본이 가리키는 경로는 새로 넣기가 막혀(403 — driving_photo_frozen)
+   *  그때만 있는지 물어본다(내 폴더는 볼 수 있다 — evidence web select). */
+  function hpPut(path, file) {
+    var at = hpObj(path), why = function (st, t) { return new Error('HTTP ' + st + ' ' + String(t || '').slice(0, 160)); };
+    return apiRetry('/storage/v1/object/evidence/' + at, {
+      method: 'POST', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'false' }, body: file
+    }).then(function (up) {
+      if (up.ok) return path;
+      return up.text().then(function (t) {
+        if (up.status === 409 || /duplicate|already exists/i.test(t || '')) return path;
+        if (up.status === 403 || /"403"|row-level security|unauthorized/i.test(t || '')) {
+          return apiRetry('/storage/v1/object/authenticated/evidence/' + at, { method: 'HEAD' })
+            .then(function (h) { if (h.ok) return path; throw why(up.status, t); });
+        }
+        throw why(up.status, t);
+      });
+    });
+  }
+  /** 고른 PDF(files — 배열) 중 기록을 읽은 것(lists[fi])만 차례로 올린다 → { paths: [파일 차례] → 경로|null, fail, big }. 늘 끝난다(거절하지 않는다). */
+  function hpKeep(files, lists) {
+    var me = myName(), out = { paths: [], fail: 0, big: 0 };
+    var can = !!(window.crypto && window.crypto.subtle && window.Hipass && window.Hipass.keepPath);   // 안전하지 않은 주소(http)면 지문을 못 낸다
+    return files.reduce(function (chain, f, fi) {
+      return chain.then(function () {
+        out.paths[fi] = null;
+        if (!(lists[fi] && lists[fi].length)) return;              // 못 읽은 파일·기록 없는 파일은 올리지 않는다
+        if (!can) { out.fail++; return; }
+        if (f.size > HP_PDF_MAX) { out.big++; return; }
+        return f.arrayBuffer().then(function (buf) { return window.crypto.subtle.digest('SHA-256', buf); })
+          .then(function (h) {
+            var lm = Number(f.lastModified);
+            // 경로 꼴은 hipass.js keepPath 하나(서버 toll-apply 가 같은 꼴만 받는다 — web/test/hipass-keep.test.mjs)
+            var path = window.Hipass.keepPath(me, isFinite(lm) && lm > 0 ? lm : Date.now(), hpHex(h));
+            if (!path) throw new Error('이 아이디로는 저장소 경로를 만들 수 없습니다');
+            return hpPut(path, f);
+          })
+          .then(function (p) { out.paths[fi] = p; }, function (e) { out.fail++; console.warn('하이패스 PDF 보관 못 함:', f.name, e && e.message); });
+      });
+    }, Promise.resolve()).then(function () { return out; });
+  }
+  function hpKeepHtml() {
+    return '<div class="hpnote warn" id="hpKeep" role="status">' + ic('alert', 16) + '<span>' + esc(HP.keepNote) + '</span></div>';
+  }
+  /** 보관이 끝나면 — 못 했을 때만 하이패스 화면 안내 줄(HP.note) 아래에 한 줄(다시 그리지 않고 끼운다 — 고른 것·스크롤 그대로) */
+  function hpKeepDone(job, r) {
+    if (HP.pdfJob !== job) return;                                    // 그 사이 다른 PDF 를 올렸거나 화면이 바뀌었다
+    HP.pdfDone = true;
+    HP.keepNote = r.fail ? HP_KEEP_FAIL : r.big ? HP_KEEP_BIG : '';
+    var drop = $('hpDrop');
+    if (!HP.keepNote || !drop || $('hpKeep')) return;
+    var nx = drop.nextElementSibling, at = nx && nx.classList.contains('hpnote') ? nx : drop;
+    var el = document.createElement('div'), sp = document.createElement('span');
+    el.className = 'hpnote warn'; el.id = 'hpKeep'; el.setAttribute('role', 'status');
+    el.innerHTML = ic('alert', 16);                                   // 아이콘(고정 SVG)만 — 글은 textContent
+    sp.textContent = HP.keepNote; el.appendChild(sp);
+    at.parentNode.insertBefore(el, at.nextSibling);
+    toast(HP.keepNote);
+  }
+  /** 그 줄의 원본 PDF — 그 기록이 든 파일 중 보관한 첫 파일의 { pdf, page } · 없으면 null */
+  function hpSrcOf(r, paths) {
+    var src = r.srcs || [];
+    for (var i = 0; i < src.length; i++) if (paths[src[i].fi]) return { pdf: paths[src[i].fi], page: src[i].page };
+    return null;
+  }
+
   function hpFiles(files) {
     // ★ 운행을 다 못 받은 상태로 대조하면 "맞는 운행이 없습니다" 가 되고,
     //   로드가 끝나도 다시 맞추지 않아 PDF 를 또 올려야 했다.
     if (!LOADED) { toast('운행을 불러오는 중입니다. 잠시 뒤에 올려 주세요.'); return; }
     if (!files || !files.length) return;
+    files = Array.prototype.slice.call(files);   // 고른 파일을 붙잡아 둔다 — 원본 보관(hpKeep)이 나중에 다시 읽는다
     if (!window.Hipass) { toast('영수증 해독기를 불러오지 못했습니다.', true); return; }
     // 사진만 골랐으면 읽지 말고 어디로 올리는지 알려 준다(웹 8차)
     if (!Array.prototype.some.call(files, function (f) { return /pdf/i.test(f.type || '') || /pdf$/i.test(f.name || ''); })) {
@@ -9327,7 +9429,9 @@ window.EduGuard = {
       HP.note = '사진 파일입니다. 여기는 하이패스 이용내역 PDF만 받습니다 — 영수증 사진은 「← 통행료로 돌아가기」를 눌러 「영수증 사진 올리기」로 올려 주세요.';
       render(); return;
     }
-    HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…'; render();
+    HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…';
+    HP.pdfJob = null; HP.pdfDone = false; HP.keepNote = '';         // 앞서 올린 PDF 의 보관 일은 버린다(그 기록도 새로 읽는다)
+    render();
     var lists = [], recs = [], done = 0, bad = 0, warns = [], dup = 0;
     Array.prototype.forEach.call(files, function (f, fi) {
       f.arrayBuffer().then(function (buf) {
@@ -9338,10 +9442,16 @@ window.EduGuard = {
         .then(function () {
           if (++done < files.length) return;
           HP.busy = false;
+          // 기록마다 그 기록이 든 파일과 그 파일 안 쪽 번호(원본 보관 — 확정할 때 줄의 pdf·page). 겹친 기록은 든 파일 모두를 차례대로.
+          var srcOf = {}, rk = window.Hipass.recKey || function (r) { return r.at + '|' + r.amount + '|' + (r.office || '') + '|' + (r.card4 || ''); };
+          lists.forEach(function (rs, fi) {
+            (rs || []).forEach(function (r) { var k = rk(r); (srcOf[k] = srcOf[k] || []).push({ fi: fi, page: r.page }); });
+          });
           // 파일끼리 겹친 기록은 한 번만(2026-10-20 AU2 — 기간이 겹치는 두 파일·같은 파일 두 번이면 통행료가 두 배로 확정됐다).
-          //   열쇠: 통과 시각·금액·영업소·카드 끝 4자리(hipass.js mergeFiles). 파일 하나 안의 겹침은 읽을 때 이미 뺐다.
+          //   열쇠: 통과 시각·금액·영업소·카드 끝 4자리(hipass.js mergeFiles · recKey). 파일 하나 안의 겹침은 읽을 때 이미 뺐다.
           var mg = window.Hipass.mergeFiles ? window.Hipass.mergeFiles(lists) : { recs: [].concat.apply([], lists.filter(Boolean)), removed: 0 };
           recs = mg.recs; dup = mg.removed;
+          recs.forEach(function (r) { r.srcs = srcOf[rk(r)] || []; });
           if (dup) toast('여러 파일에 겹친 기록 ' + n0(dup) + '건은 한 번만 셉니다(뺐습니다).');
           if (!recs.length) {
             HP.noteBad = true;
@@ -9351,6 +9461,9 @@ window.EduGuard = {
           }
           HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+          // 원본 보관을 시작한다(기다리지 않는다 — 확정할 때 끝나기를 기다린다). 못 하면 안내 한 줄(hpKeepDone).
+          var job = HP.pdfJob = hpKeep(files, lists);
+          job.then(function (r) { hpKeepDone(job, r); });
           HP.noteBad = !!bad || warns.length > 0;
           // 지금 보는 기간 밖의 기록 수(2026-10-20 AU2 #7) — 그 기간 화면에서 올리라고 한 줄 더한다(카드마다 아래 「이 기간 밖의 기록」에 목록)
           var nOut = recs.filter(function (r) { return !hpInView(r); }).length;
@@ -9398,20 +9511,29 @@ window.EduGuard = {
     var hbtn = document.querySelector('[data-hpapply="' + gi + '"]');
     if (hbtn) { hbtn.disabled = true; hbtn.textContent = '확정 중…'; }
 
-    var items = picked.map(function (e) {
-      return {
-        id: e.trip.id, amount: e.sum,
-        note: '카드 ' + (g.card4 || '?') + ' · ' + (g.plate || ''),
-        lines: e.lines.map(function (r) {
-          // 입구 영업소·차종도 보낸다 — 서버 toll_evidence_json.lines 에 입구·출구·차종·금액이 남아 통행료 추정 개선에 쓴다(2026-10-17)
-          return { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
-        }),
-      };
-    });
-
-    toast('확정 중입니다…');
-    apiRetry('/functions/v1/toll-apply', {
-      method: 'POST', body: JSON.stringify({ items: items, batch: HP.batch })
+    // 원본 PDF 보관(hpKeep)이 끝나기를 기다린다(30초까지 — 넘으면 그 줄들은 pdf 없이). 보관은 거절하지 않는다.
+    var job = HP.pdfJob;
+    var kept = job ? Promise.race([job, new Promise(function (ok) { setTimeout(function () { ok(null); }, 30000); })]) : Promise.resolve(null);
+    toast(job && !HP.pdfDone ? '원본 PDF 를 보관하는 중입니다 — 끝나면 바로 확정합니다…' : '확정 중입니다…');
+    kept.then(function (k) {
+      var paths = (k && k.paths) || [];
+      var items = picked.map(function (e) {
+        return {
+          id: e.trip.id, amount: e.sum,
+          note: '카드 ' + (g.card4 || '?') + ' · ' + (g.plate || ''),
+          lines: e.lines.map(function (r) {
+            // 입구 영업소·차종도 보낸다 — 서버 toll_evidence_json.lines 에 입구·출구·차종·금액이 남아 통행료 추정 개선에 쓴다(2026-10-17)
+            var o = { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
+            // 그 줄이 나온 PDF 원본(2026-10-23) — 보관한 것만 · page 는 그 PDF 안 쪽 번호
+            var s = hpSrcOf(r, paths);
+            if (s) { o.pdf = s.pdf; if (s.page != null) o.page = s.page; }
+            return o;
+          }),
+        };
+      });
+      return apiRetry('/functions/v1/toll-apply', {
+        method: 'POST', body: JSON.stringify({ items: items, batch: HP.batch })
+      });
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         if (!res.ok || !res.j || !res.j.ok) {
@@ -12147,7 +12269,7 @@ window.EduGuard = {
       var d = Number(e.date_millis);
       return e.username === mine && d >= r.lo && d < r.hi && e.photo_path;
     }).sort(function (x, y) { return x.date_millis - y.date_millis || x.id - y.id; });
-    // 스캔 원본이 있는 영수증은 그 장을 통째로(한 장에 한 쪽), 나머지는 낱장 사진으로.
+    // (옛 재료 — 문서는 이제 ev 로 그린다. 사진이 있는지 보는 데·예전 도구가 읽는 데만 남긴다.)
     var scans = [], scanAt = {}, photos = [];
     evid.forEach(function (e) {
       var row = { category: e.category || '기타', date: md(e.date_millis), amount: Number(e.amount) || 0,
@@ -12158,7 +12280,134 @@ window.EduGuard = {
       } else { row.path = e.photo_path; photos.push(row); }
     });
     var hasRow = sheets.some(function (s) { return s.rows.length || s.orphans.length; });
-    return { sheets: sheets, scans: scans, photos: photos, any: hasRow || scans.length > 0 || photos.length > 0 };
+    return { sheets: sheets, scans: scans, photos: photos, ev: evMaterial(mine, r, sheets, legacy),
+      any: hasRow || scans.length > 0 || photos.length > 0 };
+  }
+  /**
+   * 결재 문서의 근거 재료(2026-10-23 관리자 신고 — 하이패스 근거 누락 · 원본 장 줄이 「통행료」 쪽에 없음 · 순서 · 표 금액과 맞춰 볼 줄 없음).
+   * sheetpdf.js 가 「통행료 근거」 한 흐름 · 사진 쪽 차례 · 원본 부록으로 그린다. 지금 전역(고정본이면 withFrozen 안)에서 만든다.
+   * ★ 금액은 다시 세지 않는다 — 날마다 값은 moneyOf(금액 규칙 v3) 그대로, 표 칸 값은 이 문서의 장(sheets)에서 읽는다.
+   *   인쇄할 때 받아야 하는 것(하이패스 이용내역 줄 · 사진 판독 시각 · 찍은 시각)은 pdfPrep 이 채운다.
+   */
+  function evMaterial(mine, r, sheets, legacy) {
+    var M = moneyOf(mine, r);
+    var inR = function (ms) { ms = Number(ms); return ms >= r.lo && ms < r.hi; };
+    var has = function (o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); };
+    var biz = TRIPS.filter(function (t) { return t.username === mine && !t.deleted_at && (t.purpose || '') === BUSINESS && inR(t.start_time); });
+    var evs = EVID.filter(function (e) { return e.username === mine && inR(e.date_millis); });
+    var dayOf = {};                  // 영수증 id → 규칙 v3 이 붙인 날(이은 운행의 날 · 자정 넘긴 운행의 날)
+    ['주차', '통행료'].forEach(function (cat) { M[cat].days.forEach(function (d) { d.ev.forEach(function (e) { dayOf[e.id] = d.day; }); }); });
+    // 표 칸 값(이 문서의 장들) — 날마다·합계. 대조 줄의 「표 통행료」는 이것이다.
+    var table = { '통행료': { total: 0, byDay: {} }, '주차': { total: 0, byDay: {} } };
+    var addT = function (cat, day, v) { v = Math.round(Number(v) || 0); if (!v) return; table[cat].total += v; table[cat].byDay[day] = (table[cat].byDay[day] || 0) + v; };
+    sheets.forEach(function (sh) {
+      (sh.rows || []).forEach(function (x) { addT('통행료', x.date, x.toll); addT('주차', x.date, x.parking); });
+      (sh.orphans || []).forEach(function (x) { addT('통행료', x.date, x.toll); addT('주차', x.date, x.parking); });
+    });
+    var days = function (cat) {
+      return M[cat].days.map(function (d) {
+        var hp = {};
+        (d.hp || []).forEach(function (t) { hp[t.id] = Math.round((d.ha && d.ha[t.id]) || 0); });
+        return { day: d.day, T: Math.round(d.T), H: Math.round(d.H || 0), D: Math.round(d.D || 0), settle: Math.round(d.settle), st: d.st,
+          U: d.ev.reduce(function (s, e) { return s + Math.round(Number(e.amount) || 0); }, 0),
+          ev: d.ev.map(function (e) { return e.id; }), hp: hp, amt: d.amt || {}, trips: d.trips.map(function (t) { return t.id; }),
+          fill: d.fillEv || {}, target: d.target ? d.target.id : null, dup: (d.dup || []).map(function (e) { return e.id; }) };
+      });
+    };
+    var ejOf = function (v) { if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } } return v || null; };
+    var trips = biz.map(function (t) {
+      var a = tollNeed(t).a, ej = has(t, 'toll_evidence_json');
+      return { id: t.id, start: Number(t.start_time), end: t.end_time == null || t.end_time === '' ? null : Number(t.end_time),
+        visit: t.visit_place || '', to: dong(t.end_address), plate: t.plate_no || '',
+        // 하이패스 몫(규칙 v3 은 통행료가 있는 운행만 센다) — 이 값이 있는데 자료에 toll_evidence_json 칸이 없으면 인쇄 준비가 지금 줄을 받는다
+        hp: a > 0 && window.MoneyRule ? window.MoneyRule.hipassOf(t, a) : 0,
+        ej: ej ? ejOf(t.toll_evidence_json) : undefined, line: ej ? 'frozen' : '',
+        // 결재본(또는 지금 화면)의 통행료 — 지금 줄을 받으면 이것과 같을 때만 쓴다
+        fz: { c: t.toll_cost == null || t.toll_cost === '' ? null : Number(t.toll_cost), s: t.toll_status || '', src: t.toll_source || '',
+          h: has(t, 'toll_hipass') ? (t.toll_hipass == null || t.toll_hipass === '' ? null : Number(t.toll_hipass)) : undefined } };
+    });
+    var items = evs.map(function (e) {
+      var lt = linkedTrip(e, r);
+      return { id: e.id, cat: e.category || '기타', ms: Number(e.date_millis),
+        cap: has(e, 'captured_at') ? (e.captured_at == null || e.captured_at === '' ? null : Number(e.captured_at)) : undefined,
+        amount: Number(e.amount) || 0, memo: e.memo || '', plate: e.vehicle_plate || '', photo: e.photo_path || '', scan: e.scan_path || '',
+        link: lt ? lt.id : null, day: dayOf[e.id] || ymd(Number(e.date_millis)), ai: null };
+    });
+    // 계기판 사진의 차 — 번호판이 없는 사진은 업무 운행 차가 한 대일 때만 그 차(서버 검증 R12·A05 와 같은 bizPlates)
+    var plates = [];
+    biz.forEach(function (t) { var p = t.plate_no || ''; if (t.end_odometer != null && plates.indexOf(p) < 0) plates.push(p); });
+    // user — 하이패스 원본은 이 사람 폴더(<아이디>/hipass/…)의 것만 싣는다(sheetpdf 보안 확인)
+    return { v: 1, user: mine, legacy: !!legacy, frozen: !!FROZEN_ON, items: items, trips: trips,
+      money: { '통행료': { days: days('통행료') }, '주차': { days: days('주차') } }, table: table, bizPlates: plates, photoMeta: null };
+  }
+  /**
+   * 인쇄 준비(2026-10-23) — 근거 재료(doc.ev)에 인쇄할 때만 받는 것을 채운다. 모두 읽기만 하는 GET 이고, 못 받아도 문서는 만든다.
+   * 세 길(결재 완료 한 사람 PDF · 결재 완료 묶음 · 상신 전 미리보기·결재 중 문서)이 모두 이것을 거친다 — 같은 자료면 같은 문서.
+   *   ① 하이패스 이용내역 줄 — 자료의 운행에 toll_evidence_json 칸이 없으면(이미 결재된 10월분 고정본 · 지금 자료) 지금 줄을 받는다.
+   *      그 운행의 toll_cost·toll_status·toll_source(·toll_hipass)가 자료와 같을 때만 쓴다 — 다르면 「결재 뒤 바뀐 운행」(줄을 싣지 않음).
+   *      결재 기간은 잠겨 있어 보통 같다. 못 받으면(권한·연결) 「이용내역 줄을 받지 못함」 + 문서 점검 「확인 필요」.
+   *   ② 사진 판독(evidence_ai) — 영수증 시각(원본 장 줄이면 그 장 판독에서 짝지은 영수증의 시각) · 원본 장 안 자리 · 그 장 영수증 수 · 계기판 km.
+   *      사진이 바뀐 판독은 쓰지 않는다. 볼 수 있는 사람만(본인·관리자) — 못 보면 찍은 시각, 그것도 없으면 그날 맨 뒤.
+   *   ③ 찍은 시각(captured_at) — 지금 자료(EVID)에는 그 칸이 없다(고정본에는 있다).
+   */
+  function pdfPrep(doc) {
+    var ev = doc && doc.ev;
+    if (!ev || ev.prepped) return Promise.resolve(doc);
+    var get = function (path) { return apiRetry(path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); };
+    var chunks = function (list) { var out = []; for (var i = 0; i < list.length; i += 80) out.push(list.slice(i, i + 80)); return out; };
+    var idList = function (l) { return l.map(function (x) { return encodeURIComponent(String(x.id)); }).join(','); };
+    var num = function (v) { return v == null || v === '' ? null : Number(v); };
+    var ejOf = function (v) { if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } } return v || null; };
+    var byId = {};
+    ev.items.forEach(function (e) { byId[String(e.id)] = e; });
+    var jobs = [];
+    chunks(ev.trips.filter(function (t) { return t.hp > 0 && t.ej === undefined; })).forEach(function (part) {
+      jobs.push(get('/rest/v1/trips?select=id,toll_cost,toll_status,toll_source,toll_hipass,toll_evidence_json&id=in.(' + idList(part) + ')').then(function (rows) {
+        var by = {};
+        (rows || []).forEach(function (x) { by[String(x.id)] = x; });
+        part.forEach(function (t) {
+          var x = by[String(t.id)];
+          if (!x) { t.line = 'nofetch'; return; }
+          var same = num(x.toll_cost) === t.fz.c && String(x.toll_status || '') === t.fz.s && String(x.toll_source || '') === t.fz.src &&
+            (t.fz.h === undefined || num(x.toll_hipass) === t.fz.h);
+          if (!same) { t.line = 'stale'; return; }
+          t.ej = ejOf(x.toll_evidence_json); t.line = 'live';
+        });
+      }, function () { part.forEach(function (t) { t.line = 'nofetch'; }); }));
+    });
+    chunks(ev.items.filter(function (e) { return e.photo; })).forEach(function (part) {
+      jobs.push(get('/rest/v1/evidence_ai?select=evidence_id,photo_path,result&evidence_id=in.(' + idList(part) + ')').then(function (rows) {
+        (rows || []).forEach(function (x) {
+          var e = byId[String(x.evidence_id)];
+          if (e && x.photo_path === e.photo) e.ai = aiBits(e, x.result || {});
+        });
+      }, function () { }));
+    });
+    chunks(ev.items.filter(function (e) { return e.cap === undefined && e.cat !== '계기판'; })).forEach(function (part) {
+      jobs.push(get('/rest/v1/evidences?select=id,captured_at&id=in.(' + idList(part) + ')').then(function (rows) {
+        (rows || []).forEach(function (x) { var e = byId[String(x.id)]; if (e) e.cap = x.captured_at == null || x.captured_at === '' ? null : Number(x.captured_at); });
+      }, function () { }));
+    });
+    return Promise.all(jobs).then(function () { ev.prepped = true; return doc; });
+  }
+  /** 사진 판독 한 줄 → 근거 재료에 쓸 것(시각 · 원본 장 안 자리 · 그 장 영수증 수 · 계기판 km · 상호). 원본 장 줄은 원본 장 판독(via 'scan_page')만 —
+   *  오린 줄 사진으로 읽은 옛 판독은 서버도 쓰지 않는다(driving-verify.ts scanState 'stale'). 영수증 수는 서버 isRcpt 와 같은 셈. */
+  function aiBits(e, r) {
+    var hm0 = function (t) { return /^\d{2}:\d{2}$/.test(String(t || '')) ? String(t) : null; };
+    var rcpt = function (x) { return !!x && x.kind !== 'odometer' && (x.amount != null || ['fuel', 'parking', 'toll', 'unreadable'].indexOf(String(x.kind)) >= 0); };
+    var out = { time: null, idx: null, n: null, km: null, merchant: '' };
+    if (e.scan && e.cat !== '계기판') {
+      if (r.via === 'scan_page' && r.scan_path === e.scan && Array.isArray(r.all)) {
+        var i = r.page_idx != null && r.page_idx !== '' && isFinite(Number(r.page_idx)) ? Number(r.page_idx) : null, m = i != null ? r.all[i] : null;
+        out.idx = i; out.n = r.all.filter(rcpt).length;
+        out.time = hm0(m ? m.time : r.time); out.merchant = String((m && m.merchant) || r.merchant || '');
+      }
+      return out;
+    }
+    if (r.legible === false || r.kind === 'unreadable') return out;
+    out.time = hm0(r.time); out.merchant = String(r.merchant || '');
+    if (r.odometer_km != null && r.odometer_km !== '' && isFinite(Number(r.odometer_km))) out.km = Math.round(Number(r.odometer_km));
+    return out;
   }
   /** 엑셀 파일들(차량별 1개). 지금 전역에서 만든다 — downloadXlsx 와 같은 규칙·같은 파일 이름.
    *  a = 그 문서의 결재 건(결재란 칸 이름을 고른다 — 예전 건 v1). 안 넘기면 그 사람·기간의 운행일지 결재 건. */
@@ -12282,7 +12531,8 @@ window.EduGuard = {
       /** 관리 화면(마감 기간 설정)이 저장한 뒤 — 서버 답의 cycle_rules 를 바로 쓴다(바뀌었으면 true). 다시 받기(loadAll)는 부른 쪽이. */
       reloadRules: function (raw) { var ch = CR.set(raw); if (ch) { if (fixX()) writeHash(); paintCycle(); } return ch; },
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
-      pdfDocFor: pdfDocFor, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
+      // pdfPrep — 인쇄 준비(하이패스 이용내역 줄 · 사진 판독 시각, 2026-10-23). PDF 를 만드는 세 길이 모두 pdfDocFor 다음에 부른다.
+      pdfDocFor: pdfDocFor, pdfPrep: pdfPrep, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
       BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes, liveSign: liveSign,
@@ -12348,7 +12598,7 @@ window.EduGuard = {
      배포본에는 __VERIFY__ 가 없으므로 아무 일도 하지 않는다. */
   if (window.__VERIFY__) {
     window.__buildPrint = buildPrint;
-    window.__pdfDocFor = pdfDocFor; window.__totals = totals; window.__withFrozen = withFrozen;
+    window.__pdfDocFor = pdfDocFor; window.__totals = totals; window.__withFrozen = withFrozen; window.__pdfPrep = pdfPrep;
     window.__state = function () { return { TRIPS: TRIPS, EVID: EVID, VEHICLES: VEHICLES, USERS: USERS, RATES: RATES, CYC: CYC }; };
     // 하이패스는 실제 영수증 PDF 없이는 재현이 안 된다. 대조 결과를 직접 넣어
     // '확정' 뒤에 화면이 바뀌는지 확인할 수 있게 열어 둔다(검증용).
