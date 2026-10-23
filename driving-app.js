@@ -3866,7 +3866,7 @@
           : oName + ' 결재 문서는 ' + oName + ' 결재함에서') + '</span>' + ic('chev', 14) + '</button>';
     });
     if (mine.length) {
-      h += sect('내 차례', mine.length + '건', '', '<div class="panel ibturn">' + turnGroups(mine) + '</div>');
+      h += sect('내 차례', mine.length + '건', '', '<div class="panel ibturn ibcards">' + turnGroups(mine) + '</div>');
     } else if (!SP.ndMine.length && isApproverMe()) {
       // 결재선에 든 적이 없는 사람(사원)에게는 큰 빈 상자를 보이지 않는다 — 머리글의 「내 차례인 건이 없습니다」로 충분(2026-10-15 2차)
       h += blank('결재할 것이 없습니다.', '다른 분 차례이거나 아직 상신되지 않았습니다.', 'check');
@@ -3874,7 +3874,7 @@
     if (SP.ndMine.length) {
       h += sect('운행일지 결재 — 내 차례', SP.ndMine.length + '건', '',
         '<div class="fhint" style="margin:-4px 0 10px">운행일지를 쓰지 않으셔도 결재선에 들어 있는 운행일지는 여기서 결재합니다.</div>' +
-        '<div class="panel ibturn">' + turnGroups(SP.ndMine) + '</div>');
+        '<div class="panel ibturn ibcards">' + turnGroups(SP.ndMine) + '</div>');
     }
     if (others.length) {
       var cnt = function (k) { return base.filter(function (a) { return a.status === k; }).length; };
@@ -3899,7 +3899,7 @@
         (filtered ? '<button class="btn sm" data-ibreset>' + ic('close', 12) + '조건 지우기</button>' : '') +
         '</div>';
       h += sect('그 밖의 건', shown.length + '건', chips, fbar +
-        '<div class="panel">' + (shown.length ? shown.slice(0, CAP).map(apprCard).join('')
+        '<div class="panel ibcards">' + (shown.length ? shown.slice(0, CAP).map(apprCard).join('')
           : '<div class="blank"><div class="t">해당하는 건이 없습니다.</div>' +
             (!INBOX_ALLCYC ? '<div class="d">다른 달 문서는 「전체 기간」을 눌러 보세요.</div>' : '') + '</div>') + '</div>' +
         (shown.length > CAP ? '<div class="fhint" style="margin-top:8px">최근 ' + CAP + '건만 보입니다. 위에서 상태로 좁혀 보세요(전체 ' +
@@ -3907,7 +3907,7 @@
     }
     if (SP.ndOthers.length) {
       h += sect('운행일지 결재 기록', SP.ndOthers.length + '건', '',
-        '<div class="panel">' + SP.ndOthers.slice(0, 20).map(apprCard).join('') + '</div>' +
+        '<div class="panel ibcards">' + SP.ndOthers.slice(0, 20).map(apprCard).join('') + '</div>' +
         (SP.ndOthers.length > 20 ? '<div class="fhint" style="margin-top:8px">최근 20건만 보입니다.</div>' : ''));
     }
     return h;
@@ -4390,21 +4390,33 @@
     var detBtn = detWhat ? '<button type="button" class="btn sm adetbtn" data-adet aria-expanded="' + det + '">' +
       (det ? (canAct ? '확인 항목 접기' : '접기') : detWhat) + ic('chev', 12) + '</button>' : '';
     var recallTip = '다음 분이 결재하기 전이라 승인을 취소할 수 있습니다.';
+    // 폰 「⋯」(2026-10-24 사용자 「결재함 한 건 높이 줄이기」) — 엑셀 받기·승인 취소·정정 열기·회수는 폰(≤600)에서 「⋯」 메뉴 하나로.
+    //   PC·태블릿은 지금처럼 줄에 펼친다(.amx 단추). 메뉴 항목은 같은 data-* 를 가진 단추라 같은 처리기가 받는다(kmenu).
+    var moreIt = [], recall = canRecall(a), reopen = canReopen(a);
+    var xm = /<button class="btn sm" (data-(?:fz|xfz|cfz)xlsx="[^"]*")>/.exec(tail);
+    if (xm) { moreIt.push([xm[1], '엑셀 받기']); tail = tail.replace(xm[0], xm[0].replace('class="btn sm"', 'class="btn sm amx"')); }
+    // 승인 취소 항목도 줄 단추와 같은 풀이(title · 화면 읽기 안내 — 안내 글 span 은 줄 단추 쪽에 하나)
+    if (recall) moreIt.push(['data-appr="recall_reject" data-id="' + a.id + '"' + kattr + ' title="' + recallTip + '" aria-describedby="arc-' +
+      esc(akey.replace(':', '-')) + '"', '승인 취소·반려', true]);
+    if (reopen) moreIt.push(['data-appr="reopen" data-id="' + a.id + '"' + kattr, '정정 열기']);
+    if (canWithdraw) moreIt.push(['data-appr="withdraw" data-id="' + a.id + '"' + kattr, '회수']);
     var acts =
       // 방금 승인한 건 — 다음 분이 결재하기 전이면 승인을 거두고 반려로 돌려보낸다(2026-10-19). 안내는 단추 풀이(title·화면 읽기)로
-      (canRecall(a) ? '<button class="btn sm" data-appr="recall_reject" data-id="' + a.id + '"' + kattr + ' title="' + recallTip + '"' +
+      (recall ? '<button class="btn sm amx" data-appr="recall_reject" data-id="' + a.id + '"' + kattr + ' title="' + recallTip + '"' +
         ' aria-describedby="arc-' + esc(akey.replace(':', '-')) + '">승인 취소·반려</button>' +
         '<span class="sr arecall" id="arc-' + esc(akey.replace(':', '-')) + '">' + recallTip + '</span>' : '') +
       // 반려·회수된 내 건 — 고칠 화면으로 바로(2026-10-15 매뉴얼 로봇: 결재함 카드에 갈 길이 없었다)
       (canFix ? '<button class="btn pri sm" data-fixgo="' + esc(kd ? (kd.mode || 'x') + '_month' : 'close') + '" data-fixcyc="' + esc(a.cycle) + '">고쳐서 다시 상신 →</button>' : '') +
-      (canReopen(a) ? '<button class="btn sm" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
-      (canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '"' + kattr + '>회수</button>' : '');
+      (reopen ? '<button class="btn sm amx" data-appr="reopen" data-id="' + a.id + '"' + kattr + '>정정 열기</button>' : '') +
+      (canWithdraw ? '<button class="btn sm amx" data-appr="withdraw" data-id="' + a.id + '"' + kattr + '>회수</button>' : '');
     return '<div class="acard cmp' + (canAct ? ' turn' : '') + (det ? ' det' : '') + (kd ? ' akind-' + esc(kindOf(a)) : '') + '" data-akey="' + esc(akey) + '">' +
       '<div class="ahd">' + (anyKind ? '<span class="akind' + (kd ? ' ' + (kd.mode || 'x') : '') + '">' + esc(kd ? kd.tag : '운행일지') + '</span>' : '') +
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
       // 개인경비는 기간이 20일~19일이라 달 이름만으로는 헷갈린다 — 범위를 같이 적는다(kd.cycLabel).
       '<span class="acyc">' + esc(kd && kd.cycLabel ? kd.cycLabel(a) : keyName(a.cycle, a.cycle + '분')) + '</span>' +
+      // 폰 「⋯」는 카드 오른쪽 위(첫 줄 끝) — 단추 줄 끝에 두면 360px 에서 혼자 한 줄을 썼다(2026-10-24)
+      (moreIt.length ? '<span class="amore">' + kmenu('다른 작업', moreIt) + '</span>' : '') +
       // 긴 반려 사유는 한 줄로 줄이고(끝 「…」) 「자세히」에서 전부 — 마우스를 올려도 전부 보인다
       '<span class="st ' + st.cls + (longSt ? ' along' : '') + '"' + (longSt ? ' title="' + esc(st.t) + '"' : '') + '>' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +

@@ -924,6 +924,8 @@ details.kmenu{display:inline-block;position:relative;vertical-align:middle}
 details.kmenu>summary{list-style:none;min-width:36px;justify-content:center;font-size:16px;letter-spacing:.05em;padding:0 10px}
 details.kmenu>summary::-webkit-details-marker{display:none}
 details.kmenu[open]>summary{background:var(--sunken);border-color:var(--ink-400)}
+/* 닫힌 메뉴 창은 자리를 차지하지 않게(2026-10-24) — 화면 오른쪽 끝 「⋯」의 닫힌 창(fixed, 190px)이 화면 밖으로 넘친 것으로 잡혔다 */
+details.kmenu:not([open])>.kpop{display:none}
 .kpop{position:fixed;z-index:60;min-width:190px;max-width:calc(100vw - 16px);background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r-sm);
   box-shadow:0 10px 30px rgba(20,24,28,.16);padding:6px;display:flex;flex-direction:column;text-align:left}
 .kitem{display:block;width:100%;min-height:40px;padding:8px 12px;border:0;border-radius:6px;background:none;font:inherit;font-size:13px;color:var(--ink-800);text-align:left;cursor:pointer;white-space:nowrap}
@@ -2853,6 +2855,44 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
 .apvops .aops{margin-top:0}
 .acard.cmp .acrow .apvops{order:99;flex:0 0 100%;margin-top:4px}
 #panel .aops{margin:12px 0 4px}
+/* ── 결재함 건마다 카드(2026-10-24 사용자 「건건마다 간격이 없어 헷갈린다」) ──
+   10/19 얇은 카드는 흰 상자 하나에 쌓이고 건 사이가 옅은 선(#EDF0F2, 바탕 대비 1.14) 하나뿐이었다. 상자를 걷고 건마다 카드
+   (「남은 일」 카드와 같은 모양) + 12px 간격. 내 차례 묶음 제목(확인 필요·이상 없음)은 카드 밖 바탕 위에. */
+.panel.ibcards{background:transparent;border:0;border-radius:0;overflow:visible}
+.panel.ibcards > .acard{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r)}
+.panel.ibcards > .acard + .acard{margin-top:12px}
+.panel.ibcards > .ibgrp{background:transparent;border:0;border-radius:0;padding:0 2px 8px}
+.panel.ibcards > .acard + .ibgrp{border-top:0;margin-top:20px}
+.panel.ibcards > .blank,.panel.ibcards > .ibload{background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r)}
+.panel.ibcards > .ibload{padding:16px}
+/* 폰 「⋯」 — 엑셀 받기·승인 취소·정정 열기·회수(.amx)는 PC·태블릿에서는 줄에, 폰(≤600)에서는 「⋯」 메뉴 하나로 */
+.acard.cmp .amore{display:none}
+@media screen and (max-width:900px){
+  /* 머리 줄을 건마다 같은 자리로 — 1줄 딱지·이름·기간 / 2줄 상태 / 3줄 요약(왼쪽) + 자세히(오른쪽 글자 단추).
+     예전에는 상태가 한 줄에 들어가면 첫 줄, 안 들어가면 둘째 줄로 내려가 건마다 상태·금액 자리가 달랐다(10/23 실측) */
+  .acard.cmp .ahd>span[style*="flex:1"]{display:none}
+  .acard.cmp .ahd>.st,.acard.cmp .ahd>.st.along{order:5;flex:1 1 100%}
+  .acard.cmp .ahd>.asum{order:6;flex:1 1 0;min-width:0;text-align:left}
+  /* 「자세히」·「확인 항목 N건」은 글자 단추 — 누르는 칸 44px 은 두고 위아래 음수 여백으로 줄 높이는 늘리지 않는다 */
+  .acard.cmp .ahd>.adetbtn{order:7;margin:-10px -6px -10px auto;padding:0 4px 0 10px;border-color:transparent;background:transparent;box-shadow:none;color:var(--ink-600)}
+  .acard.cmp .ahd>.ahact{order:8}
+}
+@media screen and (max-width:600px){
+  .acard.cmp .amx{display:none}
+  /* 「⋯」는 첫 줄 끝(카드 오른쪽 위) — 누르는 칸 44px 은 두고 위아래 음수 여백으로 첫 줄 높이는 그대로 */
+  .acard.cmp .ahd>.amore{display:inline-flex;order:1;margin-left:auto}
+  .acard.cmp .ahd>.amore .kbtn{min-width:44px;margin:-10px -10px -10px 0;border-color:transparent;background:transparent;box-shadow:none;color:var(--ink-600)}
+  /* 내 차례 판정 상자 — 두 칸 타일 대신 한 줄 요약(2026-10-24 사용자): 판정 띠 + 「청구 금액 ₩… · 운행 … · 전월 대비 …」 */
+  .acard.turn .acrow > .abrief .abv{padding:7px 12px;font-size:13px;gap:8px}
+  .acard.turn .acrow > .abrief .abi{width:19px;height:19px;font-size:11px}
+  .acard.turn .acrow > .abrief .abgrid{display:flex;flex-wrap:wrap;gap:2px 14px;padding:8px 12px}
+  .acard.turn .acrow > .abrief .abf{flex-direction:row;align-items:baseline;gap:6px;padding:0;border:0;border-radius:0;background:none}
+  .acard.turn .acrow > .abrief .abf b{font-size:14px;line-height:1.5;white-space:nowrap}
+  .acard.turn .acrow > .abrief .abf b.abwrap{white-space:normal}
+  .acard.turn .acrow > .abrief .abf:last-child:nth-child(odd){grid-column:auto}
+  /* 아래 고정 [반려][승인] 줄 — 카드마다 따로라 모든 카드에서 아래 모서리를 카드에 맞춘다 */
+  .panel.ibcards > .acard.turn .amact{border-bottom-left-radius:calc(var(--r) - 1px);border-bottom-right-radius:calc(var(--r) - 1px)}
+}
 </style>
 </head>
 <body>
