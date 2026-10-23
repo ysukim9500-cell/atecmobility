@@ -459,7 +459,7 @@ footer .wrap{font-size:13px}
       <section class="pcard ptodo" aria-labelledby="todoT"><div class="phd"><h2 id="todoT">오늘 할 일 <em id="todoN"></em></h2><span>마감이 가까운 순</span></div>
         <ul class="plist" id="todoList"></ul></section>
       <section class="pcard psched" aria-labelledby="schT"><div class="phd"><h2 id="schT">마감 일정</h2></div>
-        <ul class="plist" id="schList"></ul><p class="pnote">마감 뒤 5일 동안은 지난 기간이 먼저 보입니다.</p></section>
+        <ul class="plist" id="schList"></ul><p class="pnote" id="graceNote">마감 뒤 며칠 동안은 지난 기간이 먼저 보입니다.</p></section>
     </div>
     <h2 class="sr">시스템 선택</h2>
     <div class="rule"></div>
@@ -990,7 +990,7 @@ footer .wrap{font-size:13px}
       sch.push('<li class="srw" data-k="' + k + '"><span><b>' + KN[k] + ' · ' + mon + '</b><span>' + mdOf(x.from) + ' – ' + mdOf(x.due) + '</span></span>' +
         '<span class="cp ' + chip[0] + '">' + chip[1] + '</span></li>');
       if (st === 'submitted' || st === 'approved') return;            // 이미 상신했다 — 할 일이 아니다
-      var quiet = st === null, due = [quiet ? '' : ddCls(x.dday), ddWord(x.dday)], until = x.dday < 0 ? mdOf(x.due + GRACE_DAYS * DAY) + '까지 상신' : '';
+      var quiet = st === null, due = [quiet ? '' : ddCls(x.dday), ddWord(x.dday)], until = x.dday < 0 ? mdOf(x.due + CR.graceDays() * DAY) + '까지 상신' : '';
       if (st === 'rejected') {
         var ro = reopenOf(k, x, hint, m);
         rows.push({ k: k, t: KN[k] + ' ' + mon + ' ' + rejWord(ro) + ' — 고쳐서 다시 상신', s: (ro ? '정정' : '반려') + ' 사유는 들어가서 확인합니다', due: due, note: until, b: '다시 상신', href: VERIFY_OF[k] });
@@ -1154,8 +1154,17 @@ footer .wrap{font-size:13px}
   // 기간 엔진(2026-10-20) — 처음 그림은 이 브라우저가 저장해 둔 규칙(처음이면 기본), 서버 규칙은 아래 loadCycleRules 가 받아 다르면 다시 그린다.
   var CR = window.CycleRules; CR.boot();
   var DL_KIND = { x: 'expense', d: 'driving', c: 'card' };
-  // 마감 뒤 며칠 동안 방금 끝난 기간을 먼저 보일까 — 운행일지 화면과 같은 엔진 값(2026-10-20 사용자 「마감일 기준 5일 동안은 띄워줘」, 기본 5). 셈은 엔진 defaultPeriod 가 한다.
-  var GRACE_DAYS = CR.graceDays();
+  // 마감 뒤 며칠 동안 방금 끝난 기간을 먼저 보일까 — 운행일지 화면과 같은 엔진 값(2026-10-20 사용자 「마감일 기준 5일 동안은 띄워줘」, 기본 5 ·
+  //   2026-10-23 사용자 「+2일까지로」 — 서버 설정 grace_days 2). 셈은 엔진 defaultPeriod 가 한다.
+  //   ★ 값은 쓸 때마다 CR.graceDays() 로 읽는다 — 예전엔 여기서 한 번 붙잡아, 서버 규칙(loadCycleRules)을 받은 뒤에도
+  //     이 브라우저에 저장해 둔 옛 값(처음이면 기본 5)으로 「…까지 상신」 날짜를 적었다(2026-10-23).
+  /** 마감 일정 아래 안내 — 「마감 뒤 N일 동안은 …」(N = 서버 설정, 0 이면 숨김). */
+  function paintGraceNote() {
+    var el = document.getElementById('graceNote'); if (!el) return;
+    var g = CR.graceDays();
+    el.hidden = !(g > 0);
+    el.textContent = '마감 뒤 ' + g + '일 동안은 지난 기간이 먼저 보입니다.';
+  }
   /** D-day 글자 — 3 → 「D-3」/「마감 D-3」, 0 → 「오늘 마감」, -1 → 「1일 지남」/「마감 1일 지남」. */
   function ddWord(n, long) { return n === 0 ? '오늘 마감' : n < 0 ? (long ? '마감 ' : '') + (-n) + '일 지남' : (long ? '마감 ' : '') + 'D-' + n; }
   var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -1189,6 +1198,7 @@ footer .wrap{font-size:13px}
   }
   loadCycleRules();
   function renderDeadlines() {
+    paintGraceNote();
     var R = deadlines(Date.now()), T = new Date(R.today), L = R.list;
     // 마감 뒤 며칠(GRACE_DAYS) 동안의 지난 마감일이 이번 달 1일보다 앞이면 줄 그림을 그 달 1일부터(11.05 에 법인카드 10.31 → 10.01 부터)
     var d0 = new Date(Math.min.apply(null, L.map(function (x) { return x.due; })));
