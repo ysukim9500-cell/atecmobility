@@ -327,6 +327,37 @@
     return recs;
   }
 
+  /** 칸 경계에 걸친 낱말 고치기(parseDirect, 2026-10-23) — 같은 줄(y)에서 글자 간격(왼쪽 끝끼리)이 12 안쪽으로 이어진 글자들은 한 낱말이다
+   *  (이 서식의 한글 간격 ≈8.2 · 띄어쓰기 ≈10.8 · 영수증 사이 ≥25). 한 낱말이 두 칸(it.c)에 걸쳤는데 한쪽이 두 글자 이하면 그 글자들을
+   *  다른 쪽(많은 쪽) 칸으로 옮긴다. 양쪽 다 세 글자 넘게 걸치면(두 영수증 글이 붙어 버린 줄) 예전처럼 경계에서 나눈 대로 둔다. */
+  function stray(items) {
+    var rows = new Map();
+    items.forEach(function (it) {
+      var k = Math.round(it.y * 2) / 2;
+      if (!rows.has(k)) rows.set(k, []);
+      rows.get(k).push(it);
+    });
+    rows.forEach(function (arr) {
+      arr.sort(function (a, b) { return a.x - b.x; });
+      var word = [];
+      var fix = function () {
+        var n = {};
+        word.forEach(function (it) { n[it.c] = (n[it.c] || 0) + 1; });
+        var ks = Object.keys(n);
+        if (ks.length === 2) {
+          var big = n[ks[0]] >= n[ks[1]] ? ks[0] : ks[1], small = big === ks[0] ? ks[1] : ks[0];
+          if (n[small] <= 2) word.forEach(function (it) { it.c = +big; });
+        }
+        word = [];
+      };
+      arr.forEach(function (it, i) {
+        if (i && it.x - arr[i - 1].x >= 12) fix();
+        word.push(it);
+      });
+      fix();
+    });
+  }
+
   /** 한국도로공사 직접 PDF(CID 글자 + 글자마다 Tm/Tj, 4열 격자) */
   async function parseDirect(buf) {
     var u8 = new Uint8Array(buf), s = latin1(u8);
@@ -377,7 +408,10 @@
 
     /* 4) 4열 격자로 나눠 영수증 블록마다 필드 뽑기
      *    열 글자폭(≈117)이 열 간격(≈144)보다 좁다 → round 를 쓰면 0열 끝 글자가 1열로 넘어간다.
-     *    floor + 여유값이 맞다. */
+     *    floor + 여유값이 맞다.
+     *    다만 가운데 맞춘 긴 글줄(「서울북부고속도로갈매동구릉영업소」 16자)은 경계보다 왼쪽에서 시작해 첫 글자가 왼쪽 칸으로 넘어갔다
+     *    (「서울고속도로불암산영업소서」 · 「울북부고속도로갈매동구릉영업소」, 2026-10-23 출력 감사) — 경계에 걸친 낱말은
+     *    stray() 가 한두 글자만 넘어간 쪽을 낱말 쪽 칸으로 되돌린다. */
     var NCOL = 4, recs = [];
     pages.forEach(function (items, pi) {
       var xs = items.map(function (i) { return i.x; });
@@ -385,9 +419,10 @@
       var pitch = (maxX - minX) / (NCOL - 1 + 0.81);
       var cols = {};
       items.forEach(function (it) {
-        var c = Math.min(NCOL - 1, Math.max(0, Math.floor((it.x - minX + 6) / pitch)));
-        (cols[c] = cols[c] || []).push(it);
+        it.c = Math.min(NCOL - 1, Math.max(0, Math.floor((it.x - minX + 6) / pitch)));
       });
+      stray(items);
+      items.forEach(function (it) { (cols[it.c] = cols[it.c] || []).push(it); });
       Object.keys(cols).forEach(function (c) {
         var arr = cols[c], lines = new Map();
         arr.forEach(function (it) {

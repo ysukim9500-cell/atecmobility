@@ -7,7 +7,8 @@
    ★ 결재 문서는 두 가지 재료에서 나온다
        · 지금 자료(live)  : 상신 전 미리보기. 쪽마다 「미리보기」가 찍힌다.
        · 고정본(frozen)   : 상신하는 순간 서버가 굳힌 자료. 결재자가 보는 것도,
-                            결재 완료본도 이것이다 — 언제 받아도 같은 내용이 나온다.
+                            결재 완료본도 이것이다 — 금액·운행은 언제 받아도 같다(상신 뒤 덧붙인
+                            하이패스 영수증 원본만 「덧붙임」 표시를 달고 더해진다, 2026-10-23).
                             결재가 끝나기 전에는 쪽마다 「결재 중」이 찍힌다.
    ═══════════════════════════════════════════════════════════════════════════ */
 (window.DrvExtQ = window.DrvExtQ || []).push(function (C) {
@@ -914,8 +915,9 @@
     return { scanPaths: scanPaths, nImg: o.nImg != null ? o.nImg : n };
   }
   /** 운행기록부 PDF 한 권 — 결재 완료 한 사람 PDF · 결재 완료 묶음 · 상신 전 미리보기·결재 중 문서가 모두 이 길로 만든다(2026-10-23 「세 길 같은 결과」).
-   *  서명 채우기 → 인쇄 준비(C.pdfPrep — 하이패스 영수증 줄 · 사진 판독 시각) → SheetPdf.build. onImg() 는 사진 하나 받을 때마다(진행 글). */
-  function sheetBuild(doc, meta, verify, onImg) {
+   *  서명 채우기 → 인쇄 준비(C.pdfPrep — 하이패스 영수증 줄 · 사진 판독 시각) → SheetPdf.build. onImg() 는 사진 하나 받을 때마다(진행 글).
+   *  onPhotos(n) 은 실제로 받을 사진 수를 안 때 한 번(「PDF만」으로 뺀 사진을 뺀 수 — 진행 글 「… / n」, 2026-10-23). */
+  function sheetBuild(doc, meta, verify, onImg, onPhotos) {
     var sp = pdfImgs({ doc: doc }).scanPaths;
     return (C.fillSigns ? C.fillSigns(doc) : Promise.resolve())
       .then(function () { return C.pdfPrep ? C.pdfPrep(doc) : doc; })
@@ -926,11 +928,35 @@
         return window.SheetPdf.build(d, {
           PDFLib: lib.PDFLib, fontkit: lib.fontkit, fontRegular: lib.fontRegular, fontBold: lib.fontBold,
           loadImage: function (p) { return loadPhoto(p, sp[p] ? 2000 : 1500).then(function (b) { if (onImg) onImg(); return b; }); },
+          onPhotos: onPhotos || null,
           loadFile: loadRaw,
           // 하이패스 영수증 원본 PDF 의 영수증 목록(웹 hipass.js — 올릴 때와 같은 해석기 · 인쇄 화면 PDF 는 pdf.js) — 사진 영수증이 그 PDF 에 있는지 맞춘다(「PDF만」 2026-10-23)
           parseHipass: function (bytes) {
             if (!window.Hipass || !window.Hipass.parsePdf) return Promise.resolve(null);
             return window.Hipass.parsePdf(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), { pdfjs: C.loadPdfJs || null });
+          },
+          // 하이패스 영수증 원본의 쪽마다 영수증 통과 시각(「YYYY년MM월DD일HH시MM분」)과 합계 줄(「총 N건/X원」) — pdf.js 로 쪽 글자를 읽는다.
+          //   영수증이 없는 쪽(합계 줄만·빈 쪽)은 싣지 않고, 줄을 그 영수증이 실제로 있는 쪽에 놓는다(2026-10-23 사용자 「불필요한 용지」).
+          //   못 읽으면 null — 그때는 모든 쪽을 싣는다.
+          hipassPages: function (bytes) {
+            if (!C.loadPdfJs) return Promise.resolve(null);
+            return Promise.resolve(C.loadPdfJs()).then(function (pdfjs) {
+              return pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+            }).then(function (doc) {
+              var out = [], chain = Promise.resolve();
+              var page = function (i) {
+                return doc.getPage(i).then(function (pg) { return pg.getTextContent(); }).then(function (tc) {
+                  var t = tc.items.map(function (it) { return it.str || ''; }).join('').replace(/\s+/g, '');
+                  var dts = [], re = /(\d{4})년(\d{1,2})월(\d{1,2})일(\d{1,2})시(\d{1,2})분/g, m;
+                  var p2 = function (v) { return ('0' + v).slice(-2); };
+                  while ((m = re.exec(t))) dts.push(m[1] + '-' + p2(m[2]) + '-' + p2(m[3]) + ' ' + p2(m[4]) + ':' + p2(m[5]));
+                  var tm = /총:?(\d+)건\/?([\d,]+)원/.exec(t);
+                  out.push({ n: dts.length, dts: dts, total: tm ? { n: +tm[1], sum: +tm[2].replace(/,/g, '') } : null });
+                });
+              };
+              for (var i = 1; i <= doc.numPages; i++) (function (i) { chain = chain.then(function () { return page(i); }); })(i);
+              return chain.then(function () { try { doc.destroy(); } catch (e) { } return out; });
+            }).catch(function () { return null; });
           }
         });
       });
@@ -944,7 +970,9 @@
     note = note || function () { };
     if (!o.build) {
       note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
-      return sheetBuild(o.doc, o.meta, o.verify, function () { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); });
+      // 받을 사진 수는 원본을 읽은 뒤에 정해진다(「PDF만」) — 그때 분모를 고친다
+      return sheetBuild(o.doc, o.meta, o.verify, function () { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); },
+        function (n) { nImg = n; note(n ? '사진을 불러오는 중… ' + loaded + ' / ' + n : 'PDF 를 만드는 중입니다…'); });
     }
     // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
     return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
@@ -1013,13 +1041,19 @@
           '원 다릅니다. 관리자에게 알려 주세요.</span></div>';
       }
       var mk = o.meta.mark || '';
+      // 실제로 실은 사진 수(「PDF만」으로 뺀 사진은 빼고 — 운행기록부 PDF 만 돌려준다) · 개인경비·법인카드는 예전처럼
+      if (res.photos != null && o.nImg == null) nImg = res.photos;
+      // 결재 완료본에 상신 뒤 덧붙인 하이패스 원본이 실렸으면 「언제 받아도 같은 내용」 대신 그 사실을 말한다(2026-10-23 검토)
+      var anote = o.note || MARK_NOTE[mk] || MARK_NOTE[''];
+      if (!o.note && !mk && res.late) anote = '상신할 때 저장한 자료로 만든 문서입니다. 금액·운행은 <b>언제 받아도 같습니다</b>. ' +
+        '상신 뒤에 덧붙인 하이패스 영수증 원본 ' + n0(res.late) + '개가 <b>「덧붙임」</b> 표시를 달고 함께 실렸습니다.';
       // 반려·회수 뒤 다시 올리는 것이면 「다시 상신」(상신 단추 이름과 같게, 2026-10-16 3차)
       //   단추 이름에 ①② 를 달지 않는다 — 단계 카드의 ①②③(검증·미리보기·상신)과 번호가 겹쳤다(2026-10-20 V3 다듬기)
       var okLab = '확인 완료 → ' + (o.again ? '다시 상신' : '상신');
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
         '<div class="dim">' + mb + ' MB · ' + (typeof o.stat === 'function' ? o.stat(res) : o.stat || '운행기록부 ' + n0((o.doc.sheets || []).length) + '장') +
         (o.verify ? ' · 검증 결과' : '') + (nImg ? ' · 영수증 사진 ' + n0(nImg) + '장' : '') + '</div>' + chk +
-        '<div class="anote">' + (o.note || MARK_NOTE[mk] || MARK_NOTE['']) + '</div></div>';
+        '<div class="anote">' + anote + '</div></div>';
       $('pFoot').innerHTML = C.backBtn() + '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(o.file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri' + (o.okKey ? ' cta' : '') + '" id="pdfOpen" href="' + url + '" target="_blank" rel="noopener">' +

@@ -643,7 +643,8 @@
     var tw = c.text(title, MX, c.y, { size: 12, bold: true });
     c.text([meta.name, meta.cycleName].filter(Boolean).join(' · '), MX + tw + 4 * MM, c.y + 3,
       { size: 8.5, color: 0.2, maxW: CW * 0.3 });
-    var right = (sumText ? sumText + '    ' : '') + pageNo + ' / ' + pageCnt;
+    // pageCnt 가 null 이면 쪽 수를 적지 않는다(쪽 수를 미리 모르는 표 — 원본 쪽에 없는 하이패스 줄)
+    var right = pageCnt == null ? (sumText || '') : (sumText ? sumText + '    ' : '') + pageNo + ' / ' + pageCnt;
     c.text(right, MX + CW, c.y + 3, { size: 8.5, align: 'right', bold: !!sumText, maxW: CW * 0.52 });
     c.y += 12 * LH + 1.8 * MM;
     c.rule(c.y, 0.6); c.y += 3.5 * MM;
@@ -974,11 +975,15 @@
         var ej = t.ej && typeof t.ej === 'object' ? t.ej : null;
         var lines = ej && Array.isArray(ej.lines) && ej.lines.length ? ej.lines : null, prev = false;
         if (!lines && ej && ej.prev && Array.isArray(ej.prev.lines) && ej.prev.lines.length) { lines = ej.prev.lines; prev = true; }
+        // 객체가 아닌 칸(null 등)은 건너뛴다 — 차례(i)는 그대로(인쇄 준비의 덧붙임 표시 t.late 가 차례로 가리킨다). 쓸 줄이 하나도 없으면 줄 없음으로(2026-10-23 검토)
+        var isLn = function (l) { return !!l && typeof l === 'object' && !Array.isArray(l); };
+        if (lines && !lines.some(isLn)) { lines = null; prev = false; }
         if (t.line === 'stale') {
           rows.push(ext(base, { kind: 'hpStale', ms: t.start, what: '하이패스', content: changed + ' — 하이패스 영수증 줄 생략(하이패스 금액 ' + n0(share) + '원)' }));
         } else if (lines) {
           var lateI = Array.isArray(t.late) ? t.late : [], unkN = 0;
           lines.forEach(function (l, i) {
+            if (!isLn(l)) return;
             var at = atMs(l.at), pdf = l.pdf ? String(l.pdf) : '', amt = Math.round(Number(l.amount) || 0);
             // 상신 뒤 덧붙인 원본 — 결재본 문서에서 그 경로가 지금 자료에서 왔다(위 머리 글). 미리보기는 지금 자료가 곧 문서라 아니다.
             var late = !!(ev.frozen && pdf && (t.line === 'live' || lateI.indexOf(i) >= 0));
@@ -995,7 +1000,7 @@
             out.nHp++;
           });
           if (unkN) out.nUnkTrip++;
-          var ls = Math.round(sumOf(lines, function (l) { return l.amount; }));
+          var ls = Math.round(sumOf(lines, function (l) { return isLn(l) ? l.amount : 0; }));
           if (ls !== share) rows[rows.length - 1].note = '이 운행 하이패스 영수증 합 ' + n0(ls) + '원 · 하이패스 금액 ' + n0(share) + '원';
         } else {
           // 줄 없음(hpNone) — 하이패스 금액만 있고 그 영수증 원본이 없다: 「원본 없음」.
@@ -1134,13 +1139,15 @@
     var ev = doc.ev, F = tollFlow(ev, { changed: changedText(ev, doc.meta) }), S = scanPlan(ev), paths = [];
     var add = function (p) { if (p && paths.indexOf(p) < 0) paths.push(p); };
     // 통행료는 오린 사진을 싣지 않는다(2026-10-23 — 원본 장 · 낱장 사진만). 주차·주유·계기판·그 밖은 예전 그대로.
+    var other = {};
     photoSections(ev, F, null).forEach(function (s) {
       if (s.cat === '통행료') return;
-      s.entries.forEach(function (e) { add(e.path); });
+      s.entries.forEach(function (e) { add(e.path); if (e.path) other[e.path] = true; });
     });
     F.days.forEach(function (d) { d.rows.forEach(function (r) { if (r.kind === 'rc' && r.photo) add(r.photo); }); });   // 낱장 통행료 사진
     S.pages.forEach(function (g) { add(g.path); });
-    return { F: F, S: S, paths: paths };
+    // other = 통행료가 아닌 묶음이 쓰는 사진 — 통행료 묶음 계획(tollPlan)이 빼지 않는다
+    return { F: F, S: S, paths: paths, other: other };
   }
   /** 문서에 넣을 사진 경로(받기 전에 세기·진행 글용). */
   function imagePaths(doc) {
@@ -1374,7 +1381,7 @@
         }
         if (!hit) return;
         hit.ph = true;
-        out[String(e.id)] = { f: hit.f, page: Number(hit.x.page) || 1 };
+        out[String(e.id)] = { f: hit.f, page: Number(hit.x.page) || 1, at: String(hit.x.atText || '') };
       });
     });
     return out;
@@ -1389,11 +1396,12 @@
     var match = tollMatch(F, ok);
     var isIn = function (e) { return !!e && e.cat === '통행료' && !!match[String(e.id)]; };
     var dropSheet = {}, dropPhoto = {}, byPhoto = {};
+    var used = P.other || {};       // 주차·주유·계기판·그 밖 묶음이 쓰는 사진은 빼지 않는다(받지 않으면 그 묶음에 「사진을 불러오지 못했습니다」)
     P.S.pages.forEach(function (g) {
-      if (g.lines.length && g.lines.every(isIn)) dropSheet[g.path] = true;
+      if (g.lines.length && g.lines.every(isIn) && !used[g.path]) dropSheet[g.path] = true;
     });
     F.days.forEach(function (d) { d.rows.forEach(function (r) { if (r.kind === 'rc' && r.photo) (byPhoto[r.photo] = byPhoto[r.photo] || []).push(r); }); });
-    Object.keys(byPhoto).forEach(function (p) { if (byPhoto[p].every(function (r) { return isIn(r.e); })) dropPhoto[p] = true; });
+    Object.keys(byPhoto).forEach(function (p) { if (!used[p] && byPhoto[p].every(function (r) { return isIn(r.e); })) dropPhoto[p] = true; });
     return { ok: ok, match: match, dropSheet: dropSheet, dropPhoto: dropPhoto };
   }
   /** 낱장 통행료 사진 — 같은 사진(fp)은 한 묶음 · 묶음의 사진이 모두 빠지면(PDF 에 있음) 묶음도 뺀다. [{ path, paths, rows }] */
@@ -1415,7 +1423,7 @@
   function drawUnplaced(c, list, meta, sub) {
     var W = [26 * MM, CW - 99 * MM, 17 * MM, 34 * MM, 22 * MM];
     var th = function () { c.row(['날짜·시각', '내용', '금액', '붙은 운행', '원본'].map(function (h, i) { return ext({ w: W[i], t: h }, TV_HEAD); }), { minH: 5 * MM }); };
-    receiptHead(c, '통행료 — 원본 쪽에 없는 하이패스 영수증 줄', meta, 1, 1, '하이패스 ' + n0(list.length) + '줄', sub);
+    receiptHead(c, '통행료 — 원본 쪽에 없는 하이패스 영수증 줄', meta, 1, null, '하이패스 ' + n0(list.length) + '줄', sub);
     th();
     var brk = function () {
       c.newPage();
@@ -1434,25 +1442,47 @@
       ], { onBreak: brk, minH: 5 * MM });
     });
     var note = '원본 없음 = 하이패스 금액은 있는데 영수증 원본(PDF)이 없음 · 확인 못 함 = 출력한 분이 원본이 있는지 볼 수 없음 · ' +
-      '원본 못 받음·지문 다름·확인 안 됨 = 원본 파일을 싣지 못함 · 줄 생략 = 결재 뒤 바뀐 운행 · — = 10월분 전(원본을 따지지 않음).';
+      '원본 못 받음·지문 다름·확인 안 됨 = 원본 파일을 싣지 못함 · 줄 못 받음 = 이 운행의 하이패스 영수증 줄을 받지 못함 · 줄 생략 = 금액이 문서와 달라진 운행(줄을 싣지 않음) · — = 10월분 전(원본을 따지지 않음).';
     var lay = c.layout({ t: note, size: 7.2, wrap: true, maxLines: 3, padX: 0, padY: 0, color: 0.3 }, CW);
     if (c.y + 2 * MM + lay.h > LIMIT) c.newPage(); else c.y += 2 * MM;
     c.cell(MX, c.y, CW, lay.h, { border: false, color: 0.3, valign: 'top' }, lay);
     c.y = LIMIT;
   }
   /** 하이패스 영수증 원본 — PDF 쪽마다 한 쪽: 위에 그 쪽에서 정산한 영수증 표(하이패스 줄 + 사진을 싣지 않은, 이 PDF 에 있는 사진 영수증) ·
-   *  아래에 그 쪽(비율대로, 글자는 벡터). 줄의 쪽 번호가 PDF 쪽 수보다 크면 마지막 쪽에. 상신 뒤 덧붙인 원본이면 쪽마다 머리 아래 표시(f.lateText),
-   *  첫 쪽에 안내 한 줄(note). */
+   *  아래에 그 쪽(비율대로, 글자는 벡터). 상신 뒤 덧붙인 원본이면 쪽마다 머리 아래 표시(f.lateText), 첫 쪽에 안내 한 줄(note).
+   *  쪽 글자(f.pageInfo — 쪽마다 영수증 통과 시각 dts · 합계 줄 total)를 읽었으면(2026-10-23 사용자 「불필요한 용지」):
+   *    · 줄은 그 영수증 통과 시각이 실제로 있는 쪽에 놓는다(적힌 쪽 번호가 PDF 쪽과 어긋나는 꼴이 있다)
+   *    · 이 문서 정산에 쓴 줄이 없는 쪽(합계 줄만·빈 쪽·다른 통행만)은 싣지 않고, 그 파일 첫 쪽에 몇 쪽을 뺐는지와 원본 합계를 적는다
+   *    · 영수증을 하나도 못 읽은 파일(그림만 있는 PDF 등)은 모든 쪽을 싣는다
+   *  못 읽었으면 예전처럼 모든 쪽 · 줄은 적힌 쪽 번호대로(PDF 쪽 수보다 크면 마지막 쪽). */
   function drawHipassSheets(c, files, rows, meta, subOnce, note) {
-    var total = files.reduce(function (s, f) { return s + f.pages.length; }, 0), k = 0;
-    files.forEach(function (f, fi) {
+    var plan = files.map(function (f) {
+      var info = f.pageInfo, any = !!info && info.some(function (p) { return p && p.n > 0; });
+      var keyOf = function (r) { return r.recAt ? String(r.recAt) : ymdK(r.ms) + ' ' + hmK(r.ms); };
+      var pageOf = function (r) {
+        if (any) {
+          var key = keyOf(r);
+          for (var j = 0; j < info.length; j++) if (info[j] && (info[j].dts || []).indexOf(key) >= 0) return j + 1;
+        }
+        return Math.max(1, Math.min(f.pages.length, Number(r.page) || 1));
+      };
+      var on = f.pages.map(function () { return []; });
+      rows.forEach(function (r) { if (r.pdfPath === f.path) on[pageOf(r) - 1].push(r); });
+      // 쪽 글자를 읽었으면 이 문서 정산에 쓴 줄이 있는 쪽만 싣는다(합계 줄만·빈 쪽·다른 통행만 있는 쪽은 뺌, 2026-10-23 사용자 「불필요한 용지」)
+      var keep = f.pages.map(function (ep, j) { return !any || on[j].length > 0; });
+      var total = any ? (info.map(function (p) { return p && p.total; }).filter(Boolean)[0] || null) : null;
+      return { f: f, on: on, keep: keep, skipped: keep.filter(function (x) { return !x; }).length, total: total };
+    });
+    var count = plan.reduce(function (s, p) { return s + p.keep.filter(Boolean).length; }, 0), k = 0;
+    plan.forEach(function (p, fi) {
+      var f = p.f, firstOfFile = true;
       f.start = c.pdf.getPageCount() + 1;
-      var pageOf = function (r) { return Math.max(1, Math.min(f.pages.length, Number(r.page) || 1)); };
       f.pages.forEach(function (ep, j) {
+        if (!p.keep[j]) return;
         k++;
-        var mine = rows.filter(function (r) { return r.pdfPath === f.path && pageOf(r) === j + 1; }).sort(function (a, b) { return a.ms - b.ms; });
+        var mine = p.on[j].slice().sort(function (a, b) { return a.ms - b.ms; });
         var sum = sumOf(mine, function (r) { return r.amount; });
-        receiptHead(c, '통행료 — 하이패스 영수증 원본', meta, k, total, mine.length ? '이 쪽 정산 ' + n0(mine.length) + '장 ' + won(sum) : '', subOnce());
+        receiptHead(c, '통행료 — 하이패스 영수증 원본', meta, k, count, mine.length ? '이 쪽 정산 ' + n0(mine.length) + '장 ' + won(sum) : '', subOnce());
         if (k === 1 && note) {
           c.text(note, MX, c.y, { size: 7.4, color: 0.3, maxW: CW });
           c.y += 7.4 * LH + 1 * MM;
@@ -1461,6 +1491,12 @@
         c.text(f.name + ' · ' + (j + 1) + ' / ' + f.pages.length + '쪽' + (files.length > 1 ? ' · 파일 ' + (fi + 1) + ' / ' + files.length : ''),
           MX + lw, c.y + (lw ? (8.6 - 7.6) * 0.85 : 0), { size: 7.6, color: 0.35, maxW: CW - lw });
         c.y += (lw ? 8.6 : 7.6) * LH + 2 * MM;
+        if (firstOfFile && p.skipped) {
+          var tt = p.total ? ' · 원본 합계 「총 ' + n0(p.total.n) + '건 / ' + n0(p.total.sum) + '원」' : '';
+          c.text('원본 ' + n0(f.pages.length) + '쪽 중 이 문서 정산에 쓰지 않은 ' + n0(p.skipped) + '쪽(합계 줄만·다른 통행)은 싣지 않았습니다' + tt, MX, c.y, { size: 7.4, color: 0.3, maxW: CW });
+          c.y += 7.4 * LH + 1.2 * MM;
+        }
+        firstOfFile = false;
         if (mine.length) {
           var W = [9 * MM, 24 * MM, 17 * MM, CW - 100 * MM, 50 * MM];
           var th = function () { c.row(['번호', '날짜·시각', '금액', '내용(입구 → 출구 영업소)', '붙은 운행'].map(function (h, i) { return ext({ w: W[i], t: h }, TV_HEAD); }), { minH: 5 * MM }); };
@@ -1534,28 +1570,32 @@
     });
   }
   /** 낱장 통행료 사진 — 한 쪽에 위 표(그 쪽 사진들의 영수증) · 아래 사진 4장(2 × 2). 사진 번호 #k 는 이 묶음 차례. 머리 금액 = 정산한 것만. */
-  function drawTollSingles(c, groups, imgs, meta, subOnce) {
-    var per = 4, pages = Math.ceil(groups.length / per);
-    var settled = sumOf([].concat.apply([], groups.map(function (g) { return g.rows; })), function (r) { return r.excluded ? 0 : r.amount; });
+  function drawTollSingles(c, groups, imgs, meta, subOnce, bare) {
+    // bare = 사진 파일이 없는 낱장 통행료 영수증 줄(앱이 줄만 먼저 저장했거나 사진이 지워짐) — 첫 쪽 표 끝에 「사진 없음」으로 적는다(2026-10-23 검토:
+    //   「통행료 근거」 쪽이 없어진 뒤로 이 줄이 문서 어디에도 안 나왔다). 사진이 있는 묶음이 없으면 표만 한 쪽.
+    bare = bare || [];
+    var per = 4, pages = Math.max(1, Math.ceil(groups.length / per));
+    var settled = sumOf([].concat.apply([], groups.map(function (g) { return g.rows; })).concat(bare), function (r) { return r.excluded ? 0 : r.amount; });
     groups.forEach(function (g, i) { g.no = i + 1; });
-    for (var i = 0; i < groups.length; i += per) {
+    for (var i = 0; i < Math.max(groups.length, 1); i += per) {
       var chunk = groups.slice(i, i + per);
-      receiptHead(c, '통행료 — 영수증 사진', meta, i / per + 1, pages, '사진 ' + n0(groups.length) + '장 · 정산 ' + won(settled), subOnce());
+      receiptHead(c, '통행료 — 영수증 사진', meta, i / per + 1, pages, '사진 ' + n0(groups.length) + '장' + (bare.length ? ' · 사진 없는 줄 ' + n0(bare.length) : '') + ' · 정산 ' + won(settled), subOnce());
       var W = [9 * MM, 24 * MM, 17 * MM, CW - 100 * MM, 50 * MM];
       var th = function () { c.row(['번호', '날짜·시각', '금액', '내용', '정산 · 붙은 운행'].map(function (h, k) { return ext({ w: W[k], t: h }, TV_HEAD); }), { minH: 5 * MM }); };
       var brk = function () { c.newPage(); th(); };
       th();
-      chunk.forEach(function (g) {
-        g.rows.forEach(function (r) {
-          c.row([
-            { w: W[0], t: '#' + g.no, size: 7.6, align: 'center', bold: true },
-            { w: W[1], t: whenText(r), size: 7.4, align: 'center' },
-            { w: W[2], t: n0(r.amount), size: 7.4, align: 'right', padX: 1.6 * MM },
-            { w: W[3], t: r.content || '', size: 7.2, wrap: true, maxLines: 2, padX: 1.4 * MM },
-            { w: W[4], t: settleText(r), size: 7, wrap: true, maxLines: 2, padX: 1 * MM, color: r.excluded ? 0.45 : null }
-          ], { onBreak: brk, minH: 5 * MM });
-        });
-      });
+      var line = function (no, r, noPhoto) {
+        c.row([
+          { w: W[0], t: no, size: 7.6, align: 'center', bold: true },
+          { w: W[1], t: whenText(r), size: 7.4, align: 'center' },
+          { w: W[2], t: n0(r.amount), size: 7.4, align: 'right', padX: 1.6 * MM },
+          { w: W[3], t: r.content || '', size: 7.2, wrap: true, maxLines: 2, padX: 1.4 * MM },
+          { w: W[4], t: settleText(r) + (noPhoto ? ' · 사진 없음' : ''), size: 7, wrap: true, maxLines: 2, padX: 1 * MM, color: r.excluded ? 0.45 : null, bold: noPhoto && !r.excluded }
+        ], { onBreak: brk, minH: 5 * MM });
+      };
+      chunk.forEach(function (g) { g.rows.forEach(function (r) { line('#' + g.no, r, false); }); });
+      if (i === 0) bare.forEach(function (r) { line('—', r, true); });
+      if (!chunk.length) { c.y = LIMIT; continue; }
       c.y += 3 * MM;
       // 표가 길어 사진 자리가 너무 줄면(40% 미만) 사진을 다음 쪽에
       if (LIMIT - c.y < (LIMIT - MT) * 0.4) {
@@ -1589,6 +1629,8 @@
     F.days.forEach(function (d) {
       d.rows.forEach(function (r) {
         if (r.ev != null) rowOfEv[String(r.ev)] = r;
+        // 0원 하이패스 줄은 정산과 무관 — 원본 쪽에 없는 줄 표에 적지 않는다(2026-10-23 「불필요한 용지」 — 그 한 줄 때문에 쪽이 하나 생겼다)
+        if (/^hp/.test(r.kind) && !(Math.round(Number(r.amount) || 0) > 0)) return;
         if (r.kind === 'hp' || r.kind === 'hpPrev') {
           if (r.pdf && okBy[r.pdf]) { onPdf.push(ext(r, { pdfPath: r.pdf })); return; }
           var fb = r.pdf ? files.by[r.pdf] : null;
@@ -1601,12 +1643,17 @@
         else if (tollPhotoRow(r) && !r.excluded && dropped(r)) {
           // 사진을 싣지 않는 정산 영수증 — 그 PDF 쪽 표에 함께(사진이 남는 영수증은 사진 쪽에만 — 두 번 적지 않는다)
           var m = T.match[String(r.e.id)];
-          if (m) onPdf.push(ext(r, { pdfPath: m.f.path, page: m.page }));
+          if (m) onPdf.push(ext(r, { pdfPath: m.f.path, page: m.page, recAt: m.at }));
         }
       });
     });
     var sheets = P.S.pages.filter(function (g) { return g.lines.some(function (e) { return e.cat === '통행료'; }) && !T.dropSheet[g.path]; });
-    if (!F.show && !sheets.length && !T.ok.length && !singles.length) return;
+    // 사진 파일이 없는 낱장 통행료 영수증 줄 — 낱장 표에 「사진 없음」으로 적는다(2026-10-23 검토). 정산에 든 것은 한 장씩 문서 점검에
+    //   알린다(결과 창 「불러오지 못한 사진 N장」 — 이슈 수가 곧 장 수다). 0원·같은 통행료·운행 없는 날처럼 정산에서 뺀 것은 표에만.
+    var bare = [];
+    F.days.forEach(function (d) { d.rows.forEach(function (r) { if (r.kind === 'rc' && !r.photo && r.e && r.e.cat === '통행료') bare.push(r); }); });
+    bare.forEach(function (r) { if (!r.excluded) c.issue('image', '사진이 없는 통행료 영수증: ' + whenText(r) + ' ' + n0(r.amount) + '원'); });
+    if (!F.show && !sheets.length && !T.ok.length && !singles.length && !bare.length) return;
     var H0 = F.head, ex = [H0.noTripN ? '업무 운행 없는 날 영수증 사진 ' + n0(H0.noTripN) + '장 ' + n0(H0.noTrip) + '원' : '',
       H0.dupN ? '하이패스와 같은 영수증 사진 ' + n0(H0.dupN) + '장 ' + n0(H0.dup) + '원(한 번만 셈)' : '',
       F.nZero ? '금액 0원 영수증 사진 ' + n0(F.nZero) + '장' : ''].filter(Boolean);
@@ -1615,7 +1662,7 @@
     if (unplaced.length) drawUnplaced(c, unplaced, meta, subOnce());
     if (T.ok.length) drawHipassSheets(c, T.ok, onPdf, meta, subOnce, F.lateN ? lateNote(F.lateN, F.lateDoneN || 0) : '');
     if (sheets.length) drawTollSheets(c, sheets, imgs, meta, rowOfEv, subOnce);
-    if (singles.length) drawTollSingles(c, singles, imgs, meta, subOnce);
+    if (singles.length || bare.length) drawTollSingles(c, singles, imgs, meta, subOnce, bare);
     if (first) {
       receiptHead(c, '통행료', meta, 1, 1, '', subOnce());
       c.text('이 기간 통행료 영수증이 없습니다.', MX, c.y, { size: 9 });
@@ -1684,7 +1731,7 @@
    * 돌려주는 것에 parts = [{ part, from, to }](쪽 범위 — 시험·안내용)도 있다.
    */
   function build(doc, deps) {
-    var lib = deps.PDFLib, c, imgs = {}, hashes = {}, files = [];
+    var lib = deps.PDFLib, c, imgs = {}, hashes = {}, files = [], nPhotos = null;
     var meta = doc.meta || {};
     var P = doc.ev ? planOf(doc) : null;
     files.by = {};
@@ -1735,6 +1782,13 @@
                 .then(function () {
                   if (!deps.parseHipass || !needRecs(P.F)) return;
                   return Promise.resolve().then(function () { return deps.parseHipass(bytes.slice()); }).then(function (recs) { f.recs = Array.isArray(recs) ? recs : null; }, function () { f.recs = null; });
+                })
+                // 쪽마다 영수증 통과 시각·합계 줄(deps.hipassPages — pdf.js 쪽 글자) — 영수증 없는 쪽(합계 줄만·빈 쪽)은 싣지 않고 줄은 그 영수증이 있는 쪽에(2026-10-23 사용자 「불필요한 용지」).
+                //   쪽 수가 넣은 쪽 수와 다르거나 못 읽으면 null — 모든 쪽을 싣고 줄은 적힌 쪽 번호대로.
+                .then(function () {
+                  if (!deps.hipassPages) return;
+                  return Promise.resolve().then(function () { return deps.hipassPages(bytes.slice()); })
+                    .then(function (info) { f.pageInfo = Array.isArray(info) && f.pages && info.length === f.pages.length ? info : null; }, function () { f.pageInfo = null; });
                 });
             });
           });
@@ -1747,6 +1801,10 @@
       //   통행료 묶음 계획(tollPlan) — PDF 에 다 든 사진 원본 장·낱장 사진은 받지 않는다.
       if (P) P.T = tollPlan(P, files);
       var paths = P ? P.paths.filter(function (p) { return !P.T.dropSheet[p] && !P.T.dropPhoto[p]; }) : imagePaths(doc);
+      // 실제로 받을 사진 수 — 「PDF만」으로 뺀 사진을 빼고 센다(결과 창 「영수증 사진 N장」 · 진행 글 「… / N」, 2026-10-23 출력 감사:
+      //   imagePaths 는 원본을 읽기 전에 세서 뺀 사진까지 셌다 — 232 는 32장이라 했는데 29장)
+      nPhotos = paths.length;
+      if (deps.onPhotos) { try { deps.onPhotos(nPhotos); } catch (e) { /* 진행 글일 뿐 */ } }
       // 받기는 넷씩 함께(사진 30장을 하나씩 받으면 한참 걸린다), PDF 에 넣기는 받은 순서와 무관하게 하나씩.
       var one = function (p) {
         return Promise.resolve().then(function () { return deps.loadImage ? deps.loadImage(p) : null; })
@@ -1838,7 +1896,8 @@
       if (!pdf.getPageCount()) { c.newPage(); c.text('내용이 없습니다.', MX, c.y, { size: 10 }); }
       var n = finishPages(c, meta);
       return pdf.save().then(function (bytes) {
-        return { bytes: bytes, pages: n, issues: c.issues, stats: c.stats, totals: totals, parts: parts };
+        // photos = 받은(실으려 한) 사진 수 · late = 상신 뒤 덧붙인 하이패스 원본 수(결과 창 안내문 — 「언제 받아도 같은 내용」을 그대로 말하지 않게)
+        return { bytes: bytes, pages: n, issues: c.issues, stats: c.stats, totals: totals, parts: parts, photos: nPhotos, late: P ? P.F.lateN || 0 : 0 };
       });
     });
   }
