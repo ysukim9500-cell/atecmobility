@@ -618,7 +618,7 @@
     var st = isAll() ? '' : P ? (P.status ? P.status(key) : '') : ((myAppr(key) || {}).status || '');
     var say = isAll() ? '아직 상신하지 않은 사람은 지금 상신하면 돼요.'
       : st === 'approved' ? '결재가 끝났어요.' : st === 'submitted' ? '결재 중이에요.'
-      : st === 'rejected' ? '반려됐어요. 고쳐서 다시 상신해 주세요.'
+      : st === 'rejected' ? (!P && reopenInfo(myAppr(key)) ? '정정 중이에요. 고쳐서 다시 상신해 주세요.' : '반려됐어요. 고쳐서 다시 상신해 주세요.')
       : '아직 상신 전이면 지금 상신해 주세요.';
     return '<div class="cycband grace" data-graceband>' + ic('cal', 15) + '<span><b>' + cycleName(CYC) + ' (' + esc(span) + ') · ' +
       esc(dueText(r, Date.now())) + '</b>. ' + say + '</span>' +
@@ -1209,7 +1209,7 @@
       '<span class="dim">' + esc(myCycLocked() ? lockWhy(myName()) + ' 이 기간에는 영수증을 올리거나 지울 수 없어요. 아래 내용은 확인만 하세요.' : EV_SUB_DESC[name]) + '</span>' +
       // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
       //   계기판은 영수증이 아니라 사진(2026-10-20 V3 다듬기 — 「계기판 영수증 1건」)
-      ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + (name === '계기판' ? '계기판 사진 ' + n0(by[name].n) + '장' : esc(name) + ' 영수증 ' + n0(by[name].n) + '건') + ' 보기·삭제 ↓</button>' : '') +
+      ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + (name === '계기판' ? '계기판 사진 ' + n0(by[name].n) + '장' : esc(name) + ' 영수증 ' + n0(by[name].n) + '건') + (myCycLocked() ? ' 보기 ↓' : ' 보기·삭제 ↓') + '</button>' : '') +
       '</div>';
     // 공지 띠는 이번 달 마감 화면에만(2026-10-19 웹 사용성 1차 — 같은 띠가 두 화면에 나오던 것)
     var canUp = !cycleLocked(myName()) && !isMulti();
@@ -1515,7 +1515,7 @@
       var rule = '증빙이 있는 날은 ‘맞음’이에요. 정산에는 <b>운행 금액</b>이 들어가고, 영수증은 맞는지 확인만 해요. ' +
         '운행에 ' + word + '를 적지 않은 날은 <b>영수증 금액</b>이 그 운행에 들어가요.' +
         (isToll ? ' 하이패스 이용내역 PDF로 맞춘 통행료는 그 자체가 증빙이라, 같은 금액의 영수증 사진을 또 올려도 한 번만 계산해요.' : '') +
-        ' 줄을 누르면 그 운행을 고칠 수 있어요.' +
+        (myCycLocked() ? '' : ' 줄을 누르면 그 운행을 고칠 수 있어요.') +
         (nOld ? ' 10월분(09.21) 전 날은 확인하지 않아요. 금액은 똑같이 계산해요.' : '');
       // 한 줄 안내 + 「자세히 보기」(2026-10-20 디자인 v2 P_Evid) — 접혀 있으면 할 일 글(.mhow)은 숨기고 갈래별 수만 한 줄로 보인다.
       //   「자세히 보기 (N일)」로 펼치면 예전처럼 할 일 글 + 규칙 + 모든 날. 결재 중·완료 기간 한 줄(고칠 수 없음)은 늘 보인다.
@@ -1742,9 +1742,9 @@
     return { lo: Date.UTC(c.y, c.m - 2, EDU_START_DAY) - KST, hi: Date.UTC(c.y, c.m - 1, EDU_START_DAY) - KST };
   }
   /** 마감 라벨 = 다음 달 20일(예: 회차 2026-08 → "9/20"). */
-  function eduDeadlineLabel(month) { var c = eduYm(month); return (c.m % 12 + 1) + '/' + (EDU_START_DAY - 1); }
+  function eduDeadlineLabel(month) { var c = eduYm(month); return pad(c.m % 12 + 1) + '.' + pad(EDU_START_DAY - 1); }
   /** 공개일 라벨(예: 회차 2026-09 → "9/21"). */
-  function eduOpenLabel(month) { return eduYm(month).m + '/' + EDU_START_DAY; }
+  function eduOpenLabel(month) { return pad(eduYm(month).m) + '.' + pad(EDU_START_DAY); }
   /** 공개된 회차인가 — 회차 키는 글자 순서가 시간 순서와 같다. */
   function eduIsOpen(month, nowMs) { return String(month) <= eduKeyAt(nowMs == null ? Date.now() : nowMs); }
   /** 마감 카운트다운: "D-3" / "D-DAY" / 지나면 "지연 5일". */
@@ -3591,7 +3591,7 @@
       SUB_NOTE[nk] = nprev; SUB_NOTE_PREV[nk] = !!nprev;
     }
     h += '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="subNote">의견</label><div class="fbody">' +
-      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재자에게 남길 말(선택). 예: 9/30 통행료 두 장은 왕복이에요">' +
+      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재자에게 남길 말(선택). 예: ' + (SUB_KIND === 'expense' ? '10.05 식비는 세 명이 함께 먹었어요' : SUB_KIND === 'card' ? '10.05 주유는 출장 차량에 넣었어요' : '09.30 통행료 두 장은 왕복이에요') + '">' +
       esc(SUB_NOTE[nk]) + '</textarea>' +
       '<div class="fhint">' + (SUB_NOTE_PREV[nk] ? '지난번 상신 때 남긴 의견을 불러왔어요. 고치거나 지울 수 있어요. ' : '') +
       '결재선의 모든 결재자가 결재함에서 봐요(300자까지).</div></div></div>';
@@ -5255,7 +5255,7 @@
   }
   /** 정산 예정 금액 카드(4칸) — 이름 왼쪽·숫자 오른쪽. totals(금액 규칙 v3)와 같은 숫자(영수증 화면 「정산에 들어가는」 금액과 같다). */
   function closeMoneyHtml(T, closed, st) {
-    var other = T.n - T.biz, chip = st === 'rejected' ? ['반려됨', ' bad'] : st === 'withdrawn' ? ['회수됨', ''] : ['상신 전', ''];
+    var other = T.n - T.biz, chip = st === 'rejected' ? [reopenInfo(myAppr()) ? '정정 중' : '반려됨', ' bad'] : st === 'withdrawn' ? ['회수됨', ''] : ['상신 전', ''];
     var dim = function (on) { return on ? ' <small class="dim">(영수증 포함)</small>' : ''; };
     return '<section class="ccard cmoney" aria-label="정산 예정 금액" data-cmoney><div class="chd"><h2>정산 예정 금액</h2><span class="dchip' + chip[1] + '">' + chip[0] + '</span></div>' +
       '<div class="cbig"><span>' + (closed ? '업무용 비용' : '업무용 비용(지금까지)') + '</span><b data-k="cost">' + n0(T.cost) + '<small>원</small></b></div>' +
@@ -5330,7 +5330,8 @@
       verdict = '아직 기록된 운행이 없어요'; clean = ' clean'; desc = '앱에서 운행을 기록하면 여기에 모여요.';
     } else if (st === 'rejected') {
       // 반려된 기간(2026-10-16 3차) — 사유 띠는 viewClose 가 맨 위에(rejBandHtml)
-      verdict = '반려됐어요. 고쳐서 <em>다시 상신</em>하세요'; desc = step ? step.d : '';
+      // 관리자가 「정정 열기」로 다시 연 기간이면 「정정 중」(위 띠·포털·결재함과 같은 말, 2026-10-25 교육 자료 로봇)
+      verdict = (reopenInfo(myAppr()) ? '정정 중이에요' : '반려됐어요') + '. 고쳐서 <em>다시 상신</em>하세요'; desc = step ? step.d : '';
     }
     // 마감일 당일·마감 뒤 며칠은 빨강·굵게(AU6-L7) — 상신한 뒤에는 빨갛게 하지 않는다(AU6-M1 과 같은 원칙)
     var hot = !sentNow && /오늘 마감|지남/.test(when);
@@ -6599,7 +6600,10 @@
     bindDrop($('evDrop'), evAddFiles);
     askAi().then(function (on) {
       var el = $('evAiNote');
-      if (el) el.innerHTML = on
+      // 계기판 차례에서 연 창이면 계기판 말로(2026-10-25 교육 자료 로봇 — 위 글은 km 인데 아래 안내만 「구분·날짜·금액」이었다)
+      if (el) el.innerHTML = odo
+        ? (on ? gemTag('AI') + '가 사진에서 <b>계기판 숫자(km)</b>를 읽어 보여 드려요. 틀릴 수 있으니 사진과 비교해 확인해 주세요.' : 'AI 읽기가 꺼져 있어요. 계기판 사진만 올리면 돼요.')
+        : on
         ? gemTag('AI') + '가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드려요. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
         : 'AI 읽기가 꺼져 있어 구분, 날짜, 금액을 직접 넣어야 해요. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b>로 줄을 늘리세요.';
     });
@@ -8259,7 +8263,7 @@ window.EduGuard = {
       '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
       '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계해요.<br>' +
       '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
-      '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '-' + pad(b[1]); }).join(' · ')) + '<br>' +
+      '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '.' + pad(b[1]); }).join(' · ')) + '<br>' +
       '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산해요. 리포트와 다르면 알려 주세요.</div>');
     return h;
   }
