@@ -58,17 +58,19 @@
   /** 서버 오류를 사람 말로. 잠금(CARD_LOCKED)은 따로 말한다. */
   function why(e) {
     var m = String((e && e.message) || '');
-    if (/CARD_LOCKED/.test(m)) return '결재 중이거나 결재가 끝난 기간이라 고칠 수 없습니다. 고치려면 먼저 회수해 주세요.';
-    if (/401|403|jwt|로그인/i.test(m)) return '로그인이 풀렸거나 권한이 없습니다. 다시 로그인해 주세요.';
-    if (/23505|duplicate/i.test(m)) return '같은 승인번호·승인일 줄이 이미 있습니다. 목록을 다시 불러와 주세요.';
-    if (/23514|check constraint/i.test(m)) return '칸 길이나 금액 범위를 넘었습니다(구분 20자 · 사용목적·비고 200자).';
+    if (/CARD_LOCKED/.test(m)) return C.lockSay ? C.lockSay(myC()) : '결재 중이거나 결재가 끝난 기간이라 고칠 수 없어요.';
+    if (/401|403|jwt|로그인/i.test(m)) return '로그인이 만료됐거나 권한이 없어요. 다시 로그인해 주세요.';
+    if (/23505|duplicate/i.test(m)) return '같은 승인번호·승인일 줄이 이미 있어요. 목록을 다시 불러와 주세요.';
+    if (/23514|check constraint/i.test(m)) return '칸 길이나 금액 범위를 넘었어요. 구분은 20자, 사용목적·비고는 200자까지 적을 수 있어요.';
     console.error('법인카드:', m);
-    return '잠시 뒤 다시 해 주세요.';
+    return '잠시 후 다시 해 주세요.';
   }
   function failMsg(head, e, tail) {
     var m = String((e && e.message) || '');
     if (m) console.warn(head, m);
-    return /[가-힣]/.test(m) && !/https?:\/\/|HTTP \d/.test(m) ? head + ': ' + m : head + '. ' + tail;
+    // 원인은 쌍점 대신 다음 문장으로(2026-10-24 검수 — 「저장하지 못했어요: …」는 문장 속 쌍점), 끝 마침표는 한 번만
+    var mm = m.trim();
+    return /[가-힣]/.test(mm) && !/https?:\/\/|HTTP \d/.test(mm) ? head + '. ' + mm + (/[.!?…]$/.test(mm) ? '' : '.') : head + '. ' + tail;
   }
 
   /* ══════════════════ 자료 ══════════════════ */
@@ -92,7 +94,7 @@
     var p = C.fetchAll('/rest/v1/card_items?select=*&cycle=eq.' + encodeURIComponent(cyc) +
       (all ? '' : '&username=eq.' + encodeURIComponent(me())) + '&order=appr_date.asc,appr_time.asc,id.asc')
       .then(function (rows) { ITEMS[k] = { rows: (rows || []).sort(byDate) }; if (!all) pruneFailed(cyc); return ITEMS[k].rows; })
-      .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료되었습니다.' : (e && e.noPerm) ? '법인카드 내역을 볼 권한이 없습니다.' : '법인카드 내역을 불러오지 못했습니다.' }; return null; });
+      .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료됐어요.' : (e && e.noPerm) ? '법인카드 내역을 볼 권한이 없어요.' : '법인카드 내역을 불러오지 못했어요.' }; return null; });
     ITEMS[k] = { wait: p };
     if (!all) {
       rest('/rest/v1/rpc/card_cycle_locked', { method: 'POST', body: JSON.stringify({ p_username: me(), p_cycle: cyc }) })
@@ -173,7 +175,8 @@
   function notReady(title, x) {
     if (x && x.err) {
       return C.head(title) + '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
-        '<div style="font-weight:700;margin-bottom:6px">' + esc(x.err) + '</div><div class="dim" style="margin-bottom:16px">잠시 뒤 다시 시도해 주세요.</div>' +
+        '<div style="font-weight:700;margin-bottom:6px">' + esc(x.err) + '</div><div class="dim" style="margin-bottom:16px">' +
+        (C.retryHint ? C.retryHint(x.err) : '잠시 후 다시 해 주세요.') + '</div>' +
         '<button class="btn pri" data-creload>다시 불러오기</button></div></section>';
     }
     return C.head(title) + C.skeleton();
@@ -183,7 +186,7 @@
     var S = C.state(), cur = cCurrent();
     if (C.cmpCycle(S.CYC, cur) >= 0) return '';
     return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + esc(cycName(S.CYCKEY)) + ' (' + esc(R.span(S.CYCKEY)) +
-      ') · 지난 기간</b>을 보고 있습니다. 법인카드는 <b>1일 ~ 말일</b>이 한 기간입니다.</span>' +
+      ') · 지난 기간</b>을 보고 있어요. 법인카드는 <b>1일 ~ 말일</b>이 한 기간이에요.</span>' +
       '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + (cur.x || '') + '">이번 기간(' + esc(CR.short(cur)) + ' ' + esc(cSpan(cur)) + ')으로 →</button></div>';
   }
   function tag(key) {
@@ -229,12 +232,12 @@
     return '<section class="sect" style="margin:0 0 16px"><div class="astrip">' +
       '<div class="ahd"><span class="akind c">법인카드</span><span class="st ' + st.cls + '">' + esc(st.t) + '</span><span style="flex:1"></span>' + btn + '</div>' +
       // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 상신 의견 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
-      (a ? C.apprTrack(a) + (C.opinions ? C.opinions(a) : '') : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 상신하면 결재함으로 갑니다.</div>') +
+      (a ? C.apprTrack(a) + (C.opinions ? C.opinions(a) : '') : '<div class="anote" style="margin-top:0">' + C.apprHint + ' 지난번 결재선도 불러올 수 있어요.</div>') +
       (a && (a.status === 'submitted' || a.status === 'approved') ? extra(a, true) + (C.apvSlot ? C.apvSlot('card', a, { ops: false }) : '') : '') +
-      (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 카드 내역을 고칠 수 없습니다. ' +
-        (canWithdraw ? '고치려면 「회수」한 뒤 다시 상신하세요.' : '첫 결재자가 이미 결재해 회수할 수 없습니다 — 반려를 요청하세요.') + '</div>' : '') +
+      (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 카드 내역을 고칠 수 없어요. ' +
+        (canWithdraw ? '고치려면 회수한 뒤 다시 상신하세요.' : '이미 승인한 결재자가 있어 회수할 수 없어요. 고치려면 지금 차례인 결재자에게 반려를 요청하세요.') + '</div>' : '') +
       // 반려·회수 뒤 — 어디서 다시 상신하는지(운행일지 띠와 같게, 2026-10-16 3차). 검증·상신 화면이 아니면 그리 가는 길도.
-      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote afix">고친 뒤 「검증·상신」에서 다시 상신합니다.' +
+      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote afix">고친 뒤 ‘검증·상신’에서 다시 상신하세요.' +
         (C.state().VIEW !== 'c_verify' ? ' <button class="btn pri sm" data-v="c_verify">고쳐서 다시 상신 →</button>' : '') + '</div>' : '') +
       '</div></section>';
   }
@@ -258,7 +261,7 @@
     var cyc = S.CYCKEY, a = myC(cyc), locked = lockedFor(me(), cyc);
     var T = R.totals(rows), hist = histFor(rows);
     var nSug = locked ? 0 : sugCount(rows);
-    var h = head(title, 'ERP 에서 받은 내 카드 내역에 구분·사용목적을 적습니다');
+    var h = head(title, 'ERP에서 받은 내 카드 내역에 구분·사용목적을 적어요.');
     h += apprStrip(a);
     h += cancelBand(rows);                 // 전액 취소된 승인이 남아 있으면(2026-10-20 AU2 #5)
     // ★ 2026-10-15: 「ERP 엑셀 올리기」는 요약 칸의 빨간 단추 하나만(빈 기간에 둘이던 것). 「임시저장」 단추는 뺐다 —
@@ -270,15 +273,15 @@
         (rows.length ? sugBtnHtml(nSug) : '') +
         (rows.length ? '<button class="btn" data-v="c_verify">검증·상신으로 ' + ic('chev', 13) + '</button>' : '') + '</div>') + '</div>';
     // 결재 중 안내는 위 결재 띠에 이미 있다 — 여기서는 결재가 끝난 기간만(2026-10-15, 같은 안내 두 번)
-    if (locked && a && a.status === 'approved') h += '<div class="hpnote">' + ic('check', 16) + '<span><b>결재가 끝난 기간입니다.</b> 카드 내역을 올리거나 고칠 수 없습니다. ' +
-      '고칠 것이 있으면 관리자에게 「정정 열기」를 요청하세요.</span></div>';
+    if (locked && a && a.status === 'approved') h += '<div class="hpnote">' + ic('check', 16) + '<span><b>결재가 끝난 기간이라 카드 내역을 올리거나 고칠 수 없어요.</b> ' +
+      '고칠 것이 있으면 관리자에게 정정을 요청하세요.</span></div>';
     h += C.sect('내역', '<span id="cSectN">' + sectN(rows) + '</span>', '',
       rows.length ? (locked ? '' : saveLineHtml(rows)) + tableHtml(rows, locked, hist)
-        : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">이 기간에 올린 카드 내역이 없습니다.</div>' +
-          (locked ? '' : '<div class="d">ERP 에서 내 법인카드 승인내역을 엑셀(.xls · .xlsx)로 받아 위 「ERP 엑셀 올리기」로 올려 주세요. 0원·취소 줄은 자동으로 뺍니다.<br>법인카드를 쓰지 않았으면 할 일이 없습니다.</div>') +
+        : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">이 기간에 올린 카드 내역이 없어요.</div>' +
+          (locked ? '' : '<div class="d">ERP에서 내 법인카드 승인내역을 엑셀(.xls, .xlsx)로 다운로드해서 올려 주세요. 0원·취소 줄은 자동으로 빠져요.<br>법인카드를 쓰지 않았으면 할 일이 없어요.</div>') +
           '</div></div>');
-    if (!locked) h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다.</b> 칸을 고치면 바로 저장됩니다. 구분 칸 아래 점선 단추는 <b>추천</b>입니다 — ' +
-      '누르거나 「추천 구분 채우기」로 확정합니다. 같은 파일을 다시 올려도 적어 둔 구분·사용목적·비고는 그대로입니다.</div>';
+    if (!locked) h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없어요.</b> 구분 칸의 점선 버튼은 <b>추천</b>이라 ' +
+      '누르거나 ‘추천 구분 채우기’로 확정하세요.</div>';
     return h;
   }
   function tableHtml(rows, locked, hist) {
@@ -301,12 +304,12 @@
     return '<tr data-crow="' + it.id + '"' + (MISSING[it.id] ? ' class="cmiss"' : '') + '>' +
       '<td class="n" data-l="순번">' + (C.mselBox ? C.mselBox('c', { id: String(it.id), amt: it.amount,
         line: String(it.appr_date || '').slice(5).replace('-', '.') + ' ' + (it.merchant || '카드') + ' ' + n0(it.amount) + '원',
-        why: locked ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없습니다' : '' }) : '') + (i + 1) + '</td>' +
+        why: locked ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없어요' : '' }) : '') + (i + 1) + '</td>' +
       '<td data-l="승인일">' + esc(String(it.appr_date || '').slice(5).replace('-', '.')) + '</td>' +
       '<td class="dim" data-l="시간">' + esc(String(it.appr_time || '').slice(0, 5)) + '</td>' +
       // 「파일에 없는 줄」 표시는 가맹점 아래 줄에 — 가맹점 옆에 붙이면 칸이 넓어져 맨 끝 「지우기」가 표 밖으로 밀렸다(2026-10-15)
       '<td class="el" data-l="가맹점" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') +
-        (cancelOf(it) ? '<div style="margin-top:3px;line-height:1"><span class="st bad" data-ccancel title="' + esc((it.src.cancel.file || 'ERP 파일') + '에서 전액 취소로 확인 — 청구하지 않으려면 이 줄을 지워 주세요') + '">전액 취소된 승인</span></div>'
+        (cancelOf(it) ? '<div style="margin-top:3px;line-height:1"><span class="st bad" data-ccancel title="' + esc((it.src.cancel.file || 'ERP 파일') + '에서 전액 취소로 확인됐어요. 청구하지 않으려면 이 줄을 지워 주세요.') + '">전액 취소된 승인</span></div>'
           : MISSING[it.id] ? '<div style="margin-top:3px;line-height:1"><span class="st warn">파일에 없는 줄</span></div>' : '') + '</td>' +
       '<td class="el dim" data-l="업종">' + esc(it.biz_type || '') + '</td>' +
       '<td class="n total" data-l="승인금액">' + n0(it.amount) + '</td>' +
@@ -350,13 +353,13 @@
   }
   function saveLineText(rows) {
     var nf = Object.keys(FAILED).length;
-    if (pending()) return '<span class="st warn">저장 중…</span> <span>칸에 적은 값을 보내고 있습니다</span>';
+    if (pending()) return '<span class="st warn">저장 중…</span> <span>칸에 적은 값을 보내고 있어요.</span>';
     // 실패한 칸은 서버 값으로 되돌려 둔다 — 그때 적은 값은 FAILED 에 남겨 「다시 저장」으로 다시 보낸다(2026-10-15, 「임시저장」 단추 대신).
-    if (nf) return '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span> <span>적은 값이 되돌려졌습니다 — 「다시 저장」을 누르면 적었던 값을 다시 보냅니다</span>' +
+    if (nf) return '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span> <span>적은 값이 되돌아갔어요. ‘다시 저장’을 누르면 적었던 값을 다시 보내요.</span>' +
       '<button type="button" class="btn sm" id="btnCRetry" data-cretry>다시 저장</button>';
     var t = lastSaveMs(rows);
-    return '<span class="st ok">자동 저장됨</span> <span>' + (t ? '· 마지막 저장 ' + hhmm(t) + ' ' : '') +
-      '— 같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적은 그대로입니다</span>';
+    return '<span class="st ok">자동 저장됨</span> <span>' + (t ? '· 마지막 저장 ' + hhmm(t) + ' · ' : '') +
+      '같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적·비고는 그대로예요.</span>';
   }
   /** 다시 받은 줄(지금 기간)에 없는 줄의 「저장 못 함」 표시는 지운다(지운 줄·다른 기간으로 옮겨진 줄). */
   function pruneFailed(cyc) {
@@ -371,7 +374,7 @@
   /** 「다시 저장」 — 저장 못 한 칸에 그때 적었던 값을 다시 넣고 보낸다. 끝나면 알린다(또 실패하면 그 까닭은 칸마다 알림으로). */
   function retrySaves() {
     var list = Object.keys(FAILED).map(function (k) { return FAILED[k]; }).filter(function (x) { return x && x.v != null; });
-    if (!list.length) { C.toast('다시 보낼 값이 없습니다 — 빨간 「저장 못 함」 칸을 다시 적어 주세요.', true); paintSave(); return; }
+    if (!list.length) { C.toast('다시 보낼 값이 없어요. ‘저장 못 함’으로 표시된 칸을 다시 적어 주세요.', true); paintSave(); return; }
     list.forEach(function (x) {
       var el = document.querySelector('.cin[data-cid="' + x.id + '"][data-f="' + x.f + '"]');
       if (el && el !== document.activeElement) { el.value = x.v; if (x.f !== 'note') el.classList.toggle('need', !String(x.v).trim()); }
@@ -380,8 +383,8 @@
     paintSave();
     settleSaves().then(function () {
       var bad = list.filter(function (x) { return FAILED[x.id + '|' + x.f]; }).length;
-      if (bad) C.toast('또 저장하지 못한 칸이 ' + n0(bad) + '곳 있습니다 — 빨간 「저장 못 함」 표시를 확인해 주세요.', true);
-      else C.toast('다시 저장했습니다 (' + n0(list.length) + '곳)');
+      if (bad) C.toast('또 저장하지 못한 칸이 ' + n0(bad) + '곳 있어요. ‘저장 못 함’ 표시를 확인해 주세요.', true);
+      else C.toast(n0(list.length) + '곳을 다시 저장했어요.');
       paintSave();
     });
   }
@@ -420,7 +423,7 @@
   function saveNow(id, f, v, cyc) {
     return rowIn(cyc, id).then(function (it) {
       if (!it) {
-        failCell(id, f, undefined, '저장하지 못했습니다 — 그 줄을 찾지 못했습니다(지워졌거나 다른 기간). 목록을 다시 불러온 뒤 적어 주세요.', v, cyc);
+        failCell(id, f, undefined, '그 줄을 찾지 못해 저장하지 못했어요. 지워졌거나 다른 기간일 수 있으니 목록을 다시 불러온 뒤 적어 주세요.', v, cyc);
         return;
       }
       v = String(v == null ? '' : v).trim().slice(0, MAXLEN[f]);
@@ -433,13 +436,13 @@
       return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id) + '&select=id,' + f + ',updated_at', {
         method: 'PATCH', keepalive: true, headers: { Prefer: 'return=representation' }, body: JSON.stringify(body)
       }).then(function (out) {
-        if (!out || !out.length) throw new Error('저장되지 않았습니다(권한 또는 잠금)');
+        if (!out || !out.length) throw new Error('권한이 없거나 잠긴 기간이에요');
         it[f] = out[0][f]; it.updated_at = out[0].updated_at;
         delete FAILED[k]; LAST_SAVE = Date.now();
         mark(id, '저장됨');
       }).catch(function (e) {
         it[f] = prev;
-        failCell(id, f, prev, failMsg('저장하지 못했습니다', e, why(e)), v, cyc);
+        failCell(id, f, prev, failMsg('저장하지 못했어요', e, why(e)), v, cyc);
       }).then(function () { SAVING--; delete INFL[k]; paintBlank(); paintSave(); });
     });
   }
@@ -458,8 +461,8 @@
     var top = all.slice(0, 2), rest = all.slice(2);
     // 많이 쓴 구분 둘 + 나머지는 「외 N구분」 한 칸(2026-10-15 — 둘만 보여 위 합계와 안 맞아 보이던 것)
     var restSum = rest.reduce(function (s, x) { return s + (Number(x.sum) || 0); }, 0), restN = rest.reduce(function (s, x) { return s + x.n; }, 0);
-    return fact('건수', n0(T.n) + '<small>건</small>', 'ERP 에서 올린 승인') +
-      fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적 — 채워야 상신', blank > 0) +
+    return fact('건수', n0(T.n) + '<small>건</small>', 'ERP에서 올린 승인') +
+      fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적을 채워야 상신할 수 있어요', blank > 0) +
       top.map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') +
       (rest.length ? fact('외 ' + n0(rest.length) + '구분', won(restSum), n0(restN) + '건 · ' + rest.map(function (x) { return x.c; }).join(' · ')) : '');
   }
@@ -472,8 +475,8 @@
     var c = (rows || []).filter(cancelOf);
     if (!c.length || lockedFor(me(), C.state().CYCKEY)) return '';
     var amt = c.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0);
-    return '<div class="awarn" id="cCancelBand">' + ic('alert', 15) + '<span><b>전액 취소된 승인 ' + n0(c.length) + '건(' + won(amt) + ')이 아직 남아 있습니다.</b> ' +
-      'ERP 파일에서 취소로 확인된 결제라 그대로 상신하면 취소된 금액까지 청구됩니다 — 표에서 「전액 취소된 승인」 줄을 지워 주세요.</span></div>';
+    return '<div class="awarn" id="cCancelBand">' + ic('alert', 15) + '<span><b>전액 취소된 승인 ' + n0(c.length) + '건(' + won(amt) + ')이 아직 남아 있어요.</b> ' +
+      '그대로 상신하면 취소된 금액까지 청구되니 표에서 ‘전액 취소된 승인’ 줄을 지워 주세요.</span></div>';
   }
   function paintBlank() {
     var rows = mineRows(C.state().CYCKEY);
@@ -501,7 +504,7 @@
       var sg = R.suggest(it, hist);
       if (sg) todo.push({ id: String(it.id), cat: sg.cat });
     });
-    if (!todo.length) { C.toast('채울 추천이 없습니다.'); return; }
+    if (!todo.length) { C.toast('채울 추천이 없어요.'); return; }
     C.toast('추천 구분 ' + n0(todo.length) + '줄을 채우는 중…');
     var cyc = S.CYCKEY;
     C.vx.pool(todo, 3, function (x) {
@@ -515,11 +518,11 @@
       //   결재 중 잠김 등으로 하나도 안 들어갔는데 「N줄에 추천 구분을 채웠습니다」라고 했다). 실패가 있으면 그 수를 알리고 다시 받는다.
       var bad = todo.filter(function (x) { return FAILED[x.id + '|category']; }).length, ok = todo.length - bad;
       if (!bad) {
-        C.toast(n0(todo.length) + '줄에 추천 구분을 채웠습니다. 맞는지 한 번 보세요.');
+        C.toast(n0(todo.length) + '줄에 추천 구분을 채웠어요. 맞는지 한 번 보세요.');
         if (!typing()) C.render(); else paintSug();
         return;
       }
-      C.toast((ok ? n0(ok) + '줄은 채웠지만 ' : '') + n0(bad) + '줄은 저장하지 못했습니다 — 빨간 「저장 못 함」 칸을 확인해 주세요(결재 중이면 회수한 뒤에 채울 수 있습니다).', true);
+      C.toast((ok ? n0(ok) + '줄은 채웠지만 ' : '') + n0(bad) + '줄은 저장하지 못했어요. ‘저장 못 함’ 칸을 확인하고, 결재 중이면 회수한 뒤 다시 채워 주세요.', true);
       dropItems(cyc);
       loadItems(cyc, false, true).then(function () { if (!typing()) C.render(); else { paintSug(); paintSave(); } });
     });
@@ -527,34 +530,35 @@
   function openDel(id) {
     var it = findMine(id); if (!it) return;
     C.openPanel('이 줄을 지울까요?', String(it.appr_date) + ' · ' + (it.merchant || '') + ' · ' + n0(it.amount) + '원',
-      '<div class="anote" style="margin-top:0">ERP 파일에 다시 들어 있으면 다음에 올릴 때 다시 들어옵니다(그때 구분·사용목적은 새로 적어야 합니다).</div>',
+      '<div class="anote" style="margin-top:0">지운 줄이 ERP 파일에 있으면 다음에 올릴 때 다시 들어와요. 그때 구분·사용목적은 새로 적어야 해요.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCDelGo" data-id="' + esc(String(it.id)) + '">지우기</button>');
   }
   /** 한 줄 지우기 — 한 건 지우기·여러 줄 지우기(C.msel)가 같은 길. */
   function delOne(id) {
     return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=representation' } })
       .then(function (rows) {
-        if (!rows || !rows.length) throw new Error('지워지지 않았습니다(권한 또는 잠금)');
+        if (!rows || !rows.length) throw new Error('권한이 없거나 잠긴 기간이에요');
         delete MISSING[id];
         Object.keys(FAILED).forEach(function (k) { if (k.split('|')[0] === String(id)) delete FAILED[k]; });
       });
   }
   if (C.mselDef) C.mselDef('c', {
-    noun: '카드 내역', note: 'ERP 파일에 다시 들어 있으면 다음에 올릴 때 다시 들어옵니다(그때 구분·사용목적은 새로 적어야 합니다).',
-    del: function (id) { return findMine(id) ? delOne(id) : Promise.reject(new Error('이미 없는 줄입니다')); },
-    why: function (e) { return failMsg('지우지 못했습니다', e, why(e)); },
+    noun: '카드 내역', note: '지운 줄이 ERP 파일에 있으면 다음에 올릴 때 다시 들어와요. 그때 구분·사용목적은 새로 적어야 해요.',
+    del: function (id) { return findMine(id) ? delOne(id) : Promise.reject(new Error('이미 없는 줄이에요')); },
+    // 까닭만 — 이어 붙이는 쪽이 이미 「…은 지우지 못했어요.」라고 말한다(2026-10-24 검수 — 같은 말이 두 번 나왔다, 개인경비와 같게)
+    why: function (e) { var m = String((e && e.message) || ''); return /이미 없는|권한이 없거나/.test(m) ? m : why(e); },
     done: function () { var S = C.state(); dropItems(S.CYCKEY); loadItems(S.CYCKEY, false, true).then(function () { C.render(); }); }
   });
   function runDel(id) {
     var b = $('btnCDelGo'); if (b) { b.disabled = true; b.textContent = '지우는 중…'; }
     delOne(id)
       .then(function () {
-        C.closePanel(); C.toast('지웠습니다.');
+        C.closePanel(); C.toast('지웠어요.');
         var S = C.state(); dropItems(S.CYCKEY);
         return loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
       }).catch(function (e) {
         if (b && document.contains(b)) { b.disabled = false; b.textContent = '지우기'; }
-        C.toast(failMsg('지우지 못했습니다', e, why(e)), true);
+        C.toast(failMsg('지우지 못했어요', e, why(e)), true);
       });
   }
 
@@ -577,14 +581,14 @@
   }
   function openUpload() {
     var S = C.state();
-    if (C.isMulti()) { C.toast('카드 내역은 한 기간씩 올립니다. 위에서 기간을 하나 골라 주세요.', true); return; }
-    if (lockedFor(me(), S.CYCKEY)) { C.toast('결재 중이거나 끝난 기간이라 올릴 수 없습니다.', true); return; }
-    if (C_SENDING) { C.toast('앞서 고른 파일을 아직 올리는 중입니다. 끝난 뒤 다시 열어 주세요.'); return; }
+    if (C.isMulti()) { C.toast('카드 내역은 한 기간씩 올려요. 기간을 하나만 골라 주세요.', true); return; }
+    if (lockedFor(me(), S.CYCKEY)) { C.toast('결재 중이거나 끝난 기간이라 올릴 수 없어요.', true); return; }
+    if (C_SENDING) { C.toast('앞서 고른 파일을 아직 올리는 중이에요. 끝난 뒤 다시 열어 주세요.'); return; }
     CUP = { cyc: S.CYCKEY, busy: false, sent: false, res: null, plan: null, file: '', useOwner: true };
     C.openPanel('ERP 엑셀 올리기 — 법인카드', cycName(S.CYCKEY) + ' · ' + R.span(S.CYCKEY),
       '<div class="drop" id="cDrop" style="margin:0 0 14px">' +
-      '<div class="dt">ERP 에서 받은 <b>내 법인카드 승인내역</b> 엑셀을 올립니다</div>' +
-      '<div class="dd">.xls · .xlsx · PC 에서는 여기에 끌어다 놓아도 됩니다<br>0원·취소 줄과 ' + esc(R.span(S.CYCKEY)) + ' 밖의 줄은 자동으로 뺍니다</div>' +
+      '<div class="dt">ERP에서 다운로드한 <b>내 법인카드 승인내역</b> 엑셀을 올려 주세요</div>' +
+      '<div class="dd">.xls, .xlsx 파일이에요. PC에서는 여기에 끌어다 놓아도 돼요.<br>0원·취소 줄과 ' + esc(R.span(S.CYCKEY)) + ' 밖의 줄은 자동으로 빠져요.</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기<input type="file" id="cFile" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>' +
       '</div><div id="cPrev"></div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCUpGo" disabled>올리기</button>', true);
@@ -603,7 +607,7 @@
     if (!f || !s || s.busy) return;
     // ★ 5MB 읽기 상한은 여기서(card-erp.js 는 크기를 보지 않는다) — SheetJS 에 넘기기 전에 막아야 큰 파일에서 브라우저가 멈추지 않는다.
     if (f.size > MAX_BYTES) {
-      prevMsg('파일이 너무 큽니다(' + (f.size / 1048576).toFixed(1) + 'MB). 5MB 까지 올릴 수 있습니다 — ERP 에서 한 달치만 받아 올려 주세요.');
+      prevMsg('파일이 너무 커요(' + (f.size / 1048576).toFixed(1) + 'MB). 5MB까지 올릴 수 있으니 ERP에서 한 달치만 다운로드해서 올려 주세요.');
       return;
     }
     s.busy = true; s.res = null; s.plan = null; s.painted = false;
@@ -624,11 +628,11 @@
     }).catch(function (e) {
       if (CUP !== s) return;
       var m = String((e && e.message) || '');
-      prevMsg(m === 'NOT_SHEET' ? 'ERP 엑셀 파일(.xls · .xlsx)이 아닙니다. ERP 에서 엑셀로 받은 파일을 올려 주세요.'
-        : m === 'NO_HEADER' ? '머리글(법인카드 · 승인일자 · 승인번호 · 가맹점 · 승인금액)을 찾지 못했습니다. 빠진 것: ' + (((e.res && e.res.missing) || []).join(', ') || '없음')
-        : m === 'TOO_MANY' ? '줄이 너무 많습니다(' + n0(E.MAX_ROWS) + '줄까지). 한 달치만 받아 올려 주세요.'
-        : m === 'XLSX' ? '엑셀 읽기 도구를 불러오지 못했습니다. 새로 고침 뒤 다시 해 주세요.'
-        : '파일을 읽지 못했습니다. ERP 에서 다시 받아 올려 주세요.');
+      prevMsg(m === 'NOT_SHEET' ? 'ERP 엑셀 파일(.xls, .xlsx)이 아니에요. ERP에서 엑셀로 다운로드한 파일을 올려 주세요.'
+        : m === 'NO_HEADER' ? '머리글(법인카드, 승인일자, 승인번호, 가맹점, 승인금액)을 찾지 못했어요. 빠진 것: ' + (((e.res && e.res.missing) || []).join(', ') || '없음')
+        : m === 'TOO_MANY' ? '줄이 너무 많아요(' + n0(E.MAX_ROWS) + '줄까지). 한 달치만 다운로드해서 올려 주세요.'
+        : m === 'XLSX' ? '엑셀 읽기 도구를 불러오지 못했어요. 새로고침한 뒤 다시 해 주세요.'
+        : '파일을 읽지 못했어요. ERP에서 다시 다운로드해서 올려 주세요.');
       if (!/^(NOT_SHEET|NO_HEADER|TOO_MANY|XLSX)$/.test(m)) console.error('법인카드 엑셀:', e);
     }).then(function () { s.busy = false; });
   }
@@ -643,28 +647,28 @@
     var erpBad = erp.found && !erp.ok;
     if (erpBad) {
       nCheck++;
-      h += '<div class="awarn" id="cErpBad">' + ic('alert', 15) + '<span><b>ERP 합계가 맞지 않습니다.</b> 파일 합계 ' + won(erp.fileTotal) + ' ≠ 승인 ' + won(erp.approved) + ' − 취소 ' + won(erp.cancelled) + ' = ' + won(erp.net) +
-        '. 파일이 잘렸거나 읽지 못한 줄이 있을 수 있습니다 — 아래 「뺀 줄」을 확인해 주세요.</span></div>';
+      h += '<div class="awarn" id="cErpBad">' + ic('alert', 15) + '<span><b>ERP 합계가 맞지 않아요.</b> 파일 합계는 ' + won(erp.fileTotal) + '인데, 승인 ' + won(erp.approved) + ' − 취소 ' + won(erp.cancelled) + ' = ' + won(erp.net) + '이에요' +
+        '. 파일이 잘렸거나 읽지 못한 줄이 있을 수 있으니 ‘뺀 줄’을 확인해 주세요.</span></div>';
     }
     // 읽지 못해 뺀 줄 — 특히 승인번호가 비었거나 너무 긴 「취소」 줄은 원래 승인과 짝을 못 지어 원래 승인이 그대로 들어간다.
     var bad = res.dropped.filter(function (d) { return d.reason === 'invalid'; }), badCancel = bad.filter(function (d) { return d.cancel; });
     if (bad.length) {
       nCheck += bad.length;
-      h += '<div class="awarn" id="cBadRows">' + ic('alert', 15) + '<span><b>읽지 못해 뺀 줄 ' + n0(bad.length) + '건</b>(승인일·승인번호·금액).' +
-        (badCancel.length ? ' 그 가운데 <b>취소 줄 ' + n0(badCancel.length) + '건</b>은 원래 승인과 짝을 짓지 못해 <b>원래 승인이 그대로 들어갑니다</b>' +
-          ' — 취소된 승인이면 올린 뒤 표에서 그 줄을 지워 주세요.' : ' 아래 「뺀 줄」에서 확인해 주세요.') + '</span></div>';
+      h += '<div class="awarn" id="cBadRows">' + ic('alert', 15) + '<span>승인일, 승인번호, 금액을 읽지 못해 뺀 줄이 <b>' + n0(bad.length) + '건</b> 있어요.' +
+        (badCancel.length ? ' 그 가운데 <b>취소 줄 ' + n0(badCancel.length) + '건</b>은 원래 승인과 맞추지 못해 <b>원래 승인이 그대로 들어가요</b>.' +
+          ' 취소된 승인이면 올린 뒤 표에서 그 줄을 지워 주세요.' : ' ‘뺀 줄’에서 확인해 주세요.') + '</span></div>';
     }
-    if (!res.items.length) h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(cycName(s.cyc)) + '(' + esc(R.span(s.cyc)) + ') 줄이 없습니다. 다른 달 파일인지 확인해 주세요.</span></div>';
+    if (!res.items.length) h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(cycName(s.cyc)) + '(' + esc(R.span(s.cyc)) + ') 줄이 없어요. 다른 달 파일인지 확인해 주세요.</span></div>';
     if (res.owner.mismatch && s.useOwner) nCheck += res.owner.mismatch;
     if (res.owner.mismatch) {
       var names = {};
       res.items.forEach(function (it) { if (it.owner_mismatch) names[it.owner_name] = 1; });
       var who = Object.keys(names).join(', ');
       h += '<div class="awarn">' + ic('alert', 15) + '<span>' + (res.owner.all
-        ? '이 파일은 <b>' + esc(who) + '</b> 님 카드 내역으로 보입니다(소유자가 내 이름 ' + esc(myFullName()) + ' 이 아님). 내 카드 내역만 올려 주세요.'
-        : '소유자가 내 이름(' + esc(myFullName()) + ')이 아닌 줄이 ' + n0(res.owner.mismatch) + '건 있습니다(' + esc(who) + ').') + '</span></div>' +
+        ? '이 파일은 <b>' + esc(who) + '</b> 님 카드 내역 같아요. 내 이름(' + esc(myFullName()) + ')으로 된 카드 내역만 올려 주세요.'
+        : '소유자가 내 이름(' + esc(myFullName()) + ')이 아닌 줄이 ' + n0(res.owner.mismatch) + '건 있어요(' + esc(who) + ').') + '</span></div>' +
         '<label class="finall" style="margin:6px 0 10px"><input type="checkbox" id="cOwn"' + (s.useOwner ? ' checked' : '') + '> 소유자가 다른 줄 ' + n0(res.owner.mismatch) + '건도 올리기' +
-        (s.useOwner ? '' : ' <span class="dim">(지금은 빼 둡니다)</span>') + '</label>';
+        (s.useOwner ? '' : ' <span class="dim">(지금은 빼 둬요)</span>') + '</label>';
     }
     // 이미 올린 승인 가운데 이 파일에서 전액 취소로 확인된 것(2026-10-20 AU2 #5) — 기본 「같이 지우기」.
     //   끄면 지우지 않고 그 줄에 「전액 취소된 승인」 표시를 남긴다(새로 고침해도 남음 — src.cancel). 돈이 틀리는 경고라 숫자 칸보다 위에.
@@ -673,22 +677,22 @@
     if (canc.length) {
       var cAmt = canc.reduce(function (a2, e) { return a2 + (Number(e.amount) || 0); }, 0);
       if (!s.delCancel) nCheck += canc.length;
-      h += '<div class="awarn" id="cCancelGone">' + ic('alert', 15) + '<span><b>이미 올린 승인 ' + n0(canc.length) + '건(' + won(cAmt) + ')이 이 파일에서 전액 취소로 확인됐습니다.</b> ' +
-        '그대로 두면 취소된 결제가 청구됩니다 — ' + esc(canc.slice(0, 5).map(function (e) {
+      h += '<div class="awarn" id="cCancelGone">' + ic('alert', 15) + '<span><b>이미 올린 승인 ' + n0(canc.length) + '건(' + won(cAmt) + ')이 이 파일에서 전액 취소로 확인됐어요.</b> ' +
+        '그대로 두면 취소된 결제가 청구돼요. 대상: ' + esc(canc.slice(0, 5).map(function (e) {
           return String(e.appr_date || '').slice(5).replace('-', '.') + ' ' + (e.merchant || '') + ' ' + n0(e.amount) + '원';
         }).join(', ')) + (canc.length > 5 ? ' 외 ' + n0(canc.length - 5) + '건' : '') + '</span></div>' +
         '<label class="finall" style="margin:6px 0 10px"><input type="checkbox" id="cCancelDel"' + (s.delCancel ? ' checked' : '') + '> 취소된 승인 ' + n0(canc.length) + '건 같이 지우기' +
-        (s.delCancel ? '' : ' <span class="dim">(지금은 지우지 않고 「전액 취소된 승인」으로 표시만 합니다)</span>') + '</label>';
+        (s.delCancel ? '' : ' <span class="dim">(지금은 지우지 않고 표시만 해요)</span>') + '</label>';
     }
     h += '<div class="facts cfacts">' +
       fact('새 줄', n0(pl.inserts.length) + '<small>줄</small>', '처음 들어오는 승인') +
-      fact('바뀐 줄', n0(pl.updates.length) + '<small>줄</small>', 'ERP 칸만 고침 — 구분·사용목적은 그대로') +
+      fact('바뀐 줄', n0(pl.updates.length) + '<small>줄</small>', 'ERP 칸만 바꾸고 구분·사용목적은 그대로 둬요') +
       fact('그대로', n0(pl.same.length) + '<small>줄</small>', '이미 같은 값') +
       fact('올릴 금액', won(amt), '새 줄 + 바뀐 줄') +
       fact('뺀 줄', n0(res.dropped.length) + '<small>줄</small>', '0원·취소·다른 달 등') + '</div>';
-    if (erp.found && erp.ok) h += '<div class="pdfok">' + ic('check', 15) + '<span>ERP 합계 ' + won(erp.fileTotal) + ' = 승인 ' + won(erp.approved) + ' − 취소 ' + won(erp.cancelled) + ' — 맞습니다</span></div>';
-    else if (!erp.found) h += '<div class="fhint">파일에 「합계」 줄이 없어 ERP 합계와 맞춰 보지 못했습니다.</div>';
-    if (pl.missing.length) h += '<div class="fhint">이 기간에 이미 있는데 <b>파일에 없는 줄 ' + n0(pl.missing.length) + '건</b> — 지우지 않습니다. 올린 뒤 표의 「파일에 없는 줄」 표시를 보고 필요 없으면 지워 주세요.</div>';
+    if (erp.found && erp.ok) h += '<div class="pdfok">' + ic('check', 15) + '<span>ERP 합계가 맞아요. 파일 합계 ' + won(erp.fileTotal) + ' = 승인 ' + won(erp.approved) + ' − 취소 ' + won(erp.cancelled) + '</span></div>';
+    else if (!erp.found) h += '<div class="fhint">파일에 ‘합계’ 줄이 없어 ERP 합계와 비교하지 못했어요.</div>';
+    if (pl.missing.length) h += '<div class="fhint">이 기간에 이미 있는데 <b>파일에 없는 줄 ' + n0(pl.missing.length) + '건</b>은 지우지 않아요. 올린 뒤 표에 ‘파일에 없는 줄’로 표시되니 필요 없으면 지워 주세요.</div>';
     if (res.dropped.length) {
       h += '<section class="sect" style="margin-top:12px"><div class="hd"><h2>뺀 줄</h2><span class="cnt">' + n0(res.dropped.length) + '줄</span></div>' +
         '<div class="panel"><div class="scroll" data-rows><table class="cdrop"><thead><tr><th class="n">엑셀 행</th><th>승인일</th><th>승인번호</th><th>가맹점</th><th class="n">금액</th><th>까닭</th></tr></thead><tbody>' +
@@ -705,7 +709,7 @@
       var nAct = nGo + nDel + nMark;      // 올릴 줄 + 같이 지울 취소 줄 + 표시만 남길 취소 줄(2026-10-20)
       b.disabled = !nAct || s.busy;
       // 개인경비 「N건 올리기」와 같은 이름(2026-10-15 — 예전 「넣기 (새 5 · 바뀜 0)」). 새·바뀐 줄 수는 위 숫자 칸에 있다.
-      b.textContent = !nAct ? '올릴 줄이 없습니다' : [nGo ? n0(nGo) + '건 올리기' : '', nDel ? '취소 ' + n0(nDel) + '건 지우기' : '', nMark ? '취소 ' + n0(nMark) + '건 표시' : '']
+      b.textContent = !nAct ? '올릴 줄이 없어요' : [nGo ? n0(nGo) + '건 올리기' : '', nDel ? '취소 ' + n0(nDel) + '건 지우기' : '', nMark ? '취소 ' + n0(nMark) + '건 표시' : '']
         .filter(Boolean).join(' · ') + (nCheck ? ' · 확인 ' + n0(nCheck) + '건' : '');
       b.title = nCheck ? '위의 경고를 확인한 뒤 올려 주세요' : '';
     }
@@ -737,7 +741,7 @@
     }, Promise.resolve()).then(function () {
       // 올린 뒤 취소된 승인 — 한 줄씩(실패해도 나머지는 계속, 몇 줄이 왜 남았는지 알린다)
       return toDel.reduce(function (p, e) {
-        return p.then(function () { return delOne(String(e.id)).then(function () { nDel++; }, function (er) { delFail.push(failMsg('지우지 못했습니다', er, why(er))); }); });
+        return p.then(function () { return delOne(String(e.id)).then(function () { nDel++; }, function (er) { delFail.push(failMsg('지우지 못했어요', er, why(er))); }); });
       }, Promise.resolve()).then(function () {
         return toMark.reduce(function (p, e) {
           var src = {}; Object.keys(e.src && typeof e.src === 'object' ? e.src : {}).forEach(function (k) { src[k] = e.src[k]; });
@@ -753,14 +757,15 @@
       MISSING = {};
       s.plan.missing.forEach(function (e) { MISSING[e.id] = 1; });
       C.closePanel();
-      var msg = '올렸습니다 — 새 ' + n0(s.plan.inserts.length) + '줄 · 바뀜 ' + n0(s.plan.updates.length) + '줄' +
-        (nDel ? ' · 전액 취소된 승인 ' + n0(nDel) + '줄을 지웠습니다' : '') +
-        (toMark.length ? ' · 전액 취소된 승인 ' + n0(nMark) + '줄은 표에 「전액 취소된 승인」으로 표시했습니다' : '') +
-        (s.plan.missing.length ? ' · 파일에 없는 줄 ' + n0(s.plan.missing.length) + '줄은 표에 표시했습니다' : '');
-      if (delFail.length) C.toast(msg + ' — 취소된 승인 ' + n0(delFail.length) + '줄은 지우지 못했습니다: ' + delFail[0], true);
+      var msg = '새 줄 ' + n0(s.plan.inserts.length) + '줄, 바뀐 줄 ' + n0(s.plan.updates.length) + '줄을 올렸어요.' +
+        (nDel ? ' 전액 취소된 승인 ' + n0(nDel) + '줄을 지웠어요.' : '') +
+        (toMark.length ? ' 전액 취소된 승인 ' + n0(nMark) + '줄은 지우지 않고 표에 표시했어요.' : '') +
+        (s.plan.missing.length ? ' 파일에 없는 ' + n0(s.plan.missing.length) + '줄도 표에 표시했어요.' : '');
+      if (delFail.length) C.toast(msg + ' 취소된 승인 ' + n0(delFail.length) + '줄은 남았어요. ' + delFail[0], true);
       else C.toast(msg);
     }).catch(function (e) {
-      C.toast(failMsg('올리지 못했습니다', e, why(e)) + (done ? ' (' + n0(done) + '줄은 들어갔습니다)' : ''), true);
+      // 일부만 들어갔으면 그 사실을 먼저(2026-10-24 검수 — 「다시 해 주세요」 뒤에 덧붙어 읽혔다)
+      C.toast(failMsg(done ? n0(done) + '줄만 올리고 나머지는 올리지 못했어요' : '올리지 못했어요', e, why(e)), true);
       if (b && document.contains(b)) { b.disabled = false; b.textContent = '다시 올리기'; }
     }).then(function () {
       s.busy = false; C_SENDING = false;
@@ -833,14 +838,14 @@
   /** AI 검증 모션 재료(2026-10-20) — 이번 달 카드 줄(날짜·가맹점·금액, 여섯 줄). 사진이 없으니 종이(카드 내역) 그림. */
   function cMotion(cyc) {
     var rows = mineRows(cyc).slice().sort(byDate);
-    return { title: 'AI가 카드 내역을 읽고 있습니다', cols: ['날짜', '가맹점', '금액(원)', '맞춰 보기'], N: 0, paper: 'sheet', more: Math.max(0, rows.length - 6),
+    return { title: 'AI가 카드 내역을 읽고 있어요', cols: ['날짜', '가맹점', '금액(원)', '맞춰 보기'], N: 0, paper: 'sheet', more: Math.max(0, rows.length - 6),
       rows: rows.slice(0, 6).map(function (it) { return { id: it.id, date: String(it.appr_date || '').slice(5).replace('-', '.'), place: it.merchant || '—', amt: n0(it.amount) }; }),
       photos: [] };
   }
   function runCheck() {
     var S = C.state(), u = me(), cyc = S.CYCKEY, k = vkey(u, cyc), mk = 'c:' + k, M = C.vx.aiMotion;
     if (VRUN.busy) return;
-    if (pending()) { C.toast('칸을 저장하는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
+    if (pending()) { C.toast('칸을 저장하는 중이에요. 잠시 후 다시 눌러 주세요.'); return; }
     var n = mineRows(cyc).length, s0 = sig(u, cyc);
     VRUN = { busy: true, note: '규칙을 살피는 중…', k: k, t0: Date.now() };
     if (M) { M.begin(mk, cMotion(cyc)); M.step(mk, { phase: 'run' }); }
@@ -866,25 +871,25 @@
       VR[k] = { at: Date.now(), sig: s0, res: res, ai: ai };
       CFRESH[k] = 1;                               // 이번에 들어와서 검증했다(V3 U9)
       setPreviewed(k, false);
-      C.toast('검증했습니다 — ' + sumText(res.summary) + (ai.note ? ' · ' + ai.note : '') + (ai.exNote ? ' · ' + ai.exNote : ''));
+      C.toast('검증했어요(' + sumText(res.summary) + ').' + (ai.note ? ' ' + C.endDot(ai.note) : '') + (ai.exNote ? ' ' + C.endDot(ai.exNote) : ''));
       // 응답이 왔다 — 실제 결과(항목이 가리키는 줄)로 카드 줄마다 딱지(80ms 간격) 뒤 결과 화면
       if (M) return M.finish(mk, M.chipsFrom(res.items || [], 'items', function (it) {
         return it.level === 'block' ? ['빈칸', 'bad', 4] : it.level === 'bad' ? ['불일치', 'bad', 3] : it.level === 'warn' ? ['확인 필요', 'warn', 2] : null;
       }));
-    }).catch(function (e) { C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true); })
+    }).catch(function (e) { C.toast(failMsg('검증하지 못했어요', e, '잠시 후 다시 눌러 주세요.'), true); })
       .then(function () { clearInterval(VTICK); VTICK = null; VRUN = { busy: false, note: '', k: '', t0: 0 }; if (M) M.end(mk); C.render(); });
   }
   /** AI 상태 → [값, 설명]. */
   function aiFact(ai, nRows) {
     if (!ai) return ['—', '검증 전'];
-    if (ai.status === 'ok') return ['완료', 'Gemini 가 ' + n0(nRows) + '줄의 구분·사용목적을 봤습니다'];
-    if (ai.status === 'cached') return ['완료', '같은 자료로 본 Gemini 결과를 다시 썼습니다'];
-    if (ai.status === 'none') return ['—', '카드 내역이 없습니다'];
+    if (ai.status === 'ok') return ['완료', 'AI가 ' + n0(nRows) + '줄의 구분·사용목적을 봤어요'];
+    if (ai.status === 'cached') return ['완료', '같은 자료로 본 AI 결과를 다시 썼어요'];
+    if (ai.status === 'none') return ['—', '카드 내역이 없어요'];
     return ['규칙만', ai.note || AI_FAIL];
   }
   var LV = { block: ['빈칸', 'bad'], bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
   function itemsHtml(items, links) {
-    if (!items || !items.length) return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">확인이 필요한 항목이 없습니다.</div></div></div>';
+    if (!items || !items.length) return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">확인이 필요한 항목이 없어요.</div></div></div>';
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, ref = (it.ref && it.ref.items) || [], go = '';
       if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-cvfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>'; }
@@ -927,34 +932,34 @@
     VITEMS = [];
     var verdict, clean = '';
     if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('Gemini') + '</span><span class="cvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
-    else if (!v) verdict = '아직 검증하지 않았습니다';
-    else if (!dataFresh) verdict = '자료가 바뀌었습니다 — 다시 검증해 주세요';
-    else if (s.block) verdict = '빈 칸이 있는 줄이 <em>' + n0(s.blank_rows) + '줄</em> — 채워야 상신할 수 있습니다';
-    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
-    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
-    else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
+    else if (!v) verdict = '아직 검증하지 않았어요';
+    else if (!dataFresh) verdict = '자료가 바뀌었어요. 다시 검증해 주세요.';
+    else if (s.block) verdict = '<em>' + n0(s.blank_rows) + '줄</em>에 빈 칸이 있어요. 채워야 상신할 수 있어요.';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있어요';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있어요'; clean = ' wait'; }
+    else { verdict = '<em>이상 없어요</em>'; clean = ' clean'; }
     // 2026-10-20 디자인 v2: 세 시스템 같은 단계 카드(C.vx.stepCard — 지금 할 단계 단추가 깜빡임, 도는 동안 진행 막대)
     // st — 빈 칸이 있어 ③ 이 지금일 때 ② 는 「끝」이 아니라 「아직」(누를 수는 있다 — 흰 바탕 단추, V3 B5)
     var card = function (n, title, desc, button, st) { return C.vx.stepCard(n, stage, title, desc, button, { busy: busy && n === 1, st: st }); };
     var mk = 'c:' + k, AM = C.vx.aiMotion;
     var none = !rows.length;
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
-      card(1, '검증하기 ' + C.vx.gemBadge('Gemini'), none ? '먼저 「이번 달 카드 내역」에서 ERP 엑셀을 올려 주세요.'
-        : busy ? '규칙으로 살피고, Gemini 가 구분·사용목적을 읽는 중입니다…'
-        : v && fresh ? '지금 자료로 검증했습니다. 고친 게 있으면 다시 눌러 주세요.'
-        : v && dataFresh ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(C.vx.whenText(new Date(v.at).toISOString())) + ') 결과입니다.'
-        : '빈칸·같은 승인번호·기간 밖·소유자·0원 줄과 같은 날 같은 금액의 개인경비를 규칙으로 보고, Gemini 가 구분이 가맹점·시간과 맞는지와 사용목적을 봅니다.',
-        C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? ((AM && AM.short(mk)) || VRUN.note || 'Gemini 가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
+      card(1, '검증하기 ' + C.vx.gemBadge('Gemini'), none ? '먼저 ‘이번 달 카드 내역’에서 ERP 엑셀을 올려 주세요.'
+        : busy ? '규칙으로 살피고, AI가 구분·사용목적을 읽는 중…'
+        : v && fresh ? '지금 자료로 검증했어요. 고친 게 있으면 다시 눌러 주세요.'
+        : v && dataFresh ? '먼저 지금 자료로 검증해 주세요. 지금 보이는 건 지난 검증(' + esc(C.vx.whenText(new Date(v.at).toISOString())) + ') 결과예요.'
+        : '규칙으로 빈칸, 중복, 기간 밖 줄을 보고 AI가 구분과 사용목적을 봐요.',
+        C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? ((AM && AM.short(mk)) || VRUN.note || 'AI가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
-      card(2, 'PDF 미리보기', v && fresh ? '결재자에게 갈 지출결의서(가로 A4)를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
+      card(2, 'PDF 미리보기', v && fresh ? '결재자에게 갈 지출결의서(가로 A4)를 열어 확인하세요.' : '검증을 먼저 해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>',
         blocked && !seen ? 'todo' : undefined) +
-      card(3, '상신', !canSubmit ? '이미 상신했습니다.' : blocked ? '구분·사용목적이 빈 줄이 있습니다 — 「빈 칸으로 가기」로 채운 뒤 ① 다시 검증하면 상신할 수 있습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+      card(3, '상신', !canSubmit ? '이미 상신했어요.' : blocked ? '구분·사용목적이 빈 줄이 있어요. 빈 칸을 채우고 다시 검증하면 상신할 수 있어요.' : stage === 3 ? '결재선을 고르고 상신하세요.' : 'PDF 미리보기를 먼저 확인해 주세요.',
         // 빈 칸이 있으면 지금 누를 단추는 「빈 칸으로 가기」(빨강·깜빡임) — 상신 단추는 그 아래 회색(못 누름)
         (blocked ? '<button class="btn big pri cta" data-cgoblank>' + ic('chev', 14) + '빈 칸으로 가기</button>' : '') +
         (canSubmit ? '<button class="btn big' + (stage === 3 && !blocked ? ' pri cta' : '') + '" id="btnOpenSubmit" data-kind="card"' + (stage === 3 && !blocked && !busy ? '' : ' disabled') + '>' +
           (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '')) + '</ol>';
-    var h = head('검증·상신', '순서대로 눌러 주세요 — 깜빡이는 단추가 지금 할 일입니다');
+    var h = head('검증·상신', '깜빡이는 버튼부터 순서대로 눌러 주세요.');
     h += apprStrip(a);
     h += cancelBand(rows);                 // 전액 취소된 승인이 남아 있으면 — 상신 전에 한 번 더(2026-10-20 AU2 #5 검증 경고)
     var af = aiFact(v && v.ai, rows.length);
@@ -965,7 +970,7 @@
     else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && dataFresh && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
       (v ? '마지막 검증 ' + esc(C.vx.whenText(new Date(v.at).toISOString())) : '검증 전') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
       '<p class="verdict' + (busy ? '' : clean) + '">' + verdict + '</p>' +
-      (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적 — 상신을 막음', s.block > 0) +
+      (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적이 비면 상신할 수 없어요', s.block > 0) +
         fact('불일치', n0(s.bad), '같은 승인번호가 두 번', s.bad > 0) + fact('확인 필요', n0(s.warn), '기간 밖 · 소유자 · 구분·사용목적 · 개인경비 중복') + fact('참고', n0(s.info), '0원 줄') +
         '<div class="fact" id="cAiFact"><div class="k">AI 확인 ' + C.vx.gemBadge() + '</div><div class="v">' + esc(af[0]) + '</div><div class="sub">' + esc(af[1]) + '</div></div></div>' +
         (v.ai && v.ai.note ? '<div class="awarn" id="cAiNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.note) + '</span></div>' : '') +
@@ -976,26 +981,26 @@
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, true));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!none && !busy) {
-      h += '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">위 ① 「검증하기」를 누르면 이번 달 카드 내역을 살펴봅니다.</div>' +
-        '<div class="d">구분·사용목적이 빈 줄만 상신을 막습니다. 나머지(같은 승인번호·기간 밖·소유자·0원·구분과 내역·사용목적·개인경비 중복)는 결재자가 같이 봅니다.</div></div></div>';
+      h += '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">‘검증하기’를 누르면 이번 달 카드 내역을 살펴봐요.</div>' +
+        '<div class="d">구분·사용목적이 빈 줄만 상신을 막아요. 같은 승인번호, 이 기간 밖 승인일, 소유자가 상신자와 다른 줄, 0원 줄, 구분·내역이 맞지 않아 보이는 줄, 짧거나 모호한 사용목적, 개인경비와 겹칠 수 있는 줄은 상신을 막지 않고 결재자도 같이 봐요.</div></div></div>';
     }
-    h += '<div class="anote">금액은 ERP 승인금액 그대로이고 바꾸지 않습니다. ' + C.vx.gemBadge('Gemini') + ' 는 <b>구분이 가맹점·시간과 맞지 않아 보이는 줄과 성의 없는 사용목적을 표시</b>만 하고 값을 고치거나 상신을 막지 않습니다(카드번호·이름은 보내지 않습니다).</div>';
+    h += '<div class="anote">금액은 ERP 승인금액 그대로이고, ' + C.vx.gemBadge('AI') + '는 <b>가맹점·시간과 맞지 않아 보이는 구분과 성의 없는 사용목적을 표시</b>만 해요. 값을 고치거나 상신을 막지 않고, 카드번호·이름은 AI에 보내지 않아요.</div>';
     return h;
   }
   /** 결재 중·결재 완료 기간의 검증·상신 화면(2026-10-15 화면 정리, 개인경비 lockedVerify 와 같은 모양) — 다시 검증하지 않는다.
    *  상신 때 굳힌 검증 결과(card_frozen.verify)만 보이고, 문서는 위 결재 띠의 PDF·엑셀 단추로 본다
    *  (예전: 「아직 검증하지 않았습니다」·없는 ① 단추 안내·띠와 같은 문서의 「결재 문서 PDF」 단추가 또 하나). */
   function lockedVerify(rows, a) {
-    var h = head('검증·상신', a.status === 'approved' ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다');
+    var h = head('검증·상신', a.status === 'approved' ? '결재가 끝난 기간이에요.' : '결재 중인 기간이에요.');
     h += apprStrip(a);
     var f = FZSUM[fzKey(a)], v = f && f.verify, s = (v && v.summary) || {}, items = (v && v.items) || [];
     var verdict, clean = '';
-    if (f === undefined) verdict = FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했습니다 — 잠시 뒤 다시 열어 주세요' : '상신 때 검증 결과를 불러오는 중…';
-    else if (!v) verdict = '상신 때 검증 결과가 없습니다';
-    else if (s.block) verdict = '빈 칸이 있는 줄이 <em>' + n0(s.blank_rows || s.block) + '줄</em> 있었습니다';
-    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었습니다';
-    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었습니다'; clean = ' wait'; }
-    else { verdict = '<em>이상 없었습니다</em>'; clean = ' clean'; }
+    if (f === undefined) verdict = FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요. 잠시 후 다시 열어 주세요.' : '상신 때 검증 결과를 불러오는 중…';
+    else if (!v) verdict = '상신 때 검증 결과가 없어요';
+    else if (s.block) verdict = '빈 칸이 있는 줄이 <em>' + n0(s.blank_rows || s.block) + '줄</em> 있었어요';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었어요';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었어요'; clean = ' wait'; }
+    else { verdict = '<em>이상 없었어요</em>'; clean = ' clean'; }
     var at = v && (v.ran_at || (f && f.frozen_at));
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
       '상신 때 검증 결과' + (at ? ' · ' + esc(C.vx.whenText(at)) : '') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
@@ -1006,7 +1011,7 @@
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, false));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     }
-    h += '<div class="anote">' + (a.status === 'approved' ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않습니다. 결재 문서는 위 결재 띠의 PDF 단추로 봅니다.</div>';
+    h += '<div class="anote">' + (a.status === 'approved' ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않아요. 결재 문서는 PDF로 확인하세요.</div>';
     return h;
   }
   /** 상신 창이 「상신」을 누른 직후 — 미리보기 뒤 자료가 바뀌었거나 빈 칸이 있으면 멈추고({blocked}), 아니면 요약을 돌려준다. */
@@ -1023,7 +1028,7 @@
       var goVerify = function () { C.closePanel(); if (C.state().VIEW !== 'c_verify') C.go('c_verify'); else C.render(); };
       if (seen != null && sig(u, cyc) !== seen) {
         setPreviewed(k, false); goVerify();
-        C.toast('미리보기 뒤에 카드 내역이 바뀌었습니다. PDF를 다시 확인해 주세요.', true);
+        C.toast('미리보기 후에 카드 내역이 바뀌었어요. PDF를 다시 확인해 주세요.', true);
         return { blocked: true };
       }
       // 검증하기 때 받은 Gemini 결과(같은 자료)를 그대로 더한다 — 서버도 같은 지문의 보관본으로 C07·C08 을 굳힌다.
@@ -1031,7 +1036,7 @@
       VR[k] = { at: Date.now(), sig: sig(u, cyc), res: res, ai: ai0 };
       if (res.summary.block) {
         goVerify();
-        C.toast('구분·사용목적이 빈 줄이 ' + n0(res.summary.blank_rows) + '건 있습니다. 채운 뒤 상신해 주세요.', true);
+        C.toast('구분·사용목적이 빈 줄이 ' + n0(res.summary.blank_rows) + '건 있어요. 채운 뒤 상신해 주세요.', true);
         return { blocked: true };
       }
       return { bad: res.summary.bad, warn: res.summary.warn, info: res.summary.info };
@@ -1072,7 +1077,7 @@
       noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원 · 개인경비 중복)' +
         (aiUsed === true ? ' + Gemini 구분·사용목적 확인' : aiUsed === false ? ' · Gemini 확인 없음' : ''),
       // 검증 결과 창(C.vx.showItems) 한 줄 — 검증 화면과 같은 말. 모르면 말하지 않는다(2026-10-21: 예전엔 늘 「Gemini 읽기 없음」)
-      aiNote: aiUsed === true ? 'Gemini 가 구분·사용목적을 봤습니다' : aiUsed === false ? 'AI 검증을 하지 못했습니다(규칙 검증만)' : '',
+      aiNote: aiUsed === true ? 'AI가 구분·사용목적을 봤어요' : aiUsed === false ? 'AI 검증을 하지 못했습니다(규칙 검증만)' : '',
       notes: ['· 금액은 ERP 에서 받은 승인금액 그대로입니다(취소·0원 줄은 올릴 때 뺐습니다).',
         '· 구분·사용목적이 빈 줄이 있으면 상신할 수 없습니다. 나머지 항목은 결재자가 보고 판단합니다.'],
       summary: { bad: (s.block || 0) + (s.bad || 0), warn: s.warn || 0, info: s.info || 0, receipts: 0, read: 0 },
@@ -1098,7 +1103,7 @@
     var S = C.state(), u = me(), cyc = S.CYCKEY, a = myC(cyc);
     if (a && (a.status === 'submitted' || a.status === 'approved')) { pdfFrozen(a.id); return; }
     var rows = mineRows(cyc);
-    if (!rows.length) { C.toast('이 기간에 담을 카드 내역이 없습니다.', true); return; }
+    if (!rows.length) { C.toast('이 기간에 담을 카드 내역이 없어요.', true); return; }
     var k = vkey(u, cyc), v = VR[k];
     var d = cDoc(u, cyc, rows, null, null, v ? vOf(v.res, v.at, v.ai) : null, 'preview', '상신 전 미리보기 · ' + C.vx.whenText(new Date().toISOString()) + ' 출력');
     showPdf(d, { title: 'PDF 미리보기 — 법인카드', sub: d.person.name + ' · ' + cycName(cyc) + ' (' + R.span(cyc) + ')',
@@ -1125,13 +1130,13 @@
   var MARK_SUFFIX = { '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' };
   function pdfFrozen(id) {
     var a = apprById(id);
-    if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
+    if (!a) { C.toast('결재 건을 찾지 못했어요.', true); return; }
     fetchFrozen(a).then(function (fz) {
-      if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다. 관리자에게 알려 주세요.', true); return; }
+      if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했어요. 관리자에게 알려 주세요.', true); return; }
       var o = frozenOpts(a, fz);
       if (a.status === 'approved') o.prints = { kind: 'card', ids: [a.id] };      // 결재 완료본 — 내려받기·열기를 누르면 출력 기록(2026-10-14)
       C.vx.makePdf(o).catch(function () { });
-    }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.', true); });
+    }).catch(function () { C.toast('결재 문서를 불러오지 못했어요. 잠시 후 다시 해 주세요.', true); });
   }
   function frozenOpts(a, fz) {
     var d = frozenDoc(a, fz), done = a.status === 'approved';
@@ -1154,14 +1159,14 @@
   function xlsxFrozen(id) {
     var a = apprById(id); if (!a) return;
     fetchFrozen(a).then(function (fz) {
-      if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했습니다.', true); return; }
+      if (!fz) { C.toast('상신 때 저장한 자료를 찾지 못했어요. 관리자에게 알려 주세요.', true); return; }
       var d = frozenDoc(a, fz), x = SH.xlsxBytes(d, window.Xlsx);
       var sum = d.items.reduce(function (s, it) { return s + it.amount; }, 0), exp = (a.snapshot || {}).cost;
       C.saveBlob(x.bytes, '법인카드_지출결의_' + C.vx.safeName(d.person.name) + '_' + a.cycle + MARK_SUFFIX[d.meta.mark] + '.xlsx');
       if (a.status === 'approved' && C.prints) C.prints.log('card', a.id, 'xlsx');        // 출력 기록(기다리지 않는다)
-      if (exp != null && Math.round(sum) !== Math.round(Number(exp))) C.toast('엑셀 합계 ' + n0(sum) + '원이 상신 때 금액 ' + n0(exp) + '원과 다릅니다. 관리자에게 알려 주세요.', true);
-      else C.toast('엑셀을 내려받습니다.');
-    }).catch(function () { C.toast('결재 문서를 불러오지 못했습니다.', true); });
+      if (exp != null && Math.round(sum) !== Math.round(Number(exp))) C.toast('엑셀 합계 ' + n0(sum) + '원이 상신 때 금액 ' + n0(exp) + '원과 달라요. 관리자에게 알려 주세요.', true);
+      else C.toast('엑셀을 다운로드해요.');
+    }).catch(function () { C.toast('결재 문서를 불러오지 못했어요.', true); });
   }
 
   /* ══════════════════ 결재함 카드 · 결재 요약 ══════════════════ */
@@ -1217,7 +1222,7 @@
       var p0 = Number(prev.snapshot.cost) || 0, d = cost - p0, pct = p0 ? Math.round(d / p0 * 100) : null;
       cmp = '<div class="abf"><span class="k">전월(' + pm + ') 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' + (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) +
         (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b><span class="sub">' + pm + ' ' + won(p0) + ' · ' + n0(prev.snapshot.n) + '건</span></div>';
-    } else cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 법인카드 결재가 없습니다' : '추가 기간은 전월과 견주지 않습니다') + '</span></div>';
+    } else cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 법인카드 결재가 없어요' : '추가 기간은 전월과 비교하지 않아요') + '</span></div>';
     var v = f && f.verify, vs = (v && v.summary) || null;
     var items = ((v && v.items) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
     var checks = [];
@@ -1229,14 +1234,14 @@
         var n = rowsOf(c[0]); if (n) checks.push(['warn', c[1] + ' ' + n0(n) + '줄']);
       });
     } else if (f === undefined) { if (!FZFAIL[fzKey(a)]) checks.push(['warn', '검증 결과를 불러오는 중…']); }   // 못 받았으면 그 줄은 없앤다(판정 띠가 말한다)
-    else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
+    else checks.push(['warn', '상신 때 검증 결과가 없어요']);
     var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
       nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length;
     var asApprover = a.username !== (C.state().ME || {}).username;   // 결재하는 분 — 상신자 할 일(고치세요)은 보이지 않는다
-    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했습니다' : f === undefined ? '검증 결과를 불러오는 중입니다' : '검증 결과를 아직 받지 못했습니다') + ' — 아래 「PDF 받기」로 문서를 열어 확인해 주세요']
-      : nBad ? ['bad', asApprover ? '확인이 필요합니다 — 문서의 불일치 항목을 보고 결재해 주세요' : '검증에서 맞지 않는 곳이 있습니다 — 결재하는 분이 문서에서 함께 봅니다']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
-      : nWarn ? ['warn', '대체로 정상입니다 — ' + C.vx.warnTail(items, vs, asApprover)]
-      : ['ok', '금액·검증 모두 이상 없습니다' + (myTurn(a) ? ' — 문서를 열지 않고 승인하셔도 됩니다' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 받기’로 문서를 열어 확인해 주세요.']
+      : nBad ? ['bad', asApprover ? '확인이 필요해요. 문서의 불일치 항목을 보고 결재해 주세요.' : '검증에서 맞지 않는 곳이 있어요. 결재자도 문서에서 함께 봐요.']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
+      : nWarn ? ['warn', '대체로 정상이에요. ' + C.vx.warnTail(items, vs, asApprover) + '.']
+      : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
     return '<div class="abrief ' + verdict[0] + '"><div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
       '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + esc(catLine(s.by_cat)) + '</span></div>' +
@@ -1244,8 +1249,8 @@
       cmp + '</div><div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
         return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
-      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 아래 검증 딱지를 눌러 전부 보기</li>' : '') +
-        (asApprover ? '<li class="more">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') + '</div>';
+      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건은 ‘검증’ 버튼을 누르면 모두 보여요.</li>' : '') +
+        (asApprover ? '<li class="more">고치는 것은 상신자가 해요. 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') + '</div>';
   }
   function sumHtml(a) {
     var s = a.snapshot || {};
@@ -1306,7 +1311,7 @@
         return { u: x.u, st: st, last: Math.max(lastC[x.u] || 0, a ? (Date.parse(a.closed_at || a.updated_at || '') || 0) : 0),
           left: st === 'rejected' ? '반려 사유: ' + (rs && rs.comment ? String(rs.comment).replace(/\s+/g, ' ') : '(사유 없음)')
             : (st === 'withdrawn' ? '회수함 · ' : '') + '카드 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.blank ? ' · 빈칸 ' + n0(x.blank) + '줄' : '') };
-      }), { wide: true, none: '이번 달 카드 내역이 있는 사람은 모두 상신했습니다' }) + '</div>';
+      }), { wide: true, none: '이번 달 카드 내역이 있는 사람은 모두 상신했어요' }) + '</div>';
     }
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>카드 내역이 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.cost) + '</p>' +
@@ -1342,8 +1347,8 @@
             '<td class="n" style="white-space:nowrap">' +
             (x.n ? '<button class="btn sm" data-cperson="' + esc(x.u) + '">내역</button>' : '') + '</td></tr>';
         }).join('');
-      }).join('') + '</tbody></table></div></div>' : C.blank('이 기간에 카드 내역이 있는 사람이 없습니다.', null, 'users'));
-    h += '<div class="anote">결재 상태·결재 완료본 받기·관리자 반려·정정 열기는 「결재 완료 출력」에서 합니다.</div>';
+      }).join('') + '</tbody></table></div></div>' : C.blank('이 기간에 카드 내역이 있는 사람이 없어요.', null, 'users'));
+    h += '<div class="anote">결재 상태 확인, 결재 완료 문서 다운로드, 관리자 반려, 정정 열기는 ‘결재 완료 출력’에서 해요.</div>';
     return h;
   }
   /** 직원 현황(법인카드) — 등록된 모든 직원의 이번 달 카드 내역(카드가 없는 사람도 명단에). */
@@ -1360,7 +1365,7 @@
     var none = list.filter(function (x) { return !x.n; }).length;
     var h = head('직원 현황', n0(list.length) + '명');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 달 법인카드</div>' +
-      '<p class="verdict">' + (list.length - none ? '<em>' + n0(list.length - none) + '명</em>이 카드 내역을 올렸습니다' : '<em>아직 올린 카드 내역이 없습니다</em>') + '</p>' +
+      '<p class="verdict">' + (list.length - none ? '<em>' + n0(list.length - none) + '명</em>이 카드 내역을 올렸어요' : '<em>아직 올린 카드 내역이 없어요</em>') + '</p>' +
       '<div class="facts">' + fact('등록 인원', n0(list.length) + '<small>명</small>') + fact('내역 있음', n0(list.length - none) + '<small>명</small>') + fact('내역 없음', n0(none) + '<small>명</small>') + '</div></div>';
     list.sort(function (x, y) { return y.sum - x.sum; });
     h += C.sect('명단', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>직급</th>' +
@@ -1374,8 +1379,8 @@
             '<td>' + (x.blank ? '<span class="st bad">' + n0(x.blank) + '줄</span>' : '<span class="dim">—</span>') + '</td>' +
             '<td>' + (x.a ? stChip(x.a) : (x.n ? '<span class="st warn">상신 전</span>' : '<span class="dim">—</span>')) + '</td></tr>';
         }).join('');
-      }).join('') + '</tbody></table></div></div>' : C.blank('보는 범위에 직원이 없습니다.', null, 'users'));
-    h += '<div class="anote">줄을 누르면 그 사람의 카드 내역(전체 내역)으로 갑니다.</div>';
+      }).join('') + '</tbody></table></div></div>' : C.blank('보는 범위에 직원이 없어요.', null, 'users'));
+    h += '<div class="anote">줄을 누르면 전체 내역에서 그 사람의 카드 내역이 열려요.</div>';
     return h;
   }
   var CL = { cat: '', who: '', blank: false };
@@ -1424,7 +1429,7 @@
               '<td class="el" title="' + esc(it.purpose || '') + '">' + (String(it.purpose || '').trim() ? esc(it.purpose) : '<span class="st warn">빈칸</span>') + '</td><td class="el dim">' + esc(it.note || '') + '</td></tr>';
           }).join('');
       }).join('') + '</tbody><tfoot><tr><td colspan="5">보이는 ' + n0(rows.length) + '건 합계</td><td class="n total">' + n0(total) + '</td><td colspan="3"></td></tr></tfoot></table></div></div>'
-      : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 카드 내역이 없습니다.</div><div style="margin-top:12px"><button class="btn sm" data-cclear>조건 지우기</button></div></div></div>');
+      : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 카드 내역이 없어요.</div><div style="margin-top:12px"><button class="btn sm" data-cclear>조건 지우기</button></div></div></div>');
     return h;
   }
   /** 카드번호 끝 4자리만(「…1234」). 숫자가 4자리보다 적으면 그대로. */
@@ -1454,7 +1459,7 @@
     });
     out.push(['합계', '', '', '', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '']);
     C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_내역_' + S.CYCKEY + scopeSuffix() + '.csv', 'text/csv;charset=utf-8');
-    C.toast('CSV 를 내려받습니다(' + n0(rows.length) + '건).');
+    C.toast('카드 내역 ' + n0(rows.length) + '건을 CSV로 다운로드했어요.');
   }
   var FINSEL = {}, FINJOB = null;
   // 고르기 · 이 팀 모두 고르기 · 이름으로 찾기는 다시 그리지 않고 그 자리에서(C.fin — 운행일지 결재 완료 출력과 같게, 2026-10-23).
@@ -1490,7 +1495,7 @@
     // 이름으로 찾기(2026-10-23) — 표에는 shown 을 다 그리고 안 맞는 줄은 C.fin 이 그 자리에서 숨긴다. 고른 수는 보이는 줄만.
     var vis = shown.filter(finVisible), nSel = vis.filter(function (a) { return FINSEL[a.id]; }).length;
     var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
-    var h = head('법인카드 결재 완료 출력', '결재가 끝난 지출결의서를 모아 출력합니다');
+    var h = head('법인카드 결재 완료 출력', '결재가 끝난 지출결의서를 모아 출력해요.');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       // 분류는 운행일지 결재 완료 출력과 같은 셋(결재 중·반려·미상신, 결재 완료는 위 큰 제목) — 회수는 다시 올리기 전까지 미상신(2026-10-19)
@@ -1500,7 +1505,7 @@
     var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-cfinpdf data-finbtn="card"' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-cfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('card') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
-      ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
+      ? C.blank('출력 안 한 결재 완료 문서가 없어요.', '모두 한 번 이상 출력됐어요. ‘출력 안 한 것만’을 다시 누르면 전체가 보여요.', 'stamp')
       // 2026-10-23: 표 위 이름 찾기 · 팀 머리 줄 「이 팀 모두 고르기」 · 고르기는 다시 그리지 않음(C.fin) · 다시 그려도 안쪽 스크롤 그대로(data-keep)
       : done.length ? FIN.bar('card') + '<div class="panel"><div class="scroll" data-rows data-keep="fin"><table class="rcard ftab" data-fin="card"><thead><tr>' +
       // 세 표 같은 열 순서(팀 묶음 + 파트·센터 · 이름 · 상태) · 「전체 선택」은 표 머리 첫 칸(2026-10-19 사용성 2차 #12, 운행일지와 같게)
@@ -1522,7 +1527,7 @@
               ['data-appr="reopen" data-kind="card" data-id="' + a.id + '"', '정정 열기', true]]) + '</td></tr>';
         }).join('');
       }).join('') + FIN.none(9) + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
-      : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
+      : C.blank('아직 결재가 끝난 건이 없어요.', '결재가 끝나면 여기에 모여요.', 'stamp'));
     if (going.length) {
       h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
         C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 8, '') + g.list.map(function (a) {
@@ -1556,7 +1561,7 @@
     });
     out.push(['합계', '', '', '', tn, tc, '']);
     C.saveBlob(new TextEncoder().encode(csvText(out)), '법인카드_결재완료_금액요약_' + S.CYCKEY + scopeSuffix() + '.csv', 'text/csv;charset=utf-8');
-    C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
+    C.toast('요약표를 다운로드해요(' + n0(done.length) + '명).');
   }
   /** 고른 결재 완료 건을 PDF 한 파일로 — 한 사람씩 고정본으로 만든 뒤 이어 붙인다(한 번에 20명까지). */
   function finBundle() {
@@ -1565,7 +1570,7 @@
     var ord = FIN.order(Object.keys(FINSEL).map(apprById).filter(function (a) { return a && a.status === 'approved' && finVisible(a); }), function (a) { return a.username; });
     var list = ord.list;
     if (!list.length || FINJOB) return;
-    if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true); return; }
+    if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있어요(지금 ' + list.length + '명). 나눠서 골라 다운로드해 주세요.', true); return; }
     var job = FINJOB = {};
     C.openPanel('법인카드 결재 완료본 묶어 받기', cycName(S.CYCKEY) + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="cFinNote" role="status">준비하는 중…</div></div>',
@@ -1587,13 +1592,13 @@
         }).then(function (res) {
           parts.push(res.bytes); partIds.push(a.id);
           var sum = (res.totals[0] || {}).all || 0, exp = (a.snapshot || {}).cost;
-          if (exp != null && Math.round(sum) - Math.round(Number(exp)) !== 0) checks.push(d.person.name + ' — 문서 합계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(exp) + '원');
+          if (exp != null && Math.round(sum) - Math.round(Number(exp)) !== 0) checks.push(d.person.name + ' 님: 문서 합계 ' + n0(sum) + '원과 결재 금액 ' + n0(exp) + '원이 다름');
         });
       }).catch(function () { skipped.push(C.nameOf(a.username)); }).then(function () { if (alive()) return one(i + 1); });
     };
     one(0).then(function () {
       if (!alive()) return null;
-      if (!parts.length) throw new Error('만든 문서가 없습니다');
+      if (!parts.length) throw new Error('만든 문서가 없어요');
       note('한 파일로 묶는 중…');
       var P = window.PDFLib;
       return P.PDFDocument.create().then(function (out) {
@@ -1613,9 +1618,9 @@
       C.vx.setPdfUrls([url]);
       var file = '법인카드_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';   // 한 팀만이면 팀 이름(2026-10-23)
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div><div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
-        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) + ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '') +
-        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인 필요: ' + esc(checks.join(' · ')) + '</span></div>' : '') +
-        (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다 — 합계 점검 이상 없음</span></div>' : '') + '</div>';
+        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) + ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF 받기’로 다시 다운로드해 주세요.</span></div>' : '') +
+        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF 받기’로 다시 다운로드해 확인해 주세요.<br>' + checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
+        (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었어요. 합계도 맞아요.</span></div>' : '') + '</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button><a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
       if (C.prints) C.prints.bindOut($('pFoot'), 'card', partIds, url);    // 묶은 사람마다 한 번씩 출력 기록
@@ -1623,7 +1628,7 @@
     }).catch(function (e) {
       if (FINJOB !== job) return;
       FINJOB = null;
-      if ($('cFinNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(failMsg('PDF 한 파일로 묶지 못했습니다', e, '새로 고침 뒤 다시 해 주세요.')) + '</span></div>';
+      if ($('cFinNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(failMsg('PDF 한 파일로 묶지 못했어요', e, '새로고침한 뒤 다시 해 주세요.')) + '</span></div>';
       C.render();
     });
     C.render();
@@ -1709,8 +1714,8 @@
     cycLabel: function (a) { return cycName(a.cycle) + ' (' + R.span(a.cycle) + ')'; },
     submitHead: function () {
       var S = C.state(), rows = mineRows(S.CYCKEY), T = R.totals(rows), warn = [], bl = R.blankRows(rows);
-      if (!rows.length) warn.push('이 기간에 올린 카드 내역이 없습니다 — 먼저 ERP 엑셀을 올려 주세요');
-      if (bl) warn.push('구분·사용목적이 빈 줄 ' + n0(bl) + '건 — 채워야 상신됩니다');
+      if (!rows.length) warn.push('이 기간에 올린 카드 내역이 없어요. 먼저 ERP 엑셀을 올려 주세요.');
+      if (bl) warn.push('구분·사용목적이 빈 줄이 ' + n0(bl) + '건 있어요. 채워야 상신할 수 있어요.');
       return { title: cycName(S.CYCKEY) + ' 법인카드 상신', sub: R.span(S.CYCKEY) + ' · ' + n0(T.n) + '건 · ' + won(T.cost), warn: warn };
     },
     rangeHi: function () { return rangeHiMs(C.state().CYCKEY); },

@@ -125,13 +125,13 @@
     var key = esc(kind + ':' + a.id), CR = C.CR || window.CycleRules, cy = CR.parse(a.cycle),
       who = esc(C.nameOf(a.username) + ' · ' + (cy ? CR.name(cy) : String(a.cycle || '')));   // 다른 창과 같은 「2026년 9월분」(2026-10-15) · 「2026년 12월분 2차」(연말 추가 기간, 2026-10-20)
     if (!s.n) {
-      return '<button type="button" class="prb none" data-prhist="' + key + '" data-prwho="' + who + '" title="아직 아무도 출력하지 않았습니다 — 눌러서 출력 기록 보기">미출력</button>';
+      return '<button type="button" class="prb none" data-prhist="' + key + '" data-prwho="' + who + '" title="아직 아무도 출력하지 않았어요. 누르면 출력 기록이 열려요.">미출력</button>';
     }
     var tip = [s.n_pdf ? FMT.pdf + ' ' + n0(s.n_pdf) + '회' : '', s.n_print ? FMT.print + ' ' + n0(s.n_print) + '회' : '',
       s.n_xlsx ? FMT.xlsx + ' ' + n0(s.n_xlsx) + '회' : ''].filter(Boolean).join(' · ');
     // 두 덩어리(「출력 N회 ·」 · 「마지막 MM.DD HH:MM 이름」) — 칸이 좁으면 그 사이에서 줄을 바꾼다(2026-10-21 매뉴얼 로봇:
     //   한 줄로만 늘어나 1280 결재 완료 출력 표가 칸보다 넓어지고 「정정 열기」가 밀려났다). 글자는 예전과 같다.
-    return '<button type="button" class="prb done" data-prhist="' + key + '" data-prwho="' + who + '" title="' + esc(tip + ' — 눌러서 전체 출력 기록 보기') + '">' +
+    return '<button type="button" class="prb done" data-prhist="' + key + '" data-prwho="' + who + '" title="' + esc(tip + '. 누르면 전체 출력 기록이 열려요.') + '">' +
       '<span>출력 ' + n0(s.n) + '회 ·</span> <span>마지막 ' + esc(kst(s.last_at)) + ' ' + esc(s.last_name || s.last_by || '') + '</span></button>';
   }
   function stat(kind, id) { return KINDS[kind] ? ST[kind][id] : undefined; }
@@ -160,9 +160,9 @@
       rows = Array.isArray(rows) ? rows : [];
       var cur = rows.filter(function (r) { return r.cur !== false; }).length;
       body.innerHTML = !rows.length
-        ? C.blank('아직 아무도 출력하지 않았습니다.', '결재 완료본을 PDF·엑셀로 받으면 여기에 남습니다.', 'stamp')
-        : '<div class="anote" style="margin-top:0">이번 결재 완료 뒤 <b>' + n0(cur) + '회</b> 출력했습니다. 시각은 한국시간입니다.' +
-          (rows.length > cur ? ' 정정 전 판의 출력 ' + n0(rows.length - cur) + '회는 흐리게 보입니다(횟수에 넣지 않습니다).' : '') + '</div>' +
+        ? C.blank('아직 아무도 출력하지 않았어요.', '결재 완료 문서를 PDF·엑셀로 다운로드하거나 ‘열기 · 인쇄’로 열면 여기에 기록돼요.', 'stamp')
+        : '<div class="anote" style="margin-top:0">이번 결재 완료 후 <b>' + n0(cur) + '회</b> 출력됐어요. 시각은 한국시간이에요.' +
+          (rows.length > cur ? ' 정정 전 판의 출력 ' + n0(rows.length - cur) + '회는 흐리게 보이고 횟수에 넣지 않아요.' : '') + '</div>' +
           '<div class="panel" style="margin-top:12px"><div class="scroll"><table class="prhist"><thead><tr><th>날짜·시각</th><th>이름</th><th>형식</th></tr></thead><tbody>' +
           rows.map(function (r) {
             return '<tr' + (r.cur === false ? ' class="old"' : '') + '><td>' + esc(kst(r.at, true)) + '</td><td>' + esc(r.name || r.username || '') +
@@ -171,7 +171,7 @@
     }).catch(function (e) {
       if (!mine()) return;
       console.warn('출력 기록을 받지 못했습니다:', (e && e.message) || e);
-      body.innerHTML = '<div class="awarn">' + C.ic('alert', 15) + '<span>출력 기록을 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.</span></div>';
+      body.innerHTML = '<div class="awarn">' + C.ic('alert', 15) + '<span>출력 기록을 불러오지 못했어요. 잠시 후 다시 해 주세요.</span></div>';
     });
   }
 

@@ -157,7 +157,7 @@
           warn = mem.some(function (o) { return need(lineOf(o)) > 0; }) || (anyAuto && need(nodeLine(k)) > 0);
         return '<button class="onode d' + d + (SEL === k ? ' on' : '') + '" data-onode="' + esc(k) + '"' + (warn ? ' data-owarn="1"' : '') + '>' +
           '<span class="nm">' + esc(nodeName(k)) + '</span>' +
-          (warn ? '<span class="dot warn" title="결재선을 다 못 채우는 직원이 있습니다"></span>' : '') +
+          (warn ? '<span class="dot warn" title="결재선을 다 못 채우는 직원이 있어요"></span>' : '') +
           '<span class="c">' + n0(tree[k]) + '</span></button>';
       }).join('');
 
@@ -171,22 +171,23 @@
         '<span class="st ' + (ch.notes.length ? 'warn' : 'ok') + '">' + (ch.notes.length ? '다 못 채움 ' + ch.notes.length + '칸' : ch.over ? '지정으로 다 채움' : '조직도로 다 채움') + '</span></div>' +
         lineHtml(ch.steps) + notesHtml(ch.notes) +
         (!ch.over && ch.nOv ? '<div class="anote" id="oLineOv" style="margin-top:10px">이 부서 직원 ' + n0(ch.mem) + '명 중 <b>' + n0(ch.nOv) +
-          '명</b>은 관리자가 결재선을 지정했습니다 — 아래 표의 「지정」 딱지를 보세요.</div>' : '') +
-        '<div class="anote" style="margin-top:10px">장 본인이 상신하면 자기 칸은 비웁니다. 결재선을 바꾸려면 사람의 <b>직책</b>(센터장·파트장·팀장·사업부장)·' +
-        '<b>소속</b>·<b>앱 계정</b>을 고치세요 — 바로 반영됩니다. 직책으로 안 맞는 사람은 표의 「결재선 지정」으로 칸마다 정합니다' +
-        '(한 사람씩 또는 이 부서 모두). 직원은 상신 창에서 칸마다 바꾸거나 비울 수 있습니다.</div></div>';
+          '명</b>은 관리자가 결재선을 지정했어요. 표에 ‘지정’으로 표시돼요.</div>' : '') +
+        '<div class="anote" style="margin-top:10px">장 본인이 상신하면 자기 칸은 빈칸이 돼요. 사람의 <b>직책</b>(센터장, 파트장, 팀장, 사업부장), ' +
+        '<b>소속</b>, <b>앱 계정</b>을 고치면 결재선에 바로 반영돼요. 직책으로 맞지 않는 사람은 ‘결재선 지정’으로 한 사람씩 또는 이 부서 모두의 ' +
+        '칸을 정하세요. 직원도 상신 창에서 칸마다 바꾸거나 비울 수 있어요.</div></div>';
     } else {
       // 설명 6줄은 「?」 안에 접는다(2026-10-19 웹 사용성 1차) — 첫 문장만 늘 보인다.
-      right = '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 상신 창을 열 때 조직도로 미리 채워집니다.</b> ' +
+      right = '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 상신 창을 열 때 조직도로 미리 채워져요.</b> ' +
         '<details class="ohelp"><summary aria-label="결재선이 채워지는 방법 자세히">?<span> 어떻게 채워지나요</span></summary><div>' +
-        '상신자가 속한 <b>센터·파트의 센터장·파트장 → 팀장 → 사업부장</b>이 결재란의 「센터·파트장」·「팀장」·「사업부장」 칸에 들어가고, 전자 결재는 사업부장에서 끝납니다. 「대표이사」 칸은 빗금이고, <b>사업부장이 올린 문서만</b> 출력한 종이에 대표이사가 손으로 서명하도록 빈칸으로 둡니다. ' +
-        '직원은 상신 창에서 칸마다 바꾸거나 비울 수 있습니다. 직책으로 안 맞는 사람은 사람 표의 「결재선 지정」으로 칸마다 정해 둘 수 있습니다(그 결재선이 먼저 채워집니다). ' +
-        '여기서는 사람의 <b>직책</b>·<b>소속</b>과 <b>앱 계정</b>을 맞춰 두면 됩니다 — ' +
-        '앱 계정이 있어야 결재자로 찾히고 결재를 누를 수 있습니다. 부서를 고르면 그 부서 직원의 결재선을 미리 볼 수 있습니다.</div></details></div>' +
+        '결재란의 센터·파트장, 팀장, 사업부장 칸에는 상신자가 속한 <b>센터·파트의 센터장·파트장, 같은 팀의 팀장, 같은 사업부의 사업부장</b>이 들어가요. 전자 결재는 사업부장에서 끝나요. ' +
+        '대표이사 칸은 빗금이에요. <b>사업부장이 올린 문서만</b> 이 칸을 비워 두고, 출력한 종이에 대표이사가 손으로 서명해요. ' +
+        '직책으로 맞지 않는 사람은 ‘결재선 지정’으로 칸마다 정해 두면 그 결재선이 먼저 채워져요. 직원도 상신 창에서 칸마다 바꾸거나 비울 수 있어요. ' +
+        '여기서는 사람의 <b>직책</b>, <b>소속</b>, <b>앱 계정</b>을 맞춰 두세요. ' +
+        '앱 계정이 있어야 결재자 목록에 나오고 결재도 할 수 있어요. 부서를 고르면 그 부서 직원의 결재선이 미리 보여요.</div></details></div>' +
         // 숫자는 머리 줄에 이미 있다 — 여기서는 누구인지만(2026-10-15, 같은 숫자 두 번)
         (short.length ? '<div class="awarn" id="oShort" style="margin-top:12px">' + ic('alert', 15) + '<span>앱 계정이 있는데 결재선을 다 못 채우는 사람: ' +
           esc(short.slice(0, 8).map(function (o) { return o.name; }).join(', ') + (short.length > 8 ? ' 외 ' + (short.length - 8) + '명' : '')) +
-          '. 나무의 주황 점 부서를 눌러 까닭을 보세요.</span></div>' : '') + '</div>';
+          '. 주황 점이 있는 부서를 눌러 이유를 확인하세요.</span></div>' : '') + '</div>';
     }
 
     // ── 정리할 것 — 계정 잇기·메일 채우기 ──
@@ -198,9 +199,9 @@
         '<b>' + n0(n) + '<small>명</small></b><span class="t">' + t + '</span><span class="d">' + d + '</span></button>';
     };
     right += '<div class="otiles">' +
-      tile('data-ounl', false, unl.length, '조직도에 안 이어진 계정', unl.length ? '눌러서 조직도의 누구인지 잇기' : '모두 이어졌습니다', true) +
-      tile('data-of="noacct"', OF === 'noacct', nNoAcct, '앱 계정 없는 사람', '결재자로 못 고릅니다 — 가입하면 이어 주세요', false) +
-      tile('data-of="nomail"', OF === 'nomail', nNoMail, '회사 메일 없는 사람', '팀즈 알림(결재 차례·반려)을 못 받습니다', true) +
+      tile('data-ounl', false, unl.length, '조직도에 안 이어진 계정', unl.length ? '눌러서 조직도의 누구인지 연결해 주세요.' : '모두 연결됐어요.', true) +
+      tile('data-of="noacct"', OF === 'noacct', nNoAcct, '앱 계정 없는 사람', '결재자로 고를 수 없어요. 가입하면 연결해 주세요.', false) +
+      tile('data-of="nomail"', OF === 'nomail', nNoMail, '회사 메일 없는 사람', '팀즈 알림(결재 차례·반려)을 받지 못해요.', true) +
       '</div>';
 
     var q = Q.trim().toLowerCase();
@@ -221,7 +222,7 @@
       people.map(function (o) {
         var acct = o.username
           ? (S.PEOPLE[o.username] ? '<span class="st ok">' + esc(o.username) + '</span>'
-            : '<span class="st bad" title="연결한 계정이 없어졌습니다">' + esc(o.username) + '</span>')
+            : '<span class="st bad" title="연결한 계정이 없어졌어요">' + esc(o.username) + '</span>')
           : '<span class="st dim">없음</span>';
         acct += o.username && S.PEOPLE[o.username]
           ? (noMail(o) ? '<div class="omail miss">메일 없음</div>' : '<div class="omail" title="' + esc(o.email) + '">' + esc(o.email).replace('@', '<wbr>@') + '</div>') : '';
@@ -252,12 +253,12 @@
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-oedit="' + o.id + '" aria-label="' +
           esc(o.name) + ' 고치기">고치기</button></td></tr>';
       }).join('') + '</tbody></table></div></div>'
-      : '<div class="panel"><div class="blank"><div class="t">' + (q ? '찾는 사람이 없습니다.' : '이 부서에 사람이 없습니다.') + '</div></div></div>';
+      : '<div class="panel"><div class="blank"><div class="t">' + (q ? '찾는 사람이 없어요.' : '이 부서에 사람이 없어요.') + '</div></div></div>';
 
     // ★ <aside> 를 쓰지 않는다 — 좌측 메뉴(aside)의 폭·고정 위치·좁은 화면 감춤 규칙을 그대로 물려받는다.
     h += '<div class="orgwrap"><nav class="otree" aria-label="부서">' + left + '</nav><div class="omain">' + right + '</div></div>';
-    h += '<div class="anote">앱 계정이 없는 사람은 상신 창에서 결재자로 찾히지 않습니다 — ' +
-      '먼저 앱에서 가입하게 한 뒤 「고치기」에서 계정을 이어 주세요. 퇴사·이동한 사람은 「고치기」 창의 「목록에서 내리기」로 감춥니다(기록은 남습니다).</div>';
+    h += '<div class="anote">앱 계정이 없는 사람은 상신 창에서 결재자로 찾을 수 없어요. ' +
+      '먼저 앱에서 가입하게 한 뒤 ‘고치기’에서 계정을 연결해 주세요. 퇴사하거나 이동한 사람은 고치기 창의 ‘목록에서 내리기’로 감추세요. 기록은 남아요.</div>';
     return h;
   }
 
@@ -290,22 +291,22 @@
       fld('사업부', '<input class="inp" id="oDiv" list="dlDiv" maxlength="40" value="' + esc(v.division) + '">' + dl('dlDiv', uniq('division')),
         '예) 고객지원사업부 · 용인공장', 'oDiv') +
       fld('팀', '<input class="inp" id="oTeam" list="dlTeam" maxlength="40" value="' + esc(v.team) + '">' + dl('dlTeam', uniq('team')),
-        '사업부 직속이면 비워 둡니다', 'oTeam') +
+        '사업부 직속이면 비워 두세요.', 'oTeam') +
       fld('센터·파트', '<input class="inp" id="oUnit" list="dlUnit" maxlength="40" value="' + esc(v.unit) + '">' + dl('dlUnit', uniq('unit')),
-        '팀 직속이면 비워 둡니다', 'oUnit') +
+        '팀 직속이면 비워 두세요.', 'oUnit') +
       fld('직급', '<input class="inp" id="oRank" list="dlRank" maxlength="20" value="' + esc(v.rank) + '">' + dl('dlRank', RANKS), null, 'oRank') +
       fld('직책', '<input class="inp" id="oRole" list="dlRole" maxlength="20" value="' + esc(v.role) + '">' +
         dl('dlRole', ['사업부장', '팀장', '센터장', '파트장', '공장장', '실장']),
-        '<b>그 부서의 장</b>일 때만 넣습니다. 센터장·파트장·팀장·사업부장이면 직원들의 결재선이 이 칸으로 미리 채워집니다(한 부서에 한 명). 장이 아니면 비워 둡니다', 'oRole') +
+        '<b>그 부서의 장</b>일 때만 넣으세요. 센터장, 파트장, 팀장, 사업부장이면 직원들의 결재선이 이 칸으로 미리 채워져요. 한 부서에 한 명만 넣고, 장이 아니면 비워 두세요.', 'oRole') +
       fld('담당 업무', '<input class="inp" id="oDuty" maxlength="80" value="' + esc(v.duty) + '">', null, 'oDuty') +
       fld('회사 메일', '<input class="inp" id="oEmail" type="email" maxlength="80" value="' + esc(v.email || '') + '">',
-        '팀즈 아이디와 같은 메일. 결재 차례가 오면 이 주소로 팀즈 개인 채팅 알림을 보냅니다', 'oEmail') +
+        '팀즈 아이디와 같은 메일을 넣으세요. 결재 차례가 되면 이 주소로 팀즈 개인 채팅 알림이 가요.', 'oEmail') +
       fld('앱 계정', '<select class="inp" id="oUser"><option value="">없음 (아직 가입 전)</option>' +
         accts.map(function (u) {
           var pp = S.PEOPLE[u] || {};
           return '<option value="' + esc(u) + '"' + (v.username === u ? ' selected' : '') + '>' +
             esc(C.nameOf(u)) + ' · ' + esc(pp.dept || '') + ' · ' + esc(u) + '</option>';
-        }).join('') + '</select>', '계정이 있어야 결재를 누를 수 있습니다. 같은 이름이 둘이면 소속을 보고 고르세요', 'oUser') +
+        }).join('') + '</select>', '계정이 있어야 결재할 수 있어요. 같은 이름이 둘이면 소속을 보고 고르세요.', 'oUser') +
       fld('외주', '<label class="radio"><input type="checkbox" id="oOut"' + (v.outsourced ? ' checked' : '') + '><span>외주·협력사 인원</span></label>') +
       '</div>',
       (o ? '<button class="btn" data-ooff="' + o.id + '">목록에서 내리기</button>' : '') +
@@ -334,7 +335,7 @@
   function fail(r, what) {
     return r.text().then(function (t) {
       var msg = r.status === 401 || r.status === 403 || /row-level security|permission/i.test(t)
-        ? '권한이 없습니다. 운행일지 관리자만 고칠 수 있습니다.' : what + '하지 못했습니다.';
+        ? '권한이 없어요. 운행일지 관리자만 고칠 수 있어요.' : what + '. 잠시 후 다시 해 주세요.';
       console.error(what, r.status, t);
       throw new Error(msg);
     });
@@ -348,7 +349,7 @@
       updated_by: C.myName(), updated_at: new Date().toISOString()
     };
     if (!row.name) { C.toast('이름을 넣어 주세요.', true); $('oName').focus(); return; }
-    if (row.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email)) { C.toast('메일 주소 모양이 아닙니다.', true); $('oEmail').focus(); return; }
+    if (row.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email)) { C.toast('메일 주소 형식이 맞지 않아요.', true); $('oEmail').focus(); return; }
     if (!row.division) { C.toast('사업부를 넣어 주세요.', true); $('oDiv').focus(); return; }
     if (row.unit && !row.team && row.division) {
       // 팀 없이 파트만 있는 구조(예: 용인공장 › 자재파트)는 팀 자리에 적는다 — 나무가 두 갈래로 갈리지 않게.
@@ -363,17 +364,17 @@
     var req = id
       ? C.apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) })
       : C.apiRetry('/rest/v1/driving_org', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
-    req.then(function (r) { if (!r.ok) return fail(r, '저장'); })
+    req.then(function (r) { if (!r.ok) return fail(r, '저장하지 못했어요'); })
       .then(reloadOrg)
-      .then(function () { C.closePanel(); C.toast(id ? '고쳤습니다.' : row.name + ' 님을 추가했습니다.'); C.render(); })
-      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했습니다.', true); });
+      .then(function () { C.closePanel(); C.toast(id ? '고쳤어요.' : row.name + ' 님을 추가했어요.'); C.render(); })
+      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했어요. 잠시 후 다시 해 주세요.', true); });
   }
   function askOff(id) {
     var S = C.state(), o = S.ORG.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!o) return;
     C.openPanel('목록에서 내리기', o.name + ' · ' + [o.team, o.unit].filter(Boolean).join(' › '),
-      '<div class="anote" style="margin-top:0"><b>' + esc(o.name) + '</b> 님을 조직도에서 내립니다. 기록은 지워지지 않고 목록에서만 사라집니다. ' +
-      '앱 계정과 운행 기록에는 아무 영향이 없습니다. 이미 올라간 결재 건도 바뀌지 않습니다.</div>',
+      '<div class="anote" style="margin-top:0"><b>' + esc(o.name) + '</b> 님을 조직도 목록에서 내릴까요? ' +
+      '기록은 지우지 않아요. 앱 계정, 운행 기록, 이미 올라간 결재 건도 그대로 남아요.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="oOffGo" data-id="' + o.id + '">내리기</button>');
   }
@@ -381,10 +382,10 @@
     C.apiRetry('/rest/v1/driving_org?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ active: false, updated_by: C.myName(), updated_at: new Date().toISOString() })
-    }).then(function (r) { if (!r.ok) return fail(r, '내리기'); })
+    }).then(function (r) { if (!r.ok) return fail(r, '목록에서 내리지 못했어요'); })
       .then(reloadOrg)
-      .then(function () { C.closePanel(); C.toast('목록에서 내렸습니다.'); C.render(); })
-      .catch(function (e) { C.toast((e && e.message) || '내리지 못했습니다.', true); });
+      .then(function () { C.closePanel(); C.toast('목록에서 내렸어요.'); C.render(); })
+      .catch(function (e) { C.toast((e && e.message) || '내리지 못했어요.', true); });
   }
 
   /* ══════════════════ 결재선 지정 (2026-10-14) ══════════════════
@@ -407,7 +408,7 @@
   }
   function openLov(u) {
     var S = C.state();
-    if (!canLov()) { C.toast('운행일지 관리자만 결재선을 지정할 수 있습니다.', true); return; }
+    if (!canLov()) { C.toast('운행일지 관리자만 결재선을 지정할 수 있어요.', true); return; }
     var o = S.ORG.filter(function (x) { return x.username === u && x.active !== false; })[0];
     if (!o) return;
     var b = C.lineOverride(u) || {};
@@ -426,7 +427,7 @@
     var s = al.steps.filter(function (x) { return x.box === k; })[0];
     if (s) return C.nameOf(s.approver);
     var n = al.notes.filter(function (x) { return x.box === k; })[0];
-    return n ? '비움 — ' + n.why : '비움';
+    return n ? '비움: ' + n.why : '비움';
   }
   function lovCandHtml() {
     var S = C.state(), q = LOV.q.trim().toLowerCase(), pos = posOf(LOV.o);
@@ -443,12 +444,12 @@
     list.sort(function (a, b) { return inDiv(a) - inDiv(b) || C.nameOf(a).localeCompare(C.nameOf(b), 'ko'); });
     var more = list.length > 40;
     list = list.slice(0, 40);
-    if (!list.length) return '<div class="blank" style="padding:14px"><div class="t">찾는 분이 없습니다.</div>' +
-      '<div class="d">결재자는 조직도에 있고 앱 계정이 이어진 분만 고를 수 있습니다.</div></div>';
+    if (!list.length) return '<div class="blank" style="padding:14px"><div class="t">찾는 분이 없어요.</div>' +
+      '<div class="d">결재자는 조직도에 있고 앱 계정이 연결된 분만 고를 수 있어요.</div></div>';
     return list.map(function (u) {
       return '<button class="acand-i" data-lovpick="' + esc(u) + '"><b>' + esc(C.nameOf(u)) + '</b><span>' + esc(C.orgLabel(u)) + '</span>' +
         (u === LOV.u ? '<span class="st" style="flex:none;margin-left:6px">본인</span>' : '') + '</button>';
-    }).join('') + (more ? '<div class="anote" style="margin:6px 12px">더 있습니다 — 이름을 쳐서 좁혀 주세요.</div>' : '');
+    }).join('') + (more ? '<div class="anote" style="margin:6px 12px">더 있어요. 이름을 입력해 좁혀 주세요.</div>' : '');
   }
   /** 고른 부서(아래 부서 포함)의 앱 계정 직원 — 「이 부서 사람 모두에 적용」 대상. */
   function lovTargets() {
@@ -461,9 +462,9 @@
   function paintLov() {
     if (!LOV) return;
     var al = C.lineAt(posOf(LOV.o), LOV.o), had = !!C.lineOverride(LOV.u);
-    var h = '<div class="anote" style="margin-top:0">칸마다 <b>자동</b>(조직도 직책으로 채움) · <b>비움</b>(빗금, 건너뜀) · <b>사람 지정</b> 중에서 고릅니다. ' +
-      '저장하면 ' + esc(LOV.o.name) + ' 님이 상신 창을 열 때 이 결재선이 먼저 채워집니다(이번 기간에 반려·회수된 결재선이 있으면 그것이 먼저). ' +
-      '본인이 들어간 칸은 비웁니다. ' + esc(LOV.o.name) + ' 님은 상신 창에서 칸마다 바꾸거나 비울 수 있습니다. 대표이사 칸은 고르지 않습니다(전자 결재는 사업부장에서 끝).</div>';
+    var h = '<div class="anote" style="margin-top:0">칸마다 <b>자동</b>(조직도 직책으로 채움), <b>비움</b>(빗금, 건너뜀), <b>사람 지정</b> 중에서 고르세요. ' +
+      '저장하면 ' + esc(LOV.o.name) + ' 님이 상신 창을 열 때 이 결재선이 먼저 채워져요. 이번 기간에 반려·회수된 결재선이 있으면 그것이 먼저예요. ' +
+      '본인이 들어간 칸은 빈칸이 돼요. 전자 결재는 사업부장에서 끝나서 대표이사 칸은 고를 수 없어요. ' + esc(LOV.o.name) + ' 님도 상신 창에서 칸마다 바꾸거나 비울 수 있어요.</div>';
     h += '<div class="olov">' + C.APPR_BOXES.map(function (k, i) {
       var m = LOV.mode[k], who = LOV.who[k];
       var r = function (val, label, extra) {
@@ -477,7 +478,7 @@
         r('pick', who ? esc(C.nameOf(who)) + (C.canApprove(who) ? '' : ' <small>(지금 결재 못 함)</small>') : '사람 지정') +
         '</div>' +
         (LOV.open === k ? '<div class="olov-pick"><input class="inp" id="lovQ" autocomplete="off" aria-label="' + esc(k) + ' 칸에 넣을 분 찾기" ' +
-          'placeholder="「' + esc(k) + '」 칸에 넣을 분 — 이름·부서·직급" value="' + esc(LOV.q) + '">' +
+          'placeholder="이름, 부서, 직급으로 찾기" value="' + esc(LOV.q) + '">' +
           '<div class="olov-cand" id="lovCand">' + lovCandHtml() + '</div></div>' : '') +
         '</div>';
     }).join('') + '</div>';
@@ -487,7 +488,7 @@
     if (LOV.confirm) {
       var tg = lovTargets();
       h += '<div class="awarn" id="lovConfirm" style="margin-top:12px">' + ic('alert', 15) + '<span><b>' + esc(nodeName(SEL)) + '</b>의 앱 계정 직원 <b>' + n0(tg.length) +
-        '명</b>(하위 부서 포함)의 결재선을 모두 이것으로 바꿉니다(지금 지정이 있으면 덮어씁니다): ' +
+        '명</b>(하위 부서 포함)의 결재선을 모두 이것으로 바꿔요. 지금 지정이 있으면 덮어써요. 대상: ' +
         esc(tg.slice(0, 12).map(function (o) { return o.name; }).join(', ') + (tg.length > 12 ? ' 외 ' + (tg.length - 12) + '명' : '')) + '</span></div>' +
         // 본문 안 확인 줄도 [동작] [취소] 차례(2026-10-20 단추 차례 통일 — 창 아래 줄 규칙 footOrder 가 닿지 않는 곳이라 여기서)
         '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">' +
@@ -503,12 +504,12 @@
   /** 칸 값이 다 정해졌는가 — 「사람 지정」인데 아직 안 고른 칸이 있으면 알리고 false. */
   function lovReady() {
     var miss = C.APPR_BOXES.filter(function (k) { return LOV.mode[k] === 'pick' && !LOV.who[k]; })[0];
-    if (miss) { C.toast('「' + miss + '」 칸에 넣을 분을 골라 주세요.', true); LOV.open = miss; paintLov(); return false; }
+    if (miss) { C.toast('‘' + miss + '’ 칸에 넣을 분을 골라 주세요.', true); LOV.open = miss; paintLov(); return false; }
     return true;
   }
   function reloadLov() {
     return C.fetchLineOv().then(function (rows) {
-      if (!rows) throw new Error('저장은 됐지만 목록을 다시 받지 못했습니다. 새로고침해 주세요.');
+      if (!rows) throw new Error('저장은 됐지만 목록을 다시 불러오지 못했어요. 새로고침해 주세요.');
       C.setLineOv(rows);
     });
   }
@@ -523,31 +524,31 @@
       : C.apiRetry(path + '?username=in.' + encodeURIComponent('(' + users.map(function (u) { return '"' + String(u).replace(/["\\]/g, '') + '"'; }).join(',') + ')'), {
         method: 'DELETE', headers: { Prefer: 'return=minimal' }
       });
-    return req.then(function (r) { if (!r.ok) return fail(r, '결재선 저장'); }).then(reloadLov);
+    return req.then(function (r) { if (!r.ok) return fail(r, '결재선을 저장하지 못했어요'); }).then(reloadLov);
   }
   function lovDone(msg) { LOV = null; C.closePanel(); C.toast(msg); C.render(); }
   function saveLov() {
     if (!LOV || !lovReady()) return;
     var b = lovBoxes(), nm = LOV.o.name, btn = $('lovSave'); if (btn) btn.disabled = true;
     writeLov([LOV.u], b)
-      .then(function () { lovDone(Object.keys(b).length ? nm + ' 님의 결재선을 지정했습니다.' : nm + ' 님의 결재선을 자동으로 되돌렸습니다.'); })
-      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했습니다.', true); });
+      .then(function () { lovDone(Object.keys(b).length ? nm + ' 님의 결재선을 지정했어요.' : nm + ' 님의 결재선을 자동으로 되돌렸어요.'); })
+      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했어요. 잠시 후 다시 해 주세요.', true); });
   }
   function clearLov() {
     if (!LOV) return;
     var nm = LOV.o.name;
     writeLov([LOV.u], {})
-      .then(function () { lovDone(nm + ' 님의 결재선을 자동으로 되돌렸습니다.'); })
-      .catch(function (e) { C.toast((e && e.message) || '되돌리지 못했습니다.', true); });
+      .then(function () { lovDone(nm + ' 님의 결재선을 자동으로 되돌렸어요.'); })
+      .catch(function (e) { C.toast((e && e.message) || '되돌리지 못했어요.', true); });
   }
   function applyAllLov() {
     if (!LOV) return;
     var tg = lovTargets().map(function (o) { return o.username; });
-    if (!tg.length) { C.toast('이 부서에 앱 계정이 있는 직원이 없습니다.', true); return; }
+    if (!tg.length) { C.toast('이 부서에 앱 계정이 있는 직원이 없어요.', true); return; }
     var b = lovBoxes(), btn = $('lovAllGo'); if (btn) btn.disabled = true;
     writeLov(tg, b)
-      .then(function () { lovDone(nodeName(SEL) + ' 직원 ' + n0(tg.length) + '명의 결재선을 ' + (Object.keys(b).length ? '지정했습니다.' : '자동으로 되돌렸습니다.')); })
-      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했습니다.', true); });
+      .then(function () { lovDone(nodeName(SEL) + ' 직원 ' + n0(tg.length) + '명의 결재선을 ' + (Object.keys(b).length ? '지정했어요.' : '자동으로 되돌렸어요.')); })
+      .catch(function (e) { if (btn) btn.disabled = false; C.toast((e && e.message) || '저장하지 못했어요. 잠시 후 다시 해 주세요.', true); });
   }
 
   /* ══════════════════ 안 이어진 계정 잇기 ══════════════════
@@ -571,13 +572,13 @@
     }).join('');
     C.openPanel('조직도에 안 이어진 계정', n0(unl.length) + '명',
       unl.length
-        ? '<div class="anote" style="margin-top:0">웹·앱으로 가입했지만 조직도의 누구인지 정해지지 않은 계정입니다. ' +
-          '오른쪽에서 <b>조직도의 그 사람</b>을 고르고 「잇기」를 누르세요. 같은 이름이 한 명이면 미리 골라 두었습니다. ' +
-          '조직도에 없는 사람이면 닫고 「＋ 사람 추가」로 만든 뒤 앱 계정을 고르면 됩니다.<br>' +
-          '이으면 <b>결재자로 고를 수 있고</b>, 관리 화면의 <b>소속(사업부·팀·파트)</b>도 바르게 묶입니다.</div>' +
+        ? '<div class="anote" style="margin-top:0">웹이나 앱으로 가입했지만 조직도의 누구인지 정해지지 않은 계정이에요. ' +
+          '<b>조직도의 그 사람</b>을 고르고 ‘잇기’를 누르세요. 같은 이름이 한 명이면 미리 골라 뒀어요. ' +
+          '조직도에 없는 사람이면 창을 닫고 ‘＋ 사람 추가’로 만든 뒤 앱 계정을 고르세요.<br>' +
+          '이으면 <b>결재자로 고를 수 있고</b>, 관리 화면의 <b>소속(사업부·팀·파트)</b>도 바르게 묶여요.</div>' +
           '<div class="panel" style="margin-top:12px"><div class="scroll"><table><thead><tr><th>계정</th><th>가입 때 적은 부서</th><th>조직도의 누구?</th><th></th></tr></thead><tbody>' +
           rows + '</tbody></table></div></div>'
-        : C.blank('모든 계정이 조직도에 이어져 있습니다.', null, 'users'),
+        : C.blank('모든 계정이 조직도에 이어져 있어요.', null, 'users'),
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>', true);
   }
   function linkAcct(u) {
@@ -593,15 +594,15 @@
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ username: u, updated_by: C.myName(), updated_at: new Date().toISOString() })
     }).then(function (r) {
-      if (!r.ok) return fail(r, '잇기');
+      if (!r.ok) return fail(r, '계정을 연결하지 못했어요');
       return r.json().catch(function () { return null; }).then(function (rows) {
-        if (!Array.isArray(rows) || !rows.length) { var er = new Error('그 사이 다른 분이 이 사람에게 계정을 이었습니다 — 목록을 다시 불러왔으니 확인해 주세요.'); er.raced = true; throw er; }
+        if (!Array.isArray(rows) || !rows.length) { var er = new Error('그사이 다른 분이 이 사람에게 계정을 연결했어요. 목록을 다시 불러왔으니 확인해 주세요.'); er.raced = true; throw er; }
       });
     })
       .then(reloadOrg)
-      .then(function () { C.toast(C.nameOf(u) + ' 계정을 ' + (o ? o.name : '조직도') + ' 님에게 이었습니다.'); C.render(); openUnlinked(); })
+      .then(function () { C.toast(C.nameOf(u) + ' 계정을 ' + (o ? o.name + ' 님에게' : '조직도에') + ' 연결했어요.'); C.render(); openUnlinked(); })
       .catch(function (e) {
-        C.toast((e && e.message) || '잇지 못했습니다.', true);
+        C.toast((e && e.message) || '연결하지 못했어요. 잠시 후 다시 해 주세요.', true);
         if (e && e.raced) reloadOrg().then(function () { C.render(); openUnlinked(); }, function () { });
       });
   }

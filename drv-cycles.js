@@ -148,18 +148,18 @@
   }
   function noDot(s) { return String(s || '').trim().replace(/[.。]+$/, ''); }
   /** 서버 오류 → 쉬운 말(설계서 §4-8). */
-  function errText(e) {
+  function errText(e, head) {
     var c = String((e && e.code) || ''), d = noDot(e && e.details), st = e && e.status;
-    if (st === 401) return '로그인이 풀렸습니다. 다시 로그인해 주세요.';
-    if (c === 'NOT_ALLOWED' || st === 403) return '마감 기간 설정은 권한 관리를 맡은 관리자만 바꿀 수 있습니다.';
-    if (c === 'CYCLE_LOCKED') return '결재 중이거나 결재가 끝난 기간은 바꿀 수 없습니다' + (d ? ' — ' + d : '') + '. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
+    if (st === 401) return '로그인이 만료됐어요. 다시 로그인해 주세요.';
+    if (c === 'NOT_ALLOWED' || st === 403) return '마감 기간 설정은 권한 관리를 맡은 관리자만 바꿀 수 있어요.';
+    if (c === 'CYCLE_LOCKED') return '결재 중이거나 결재가 끝난 기간은 바꿀 수 없어요.' + (d ? ' ' + d + '.' : '') + ' 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
     if (c === 'PAST_PERIOD') return pastText(e.details, e.hint);
-    if (c === 'CARD_LOCKED') return '결재 중이거나 결재가 끝난 법인카드 줄이 다른 기간으로 옮겨 가야 해서 저장하지 못했습니다. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
-    if (c === 'BAD_RANGE') return (d || '고를 수 있는 날짜 밖입니다') + '.';
-    if (c === 'BAD_YEAR') return '이 해는 바꿀 수 없습니다 — 올해 앞뒤 1년만 바꿀 수 있습니다.';
-    if (c === 'RULES_INVALID') return '기간이 서로 맞지 않아 저장하지 못했습니다' + (d ? ' — ' + d : '') + '.';
-    if (st === 404 || e && e.pg === 'PGRST202') return '서버에 아직 마감 기간 설정이 없습니다. 서버 준비가 끝난 뒤 다시 해 주세요.';
-    return '잠시 뒤 다시 해 주세요.';
+    if (c === 'CARD_LOCKED') return '결재 중이거나 결재가 끝난 법인카드 줄이 다른 기간으로 옮겨 가야 해서 저장하지 못했어요. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
+    if (c === 'BAD_RANGE') return (d || '고를 수 있는 날짜 밖이에요') + '.';
+    if (c === 'BAD_YEAR') return '마감 기간은 올해 앞뒤 1년만 바꿀 수 있어요.';
+    if (c === 'RULES_INVALID') return '기간이 서로 맞지 않아 저장하지 못했어요' + (d ? '. ' + d : '') + '.';
+    if (st === 404 || e && e.pg === 'PGRST202') return '서버에 아직 마감 기간 설정이 없어요. 서버 준비가 끝난 뒤 다시 해 주세요.';
+    return (head ? head + '. ' : '') + '잠시 후 다시 해 주세요.';
   }
   /** PAST_PERIOD(2026-10-21 — 이미 끝난 기간·지난 끝날) → 쉬운 말.
    *  details = {"today":"YYYY-MM-DD","items":[{kind,key,old_hi,hi,why:'ended'|'past'}]} JSON 글자(서버 cycle_past_violations).
@@ -168,18 +168,19 @@
     var j = null;
     try { j = details ? JSON.parse(details) : null; } catch (er) { j = null; }
     var it = j && Array.isArray(j.items) ? j.items.filter(function (x) { return x && SYS[x.kind] && x.key; }) : [];
-    if (!it.length) return noDot(hint) ? noDot(hint) + '.' : '이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞으로 정할 수도 없습니다.';
+    if (!it.length) return noDot(hint) ? noDot(hint) + '.' : '이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞으로 정할 수도 없어요.';
     var t = isYmd(j.today) ? md(j.today) : '';
     var nm = function (x) { return SYS[x.kind].name + ' ' + keyShort(x.key); };
     var ended = it.filter(function (x) { return x.why === 'ended'; }), past = it.filter(function (x) { return x.why !== 'ended'; });
     var s = [];
+    // 기간 이름 뒤에 바로 조사를 붙이지 않는다(「12월분」·「12월분 2차」 받침이 달라 은/는이 갈린다) — 「… 기간은」·「… 대신」으로 받는다
     if (ended.length) {
-      s.push('이미 끝난 기간은 바꿀 수 없습니다' + (t ? '(오늘 ' + t + ')' : '') + ' — ' +
-        ended.map(function (x) { return nm(x) + (isYmd(x.old_hi) ? '(' + md(x.old_hi) + ' 마감)' : ''); }).join(' · ') + '. 끝난 기간은 저장된 그대로 두세요.');
+      s.push((t ? '오늘(' + t + ') 기준으로 ' : '') + '이미 끝난 기간은 바꿀 수 없어요. ' +
+        ended.map(function (x) { return nm(x) + (isYmd(x.old_hi) ? '(' + md(x.old_hi) + ' 마감)' : ''); }).join(', ') + ' 기간은 저장된 그대로 두세요.');
     }
     if (past.length) {
-      s.push('끝날을 오늘' + (t ? '(' + t + ')' : '') + '보다 앞으로 정할 수 없습니다 — ' +
-        past.map(function (x) { return nm(x) + (isYmd(x.hi) ? ' 끝 ' + md(x.hi) : ''); }).join(' · ') + '. 오늘이나 그 뒤 날짜로 골라 주세요.');
+      s.push('끝날을 오늘' + (t ? '(' + t + ')' : '') + '보다 앞으로 정할 수 없어요. ' +
+        past.map(function (x) { return nm(x) + ' 끝날' + (isYmd(x.hi) ? '(' + md(x.hi) + ')' : ''); }).join(', ') + '은 오늘이나 그 뒤 날짜로 다시 골라 주세요.');
     }
     return s.join(' ');
   }
@@ -195,14 +196,14 @@
       ST.noCol = !Object.prototype.hasOwnProperty.call(row, 'cycle_rules');
       ST.rules = cr && typeof cr === 'object' ? cr : { overrides: [] };
       ST.rulesErr = '';
-    }).catch(function () { ST.rules = null; ST.rulesErr = '지금 마감 기간 설정을 읽지 못했습니다.'; });
+    }).catch(function () { ST.rules = null; ST.rulesErr = '마감 기간 설정을 불러오지 못했어요.'; });
   }
   function loadLog() {
     return C.apiRetry('/rest/v1/cycle_rules_log?select=id,at,actor,via,year,note,changed,restamped&order=at.desc&limit=20').then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (rows) { ST.log = Array.isArray(rows) ? rows : []; ST.logErr = ''; })
-      .catch(function () { ST.log = null; ST.logErr = '바꾼 기록을 불러오지 못했습니다.'; });
+      .catch(function () { ST.log = null; ST.logErr = '바꾼 기록을 불러오지 못했어요.'; });
   }
   function boot() {
     if (ST.booting) return;
@@ -249,7 +250,7 @@
       return j;
     }, function (e) {
       if (seq !== ST.drySeq) return null;
-      ST.dryBusy = false; ST.dryErr = errText(e);
+      ST.dryBusy = false; ST.dryErr = errText(e, '미리 보기를 불러오지 못했어요');
       paint();
       return null;
     });
@@ -283,9 +284,9 @@
   }
   /** CYCLE_LOCKED 와 같은 말 — 서버가 미리 보기 blocked 로 알려 준 기간들. */
   function lockedText(bl) {
-    return '결재 중이거나 결재가 끝난 기간은 바꿀 수 없습니다 — ' + bl.map(function (b) {
+    return '결재 중이거나 결재가 끝난 기간은 바꿀 수 없어요. ' + bl.map(function (b) {
       return (SYS[b.kind] ? SYS[b.kind].name + ' ' : '') + keyShort(b.key) + ': ' + blParts(b);
-    }).join(' · ') + '. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
+    }).join(', ') + '. 그 건을 회수하거나 반려한 뒤 다시 해 주세요.';
   }
   /** 옮겨 가는 날의 이미 올린 기록 — [이름, 수, 단위]. 서버 칸 이름이 조금 달라도 읽는다(운행일지 trips·evidences, 개인경비·법인카드 items). */
   function recParts(k, m) {
@@ -314,7 +315,7 @@
   function extraSub(k) {
     var Y = ST.year, v = ST.form[k];
     if (!isYmd(v.dec)) return '';
-    if (v.dec === lim(Y).d1) return '12월분이 12.31 까지라 없음';
+    if (v.dec === lim(Y).d1) return '12월분이 12.31까지라 2차를 둘 수 없어요.';
     var r = span(addD(v.dec, 1), Y + '-12-31');
     return v.extra ? '12월분 2차 ' + r : '두면 ' + r;
   }
@@ -403,7 +404,7 @@
       (pills ? '<ol class="cys-pl" aria-label="' + esc(SYS[k].name) + ' 기간">' + pills + '</ol>' : '') +
       (gone.length ? '<p class="cys-gone">' + esc(gone.map(chgText).join(' · ')) + '</p>' : '');
     if (mv.length) {
-      h += '<table class="cys-mv"><caption class="sr">' + esc(SYS[k].name) + ' — 다른 기간으로 옮겨 가는 날</caption><thead><tr>' +
+      h += '<table class="cys-mv"><caption class="sr">' + esc(SYS[k].name) + '에서 다른 기간으로 옮겨 가는 날</caption><thead><tr>' +
         '<th scope="col">옮겨 가는 날</th><th scope="col">지금</th><th scope="col">바꾼 뒤</th><th scope="col" class="n">이미 올린 기록(건)</th></tr></thead><tbody>' +
         mv.map(function (m) {
           var parts = recParts(k, m);
@@ -416,12 +417,12 @@
   }
   function prevHtml() {
     if (!ST.form) return '';
-    if (probs(ST.form, ST.year).any) return '<p class="cys-msg warn">고칠 칸이 있습니다 — 표에 적힌 날짜 범위로 골라 주세요.</p>';
+    if (probs(ST.form, ST.year).any) return '<p class="cys-msg warn">고칠 칸이 있어요. 표에 적힌 날짜 범위로 골라 주세요.</p>';
     if (ST.dryErr && !ST.dryBusy) return '<p class="cys-msg bad">' + esc(ST.dryErr) + '</p><button type="button" class="btn" data-cysretry>다시 미리 보기</button>';
     var d = curDry(), show = d || ST.dry;
-    if (!show) return '<p class="cys-wait">서버에서 미리 보기를 받는 중입니다…</p>';
+    if (!show) return '<p class="cys-wait">미리 보기를 불러오는 중…</p>';
     return '<div class="cys-prev' + (d ? '' : ' stale') + '"' + (d ? '' : ' aria-busy="true"') + '>' +
-      (d ? '' : '<p class="cys-wait">고친 값으로 다시 계산하는 중입니다…</p>') +
+      (d ? '' : '<p class="cys-wait">고친 값으로 다시 계산하는 중…</p>') +
       KINDS.map(function (k) { return prevKind(k, show); }).join('') + '</div>';
   }
   /** 저장 줄의 글·단추 상태(처음 그릴 때와 다시 칠할 때 같은 것). */
@@ -429,15 +430,15 @@
     var Y = ST.year, P = probs(ST.form, Y), d = curDry(), dirty = isDirty();
     var bl = d && Array.isArray(d.blocked) ? d.blocked : [], chN = d && Array.isArray(d.changed) ? d.changed.length : 0;
     var t = '', cls = '';
-    if (ST.saving) t = '저장하는 중입니다…';
+    if (ST.saving) t = '저장하는 중…';
     else if (ST.saveErr) { t = ST.saveErr; cls = 'bad'; }
-    else if (P.any) { t = '고칠 칸이 있습니다.'; cls = 'warn'; }
+    else if (P.any) { t = '고칠 칸이 있어요.'; cls = 'warn'; }
     else if (ST.dryErr && !ST.dryBusy) { t = ST.dryErr; cls = 'bad'; }
     else if (bl.length) { t = lockedText(bl); cls = 'bad'; }
-    else if (!d) t = dirty ? '미리 보기를 받는 중입니다…' : '';
-    else if (!chN) t = '바꾼 것이 없습니다. 날짜를 고르면 위 미리 보기가 바로 바뀝니다.';   // 이 글은 미리 보기 아래에 있다(2026-10-20 V3 다듬기 — 「아래」라 했다)
-    else if (!dirty) { t = '지금 저장된 설정이 이 화면의 모양과 조금 다릅니다 — 저장하면 위 미리 보기처럼 맞춰집니다.'; cls = 'warn'; }
-    else t = '저장하면 직원 화면·포털 마감 일정이 바로 바뀝니다.';
+    else if (!d) t = dirty ? '미리 보기를 불러오는 중…' : '';
+    else if (!chN) t = '바꾼 것이 없어요. 날짜를 고르면 미리 보기가 바로 바뀌어요.';   // 이 글은 미리 보기 아래에 있다(2026-10-20 V3 다듬기 — 「아래」라 했다)
+    else if (!dirty) { t = '저장된 설정이 이 화면과 조금 달라요. 저장하면 미리 보기처럼 맞춰져요.'; cls = 'warn'; }
+    else t = '저장하면 직원 화면·포털 마감 일정이 바로 바뀌어요.';
     return {
       t: t, cls: cls,
       save: !(ST.saving || P.any || (ST.dryErr && !ST.dryBusy) || bl.length > 0 || (d ? !chN : !dirty)),
@@ -466,7 +467,7 @@
   function logHtml() {
     if (ST.log === undefined) return '<p class="cys-wait">불러오는 중…</p>';
     if (ST.log === null) return '<p class="cys-none">' + esc(ST.logErr) + '</p>';
-    if (!ST.log.length) return '<p class="cys-none">아직 바꾼 기록이 없습니다.</p>';
+    if (!ST.log.length) return '<p class="cys-none">아직 바꾼 기록이 없어요.</p>';
     return '<table class="cys-lg"><thead><tr><th scope="col">언제</th><th scope="col">누가</th><th scope="col">바꾼 것</th><th scope="col">사유</th></tr></thead><tbody>' +
       ST.log.map(function (r) {
         var ch = r.changed;
@@ -479,7 +480,7 @@
         });
         if (+r.restamped) lines.push('<li>법인카드 ' + n0(r.restamped) + '줄을 새 기간으로 옮김</li>');
         var actor = String(r.actor || ''), sql = r.via === 'sql' || /^sql:/.test(actor);
-        var who = sql ? 'SQL 로 직접' + (/^sql:/.test(actor) ? ' (' + actor.slice(4) + ')' : actor ? ' (' + C.nameOf(actor) + ')' : '') : C.nameOf(actor);
+        var who = sql ? 'SQL로 직접' + (/^sql:/.test(actor) ? ' (' + actor.slice(4) + ')' : actor ? ' (' + C.nameOf(actor) + ')' : '') : C.nameOf(actor);
         return '<tr><td class="cys-when">' + esc(when(r.at)) + (r.year ? '<span class="cys-sub">' + esc(r.year + '년 연말') + '</span>' : '') + '</td>' +
           '<td class="cys-who">' + esc(who) + '</td>' +
           '<td class="cys-what">' + (lines.length ? '<ul class="cys-chl">' + lines.join('') + '</ul>' : '<span class="cys-sub">바뀐 기간 없음</span>') + '</td>' +
@@ -496,14 +497,14 @@
         return '<option value="' + y + '"' + (y === ST.year ? ' selected' : '') + '>' + y + '년 연말' + (yearSet(ST.rules, y) ? ' · 정해 둠' : '') + '</option>';
       }).join('') + '</select></label>';
     }
-    return '<div class="phead cys-head"><div><h1>마감 기간 설정</h1><p>12월분·1월분 마감일을 바꾸거나 12월 말에 추가 기간을 둡니다. 정하지 않으면 늘 하던 대로입니다.</p></div>' + sel + '</div>';
+    return '<div class="phead cys-head"><div><h1>마감 기간 설정</h1><p>12월분·1월분 마감일을 바꾸거나 12월 말에 추가 기간을 둬요. 정하지 않으면 늘 하던 대로예요.</p></div>' + sel + '</div>';
   }
   function viewCycSet() {
     css();
     var S = C.state();
     // 메뉴·주소는 driving-app.js 가 막는다 — 그래도 그려지면(권한이 그 사이 바뀜) 글만 보인다
     if (!(S.ACCT && S.ACCT.can_manage_admin)) {
-      return '<div class="cys">' + headHtml(false) + C.blank('마감 기간 설정은 권한 관리를 맡은 관리자만 볼 수 있습니다.', '마스터 계정이나 권한 주는 관리자에게 부탁해 주세요.', 'cal') + '</div>';
+      return '<div class="cys">' + headHtml(false) + C.blank('마감 기간 설정은 권한 관리를 맡은 관리자만 볼 수 있어요.', '마스터 계정이나 권한 주는 관리자에게 부탁해 주세요.', 'cal') + '</div>';
     }
     if (ST.rules === undefined) { boot(); return '<div class="cys">' + headHtml(false) + C.skeleton() + '</div>'; }
     if (ST.rules === null) {
@@ -517,18 +518,18 @@
     setTimeout(function () { fit(); paint(); }, 0);
     var Y = ST.year, narrow = isNarrow();
     var h = '<div class="cys' + (narrow ? ' narrow' : '') + '" id="cys">' + headHtml(true);
-    if (ST.noCol) h += '<p class="cys-msg warn cys-top">서버에 아직 기간 설정 칸이 없습니다 — 서버 준비가 끝난 뒤 쓸 수 있습니다.</p>';
+    if (ST.noCol) h += '<p class="cys-msg warn cys-top">서버에 아직 기간 설정 칸이 없어요. 서버 준비가 끝난 뒤 쓸 수 있어요.</p>';
     h += '<section class="cys-card" aria-labelledby="cysT1"><div class="cys-ch"><h2 id="cysT1">마감일</h2><span class="cys-cnt">' + Y + '년 12월분 · ' + (Y + 1) + '년 1월분</span></div>' +
       '<table class="cys-t"><colgroup><col class="c-sys"><col class="c-d"><col class="c-x"><col class="c-j"><col class="c-f"><col class="c-s"></colgroup>' +
       '<thead><tr><th scope="col">시스템</th><th scope="col">12월분 끝</th><th scope="col">12월 추가 기간</th><th scope="col">1월분 끝</th><th scope="col">2월분 시작</th><th scope="col">상태</th></tr></thead>' +
       '<tbody>' + KINDS.map(rowHtml).join('') + '</tbody></table>' +
       '<details class="cys-help"><summary>알아 둘 것' + C.ic('down', 14) + '</summary><ul>' +
-      '<li>고를 수 있는 날: 12월분 끝 12.10 ~ 12.31 · 1월분 끝 01.10 ~ 01.31. 2월분은 1월분 끝 다음 날부터입니다(자동).</li>' +
-      '<li>12월 추가 기간(12월분 2차)은 12월분 끝 다음 날부터 12.31 까지 따로 상신·결재합니다. 그때 1월분은 01.01 부터입니다.</li>' +
-      '<li>결재 중이거나 결재가 끝난 기간은 바꿀 수 없습니다. 반려·회수만 있으면 바꿀 수 있고, 다시 상신하면 새 기간으로 굳습니다.</li>' +
-      '<li>이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞 날짜로 정할 수도 없습니다(끝난 다음 날 나가는 월간 리포트·정산과 어긋나지 않게). 끝날을 오늘로 하는 것은 됩니다.</li>' +
-      '<li>바꾸는 기간이 시작되기 전에(12월분은 ' + Y + '년 11월 19일까지) 정해 두면 가장 안전합니다.</li>' +
-      '<li>앱(4.1.7 이상)은 다음에 열 때 새 기간을 받습니다. 그 전 앱은 화면의 기간 이름만 다르게 보이고, 금액·잠금은 서버가 정합니다.</li>' +
+      '<li>고를 수 있는 날: 12월분 끝 12.10 ~ 12.31, 1월분 끝 01.10 ~ 01.31. 2월분은 1월분 끝 다음 날부터 자동으로 시작해요.</li>' +
+      '<li>12월 추가 기간(12월분 2차)은 12월분 끝 다음 날부터 12.31까지 따로 상신·결재해요. 이때 1월분은 01.01부터예요.</li>' +
+      '<li>결재 중이거나 결재가 끝난 기간은 바꿀 수 없어요. 반려·회수된 건만 있으면 바꿀 수 있고, 다시 상신하면 새 기간으로 정해져요.</li>' +
+      '<li>이미 끝난 기간은 바꿀 수 없고, 끝날을 오늘보다 앞 날짜로 정할 수도 없어요. 끝난 다음 날 나가는 월간 리포트·정산과 어긋나지 않게 하려는 거예요. 끝날을 오늘로 정하는 건 돼요.</li>' +
+      '<li>바꿀 기간이 시작되기 전에 정해 두면 가장 안전해요. 12월분이면 ' + Y + '년 11월 19일까지 정해 두세요.</li>' +
+      '<li>앱(4.1.7 이상)은 다음에 열 때 새 기간을 받아요. 그보다 낮은 버전은 기간 이름만 다르게 보이고, 금액과 잠금은 서버가 정해요.</li>' +
       '</ul></details></section>';
     var b = barState();
     h += '<section class="cys-card" aria-labelledby="cysT2"><div class="cys-ch"><h2 id="cysT2">미리 보기</h2><span class="cys-cnt" id="cysAt">' + esc(b.at) + '</span></div>' +
@@ -559,17 +560,17 @@
   }
   function askSave() {
     if (ST.saving || !ST.form) return;
-    if (probs(ST.form, ST.year).any) { C.toast('고칠 칸이 있습니다 — 표에 적힌 날짜 범위로 골라 주세요.', true); focusBad(); return; }
+    if (probs(ST.form, ST.year).any) { C.toast('고칠 칸이 있어요. 표에 적힌 날짜 범위로 골라 주세요.', true); focusBad(); return; }
     var b = $('cysSave'); if (b) b.disabled = true;
     fresh(0).then(function (d) {
       paintBar();
-      if (!d) { C.toast(ST.dryErr || '미리 보기를 받지 못했습니다. 잠시 뒤 다시 해 주세요.', true); return; }
+      if (!d) { C.toast(ST.dryErr || '미리 보기를 불러오지 못했어요. 잠시 후 다시 해 주세요.', true); return; }
       if (Array.isArray(d.blocked) && d.blocked.length) { C.toast(lockedText(d.blocked), true); return; }
-      if (!(Array.isArray(d.changed) && d.changed.length)) { C.toast('바뀐 것이 없습니다.'); return; }
+      if (!(Array.isArray(d.changed) && d.changed.length)) { C.toast('바뀐 것이 없어요.'); return; }
       openConfirm(d);
     });
   }
-  /** 옮겨 가는 기록 한 문장 — 「이미 올린 운행 2건·영수증 1장이 12월분 2차로 옮겨 갑니다.」 */
+  /** 옮겨 가는 기록 한 문장 — 「이미 올린 운행 2건·영수증 1장이 12월분 2차로 옮겨 가요.」 */
   function movedSentence(k, mv) {
     var tot = {}, order = [], to = [];
     mv.filter(function (m) { return m && m.kind === k; }).forEach(function (m) {
@@ -577,14 +578,14 @@
       ps.forEach(function (p) { if (!tot[p[0]]) { tot[p[0]] = [0, p[2]]; order.push(p[0]); } tot[p[0]][0] += p[1]; });
       if (ps.length && to.indexOf(m.to) < 0) to.push(m.to);
     });
-    if (!order.length) return '이미 올린 기록 가운데 다른 기간으로 옮겨 가는 것은 없습니다.';
+    if (!order.length) return '이미 올린 기록 중 다른 기간으로 옮겨 가는 것은 없어요.';
     var what = order.map(function (nm) { return nm + ' ' + n0(tot[nm][0]) + tot[nm][1]; }).join('·');
     var dest = to.map(keyShort);
-    return '이미 올린 ' + what + '이 ' + (dest.length === 1 ? dest[0] + ro(dest[0]) : '다른 기간(' + dest.join(' · ') + ')으로') + ' 옮겨 갑니다.';
+    return '이미 올린 ' + what + '이 ' + (dest.length === 1 ? dest[0] + ro(dest[0]) : '다른 기간(' + dest.join(', ') + ')으로') + ' 옮겨 가요.';
   }
   function openConfirm(d) {
     var Y = ST.year, ch = d.changed || [], mv = d.moved || [];
-    var body = '<div class="cys-cf"><p class="cys-cfl">' + Y + '년 연말 마감 기간을 아래처럼 바꿉니다. <b>직원 화면·포털 마감 일정이 바로 바뀝니다.</b></p>';
+    var body = '<div class="cys-cf"><p class="cys-cfl">' + Y + '년 연말 마감 기간을 이렇게 바꿔요. <b>저장하면 직원 화면과 포털 마감 일정에 바로 반영돼요.</b></p>';
     KINDS.forEach(function (k) {
       var c = ch.filter(function (x) { return x && x.kind === k; });
       if (!c.length) return;
@@ -606,7 +607,7 @@
   function runSave() {
     if (ST.saving || !ST.form) return;
     var Y = ST.year;
-    if (ST.cfKey !== sig(ST.form, Y)) { C.closePanel(); C.toast('그 사이 칸이 바뀌었습니다 — 미리 보기를 다시 보고 저장해 주세요.', true); return; }
+    if (ST.cfKey !== sig(ST.form, Y)) { C.closePanel(); C.toast('그사이 값이 바뀌었어요. 미리 보기를 다시 확인하고 저장해 주세요.', true); return; }
     var note = String((($('cysNote') || {}).value) || ST.note || '').trim().slice(0, 200);
     ST.saving = true; ST.saveErr = '';
     var g = $('cysGo'); if (g) { g.disabled = true; g.textContent = '저장하는 중…'; }
@@ -622,10 +623,10 @@
         C.render();
         dry(true);
       };
-      if (j && j.nothing) { done('바뀐 것이 없습니다.'); return; }
+      if (j && j.nothing) { done('바뀐 것이 없어요.'); return; }
       var raw = j && j.cycle_rules && typeof j.cycle_rules === 'object' ? j.cycle_rules : null;
       var after = function () {
-        done('저장했습니다 — 직원 화면·포털 마감 일정이 바로 바뀝니다.' + (+(j && j.restamped) ? ' 법인카드 ' + n0(j.restamped) + '줄을 새 기간으로 옮겼습니다.' : ''));
+        done('저장했어요. 직원 화면·포털 마감 일정이 바로 바뀌어요.' + (+(j && j.restamped) ? ' 법인카드 ' + n0(j.restamped) + '줄을 새 기간으로 옮겼어요.' : ''));
         apply(ST.rules);
         C.loadAll();
       };
@@ -633,12 +634,12 @@
       else loadRules().then(function () {
         if (ST.rules) { after(); return; }
         // 저장은 됐는데 지금 값을 다시 못 읽었다 — 빈 설정으로 그리지 않고 「다시 불러오기」 화면으로
-        C.toast('저장했습니다. 지금 설정을 다시 읽지 못했습니다 — 「다시 불러오기」를 눌러 주세요.', true);
+        C.toast('저장했어요. 설정을 다시 불러오지 못했으니 ‘다시 불러오기’를 눌러 주세요.', true);
         C.render(); C.loadAll();
       });
     }, function (e) {
       ST.saving = false;
-      ST.saveErr = errText(e);
+      ST.saveErr = errText(e, '저장하지 못했어요');
       C.closePanel();
       C.toast(ST.saveErr, true);
       paint();
@@ -650,7 +651,7 @@
     var Y = ST.year;
     KINDS.forEach(function (k) { ST.form[k] = { dec: stdDec(k, Y), extra: false, jan: stdJan(k, Y) }; });
     ST.hint = {};
-    C.toast('세 시스템 모두 기본으로 바꿨습니다 — 미리 보기를 보고 「저장」을 눌러야 적용됩니다.');
+    C.toast('세 시스템 모두 기본으로 바꿨어요. 미리 보기를 확인하고 ‘저장’을 눌러야 적용돼요.');
     later();
   }
   function setYear(y) {
@@ -660,7 +661,7 @@
     resetForm();
     C.render();
     dry(true);
-    if (lost) C.toast('고치던 값은 저장하지 않고 넘어갔습니다.');
+    if (lost) C.toast('고치던 값은 저장하지 않고 넘어갔어요.');
   }
 
   /* ══════════════════ 이벤트 ══════════════════ */
@@ -676,7 +677,7 @@
       if (v[fld] === t.value) return;
       v[fld] = t.value; ST.hint[k] = '';
       // 12월분 끝을 12.31 로 하면 추가 기간이 남을 날이 없다 — 끄고 까닭을 적는다
-      if (fld === 'dec' && v.extra && v.dec === lim(Y).d1) { v.extra = false; ST.hint[k] = '12월분이 12.31 까지라 추가 기간을 껐습니다'; }
+      if (fld === 'dec' && v.extra && v.dec === lim(Y).d1) { v.extra = false; ST.hint[k] = '12월분이 12.31까지라 추가 기간을 껐어요.'; }
     }
     later();
   }

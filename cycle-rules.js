@@ -316,29 +316,29 @@
      기본과 범위가 다른 기간은 모두 적는다(12월분 · 추가 기간 · 1월분 · 1월분 끝을 옮긴 2월분). 틀리면 Error(code BAD_YEAR · BAD_PLAN · BAD_RANGE, details 쉬운 말). */
   function fail(code, details) { var e = new Error(code + (details ? ': ' + details : '')); e.code = code; e.details = details || ''; throw e; }
   function planToOverrides(Y, plan) {
-    if (!isInt(Y) || Y < 2020 || Y > 2099) fail('BAD_YEAR', '해가 틀렸습니다');
-    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) fail('BAD_PLAN', '계획이 객체가 아닙니다');
+    if (!isInt(Y) || Y < 2020 || Y > 2099) fail('BAD_YEAR', '해가 틀렸어요');
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) fail('BAD_PLAN', '계획이 객체가 아니에요');
     Object.keys(plan).forEach(function (k) { if (!START[k]) fail('BAD_PLAN', '모르는 시스템 ' + k); });
     var out = [];
     KINDS.forEach(function (kind) {
       var p = plan[kind];
       if (p == null) return;
-      if (typeof p !== 'object' || Array.isArray(p)) fail('BAD_PLAN', KIND_NAME[kind] + ' 계획이 객체가 아닙니다');
+      if (typeof p !== 'object' || Array.isArray(p)) fail('BAD_PLAN', KIND_NAME[kind] + ' 계획이 객체가 아니에요');
       Object.keys(p).forEach(function (f) { if (['dec_hi', 'jan_hi', 'extra'].indexOf(f) < 0) fail('BAD_PLAN', KIND_NAME[kind] + ' 모르는 칸 ' + f); });
-      if (p.extra != null && typeof p.extra !== 'boolean') fail('BAD_PLAN', KIND_NAME[kind] + ' extra 는 참·거짓');
+      if (p.extra != null && typeof p.extra !== 'boolean') fail('BAD_PLAN', KIND_NAME[kind] + ' extra는 참·거짓이어야 해요');
       var dn = function (f) {
         if (p[f] == null) return null;
         var n = dnYmd(p[f]);
-        if (n == null) fail('BAD_PLAN', KIND_NAME[kind] + ' ' + f + ' 날짜 형식이 틀렸습니다(YYYY-MM-DD)');
+        if (n == null) fail('BAD_PLAN', KIND_NAME[kind] + ' ' + f + ' 날짜 형식이 틀렸어요(YYYY-MM-DD)');
         return n;
       };
       var S12 = stdBN(kind, Y + '-12'), S01 = stdBN(kind, (Y + 1) + '-01'), S02 = stdBN(kind, (Y + 1) + '-02');
       var d0 = dn('dec_hi'), j0 = dn('jan_hi');
       var dec = d0 == null ? S12.hiN : d0, jan = j0 == null ? S01.hiN : j0, ex = p.extra === true;
       var d10 = dnOf(Y, 12, 10), d30 = dnOf(Y, 12, 30), d31 = dnOf(Y, 12, 31), j10 = dnOf(Y + 1, 1, 10), j31 = dnOf(Y + 1, 1, 31);
-      if (dec < d10 || dec > d31) fail('BAD_RANGE', KIND_NAME[kind] + ' 12월분 끝은 ' + ymdOf(d10) + ' ~ ' + ymdOf(d31) + ' 사이여야 합니다');
-      if (jan < j10 || jan > j31) fail('BAD_RANGE', KIND_NAME[kind] + ' 1월분 끝은 ' + ymdOf(j10) + ' ~ ' + ymdOf(j31) + ' 사이여야 합니다');
-      if (ex && dec > d30) fail('BAD_RANGE', KIND_NAME[kind] + ' 12월분이 12월 31일까지면 추가 기간을 둘 수 없습니다');
+      if (dec < d10 || dec > d31) fail('BAD_RANGE', KIND_NAME[kind] + ' 12월분 끝은 ' + ymdOf(d10) + ' ~ ' + ymdOf(d31) + ' 사이여야 해요');
+      if (jan < j10 || jan > j31) fail('BAD_RANGE', KIND_NAME[kind] + ' 1월분 끝은 ' + ymdOf(j10) + ' ~ ' + ymdOf(j31) + ' 사이여야 해요');
+      if (ex && dec > d30) fail('BAD_RANGE', KIND_NAME[kind] + ' 12월분이 12월 31일까지면 추가 기간을 둘 수 없어요');
       var put = function (k, lo, hi) { out.push({ kind: kind, key: k, lo: ymdOf(lo), hi: ymdOf(hi), label: name(k) }); };
       if (dec !== S12.hiN) put(Y + '-12', S12.loN, dec);
       if (ex) put(Y + '-12b', dec + 1, d31);
@@ -360,31 +360,31 @@
   /* ── 검사(DB cycle_rules_problem 과 같은 기준 — 가짜 서버·시험용, 관리 화면은 서버 답을 쓴다) ── */
   function check(rawRules) {
     var o = rawRules;
-    if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return 'JSON 으로 읽지 못했습니다'; } }
-    if (!o || typeof o !== 'object' || Array.isArray(o)) return '규칙이 객체가 아닙니다';
-    if (o.v !== 1) return 'v 는 1 이어야 합니다';
-    if (!isInt(o.grace_days) || o.grace_days < 0 || o.grace_days > GRACE_MAX) return 'grace_days 는 0 ~ 28 정수여야 합니다';
+    if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return 'JSON으로 읽지 못했어요'; } }
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return '규칙이 객체가 아니에요';
+    if (o.v !== 1) return 'v는 1이어야 해요';
+    if (!isInt(o.grace_days) || o.grace_days < 0 || o.grace_days > GRACE_MAX) return 'grace_days는 0 ~ 28 정수여야 해요';
     for (var i = 0; i < KINDS.length; i++) {
       var s = o[KINDS[i]];
       if (s == null) continue;
-      if (typeof s !== 'object' || Array.isArray(s)) return KIND_NAME[KINDS[i]] + ' 칸이 객체가 아닙니다';
-      if (s.start_day != null && s.start_day !== START[KINDS[i]]) return KIND_NAME[KINDS[i]] + ' 기본 시작일(' + START[KINDS[i]] + '일)은 바꿀 수 없습니다';
+      if (typeof s !== 'object' || Array.isArray(s)) return KIND_NAME[KINDS[i]] + ' 칸이 객체가 아니에요';
+      if (s.start_day != null && s.start_day !== START[KINDS[i]]) return KIND_NAME[KINDS[i]] + ' 기본 시작일(' + START[KINDS[i]] + '일)은 바꿀 수 없어요';
     }
-    if (o.overrides != null && !Array.isArray(o.overrides)) return 'overrides 가 목록이 아닙니다';
+    if (o.overrides != null && !Array.isArray(o.overrides)) return 'overrides가 목록이 아니에요';
     var list = o.overrides || [], ovs = [];
     for (var j = 0; j < list.length; j++) {
       var x = list[j], at = (j + 1) + '번째 줄: ';
-      if (!x || typeof x !== 'object' || Array.isArray(x)) return at + '객체가 아닙니다';
-      if (!START[x.kind]) return at + 'kind 가 틀렸습니다';
-      if (typeof x.key !== 'string' || !/^[0-9]{4}-((0[1-9]|1[0-2])|12b)$/.test(x.key)) return at + '키 형식이 틀렸습니다';
+      if (!x || typeof x !== 'object' || Array.isArray(x)) return at + '객체가 아니에요';
+      if (!START[x.kind]) return at + 'kind가 틀렸어요';
+      if (typeof x.key !== 'string' || !/^[0-9]{4}-((0[1-9]|1[0-2])|12b)$/.test(x.key)) return at + '키 형식이 틀렸어요';
       var lo = dnYmd(x.lo), hi = dnYmd(x.hi);
-      if (lo == null || hi == null) return at + '날짜가 틀렸습니다(YYYY-MM-DD)';
-      if (lo > hi) return at + '시작이 끝보다 늦습니다';
-      if (hi - lo > SPAN_MAX) return at + '기간이 92일을 넘습니다';
-      if (typeof x.label !== 'string' || x.label.length < 1 || x.label.length > 40) return at + '이름은 1 ~ 40자여야 합니다';
+      if (lo == null || hi == null) return at + '날짜가 틀렸어요(YYYY-MM-DD)';
+      if (lo > hi) return at + '시작이 끝보다 늦어요';
+      if (hi - lo > SPAN_MAX) return at + '기간이 92일을 넘어요';
+      if (typeof x.label !== 'string' || x.label.length < 1 || x.label.length > 40) return at + '이름은 1 ~ 40자여야 해요';
       if (/b$/.test(x.key)) {
         var y = +x.key.slice(0, 4);
-        if (lo < dnOf(y, 12, 1) || hi > dnOf(y, 12, 31)) return at + '추가 기간은 그해 12월 안이어야 합니다';
+        if (lo < dnOf(y, 12, 1) || hi > dnOf(y, 12, 31)) return at + '추가 기간은 그해 12월 안이어야 해요';
       }
       ovs.push({ kind: x.kind, key: x.key, loN: lo, hiN: hi, lo: x.lo, hi: x.hi, label: x.label });
     }
@@ -396,8 +396,8 @@
         if (!mine.length) continue;
         for (var p = 0; p < mine.length; p++) {
           for (var q = p + 1; q < mine.length; q++) {
-            if (mine[p].key === mine[q].key) return KIND_NAME[kind] + ' ' + mine[p].key + ' 가 두 번 있습니다';
-            if (!(mine[p].hiN < mine[q].loN || mine[q].hiN < mine[p].loN)) return KIND_NAME[kind] + ' ' + mine[p].key + '·' + mine[q].key + ' 범위가 겹칩니다';
+            if (mine[p].key === mine[q].key) return KIND_NAME[kind] + ' ' + mine[p].key + ' 기간이 두 번 있어요';
+            if (!(mine[p].hiN < mine[q].loN || mine[q].hiN < mine[p].loN)) return KIND_NAME[kind] + ' ' + mine[p].key + '·' + mine[q].key + ' 범위가 겹쳐요';
           }
         }
         // 경계 일치 — override 앞 62일 ~ 뒤 62일: 모든 날이 자기 키의 범위 안 · 나온 키의 범위 안 모든 날이 그 키
@@ -405,13 +405,13 @@
         mine.forEach(function (v) { lo0 = Math.min(lo0, v.loN); hi0 = Math.max(hi0, v.hiN); });
         for (var n = lo0 - 62; n <= hi0 + 62; n++) {
           var k = keyOfN(kind, n), b = boundsN(kind, k);
-          if (!b || n < b.loN || n > b.hiN) return KIND_NAME[kind] + ' ' + ymdOf(n) + ': ' + k + ' 범위 밖입니다(주인 없는 날)';
+          if (!b || n < b.loN || n > b.hiN) return KIND_NAME[kind] + ' ' + ymdOf(n) + ' 날이 ' + k + ' 범위 밖이에요(주인 없는 날)';
           seen[k] = b;
         }
         var ks = Object.keys(seen);
         for (var t = 0; t < ks.length; t++) {
           for (var d = seen[ks[t]].loN; d <= seen[ks[t]].hiN; d++) {
-            if (keyOfN(kind, d) !== ks[t]) return KIND_NAME[kind] + ' ' + ks[t] + ': ' + ymdOf(d) + ' 가 ' + keyOfN(kind, d) + ' 입니다(기간이 이어지지 않음)';
+            if (keyOfN(kind, d) !== ks[t]) return KIND_NAME[kind] + ' ' + ks[t] + ' 기간이 이어지지 않아요. ' + ymdOf(d) + ' 날이 ' + keyOfN(kind, d) + ' 기간이에요';
           }
         }
       }

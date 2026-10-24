@@ -188,8 +188,8 @@
       recs.total = total;
       var sum = recs.reduce(function (a, r) { return a + r.amount; }, 0);
       if (total.n !== recs.length || total.sum !== sum) {
-        recs.warning = '파일 맨 아래 「총 ' + total.n + '건 / ' + won(total.sum) + '」과 읽은 영수증(' + recs.length + '건 / ' +
-          won(sum) + ')이 다릅니다. 빠진 영수증이 없는지 확인해 주세요.';
+        recs.warning = '파일 맨 아래 ‘총 ' + total.n + '건 / ' + won(total.sum) + '’과 읽은 영수증(' + recs.length + '건 / ' +
+          won(sum) + ')이 달라요. 빠진 영수증이 없는지 확인해 주세요.';
       }
     }
     return recs;
@@ -370,7 +370,7 @@
       var out = await inflate(u8.subarray(st, end));
       if (out) streams.push(latin1(out));
     }
-    if (!streams.length) throw new Error('PDF 안을 읽지 못했습니다. 하이패스에서 받은 원본 파일인지 확인해 주세요.');
+    if (!streams.length) throw new Error('PDF 안을 읽지 못했어요. 하이패스에서 다운로드한 원본 파일인지 확인해 주세요.');
 
     /* 2) ToUnicode 표 */
     var cmap = new Map();
@@ -404,7 +404,7 @@
       }
       if (items.length) pages.push(items);
     });
-    if (!pages.length) throw new Error('영수증 글자를 찾지 못했습니다.');
+    if (!pages.length) throw new Error('영수증 글자를 찾지 못했어요.');
 
     /* 4) 4열 격자로 나눠 영수증 블록마다 필드 뽑기
      *    열 글자폭(≈117)이 열 간격(≈144)보다 좁다 → round 를 쓰면 0열 끝 글자가 1열로 넘어간다.

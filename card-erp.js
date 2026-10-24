@@ -26,7 +26,7 @@
   var NEED = ['card', 'date', 'no', 'merchant', 'amount'];
   var CARD_RE = /^\d{4}-[\d*]{4}-[\d*]{4}-\d{4}$/;          // 머리글 S 가 없을 때 쓰는 줄 알아보기(가운데 가린 번호도)
   var REASON = {
-    zero: '0원 승인', cancel: '취소된 승인(원래 줄과 취소 줄)', cancel_partial: '부분 취소 — 남은 금액만 넣음',
+    zero: '0원 승인', cancel: '취소된 승인(원래 줄과 취소 줄)', cancel_partial: '부분 취소(남은 금액만 넣음)',
     cancel_orphan: '원래 승인이 이 파일에 없는 취소 줄', month: '고른 달 밖', dup: '파일 안에서 승인번호·승인일이 같은 줄',
     invalid: '승인일·승인번호·금액을 읽지 못함'
   };
@@ -185,9 +185,9 @@
       };
       if (!date || !no || no.length > 20 || !okAmt || Math.abs(amt) > 50000000) {
         // 무엇을 못 읽었는지 글자 그대로(「뺀 줄」 까닭 칸) — 사용자가 ERP 에서 그 칸을 고쳐 다시 받을 수 있게
-        rec.detail = [!date ? '승인일 「' + (gt('date') || '빈칸').slice(0, 30) + '」' : '',
-          !no || no.length > 20 ? '승인번호 「' + (no ? no.slice(0, 24) : '빈칸') + '」' : '',
-          !okAmt || Math.abs(amt) > 50000000 ? '금액 「' + (gt('amount') || '빈칸').slice(0, 30) + '」' : ''].filter(Boolean).join(' · ');
+        rec.detail = [!date ? '승인일 ‘' + (gt('date') || '빈칸').slice(0, 30) + '’' : '',
+          !no || no.length > 20 ? '승인번호 ‘' + (no ? no.slice(0, 24) : '빈칸') + '’' : '',
+          !okAmt || Math.abs(amt) > 50000000 ? '금액 ‘' + (gt('amount') || '빈칸').slice(0, 30) + '’' : ''].filter(Boolean).join(' · ');
         dropped.push(drop(rec, 'invalid')); continue;
       }
       recs.push(rec);

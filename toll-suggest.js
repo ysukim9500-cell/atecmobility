@@ -183,11 +183,11 @@
     //   money-rule 은 금액이 0 인 운행의 하이패스 몫을 세지 않으므로 여기서 따로 본다. 증빙이 없거나 맞는 날 → 그 운행에 그 금액
     //   (넣으면 운행 금액과 하이패스 몫이 함께 늘어 그날 판정은 그대로), 금액 다름·채움인 날 → 모두 직접 고르기.
     var hipU = function (t) { var h = t.toll_hipass == null || t.toll_hipass === '' ? NaN : Number(t.toll_hipass); return isFinite(h) && h > 0 ? Math.min(Math.round(h), MR.TOLL_MAX) : 0; };
-    var hipSay = function (t) { return '이 운행에 하이패스 이용내역으로 맞춘 ' + won(hipU(t)) + '이 남아 있습니다(하이패스가 증빙)'; };
+    var hipSay = function (t) { return '이 운행에 하이패스 이용내역으로 맞춘 ' + won(hipU(t)) + '이 남아 있어요. 하이패스가 증빙이에요.'; };
     var withH = U.filter(function (t) { return hipU(t) > 0; });
     if (withH.length && d && (d.st === 'mismatch' || d.st === 'filled')) {
-      return pickAll('hipass', '이 날 「모름」 운행에 하이패스로 맞춘 금액이 남아 있습니다(' + withH.map(function (t) { return hmK(t.start_time) + ' ' + won(hipU(t)); }).join(' · ') +
-        ') — 하이패스로 낸 통행료면 그 운행에 그 금액을 넣어 주세요', []);
+      return pickAll('hipass', '이날 통행료를 ‘모름’으로 둔 운행에 하이패스로 맞춘 금액(' + withH.map(function (t) { return hmK(t.start_time) + ' ' + won(hipU(t)); }).join(' · ') +
+        ')이 남아 있어요. 하이패스로 낸 통행료라면 그 운행에 그 금액을 넣어 주세요.', []);
     }
     // ① 증빙이 하나도 없는 날
     if (!d || (!(info.H > 0) && !(info.R > 0))) {
@@ -201,23 +201,23 @@
     // ⑦ 시각으로 가르지 못한 같은 금액 영수증 묶음(같은 영수증을 두 번 올렸을 수 있음)
     var dupG = MR.sameAmt(ev, timeOf).filter(function (g) { return !g.sep; });
     var dupSay0 = function (G) {
-      return '같은 금액 영수증 ' + G.map(grpSay).join(' · ') + '이 있습니다 — 같은 영수증을 두 번 올렸으면 하나를 지우고, 실제로 여러 번 냈으면(왕복 등) ';
+      return '같은 금액 영수증이 ' + G.map(grpSay).join(' · ') + ' 있어요. 같은 영수증을 두 번 올렸다면 하나를 지우고, 왕복처럼 실제로 여러 번 냈다면 ';
     };
     // ③ 영수증으로 채움 — 채우는 운행은 규칙대로(제안하지 않음), 나머지는 남는 영수증 없음
     if (d.st === 'filled') {
-      if (d.twice) return pickAll('twice', '두 번 정산 의심인 날입니다 — 맞춰보기 표의 그 줄 안내를 먼저 보세요', ev);
-      if (dupG.length) return pickAll('dupfill', '같은 금액 영수증 ' + dupG.map(grpSay).join(' · ') + '이 있어 영수증 금액을 운행에 넣기 전에 확인합니다 — ' +
-        '맞춰보기 표 그 줄의 「확인」에서 「합계 적기」(실제로 여러 번 냄) 또는 「한 번만 적기」(같은 영수증이 겹침)를 골라 주세요',
+      if (d.twice) return pickAll('twice', '두 번 정산이 의심되는 날이에요. 통행료 표에서 그날 줄의 안내를 먼저 확인하세요.', ev);
+      if (dupG.length) return pickAll('dupfill', '같은 금액 영수증이 ' + dupG.map(grpSay).join(' · ') + ' 있어 운행에 넣기 전에 확인이 필요해요. ' +
+        '통행료 표에서 그날 줄의 ‘확인’을 눌러 실제로 여러 번 냈으면 ‘합계 적기’, 같은 영수증이 겹쳤으면 ‘한 번만 적기’를 골라 주세요.',
         [].concat.apply([], dupG.map(function (g) { return g.ev; })));
       var tgts = d.trips.filter(function (t) { return d.fill[t.id] > 0; });
       U.forEach(function (t) {
         var f = Math.round(d.fill[t.id] || 0);
         if (f > 0) {
           var ids = (d.fillEv && d.fillEv[t.id]) || [];
-          mk(t, 'auto', f, 'filled', '영수증 ' + won(f) + '이 이 운행에 들어갑니다(영수증으로 채움 — 따로 맞추지 않아도 됩니다)',
+          mk(t, 'auto', f, 'filled', '영수증 ' + won(f) + '이 이 운행에 들어가요. 따로 맞추지 않아도 돼요.',
             ev.filter(function (e) { return ids.some(function (i) { return same(i, e.id); }); }));
         } else {
-          mk(t, 'none', 0, 'filledOther', '이날 영수증 ' + won(info.R) + '은 ' + tgts.map(function (x) { return hmK(x.start_time); }).join('·') + ' 운행에 들어갑니다 — 남는 증빙 없음');
+          mk(t, 'none', 0, 'filledOther', '이날 영수증 ' + won(info.R) + '은 ' + tgts.map(function (x) { return hmK(x.start_time); }).join('·') + ' 운행에 들어가요. 남는 증빙이 없어요.');
         }
       });
       return info;
@@ -228,21 +228,21 @@
       U.forEach(function (t) {
         if (hipU(t)) return mk(t, 'amount', hipU(t), 'hipass', hipSay(t));
         var lk = ev.filter(function (e) { var l = linkTo(e); return l && same(l.id, t.id); });
-        if (lk.length) return mk(t, 'pick', null, 'linked', '이 운행에 이은 영수증 ' + lk.map(evSay).join(' · ') + '이 있습니다 — 이날 증빙은 다른 운행 통행료와 맞아 금액을 정하지 않았습니다', lk);
+        if (lk.length) return mk(t, 'pick', null, 'linked', '이 운행에 연결된 영수증 ' + lk.map(evSay).join(' · ') + '이 있어요. 이날 증빙이 다른 운행 통행료와 맞아서 금액은 정하지 않았어요.', lk);
         var tm = ev.filter(function (e) { return !linkTo(e) && hasTime(e.date_millis) && inWin(e.date_millis, t) && !inKnown(e.date_millis); });
-        if (tm.length) return mk(t, 'pick', null, 'timed', '영수증 ' + tm.map(evSay).join(' · ') + '이 이 운행 시간 안입니다 — 이날 증빙은 다른 운행 통행료와 맞아 금액을 정하지 않았습니다', tm);
-        mk(t, 'none', 0, 'match', '남는 증빙 없음 — 이날 ' + proof + '이 다른 운행 통행료 ' + won(info.T) + '과 맞습니다' +
-          (d.D > 0 ? '(하이패스와 같은 영수증 ' + won(d.D) + '은 한 번만 셈)' : ''));
+        if (tm.length) return mk(t, 'pick', null, 'timed', '영수증 ' + tm.map(evSay).join(' · ') + '이 이 운행 시간 안이에요. 이날 증빙이 다른 운행 통행료와 맞아서 금액은 정하지 않았어요.', tm);
+        mk(t, 'none', 0, 'match', '남는 증빙이 없어요. 이날 ' + proof + '이 다른 운행 통행료 ' + won(info.T) + '과 맞아요.' +
+          (d.D > 0 ? ' 하이패스와 같은 영수증 ' + won(d.D) + '은 한 번만 셌어요.' : ''));
       });
       return info;
     }
-    if (d.st !== 'mismatch') return pickAll('other', '이날 통행료 증빙을 확인해 주세요', ev);
+    if (d.st !== 'mismatch') return pickAll('other', '이날 통행료 증빙을 확인해 주세요.', ev);
     // ④ 금액 다름 — 남는 금액 L = U − D − N
     var N = info.T - info.H;
     var Usum = ev.reduce(function (s, e) { return s + amt(e); }, 0);
     var diff = Usum - N;
     info.diff = diff;
-    if (!(diff > 0)) return pickAll('short', '남는 증빙이 없습니다 — 이날 증빙이 다른 운행 통행료보다 ' + won(-diff) + ' 적습니다', []);
+    if (!(diff > 0)) return pickAll('short', '남는 증빙이 없어요. 이날 증빙이 다른 운행 통행료보다 ' + won(-diff) + ' 적어요.', []);
     // 미확정 운행 것으로 보이는 영수증(그 운행에 이음 · 시각이 그 운행 시간 안이고 금액 있는 운행 시간 밖)은 하이패스와 짝짓지 않는다
     var mine = function (e) {
       var l = linkTo(e);
@@ -258,31 +258,31 @@
     var D = ev.filter(isDup).reduce(function (s, e) { return s + amt(e); }, 0);
     var L = diff - D;
     info.left = L;
-    if (!(L > 0)) return pickAll('dup', '남는 증빙이 없습니다 — 남는 영수증이 하이패스와 같은 통행료로 보입니다(한 번만 셈)', ev.filter(isDup));
-    if (L > MR.TOLL_MAX) return pickAll('max', '남는 증빙 ' + won(L) + '이 통행료 상한(200,000원)을 넘습니다', []);
+    if (!(L > 0)) return pickAll('dup', '남는 증빙이 없어요. 남는 영수증이 하이패스와 같은 통행료로 보여서 한 번만 셌어요.', ev.filter(isDup));
+    if (L > MR.TOLL_MAX) return pickAll('max', '남는 증빙 ' + won(L) + '이 통행료 상한(200,000원)을 넘어요.', []);
     var rest = ev.filter(function (e) { return !isDup(e); });
     var lf = leftSet(rest, L, U, known, linkTo);
-    if (!lf) return pickAll('partial', '남는 증빙 ' + won(L) + '이 영수증 금액과 맞지 않습니다 — 다른 운행 통행료가 틀렸을 수 있습니다', rest);
+    if (!lf) return pickAll('partial', '남는 증빙 ' + won(L) + '이 영수증 금액과 맞지 않아요. 다른 운행 통행료가 틀렸을 수 있어요.', rest);
     // ⑦ 남는 영수증(묶음을 못 정했으면 남는 후보 모두)이 같은 금액 묶음에 들면 — 제안하면 중복이 운행 금액이 된다. 직접 고르기.
     var cand = lf.set && !lf.tie ? lf.set : rest;
     var risky = dupG.filter(function (g) { return g.ev.some(function (e) { return cand.some(function (c) { return same(c.id, e.id); }); }); });
-    if (risky.length) return pickAll('same', dupSay0(risky) + '그 운행 통행료를 직접 넣어 주세요',
+    if (risky.length) return pickAll('same', dupSay0(risky) + '그 운행 통행료를 직접 넣어 주세요.',
       [].concat.apply([], risky.map(function (g) { return g.ev; })));
     var named = !!(lf.set && !lf.tie);
     info.ev = named ? lf.set : [];
     var dupSay = D > 0 ? '(하이패스와 같은 영수증 ' + won(D) + '은 한 번만 셈)' : '';
-    if (lf.score < 0) return pickAll('elsewhere', '남는 영수증 ' + (lf.set || rest).map(evSay).join(' · ') + '이 금액 있는 다른 운행 시간 안입니다 — 다른 운행 통행료가 틀렸을 수 있습니다', lf.set || rest);
+    if (lf.score < 0) return pickAll('elsewhere', '남는 영수증 ' + (lf.set || rest).map(evSay).join(' · ') + '이 금액이 있는 다른 운행 시간 안이에요. 다른 운행 통행료가 틀렸을 수 있어요.', lf.set || rest);
     if (U.length === 1) {
       mk(U[0], 'amount', L, 'left', (named ? '남는 영수증 ' + lf.set.map(evSay).join(' · ') : '남는 증빙 ' + won(L)) + dupSay, named ? lf.set : []);
       return info;
     }
     var asg = named ? assign(lf.set, U, linkTo) : null;
-    if (!asg) return pickAll('many', (named ? '남는 영수증 ' + lf.set.map(evSay).join(' · ') : '남는 증빙 ' + won(L)) + '을 어느 운행에 넣을지 정할 수 없습니다', named ? lf.set : rest);
+    if (!asg) return pickAll('many', (named ? '남는 영수증 ' + lf.set.map(evSay).join(' · ') : '남는 증빙 ' + won(L)) + '을 어느 운행에 넣을지 정하지 못했어요.', named ? lf.set : rest);
     var got = U.filter(function (u) { return (asg[u.id] || []).length; });
     U.forEach(function (u) {
       var es = asg[u.id] || [];
       if (es.length) mk(u, 'amount', es.reduce(function (s, e) { return s + amt(e); }, 0), 'left', '남는 영수증 ' + es.map(evSay).join(' · ') + dupSay, es);
-      else mk(u, 'none', 0, 'leftOther', '이날 남는 영수증은 ' + got.map(function (x) { return hmK(x.start_time); }).join('·') + ' 운행 몫입니다 — 이 운행 몫 증빙 없음');
+      else mk(u, 'none', 0, 'leftOther', '이날 남는 영수증은 ' + got.map(function (x) { return hmK(x.start_time); }).join('·') + ' 운행 몫이에요. 이 운행 몫의 증빙은 없어요.');
     });
     return info;
   }

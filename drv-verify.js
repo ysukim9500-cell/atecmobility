@@ -18,7 +18,9 @@
   function failMsg(head, e, tail) {
     var m = String((e && e.message) || '');
     if (m) console.warn(head, m);
-    return /[가-힣]/.test(m) && !/https?:\/\/|HTTP \d/.test(m) ? head + ': ' + m : head + '. ' + tail;
+    // 원인은 쌍점 대신 다음 문장으로(2026-10-24 검수 — 「저장하지 못했어요: …」는 문장 속 쌍점), 끝 마침표는 한 번만
+    var mm = m.trim();
+    return /[가-힣]/.test(mm) && !/https?:\/\/|HTTP \d/.test(mm) ? head + '. ' + mm + (/[.!?…]$/.test(mm) ? '' : '.') : head + '. ' + tail;
   }
 
   /* ══════════════════ 서버 ══════════════════ */
@@ -132,7 +134,7 @@
       var stop = '', byId = {}, last = null;
       (C.state().ALL_EVID || []).forEach(function (e) { byId[String(e.id)] = e; });
       var kindOf = function (id) { var e = byId[String(id)]; return e ? (AIM_KIND[e.category] || ((e.category || '') + ' 영수증')) : '영수증'; };
-      var label = function (n, total) { return '사진 ' + Math.min(n + 1, total) + ' / ' + total + ' 읽는 중 — ' + kindOf(unread[Math.min(n, total - 1)]); };
+      var label = function (n, total) { return kindOf(unread[Math.min(n, total - 1)]) + ' 읽는 중… ' + Math.min(n + 1, total) + ' / ' + total; };
       say(label(0, unread.length), { phase: 'read', n: 0, N: unread.length, cur: unread[0] });
       return pool(unread, 3, function (id) {
         if (stop) return Promise.reject(new Error(stop));
@@ -144,15 +146,15 @@
       }, function (n, total) {
         var rr = last && last.r && last.r.result, v = !rr ? '' : rr.odometer_km != null && isFinite(Number(rr.odometer_km)) ? n0(rr.odometer_km) + ' km'
           : rr.amount != null && isFinite(Number(rr.amount)) ? n0(rr.amount) + '원' : '';
-        say(n < total ? label(n, total) : '읽은 값을 대조하는 중…',
+        say(n < total ? label(n, total) : '읽은 값을 비교하는 중…',
           { phase: 'read', n: n, N: total, cur: n < total ? unread[n] : null, pop: v ? { kind: kindOf(last.id), value: v } : null });
       })
         .then(function (res) {
-          say('읽은 값을 운행과 맞춰 보는 중…', { phase: 'match' });
+          say('읽은 값을 운행과 비교하는 중…', { phase: 'match' });
           return call({ op: 'run', cycle: cyc, username: u }).then(function (j2) {
             // 판독 실패(500 등)·하루 한도는 곧바로 알리지 않고 남겨 둔다 — 예전에는 뒤이은 「검증했습니다」 알림에 바로 덮여 몰랐다(V3 B6).
             //   quiet(상신 창)는 창이 따로 말한다 — 남겨만 둔다.
-            WARN[wk] = stop ? String(stop) : res.fail ? '사진 ' + res.fail + '장은 읽지 못했습니다 — 다시 검증하면 이어서 읽습니다' : '';
+            WARN[wk] = stop ? String(stop) : res.fail ? '사진 ' + res.fail + '장은 읽지 못했어요. 다시 검증하면 이어서 읽어요.' : '';
             return j2.row;
           });
         });
@@ -191,7 +193,7 @@
   function isAi(it) { return /^A(0[1-9]|11)/.test(String(it && it.code || '')); }
   /** Gemini 표시. 구글 공식 로고 파일이 아니라, 같은 색감의 반짝임 모양 + 이름이다. */
   function gemBadge(label) {
-    return '<span class="gem" title="Google Gemini 가 사진을 읽어 찾은 항목">' +
+    return '<span class="gem" title="Google Gemini가 사진을 읽어 찾은 항목">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1">' +
       '<stop offset="0" stop-color="#4C8DF6"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs>' +
       '<path fill="url(#gemg)" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>' +
@@ -245,7 +247,7 @@
   function itemsHtml(items, links, appr) {
     if (!items || !items.length) {
       return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div>' +
-        '<div class="t">확인이 필요한 항목이 없습니다.</div></div></div>';
+        '<div class="t">확인이 필요한 항목이 없어요.</div></div></div>';
     }
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, fx = links && it.level !== 'info' ? FIX[it.code] : null;
@@ -278,7 +280,7 @@
     var evs = S.EVID.filter(function (e) { return eid.indexOf(String(e.id)) >= 0; })
       .sort(function (a, b) { return a.date_millis - b.date_millis; });
     if (trips.length === 1 && !eid.length) { C.openEdit(trips[0].id); return; }
-    if (!trips.length && !evs.length) { C.toast('가리키는 운행·영수증을 찾지 못했습니다. 기간을 확인하거나 ① 「검증하기」를 다시 눌러 주세요.', true); return; }
+    if (!trips.length && !evs.length) { C.toast('해당 운행이나 영수증을 찾지 못했어요. 기간을 확인하거나 다시 검증해 주세요.', true); return; }
     var mine = C.myName();
     var body = '<div class="anote">' + esc(it.detail) + '</div>';
     if (trips.length) {
@@ -305,9 +307,9 @@
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') + '</div>';
       }).join('') + '</div>' +
         // 메뉴 이름은 지금 왼쪽 메뉴 그대로 — 예전 이름 「증빙」은 없다(2026-10-21 매뉴얼 로봇)
-        '<div class="fhint" style="margin-top:8px">영수증의 금액·날짜·구분은 앱에서 고치거나, 여기서 지운 뒤 「2 영수증·통행료」에서 다시 올려 주세요.</div>';
+        '<div class="fhint" style="margin-top:8px">영수증의 금액, 날짜, 구분은 앱에서 고치거나, 여기서 지운 뒤 ‘영수증·통행료’ 단계에서 다시 올려 주세요.</div>';
     }
-    C.openPanel('바로 고치기 — ' + it.title, (isAi(it) ? 'Gemini 가 사진을 읽어 찾은 항목 · ' : '') + '고친 뒤 검증·상신 화면에서 ① 「검증하기」를 다시 눌러 주세요',
+    C.openPanel('바로 고치기 — ' + it.title, (isAi(it) ? 'AI가 사진을 읽어 찾은 항목이에요. ' : '') + '고친 뒤 다시 검증해 주세요.',
       body, '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
   }
   function sumText(s) {
@@ -348,7 +350,7 @@
     // 마감 단계가 아직 1·2단계인가(맨 아래 「지금은 N단계 차례」 — 그때는 깜빡이는 단추가 없다, AU6-L9)
     var ahead = !!C.stepNow && Math.min(C.stepNow(), 3) < 3;
     var h = C.head('검증·상신', esc(cycName(S.CYCKEY)) +
-      (ahead ? ' · 지금은 앞 단계 차례입니다 — 맨 아래 단추로 그 단계부터 하세요' : ' · 순서대로 눌러 주세요 — 깜빡이는 단추가 지금 할 일입니다'));
+      (ahead ? ' · 지금은 앞 단계 차례예요. 그 단계부터 마쳐 주세요.' : ' · 깜빡이는 버튼부터 순서대로 눌러 주세요.'));
     if (ROWS[k] === undefined) {
       fetchLatest(u, cyc).then(function () { if (C.state().VIEW === 'verify') C.render(); });
       return h + C.skeleton();
@@ -362,17 +364,20 @@
     // 반려·회수 뒤(2026-10-15 2차) — 3단계에도 반려 사유 띠. 무엇을 고쳐야 하는지 여기서 바로 보인다.
     if (a && (a.status === 'rejected' || a.status === 'withdrawn')) {
       var stx = C.apprStatusText(a);
-      h += '<div class="hpnote' + (a.status === 'rejected' ? ' warn' : '') + '" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(stx.t) + '</b>' +
-        (/다시 상신/.test(stx.t) ? '' : ' — 고친 뒤 ① 다시 검증하고 상신하세요.') + '</span></div>';
+      // 상태 글과 할 일 사이에 마침표 한 번(2026-10-24 검수 — 「회수했어요 고친 뒤…」처럼 붙어 읽혔다). 사유가 마침표로 끝나면 그대로
+      var stt = String(stx.t || '').trim();
+      if (!/다시 상신/.test(stt) && !/[.!?…]$/.test(stt)) stt += '.';
+      h += '<div class="hpnote' + (a.status === 'rejected' ? ' warn' : '') + '" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(stt) + '</b>' +
+        (/다시 상신/.test(stx.t) ? '' : ' 고친 뒤 다시 검증하고 상신하세요.') + '</span></div>';
     }
     var s = row && row.summary, items = (row && row.result && row.result.items) || [];
     var verdict, clean = '';
     // 진행 글은 .vnote 칸만 고친다(Gemini 표시는 그대로 — 개인경비 .xvnote · 법인카드 .cvnote 와 같게, 2026-10-20)
     if (busy) verdict = '<span class="gemrun">' + gemBadge('Gemini') + '</span><span class="vnote">' + esc(RUN.note || '검증하는 중…') + '</span>';
-    else if (!row) verdict = '아직 검증하지 않았습니다';
-    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있습니다';
-    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있습니다'; clean = ' wait'; }
-    else { verdict = '<em>이상 없습니다</em>'; clean = ' clean'; }
+    else if (!row) verdict = '아직 검증하지 않았어요';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있어요';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있어요'; clean = ' wait'; }
+    else { verdict = '<em>이상 없어요</em>'; clean = ' clean'; }
 
     // 검증은 한 번에 하나만 돈다. 다른 주기 것이 돌고 있으면 그렇다고 말한다(눌러도 반응이 없으면 고장으로 보인다).
     // 상신까지의 순서: ① 검증 → ② PDF 미리보기로 확인 → ③ 결재 상신. 지금 할 것 하나만 깜빡인다.
@@ -386,19 +391,19 @@
     var card = function (n, title, desc, button) { return stepCard(n, stage, title, desc, button, { busy: busy && n === 1, ahead: ahead }); };
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
       card(1, '검증하기 ' + gemBadge('Gemini'),
-        busy ? 'Gemini 가 영수증·계기판 사진을 읽고 기록과 맞춰 보는 중입니다…'
+        busy ? 'AI가 영수증과 계기판 사진을 읽고 기록과 비교하는 중…'
           : row && fresh ? readDone(row, WARN[u + '|' + cyc])
-          : row ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(whenText(row.created_at)) + ') 결과입니다.'
-          : 'Gemini 가 영수증·계기판 사진을 읽어 운행 기록과 서로 맞는지 봅니다.',
+          : row ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(whenText(row.created_at)) + ') 결과예요.'
+          : 'AI가 영수증과 계기판 사진을 읽고 운행 기록과 맞는지 확인해요.',
         gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
-          busy ? (aimShort('d:' + k) || RUN.note || 'Gemini 가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
+          busy ? (aimShort('d:' + k) || RUN.note || 'AI가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
           busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
       card(2, 'PDF 미리보기',
-        row && fresh ? '결재자에게 갈 문서를 눈으로 확인합니다.' : '① 검증하기를 먼저 해 주세요.',
+        row && fresh ? '결재자에게 갈 문서를 미리 확인해요.' : '먼저 검증해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' +
           ic('dl', 16) + 'PDF 미리보기</button>') +
       card(3, '상신',
-        !canSubmit ? '이미 상신했습니다.' : stage === 3 ? '결재선을 고르고 올립니다.' : 'PDF 미리보기를 먼저 확인해 주세요.',
+        !canSubmit ? '이미 상신했어요.' : stage === 3 ? '결재선을 고르고 올려요.' : 'PDF 미리보기를 먼저 확인해 주세요.',
         canSubmit ? '<button class="btn big' + (stage === 3 ? ' pri cta' : '') + '" id="btnOpenSubmit"' + (stage === 3 && !busy ? '' : ' disabled') + '>' +
           (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '다시 상신' : '상신') + '</button>' : '') +
       '</ol>';
@@ -414,7 +419,7 @@
         fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '고칠 것은 아님') +
         fact('사진 판독', row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
-          row.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, row.ai) +
+          row.ai ? 'AI가 읽은 영수증·계기판' : '규칙으로만 검증(AI 미설정)', false, row.ai) +
         '</div>' : '') + '</div>';
     if (moving) { /* 결과는 응답 뒤에 — 지난 결과를 먼저 보이지 않는다 */ }
     else if (row) {
@@ -424,12 +429,12 @@
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('scan', 21) + '</div>' +
-        '<div class="t">위 ① 「검증하기」를 누르면 이번 기간 기록을 살펴봅니다.</div>' +
-        '<div class="d">계기판이 이어지는지, 영수증 금액이 입력과 같은지, 같은 영수증을 두 번 올리지 않았는지 봅니다.<br>' +
-        '맞지 않는 곳이 있어도 상신은 할 수 있습니다 — 결재자가 같이 봅니다.</div></div></div>';
+        '<div class="t">이번 기간 기록을 검증해 보세요.</div>' +
+        '<div class="d">계기판이 이어지는지, 영수증 금액이 입력과 같은지, 같은 영수증을 두 번 올리지 않았는지 확인해요.<br>' +
+        '맞지 않는 곳이 있어도 상신할 수 있고, 결재자도 같이 봐요.</div></div></div>';
     }
-    h += '<div class="anote">금액은 입력값과 정해진 규칙으로만 계산합니다. ' + gemBadge('Gemini') + ' 는 <b>입력값과 다른 곳을 표시</b>만 하고 값은 바꾸지 않습니다. ' +
-      '고친 뒤에는 ① 「검증하기」를 다시 눌러 주세요.</div>';
+    h += '<div class="anote">금액은 입력값과 정산 규칙으로만 계산해요. AI는 <b>맞지 않는 곳을 표시</b>만 하고 값을 바꾸지 않아요. ' +
+      '고친 뒤 다시 검증해 주세요.</div>';
     return h;
 
     function fact(kk, v, sub, alert, gem) {
@@ -444,7 +449,7 @@
    *  결재 문서(PDF 받기·문서 보기)만 둔다. 고칠 길이 없으니 항목 글의 「…하세요」 안내는 뗀다. */
   function lockedVerify(a, cyc) {
     var S = C.state(), done = a.status === 'approved';
-    var h = C.head('검증·상신', esc(cycName(S.CYCKEY)) + ' · ' + (done ? '결재가 끝난 기간입니다' : '결재 중인 기간입니다'));
+    var h = C.head('검증·상신', esc(cycName(S.CYCKEY)) + ' · ' + (done ? '결재가 끝난 기간이에요.' : '결재 중인 기간이에요.'));
     var fk = fzKey(a), f = FZSUM[fk];
     if (f === undefined) wantSummaries([a.id]);
     var v = f && f.verify, s = (v && v.summary) || {};
@@ -452,11 +457,11 @@
       return /다시 검증하면/.test(i.detail || '') ? Object.assign({}, i, { detail: noRecheck(i.detail) }) : i;
     });
     var verdict, clean = '';
-    if (f === undefined) verdict = FZFAIL[fk] ? '상신 때 검증 결과를 불러오지 못했습니다 — 잠시 뒤 다시 열어 주세요' : '상신 때 검증 결과를 불러오는 중…';
-    else if (!v) verdict = '상신 때 검증 결과가 없습니다';
-    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었습니다';
-    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었습니다'; clean = ' wait'; }
-    else { verdict = '<em>이상 없었습니다</em>'; clean = ' clean'; }
+    if (f === undefined) verdict = FZFAIL[fk] ? '상신 때 검증 결과를 불러오지 못했어요. 잠시 후 다시 열어 주세요.' : '상신 때 검증 결과를 불러오는 중…';
+    else if (!v) verdict = '상신 때 검증 결과가 없어요';
+    else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있었어요';
+    else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있었어요'; clean = ' wait'; }
+    else { verdict = '<em>이상 없었어요</em>'; clean = ' clean'; }
     var at = v && (v.ran_at || v.created_at || (f && f.frozen_at));
     var fact = function (kk, val, sub, alert, gem) {
       return '<div class="fact"><div class="k">' + esc(kk) + (gem ? ' ' + gemBadge() : '') + '</div>' +
@@ -470,7 +475,7 @@
         fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '고칠 것은 아님') +
         fact('사진 판독', v.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—',
-          v.ai ? 'Gemini 가 읽은 영수증·계기판' : 'Gemini 미설정 — 규칙 검증만', false, v.ai) + '</div>' : '') +
+          v.ai ? 'AI가 읽은 영수증·계기판' : '규칙으로만 검증(AI 미설정)', false, v.ai) + '</div>' : '') +
       // 결재 문서 미리보기(2026-10-12) — 상신 때 저장한 자료가 있을 때만. 「PDF 받기」·「문서 보기」는 한 줄·같은 높이로 —
       //   미리보기 자리의 단추 줄 맨 앞에 넣는다(2026-10-20 V3 다듬기: 두 단추가 다른 줄·다른 높이였다). 미리보기가 없으면 예전처럼 따로 한 줄.
       (function () {
@@ -484,8 +489,8 @@
       h += C.sect('봐야 할 것', need.length ? need.length + '건' : null, '', itemsHtml(need, false, true));
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info, false, true));
     }
-    h += '<div class="anote">' + (done ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않습니다. ' +
-      '위 결과는 상신할 때 저장된 그대로이고, 결재하는 분도 같은 결과를 봅니다. 결재 문서는 위 「PDF 받기」로 받습니다.</div>';
+    h += '<div class="anote">' + (done ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않고, ' +
+      '상신할 때 저장한 결과를 결재자도 같이 봐요. 결재 문서는 ‘PDF 받기’로 다운로드하세요.</div>';
     return h;
   }
 
@@ -514,11 +519,11 @@
       ALLROWS.list = null;
       if (C.aiReset) C.aiReset();                 // 영수증 화면의 사진 판독도 새로 받게
       var w = WARN[u + '|' + cyc] || '';          // 사진 판독 실패·하루 한도는 이 마지막 알림에 이어 붙인다(V3 B6)
-      C.toast((row ? '검증했습니다 — ' + sumText(row.summary) : '검증했습니다.') + (w ? ' · ' + w : ''), !!w);
+      C.toast((row ? '검증했어요(' + sumText(row.summary) + ').' : '검증했어요.') + (w ? ' ' + C.endDot(w) : ''), !!w);
       // 응답이 왔다 — 실제 결과(서버 refs.trips)로 운행 줄마다 딱지를 찍은 뒤(80ms 간격) 결과 화면으로
       if (row) return aimFinish(mk, drvChips(row));
     }).catch(function (e) {
-      C.toast(failMsg('검증하지 못했습니다', e, '잠시 뒤 다시 눌러 주세요.'), true);
+      C.toast(failMsg('검증하지 못했어요', e, '잠시 후 다시 눌러 주세요.'), true);
     }).then(function () { RUN = { busy: false, note: '', who: '' }; aimEnd(mk); C.render(); });
   }
 
@@ -586,7 +591,7 @@
     //   예전 「Gemini 읽기 없음」은 법인카드 창에 늘 보였다(카드 검증은 ai:false 로 넘어온다 — 2026-10-21 매뉴얼 로봇).
     var aiNote = !v ? '' : v.aiNote != null ? String(v.aiNote) : v.ai === false ? 'AI 사진 판독 없음(규칙 검증만)' : '';
     C.openPanel(title, sub,
-      (appr ? '<div class="anote" style="margin-top:0">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</div>' : '') +
+      (appr ? '<div class="anote" style="margin-top:0">수정은 상신자가 해요. 고칠 곳이 있으면 반려하고 사유를 적어 주세요.</div>' : '') +
       '<div class="vsum">' + sumChip(s) +
       (v && (v.ran_at || v.created_at) ? '<span class="dim">' + esc(whenText(v.ran_at || v.created_at)) + ' 기준</span>' : '') +
       (aiNote ? '<span class="dim">' + esc(aiNote) + '</span>' : '') + '</div>' +
@@ -633,8 +638,8 @@
   }
   /** 고정본을 못 받았을 때 할 말. 결재 건이 바뀐 것이면 목록을 다시 받는다. */
   function frozenFail(e) {
-    if (e && e.stale) { C.toast('결재 문서가 바뀌었습니다(회수 뒤 다시 상신됨). 목록을 다시 불러옵니다.', true); C.loadAll(); return; }
-    C.toast('결재 문서를 불러오지 못했습니다. 잠시 뒤 다시 해 보세요.', true);
+    if (e && e.stale) { C.toast('결재 문서가 회수 뒤 다시 상신됐어요. 목록을 다시 불러올게요.', true); C.loadAll(); return; }
+    C.toast('결재 문서를 불러오지 못했어요. 잠시 후 다시 해 주세요.', true);
   }
   /** 결재 카드에 붙일 검증 요약을 한 번에 받아 온다. 받으면 화면을 다시 그린다. */
   function wantSummaries(ids, done) {
@@ -684,11 +689,11 @@
       if (!live) return '';
       var S = C.state(), mine = a.username === C.myName();
       if (a.cycle === S.CYCKEY && !C.isMulti() && (mine || C.isAll())) {
-        return '<div class="aext"><span class="dim" style="font-size:12px;flex:1">상신 때 저장한 자료가 없는 건입니다(예전 방식) — 지금 자료로 만듭니다.</span>' +
+        return '<div class="aext"><span class="dim" style="font-size:12px;flex:1">상신 때 저장한 자료가 없는 예전 건이에요. 지금 자료로 만들어요.</span>' +
           '<button class="btn sm" data-pdf="' + (mine ? '' : esc(a.username)) + '">' + ic('dl', 13) + '운행기록부 PDF</button></div>';
       }
-      return '<div class="aext"><span class="dim" style="font-size:12px">상신 때 저장한 자료가 없는 건입니다(예전 방식). ' +
-        '그 달 화면의 「정산·엑셀」에서 받을 수 있습니다.</span></div>';
+      return '<div class="aext"><span class="dim" style="font-size:12px">상신 때 저장한 자료가 없는 예전 건이에요. ' +
+        '그 달의 ‘정산·엑셀’ 화면에서 다운로드하세요.</span></div>';
     }
     var chip = f && f.verify ? '<button class="vchip" data-fzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' +
       sumChip(f.verify.summary) + '</button>' : '';
@@ -713,10 +718,10 @@
   /** 판정 띠 「대체로 정상입니다 — …」 뒤 — 아래에 항목 목록이 없으면 「확인 항목」이라 하지 않는다(세 시스템 같은 말).
    *  예전에는 항목이 하나도 없고 칩 「! AI 사진 판독 0/3장」만 있는데 「아래 확인 항목만 살펴봐 주세요」라 했다(2026-10-16 5차). */
   function warnTail(items, vs, asApprover) {
-    if (items && items.length) return asApprover ? '아래 확인 항목만 살펴봐 주세요' : '아래 확인 항목은 결재하는 분께도 보입니다';
+    if (items && items.length) return asApprover ? '확인 항목만 살펴봐 주세요' : '확인 항목은 결재자에게도 보여요';
     var un = vs && vs.receipts && vs.read < vs.receipts ? vs.receipts - vs.read : 0;
-    if (un) return asApprover ? 'AI 가 읽지 않은 사진 ' + n0(un) + '장은 직접 확인해 주세요' : 'AI 가 읽지 않은 사진 ' + n0(un) + '장은 결재하는 분이 직접 봅니다';
-    return asApprover ? '아래 「!」 표시만 살펴봐 주세요' : '아래 「!」 표시는 결재하는 분께도 보입니다';
+    if (un) return asApprover ? 'AI가 읽지 않은 사진 ' + n0(un) + '장은 직접 확인해 주세요' : 'AI가 읽지 않은 사진 ' + n0(un) + '장은 결재자가 직접 확인해요';
+    return asApprover ? '‘!’ 표시만 살펴봐 주세요' : '‘!’ 표시는 결재자에게도 보여요';
   }
   /**
    * 결재 요약(2026-10-07 사용자) — 결재자가 문서를 열지 않고도 승인할 수 있게, 상신 때 굳힌 금액·검증 결과와
@@ -744,7 +749,7 @@
         (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b>' +
         '<span class="sub">' + pm + ' ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + ' km</span></div>';
     } else {
-      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 결재가 없습니다' : '추가 기간은 전월과 견주지 않습니다') + '</span></div>';
+      cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 결재가 없어요.' : '추가 기간은 전월과 비교하지 않아요.') + '</span></div>';
     }
     // 검증(상신 때 굳힌 결과)
     var v = f && f.verify, vs = (v && v.summary) || null;
@@ -759,7 +764,7 @@
     if (vs) {
       if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
     } else if (f === undefined) { if (!FZFAIL[fzKey(a)]) checks.push(['warn', '검증 결과를 불러오는 중…']); }   // 못 받았으면 그 줄은 없앤다(판정 띠가 말한다)
-    else checks.push(['warn', '상신 때 검증 결과가 없습니다']);
+    else checks.push(['warn', '상신 때 검증 결과가 없어요']);
     // 통행료 미확정 — 아래 항목(R02)에 이미 있으면 칩으로 또 세지 않는다
     var hasR02 = items.some(function (i) { return i.code === 'R02'; });
     if (s.toll_unknown && !hasR02) checks.push(['warn', '통행료 미확정 ' + n0(s.toll_unknown) + '건(0원으로 정산)']);
@@ -770,19 +775,20 @@
     if (!s.toll_unknown && !hasR02 && !tollIssue) checks.push(['ok', '통행료 모두 확정']);
     // rate_miss 는 단가가 없던 「분기-지역」 목록이다(예: 2026-4-수도권). 빈 목록이면 문제없음.
     var rm = Array.isArray(s.rate_miss) ? s.rate_miss : (Number(s.rate_miss) > 0 ? [String(s.rate_miss) + '건'] : []);
-    if (rm.length) checks.push(['warn', '유류 단가 미등록(' + rm.map(function (k) { var q = String(k).split('-'); return q.length === 3 ? q[0] + '년 ' + q[1] + '분기 ' + q[2] : k; }).join(', ') + ') — 기본 단가로 계산']);
-    if (bigJump) checks.push(['warn', '전월보다 비용이 크게 늘었습니다']);
+    if (rm.length) checks.push(['warn', '유류 단가 미등록(' + rm.map(function (k) { var q = String(k).split('-'); return q.length === 3 ? q[0] + '년 ' + q[1] + '분기 ' + q[2] : k; }).join(', ') + ')이라 기본 단가로 계산했어요']);
+    if (bigJump) checks.push(['warn', '전월보다 비용이 크게 늘었어요']);
     var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
       nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length + (s.toll_unknown && hasR02 ? 1 : 0);
     // 결재하는 분에게 상신자가 할 일(영수증을 올리세요 등)을 시키지 않는다 — 항목은 제목만, 고칠 것은 상신자 몫이라고 한 줄(2026-10-15 2차)
     var viewer = (C.state().ME || {}).username, asApprover = a.username !== viewer;
     // ★ 상신 때 검증 결과를 못 받았으면(불러오는 중·실패·옛 건) 「이상 없음」이라고 하지 않는다.
-    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했습니다' : f === undefined ? '검증 결과를 불러오는 중입니다' : '검증 결과를 아직 받지 못했습니다') + ' — 아래 「PDF 받기」로 문서를 열어 확인해 주세요']
+    //   「검증 결과를 불러오는 중…」으로 시작하는 글 — driving-app.js apprLoading 이 이 앞부분으로 받는 중을 가린다(세 모듈 같은 글. 판정 줄은 문장이라 세 모듈 모두 끝에 마침표 — 2026-10-24 검수)
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 받기’로 문서를 열어 확인해 주세요.']
       : nBad ? ['bad', asApprover
-        ? '확인이 필요합니다 — ' + (noRcpTxt ? '영수증 없음(' + noRcpTxt + ') 등 ' : '') + '문서의 불일치 항목을 보고 결재해 주세요'
-        : '검증에서 맞지 않는 곳이 있습니다' + (noRcpTxt ? '(영수증 없음 ' + noRcpTxt + ')' : '') + ' — 결재하는 분이 문서에서 함께 봅니다']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
-      : nWarn ? ['warn', '대체로 정상입니다 — ' + warnTail(items, vs, asApprover)]
-      : ['ok', '금액·검증 모두 이상 없습니다' + (myTurn(a) ? ' — 문서를 열지 않고 승인하셔도 됩니다' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
+        ? '확인이 필요해요. ' + (noRcpTxt ? '영수증 없음(' + noRcpTxt + ') 등 ' : '') + '문서의 불일치 항목을 보고 결재해 주세요.'
+        : '검증에서 맞지 않는 곳' + (noRcpTxt ? '(영수증 없음 ' + noRcpTxt + ')' : '') + '이 있어요. 결재자도 문서에서 함께 봐요.']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
+      : nWarn ? ['warn', '대체로 정상이에요. ' + warnTail(items, vs, asApprover) + '.']
+      : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
 
     return '<div class="abrief ' + verdict[0] + '">' +
       '<div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
@@ -804,7 +810,7 @@
       ((s.version || 1) >= 3
         ? ((Number(s.ev_parking) || 0) + (Number(s.ev_toll) || 0) > 0
           ? '<div class="abf"><span class="k">영수증으로 채운 금액</span><b>' + won((Number(s.ev_parking) || 0) + (Number(s.ev_toll) || 0)) +
-            (s.ev_n ? ' <small>' + n0(s.ev_n) + '장</small>' : '') + '</b><span class="sub">운행에 금액이 없던 날 — 주차비 ' + won(s.ev_parking || 0) + ' · 통행료 ' + won(s.ev_toll || 0) +
+            (s.ev_n ? ' <small>' + n0(s.ev_n) + '장</small>' : '') + '</b><span class="sub">운행에 금액이 없던 날 · 주차비 ' + won(s.ev_parking || 0) + ' · 통행료 ' + won(s.ev_toll || 0) +
             (Number(s.no_trip_n) > 0 ? '</span><span class="sub abwarn">운행 없는 영수증 ' + n0(s.no_trip_n) + '장 ' + won(s.no_trip_amt || 0) + ' 정산 제외' : '') + '</span></div>'
           : Number(s.no_trip_n) > 0
             ? '<div class="abf"><span class="k">운행 없는 영수증</span><b>' + n0(s.no_trip_n) + '<small>장</small></b><span class="sub abwarn">' + won(s.no_trip_amt || 0) + ' 정산 제외</span></div>'
@@ -818,13 +824,13 @@
         var days = asApprover && (i.code === 'R06' || i.code === 'R15') ? noRcpDays(i.detail) : '';
         // 통행료 미확정(R02)도 결재하는 분에게 그날과 「0원으로 정산」을 보인다(2026-10-16 6차 — 「모두 확정」으로 보이던 건)
         //   날짜 목록만 — 서버 문구 「… 업무 운행입니다: 10.03, 10.05. 냈으면 …」(2026-10-21 다듬기 뒤 목록 뒤에 할 일이 붙는다 · 예전 「…: 10.03, 10.05」도 같은 답)
-        if (asApprover && i.code === 'R02') { var ud = /:\s*((?:\d{2}\.\d{2}(?:, )?)+(?: 외 \d+건)?)/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' · ' : '') + '0원으로 정산됩니다'; }
+        if (asApprover && i.code === 'R02') { var ud = /:\s*((?:\d{2}\.\d{2}(?:, )?)+(?: 외 \d+건)?)/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' 운행은 ' : '') + '0원으로 정산돼요.'; }
         // 상신한 분 본인 — 결재 중이라 다시 검증할 수 없다: 끝의 「다시 검증하면 …」은 뗀다(2026-10-21)
         var dt = noRecheck(i.detail);
         return '<li class="' + i.level + '"' + (i.code === 'R06' ? ' data-norcp="1"' : '') + '><b>' + esc(i.title || '') + '</b>' +
           (days ? ' — ' + esc(days) : dt && !asApprover ? ' — ' + esc(dt.slice(0, 110)) + (dt.length > 110 ? '…' : '') : '') + '</li>';
-      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건 — 「검증」 딱지를 눌러 전부 보기</li>' : '') +
-        (asApprover ? '<li class="more">고치는 것은 상신한 분이 합니다 — 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') +
+      }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건은 ‘검증’을 눌러 확인하세요.</li>' : '') +
+        (asApprover ? '<li class="more">수정은 상신자가 해요. 고칠 곳이 있으면 반려하고 사유를 적어 주세요.</li>' : '') + '</ul>' : '') +
       '</div>';
   }
 
@@ -853,7 +859,7 @@
       fetchBytes(base('vendor/NanumGothic-Regular.ttf')),
       fetchBytes(base('vendor/NanumGothic-Bold.ttf'))
     ]).then(function (x) {
-      if (!window.PDFLib || !window.fontkit || !window.SheetPdf) throw new Error('PDF 도구를 불러오지 못했습니다');
+      if (!window.PDFLib || !window.fontkit || !window.SheetPdf) throw new Error('PDF 도구를 불러오지 못했어요');
       return { PDFLib: window.PDFLib, fontkit: window.fontkit, fontRegular: x[2], fontBold: x[3] };
     }).catch(function (e) { LIBS = null; throw e; });
     return LIBS;
@@ -896,11 +902,11 @@
   var PDF_URLS = [], PDF_JOB = null;
   /** 문서 상태 표시(meta.mark) 별 결과 창 안내문. */
   var MARK_NOTE = {
-    preview: '상신 전 미리보기입니다. 쪽마다 <b>「미리보기」</b>가 찍혀 있습니다. 결재가 끝나면 같은 자리에서 <b>결재 완료본</b>을 받을 수 있습니다.',
-    pending: '상신할 때 저장한 자료로 만든 문서입니다. 결재가 끝나기 전이라 쪽마다 <b>「결재 중」</b>이 찍혀 있습니다.',
-    rejected: '반려된 상신 건의 문서입니다. 쪽마다 <b>「반려」</b>가 찍혀 있습니다.',
-    withdrawn: '회수한 상신 건의 문서입니다. 쪽마다 <b>「회수」</b>가 찍혀 있습니다.',
-    '': '상신할 때 저장한 자료로 만든 문서입니다. <b>언제 받아도 같은 내용</b>이 나옵니다.'
+    preview: '상신 전 미리보기라 쪽마다 <b>미리보기</b> 표시가 있어요. 결재가 끝나면 <b>결재 완료 문서</b>를 다운로드할 수 있어요.',
+    pending: '상신할 때의 자료로 만든 문서예요. 결재가 끝나기 전이라 쪽마다 <b>결재 중</b> 표시가 있어요.',
+    rejected: '반려된 문서예요. 쪽마다 <b>반려</b> 표시가 있어요.',
+    withdrawn: '회수한 문서예요. 쪽마다 <b>회수</b> 표시가 있어요.',
+    '': '상신할 때의 자료로 만든 문서예요. <b>언제 다운로드해도 내용이 같아요</b>.'
   };
   /**
    * PDF 를 만들어 결과 창을 띄운다.
@@ -969,14 +975,14 @@
     var nImg = pdfImgs(o).nImg, loaded = 0;
     note = note || function () { };
     if (!o.build) {
-      note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
+      note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF를 만드는 중…');
       // 받을 사진 수는 원본을 읽은 뒤에 정해진다(「PDF만」) — 그때 분모를 고친다
       return sheetBuild(o.doc, o.meta, o.verify, function () { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); },
-        function (n) { nImg = n; note(n ? '사진을 불러오는 중… ' + loaded + ' / ' + n : 'PDF 를 만드는 중입니다…'); });
+        function (n) { nImg = n; note(n ? '사진을 불러오는 중… ' + loaded + ' / ' + n : 'PDF를 만드는 중…'); });
     }
     // 결재란 서명(올린 서명 · 이름 도장)을 먼저 채운다.
     return (C.fillSigns ? C.fillSigns(o.doc) : Promise.resolve()).then(ensureLibs).then(function (lib) {
-      note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF 를 만드는 중입니다…');
+      note(nImg ? '사진을 불러오는 중… 0 / ' + nImg : 'PDF를 만드는 중…');
       return o.build(lib, function (p) {
         return loadPhoto(p, 1500).then(function (b) { loaded++; note('사진을 불러오는 중… ' + loaded + ' / ' + nImg); return b; });
       });
@@ -999,9 +1005,9 @@
     // o.nImg·o.build·o.stat·o.okAttr — 다른 문서(개인경비 지출결의)도 같은 창·같은 확인 순서로 만든다(2026-10-07).
     var nImg = pdfImgs(o).nImg;
     C.openPanel(o.title, o.sub,
-      '<div class="pdfwait"><div class="spin"></div><div id="pdfNote" role="status">PDF 를 만드는 중입니다…</div>' +
-      '<div class="dim" style="margin-top:6px">' + (nImg ? '사진 ' + n0(nImg) + '장을 넣습니다. ' : '') +
-      '처음 한 번은 글꼴을 받느라 조금 걸립니다.</div></div>',
+      '<div class="pdfwait"><div class="spin"></div><div id="pdfNote" role="status">PDF를 만드는 중…</div>' +
+      '<div class="dim" style="margin-top:6px">' + (nImg ? '사진 ' + n0(nImg) + '장을 넣어요. ' : '') +
+      '처음에는 글꼴을 다운로드하느라 조금 걸려요.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     // ★ 만드는 데 몇 초~수십 초 걸린다. 그 사이 창을 닫고 다른 창(운행 추가 등)을 열었으면
     //   결과로 그 창을 덮어쓰면 안 된다 — 이 작업이 띄운 '만드는 중' 줄이 아직 있을 때만 쓴다.
@@ -1022,31 +1028,31 @@
       var hip = res.issues.filter(function (i) { return i.kind === 'hipass'; });   // 하이패스 영수증 원본 PDF·줄을 못 받음 · 원본 없는 줄 · 원본을 확인하지 못한 운행(2026-10-23)
       var chk = '';
       if (!over.length && !img.length && !gly.length && !cut.length && !hip.length) {
-        chk = '<div class="pdfok">' + ic('check', 15) + '<span>문서 점검 완료 — 잘린 글자·빠진 사진 없음</span></div>';
+        chk = '<div class="pdfok">' + ic('check', 15) + '<span>문서를 점검했어요. 잘린 글자나 빠진 사진이 없어요.</span></div>';
       } else {
         chk = '<div class="awarn">' + ic('alert', 15) + '<span>' +
           [over.length ? '글자가 칸에 꽉 찬 곳 ' + over.length + '곳(' + esc(over[0].page + '쪽') + ' 등)' : '',
             img.length ? '불러오지 못한 사진 ' + img.length + '장' : '',
             gly.length ? '글꼴에 없어 ? 로 바꾼 글자 ' + gly.length + '종' : '',
-            cut.length ? '길어서 「…」로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : '',
+            cut.length ? '길어서 ‘…’로 줄인 증빙 설명 ' + cut.length + '곳(' + esc(cut[0].page + '쪽') + ' 등)' : '',
             hip.length ? '확인 필요: 하이패스 영수증 근거를 다 넣지 못함(' + esc(hipWhy(hip)) + ')' : ''].filter(Boolean).join(' · ') +
-          ' — 열어서 확인해 주세요.</span></div>';
+          '. 열어서 확인해 주세요.</span></div>';
       }
       // 문서 총계(장별 총계의 합)가 상신 때 서버가 집계한 금액과 같은가 — 다르면 결재 카드와 문서가 다른 숫자를 말한다.
       var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
       // 1원 차이도 알린다(2026-10-08, 예전 > 1 은 1원 차이를 숨겼다).
       if (o.expect != null && isFinite(Number(o.expect)) && Math.round(sum) - Math.round(Number(o.expect)) !== 0) {
-        chk += '<div class="awarn">' + ic('alert', 15) + '<span>문서 총계 <b>' + C.won(sum) + '</b> 가 ' + (o.expectName || '상신 때 집계한 금액') + ' <b>' +
-          C.won(o.expect) + '</b> 과 ' + n0(Math.abs(Math.round(sum) - Math.round(Number(o.expect)))) +
-          '원 다릅니다. 관리자에게 알려 주세요.</span></div>';
+        chk += '<div class="awarn">' + ic('alert', 15) + '<span>문서 총계 <b>' + C.won(sum) + '</b> · ' + (o.expectName || '상신 때 집계한 금액') + ' <b>' +
+          C.won(o.expect) + '</b>. ' + n0(Math.abs(Math.round(sum) - Math.round(Number(o.expect)))) +
+          '원 차이가 있어요. 관리자에게 알려 주세요.</span></div>';
       }
       var mk = o.meta.mark || '';
       // 실제로 실은 사진 수(「PDF만」으로 뺀 사진은 빼고 — 운행기록부 PDF 만 돌려준다) · 개인경비·법인카드는 예전처럼
       if (res.photos != null && o.nImg == null) nImg = res.photos;
       // 결재 완료본에 상신 뒤 덧붙인 하이패스 원본이 실렸으면 「언제 받아도 같은 내용」 대신 그 사실을 말한다(2026-10-23 검토)
       var anote = o.note || MARK_NOTE[mk] || MARK_NOTE[''];
-      if (!o.note && !mk && res.late) anote = '상신할 때 저장한 자료로 만든 문서입니다. 금액·운행은 <b>언제 받아도 같습니다</b>. ' +
-        '상신 뒤에 덧붙인 하이패스 영수증 원본 ' + n0(res.late) + '개가 <b>「덧붙임」</b> 표시를 달고 함께 실렸습니다.';
+      if (!o.note && !mk && res.late) anote = '상신할 때의 자료로 만들어 금액과 운행은 <b>언제 다운로드해도 같아요</b>. ' +
+        '상신 뒤에 첨부한 하이패스 영수증 원본 ' + n0(res.late) + '개는 <b>덧붙임</b> 표시와 함께 실려 있어요.';
       // 반려·회수 뒤 다시 올리는 것이면 「다시 상신」(상신 단추 이름과 같게, 2026-10-16 3차)
       //   단추 이름에 ①② 를 달지 않는다 — 단계 카드의 ①②③(검증·미리보기·상신)과 번호가 겹쳤다(2026-10-20 V3 다듬기)
       var okLab = '확인 완료 → ' + (o.again ? '다시 상신' : '상신');
@@ -1060,7 +1066,7 @@
           (o.okKey ? '열어서 보기' : '열기 · 인쇄') + '</a>' +
         // 상신 전 미리보기면 '확인했다'를 받고 결재 상신으로 넘긴다(검증 → PDF 확인 → 상신).
         // 2026-10-07: 문서를 먼저 열어 봐야 「확인 완료」가 눌린다(열기·내려받기 중 하나).
-        (o.okKey ? '<button class="btn" id="pdfOkBtn" ' + (o.okAttr || 'data-pdfok') + '="' + esc(o.okKey) + '" disabled title="먼저 「열어서 보기」로 문서를 확인해 주세요">' + okLab + '</button>' : '');
+        (o.okKey ? '<button class="btn" id="pdfOkBtn" ' + (o.okAttr || 'data-pdfok') + '="' + esc(o.okKey) + '" disabled title="먼저 ‘열어서 보기’로 문서를 확인해 주세요.">' + okLab + '</button>' : '');
       // 결재 완료본이면 「내려받기」(pdf) · 「열기 · 인쇄」(print)를 누를 때 출력 기록을 남긴다(기다리지 않는다, 2026-10-14).
       if (o.prints && C.prints) C.prints.bindOut($('pFoot'), o.prints.kind, o.prints.ids, url);
       if (o.okKey) {
@@ -1071,7 +1077,7 @@
           b.disabled = false; b.removeAttribute('title'); b.classList.add('pri', 'cta');
           var a = $('pdfOpen'); if (a) a.classList.remove('pri', 'cta');
           var nt = $('pdfStepNote');
-          if (nt) { nt.classList.add('ok'); nt.innerHTML = ic('check', 15) + '<span>문서를 열었습니다. 확인했으면 <b>' + okLab + '</b>을 눌러 주세요.</span>'; }
+          if (nt) { nt.classList.add('ok'); nt.innerHTML = ic('check', 15) + '<span>문서를 열었어요. 확인했으면 <b>' + okLab + '</b>을 눌러 주세요.</span>'; }
         };
         Array.prototype.forEach.call($('pFoot').querySelectorAll('a[href="' + url + '"]'), function (a) {
           a.addEventListener('click', unlock); a.addEventListener('auxclick', unlock); a.addEventListener('contextmenu', unlock);
@@ -1081,7 +1087,7 @@
       return res;
     }).catch(function (e) {
       if (mine()) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) +
-        '<span>' + esc(failMsg('PDF 를 만들지 못했습니다', e, '새로 고침 뒤 다시 해 주세요.')) + '</span></div>';
+        '<span>' + esc(failMsg('PDF를 만들지 못했어요', e, '새로고침한 뒤 다시 해 주세요.')) + '</span></div>';
       throw e;
     });
   }
@@ -1093,7 +1099,7 @@
     var S = C.state(), u = who || C.myName(), cyc = S.CYCKEY;
     var ap = C.apprOf(u, cyc);
     var doc = C.pdfDocFor(u, ap);
-    if (!doc.any) { C.toast('이번 기간에 담을 운행·영수증이 없습니다.', true); return; }
+    if (!doc.any) { C.toast('이번 기간에 담을 운행이나 영수증이 없어요.', true); return; }
     var k = keyOf(u, cyc);
     // 결재 중·완료인데 지금 자료로 만드는 것은 '상신 때 저장한 자료가 없는 옛 건'뿐이다.
     var old = ap && (ap.status === 'submitted' || ap.status === 'approved');
@@ -1113,7 +1119,7 @@
         title: done ? '결재 완료본' : old ? '결재 문서' : 'PDF 미리보기',
         sub: C.nameOf(u) + ' · ' + cycName(S.CYCKEY),
         file: '운행기록부_' + safeName(C.nameOf(u)) + '_' + cyc + (done ? '_결재완료' : old ? '_결재중' : '_미리보기') + '.pdf',
-        note: old ? '이 결재 건은 상신 때 저장한 자료가 없어(예전 방식) <b>지금 자료</b>로 만들었습니다.' : null,
+        note: old ? '상신 때 저장한 자료가 없는 예전 건이라 <b>지금 자료</b>로 만들었어요.' : null,
         expect: expect, expectName: old ? '상신 때 집계한 금액' : '화면 합계',
         okKey: !old && u === C.myName() ? k : '',
         again: !!(ap && (ap.status === 'rejected' || ap.status === 'withdrawn')),     // 반려·회수 뒤면 「확인 완료 → 다시 상신」
@@ -1130,12 +1136,12 @@
     var S = C.state();
     return a.cycle === S.CYCKEY && !C.isMulti() && (a.username === C.myName() || C.isAll());
   }
-  var NO_FZ = '이 결재 건에는 상신 때 저장한 자료가 없습니다(예전 방식). 그 달 화면의 「정산·엑셀」에서 받아 주세요.';
+  var NO_FZ = '상신 때 저장한 자료가 없는 예전 건이에요. 그 달의 ‘정산·엑셀’ 화면에서 다운로드해 주세요.';
 
   /** 고정본으로 결재 문서(결재 중이면 「결재 중」 표시, 끝났으면 완료본). */
   function pdfFrozen(id) {
     var a = apprById(id);
-    if (!a) { C.toast('결재 건을 찾지 못했습니다.', true); return; }
+    if (!a) { C.toast('결재 건을 찾지 못했어요.', true); return; }
     fetchFrozen(a).then(function (fz) {
       if (!fz) { if (liveOk(a)) { C.bizOnly(); pdfLive(a.username); } else C.toast(NO_FZ, true); return; }
       makePdf(frozenOpts(a, fz)).catch(function () { });
@@ -1188,7 +1194,7 @@
     var tag = { approved: '_결재완료', submitted: '_결재중', rejected: '_반려', withdrawn: '_회수' }[a.status] || '_결재중';
     var snap = a.snapshot || {};
     var save = function (files) {
-      if (!files.length) { C.toast('담을 운행·영수증이 없습니다.', true); return; }
+      if (!files.length) { C.toast('담을 운행이나 영수증이 없어요.', true); return; }
       files.forEach(function (f, i) {
         setTimeout(function () { C.saveBlob(f.bytes, f.name.replace(/\.xlsx$/, tag + '.xlsx')); }, i * 400);
       });
@@ -1197,7 +1203,7 @@
       if (a.status === 'approved' && C.prints) C.prints.log('driving', a.id, 'xlsx');
       var warn = C.sheetSumWarn(files, snap.version >= 2 ? snap.cost : null);
       if (warn) C.toast(warn, true);
-      else C.toast(files.length > 1 ? '엑셀 ' + files.length + '개를 내려받습니다(차량별로 한 장씩).' : '엑셀을 내려받습니다.');
+      else C.toast(files.length > 1 ? '차량별 엑셀 ' + files.length + '개를 다운로드해요.' : '엑셀을 다운로드해요.');
     };
     fetchFrozen(a).then(function (fz) {
       if (!fz) { if (liveOk(a)) { C.bizOnly(); save(C.xlsxFiles(a.username, a)); } else C.toast(NO_FZ, true); return; }
@@ -1243,8 +1249,8 @@
       runVerify(u, S.CYCKEY).then(function (row) {
         ROWS[k] = row || null; ALLROWS.list = null;
         var w = WARN[u + '|' + S.CYCKEY] || '';   // 사진 판독 경고는 이 알림에 이어 붙인다(V3 B6)
-        C.toast(C.nameOf(u) + ' — ' + (row ? sumText(row.summary) : '검증했습니다') + (w ? ' · ' + w : ''), !!w);
-      }).catch(function (er) { C.toast(failMsg('검증하지 못했습니다', er, '잠시 뒤 다시 눌러 주세요.'), true); })
+        C.toast(C.nameOf(u) + ' 님 운행일지를 검증했어요' + (row ? '(' + sumText(row.summary) + ')' : '') + '.' + (w ? ' ' + C.endDot(w) : ''), !!w);
+      }).catch(function (er) { C.toast(failMsg('검증하지 못했어요', er, '잠시 후 다시 눌러 주세요.'), true); })
         .then(function () { RUN = { busy: false, note: '', who: '' }; C.render(); });
       return;
     }
@@ -1336,7 +1342,7 @@
     var vis = shown.filter(finVisible), nSel = finPicked(vis).length;
 
     var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
-    var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력합니다');
+    var h = C.head('결재 완료 출력', esc(cname) + ' · 결재가 끝난 운행기록부를 모아 출력해요.');
     var fact = function (k, v, sub, alert) {
       return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
         '<div class="sub">' + esc(sub || '') + '</div></div>';
@@ -1360,7 +1366,7 @@
         (C.prints ? C.prints.onlyBtn('driving') : '')
       : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
-      ? C.blank('출력 안 한 결재 완료 문서가 없습니다.', '모두 한 번 이상 출력했습니다. 「출력 안 한 것만」을 다시 누르면 전체가 보입니다.', 'stamp')
+      ? C.blank('출력 안 한 결재 완료 문서가 없어요.', '모두 한 번 이상 출력됐어요. ‘출력 안 한 것만’을 다시 누르면 전체가 보여요.', 'stamp')
       : done.length
       // 세 표(결재 완료·결재 중·챙겨야 할 사람)가 같은 열 순서 — 팀 묶음 + 파트·센터 · 이름 · 상태(2026-10-19 사용성 2차 #12).
       //   「전체 선택」은 표 머리 첫 칸(예전: 표 밖 단추 줄).
@@ -1373,7 +1379,7 @@
             g.list.map(doneRow).join('');
         }).join('') + FIN.none(8) + '</tbody><tfoot><tr><td></td><td colspan="4">결재 완료 ' + n0(done.length) + '명 합계</td>' +
         '<td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
-      : C.blank('아직 결재가 끝난 건이 없습니다.', '결재가 끝나면 여기에 모입니다.', 'stamp'));
+      : C.blank('아직 결재가 끝난 건이 없어요.', '결재가 끝나면 여기에 모여요.', 'stamp'));
     function doneRow(a) {
           var p = S.USERS[a.username] || {};
           var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
@@ -1426,10 +1432,10 @@
         }).join('') + '</tbody></table></div></div>');
     }
     // 관리자 반려·정정 열기는 이 화면에만 있다(2026-10-15 2차 — 예전 「검증 현황」에서 옮겨 온 안내)
-    h += '<div class="anote"><b>관리자 반려</b>는 결재자가 자리에 없어 결재가 멈췄을 때만 씁니다. 반려하면 그 직원의 잠금이 풀려 고쳐서 다시 상신할 수 있고, ' +
-      '누가 왜 반려했는지 기록에 남습니다. 승인을 대신할 수는 없습니다.<br>' +
-      '<b>정정 열기</b>는 결재가 끝난 뒤 고칠 것이 생겼을 때 씁니다. 잠금이 풀려 직원이 고쳐 다시 상신하고 결재선을 처음부터 다시 탑니다. ' +
-      '그때의 결재 완료본은 이력에 남습니다.</div>';
+    h += '<div class="anote"><b>관리자 반려</b>는 결재자가 자리에 없어 결재가 멈췄을 때만 쓰고, 승인을 대신할 수는 없어요. 반려하면 잠금이 풀려 직원이 고쳐서 다시 상신할 수 있고, ' +
+      '반려한 사람과 사유가 기록에 남아요.<br>' +
+      '<b>정정 열기</b>는 결재가 끝난 뒤 고칠 것이 생겼을 때 써요. 잠금이 풀려 직원이 고쳐 다시 상신하면 결재선을 처음부터 다시 거치고, ' +
+      '그때의 결재 완료 문서는 이력에 남아요.</div>';
     return h;
   }
 
@@ -1445,14 +1451,14 @@
     //   전원(66명·사진 약 700장)을 한 번에 묶으면 브라우저 탭이 메모리 부족으로 꺼질 수 있다.
     var FIN_MAX = 20;
     if (list.length > FIN_MAX) {
-      C.toast('한 번에 ' + FIN_MAX + '명까지 묶을 수 있습니다(지금 ' + list.length + '명). 나눠서 골라 받아 주세요.', true);
+      C.toast('한 번에 ' + FIN_MAX + '명까지 묶을 수 있어요(지금 ' + list.length + '명). 나눠서 골라 다운로드해 주세요.', true);
       return;
     }
     var job = FINJOB = { stop: false };
     var cname = cycName(S.CYCKEY);
     C.openPanel('결재 완료본 묶어 받기', cname + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="finNote" role="status">준비하는 중…</div>' +
-      '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만듭니다. 사람이 많으면 몇 분 걸릴 수 있습니다.</div></div>',
+      '<div class="dim" style="margin-top:6px">사람마다 사진을 넣어 만들어서, 인원이 많으면 몇 분 걸릴 수 있어요.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('finNote'); if (el) el.textContent = t; };
     // checks: 한 사람씩 받는 PDF 와 같은 자체 점검 — 문서 총계 ≠ 결재 금액, 못 불러온 사진(2026-10-06 검증로봇 5)
@@ -1473,20 +1479,20 @@
           var snap = a.snapshot || {}, why = [];
           var sum = (res.totals || []).reduce(function (s, t) { return s + (Number(t && t.all) || 0); }, 0);
           if (snap.version >= 2 && isFinite(Number(snap.cost)) && Math.round(sum) - Math.round(Number(snap.cost)) !== 0) {   // 1원 차이도(2026-10-08)
-            why.push('문서 총계 ' + n0(sum) + '원 ≠ 결재 금액 ' + n0(snap.cost) + '원');
+            why.push('문서 총계 ' + n0(sum) + '원과 결재 금액 ' + n0(snap.cost) + '원이 다름');
           }
           var img = (res.issues || []).filter(function (x) { return x.kind === 'image'; }).length;
           if (img) why.push('불러오지 못한 사진 ' + img + '장');
           var hip = (res.issues || []).filter(function (x) { return x.kind === 'hipass'; });
           if (hip.length) why.push('하이패스 영수증 근거를 다 넣지 못함(' + hipWhy(hip) + ')');
-          if (why.length) checks.push(name + ' — ' + why.join(', '));
+          if (why.length) checks.push(name + ' 님: ' + why.join(', '));
         });
       }).catch(function () { skipped.push(C.nameOf(a.username)); })
         .then(function () { if (FINJOB === job) return one(i + 1); });
     };
     one(0).then(function () {
       if (FINJOB !== job) return null;
-      if (!parts.length) throw new Error('만든 문서가 없습니다');
+      if (!parts.length) throw new Error('만든 문서가 없어요');
       note('한 파일로 묶는 중…');
       var P = window.PDFLib;
       return P.PDFDocument.create().then(function (out) {
@@ -1509,11 +1515,11 @@
       var file = '운행기록부_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div>' +
         '<div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
-        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>만들지 못한 사람: ' + esc(skipped.join(', ')) +
-          ' — 한 사람씩 「PDF」로 다시 받아 주세요.</span></div>' : '') +
-        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인 필요: ' + esc(checks.join(' · ')) +
-          ' — 그 사람은 「PDF」로 다시 받아 확인해 주세요.</span></div>' : '') +
-        (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었습니다 — 총계·사진 점검 이상 없음</span></div>' : '') + '</div>';
+        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) +
+          ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF’로 다시 다운로드해 주세요.</span></div>' : '') +
+        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF’로 다시 다운로드해 확인해 주세요.<br>' +
+          checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
+        (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었어요. 총계와 사진 점검도 이상 없어요.</span></div>' : '') + '</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         '<a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
@@ -1521,7 +1527,7 @@
       C.render();
     }).catch(function (e) {
       FINJOB = null;
-      if ($('finNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(failMsg('PDF 한 파일로 묶지 못했습니다', e, '새로 고침 뒤 다시 해 주세요.')) + '</span></div>';
+      if ($('finNote')) $('pBody').innerHTML = '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(failMsg('PDF 한 파일로 묶지 못했어요', e, '새로고침한 뒤 다시 해 주세요.')) + '</span></div>';
       C.render();
     });
     C.render();
@@ -1554,7 +1560,7 @@
     var text = String.fromCharCode(0xFEFF) + rows.map(function (r) { return r.map(q).join(','); }).join(NL) + NL;
     var scope = C.orgScopeName ? C.orgScopeName() : '';
     C.saveBlob(new TextEncoder().encode(text), '결재완료_금액요약_' + cyc + (scope ? '_' + scope.replace(/[\\/:*?"<>|\s]+/g, '') : '') + '.csv');
-    C.toast('요약표를 내려받습니다(' + n0(done.length) + '명).');
+    C.toast(n0(done.length) + '명의 요약표를 다운로드해요.');
   }
 
   // 결재 완료 출력 — 고르기 칸 · 전체 선택 · 이 팀 모두 고르기는 C.fin(driving-app.js)이 받는다(2026-10-23).
@@ -1576,12 +1582,13 @@
    *  warn = 이번 검증의 판독 실패·하루 한도 글(runVerify). 운행일지·개인경비가 같이 쓴다(C.vx.readDone). */
   function readDone(row, warn) {
     var s = (row && row.summary) || {}, n = Number(s.receipts) || 0, rd = Math.min(Number(s.read) || 0, n), again = ' 고친 게 있으면 다시 눌러 주세요.';
-    if (!row || !row.ai) return 'Gemini 가 설정되지 않아 규칙으로만 검사했습니다.' + again;
-    if (!n) return '기록을 검사했습니다(읽을 사진 없음).' + again;
-    if (rd >= n) return 'Gemini 가 사진 ' + n0(n) + '장을 모두 읽어 대조했습니다.' + again;
+    if (!row || !row.ai) return 'AI가 설정되지 않아 규칙으로만 검사했어요.' + again;
+    if (!n) return '읽을 사진이 없어 기록만 검사했어요.' + again;
+    if (rd >= n) return 'AI가 사진 ' + n0(n) + '장을 모두 읽고 비교했어요.' + again;
     // 하루 한도처럼 서버가 멈춘 까닭이 있으면 그 말을, 아니면(읽기 실패) 다시 누르면 이어서 읽는다는 말
+    //   (2026-10-24 해요체 — 읽기 실패 글이 「…못했습니다」·「…못했어요」 어느 쪽이어도 같은 판정)
     var w = String(warn || '').replace(/[.\s]+$/, '');
-    return '사진 ' + n0(n) + '장 중 ' + n0(rd) + '장만 읽었습니다 — ' + (w && !/^사진 \d+장은 읽지 못했습니다/.test(w) ? w + '.' : '다시 누르면 못 읽은 사진을 이어서 읽습니다.');
+    return '사진 ' + n0(n) + '장 중 ' + n0(rd) + '장만 읽었어요. ' + (w && !/^사진 \d+장은 읽지 못했/.test(w) ? w + '.' : '다시 누르면 못 읽은 사진을 이어서 읽어요.');
   }
   /* ══════════════════ 검증·상신 단계 카드(2026-10-20 디자인 v2 — P_Verifying, 세 시스템 같은 모양) ══════════════════
      stage = 지금 할 단계(1 검증 · 2 미리보기 · 3 상신, 0 = 잠김). 순서·규칙은 각 화면이 정한 그대로 — 여기서는 모양만.
@@ -1612,7 +1619,7 @@
   function aimBegin(k, o) {
     clearInterval(AIM_T);
     AIM = { k: k, t0: Date.now(), phase: 'check', n: 0, N: o.N || 0, cur: null, tp: 0, tm: 0, pct: 4, pi: 0, ps: 0, done: false, chips: {}, pop: null,
-      title: o.title || 'AI가 영수증을 읽고 있습니다', cols: o.cols || ['날짜', '운행', '금액(원)', '맞춰 보기'], rows: (o.rows || []).slice(0, 6),
+      title: o.title || 'AI가 영수증을 읽고 있어요', cols: o.cols || ['날짜', '운행', '금액(원)', '맞춰 보기'], rows: (o.rows || []).slice(0, 6),
       more: o.more != null ? o.more : Math.max(0, (o.rows || []).length - 6),
       photos: o.photos || [], paper: o.paper || 'receipt' };
     AIM_T = setInterval(aimTick, 250);
@@ -1655,7 +1662,7 @@
   function aimShort(k) {
     if (!aimOn(k)) return '';
     if (AIM.phase === 'read' && AIM.N) return '읽는 중… ' + Math.min(AIM.n + 1, AIM.N) + ' / ' + AIM.N;
-    return AIM.phase === 'match' ? '맞춰 보는 중…' : AIM.phase === 'run' ? '읽는 중…' : '살피는 중…';
+    return AIM.phase === 'match' ? '비교하는 중…' : AIM.phase === 'run' ? '읽는 중…' : '살피는 중…';
   }
   function aimPhoto() {
     if (!AIM.photos.length) return null;
@@ -1689,10 +1696,10 @@
           (AIM.rows.length ? AIM.rows.map(function (r) {
             return '<div class="ar" data-aimo-row="' + esc(String(r.id)) + '"><b>' + esc(r.date) + '</b><span class="pl">' + esc(r.place || '—') + '</span>' +
               '<span class="am">' + esc(r.amt == null ? '—' : r.amt) + '</span><span class="ac">' + aimChip(AIM.chips[String(r.id)]) + '</span></div>';
-          }).join('') : '<div class="aimo-more">이번 기간에 맞춰 볼 줄이 없습니다</div>') +
-          (AIM.more ? '<div class="aimo-more">외 ' + n0(AIM.more) + '줄도 함께 봅니다</div>' : '') + '</div></div>' +
+          }).join('') : '<div class="aimo-more">이번 기간에 비교할 줄이 없어요</div>') +
+          (AIM.more ? '<div class="aimo-more">외 ' + n0(AIM.more) + '줄도 함께 확인해요</div>' : '') + '</div></div>' +
       '</div>' +
-      '<p class="aimo-note' + (long ? ' long' : '') + '" data-aimo-note>' + (long ? '평소보다 오래 걸립니다 — 그대로 기다려 주세요' : '보통 10~30초 걸립니다 · 읽는 동안 이 화면에 그대로 있어 주세요') + '</p></section>';
+      '<p class="aimo-note' + (long ? ' long' : '') + '" data-aimo-note>' + (long ? '평소보다 오래 걸리고 있어요. 이 화면에서 기다려 주세요.' : '보통 10~30초 걸려요. 다 읽을 때까지 이 화면에서 기다려 주세요.') + '</p></section>';
   }
   /** 시계·진행 알림 때 판의 바뀐 곳만 고친다(화면 전체를 다시 그리지 않는다). */
   function aimPaint(force) {
@@ -1704,7 +1711,7 @@
     var el = Math.floor((Date.now() - AIM.t0) / 1000), e1 = root.querySelector('[data-aimo-el]'), c1 = root.querySelector('[data-aimo-cnt]'), nt = root.querySelector('[data-aimo-note]');
     if (e1) e1.textContent = el + '초 지남';
     if (c1) c1.textContent = aimCount();
-    if (nt && el >= 60 && !nt.classList.contains('long')) { nt.classList.add('long'); nt.textContent = '평소보다 오래 걸립니다 — 그대로 기다려 주세요'; }
+    if (nt && el >= 60 && !nt.classList.contains('long')) { nt.classList.add('long'); nt.textContent = '평소보다 오래 걸리고 있어요. 이 화면에서 기다려 주세요.'; }
     var ph = aimPhoto(), fr = root.querySelector('[data-aimo-frame]');
     if (fr && fr.getAttribute('data-pid') !== (ph ? String(ph.id) : '')) {
       fr.setAttribute('data-pid', ph ? String(ph.id) : '');
@@ -1768,7 +1775,7 @@
     var short = function (a) { var w = String(a || '').trim().split(/\s+/).filter(Boolean); return w.slice(-2).join(' '); };
     var ev = (S.ALL_EVID || []).filter(function (e) { var d = Number(e.date_millis); return e.username === u && e.photo_path && d >= r.lo && d < r.hi; })
       .sort(function (a, b) { return a.date_millis - b.date_millis; });
-    return { title: 'AI가 영수증을 읽고 있습니다', cols: ['날짜', '운행', '금액(원)', '맞춰 보기'], N: ev.length,
+    return { title: 'AI가 영수증을 읽고 있어요', cols: ['날짜', '운행', '금액(원)', '맞춰 보기'], N: ev.length,
       rows: pick.map(function (t) { return { id: t.id, date: C.md(t.start_time), place: t.visit_place || short(t.end_address) || '방문처 없음', amt: amt(t) ? n0(amt(t)) : '—' }; }),
       more: Math.max(0, biz.length - 6),
       photos: ev.map(function (e) { return { id: e.id, src: C.photoUrl(e.photo_path), kind: AIM_KIND[e.category] || ((e.category || '') + ' 영수증') }; }) };

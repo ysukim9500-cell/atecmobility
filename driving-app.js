@@ -70,14 +70,30 @@
     toast._t = setTimeout(function () { t.className = ''; }, msg.length > 40 ? 6000 : 3400);
   }
   /** 성공했는데 경고가 딸린 경우 — 성공을 먼저 말하고 경고를 잇는다.
-   *  예전에는 빨간 경고만 떠서 "상신이 실패했나?" 로 읽혔다. */
+   *  예전에는 빨간 경고만 떠서 "상신이 실패했나?" 로 읽혔다. 두 문장은 줄표 대신 마침표로 잇는다(2026-10-24 해요체). */
   function toastOk(msg, warning) {
-    toast(warning ? msg + ' — ' + warning : msg, !!warning);
+    toast(warning ? endDot(msg) + ' ' + warning : msg, !!warning);
   }
   /** 서버 문구 끝에 마침표가 없으면 붙인다 — 뒤에 다른 문장을 이을 때 「승인했습니다 검증: …」처럼 붙어 읽혔다(2026-10-16 3차). */
   function endDot(s) {
     s = String(s == null ? '' : s).replace(/\s+$/, '');
     return !s || /[.!?…]$/.test(s) ? s : s + '.';
+  }
+  /** 불러오기 실패 화면 아랫줄 — 오류에 맞는 다음 할 일. 로그인 만료·권한 없음에 「잠시 후 다시」는 맞지 않았다(2026-10-24 검수).
+   *  오류 글이 이미 할 일(「…주세요.」)로 끝나면 빈 글. 개인경비·법인카드 화면도 C.retryHint 로 같이 쓴다. */
+  function retryHint(err) {
+    var s = String(err == null ? '' : err).trim();
+    if (/주세요\.?$/.test(s)) return '';
+    return /만료/.test(s) ? '다시 로그인해 주세요.' : /권한/.test(s) ? '관리자에게 문의해 주세요.' : '잠시 후 다시 해 주세요.';
+  }
+  /** 개인경비·법인카드 잠금 오류(EXPENSE_LOCKED·CARD_LOCKED) 때 할 일 — 그 기간 결재 상태에 맞게(2026-10-24 검수).
+   *  예전엔 늘 「먼저 회수해 주세요」라 결재가 끝났거나 이미 승인한 결재자가 있어 회수할 수 없을 때도 회수하라고 했다. 운행일지 lockHow 와 같은 갈래. */
+  function lockSay(a) {
+    if (a && a.status === 'approved') return '결재가 끝난 기간이라 고칠 수 없어요. 정정이 필요하면 관리자에게 문의해 주세요.';
+    if (a && a.status === 'submitted') return (a.steps || []).some(function (x) { return x.result; })
+      ? '결재 중인 기간이라 고칠 수 없어요. 이미 승인한 결재자가 있어 회수할 수 없어요. 고치려면 지금 차례인 결재자에게 반려를 요청하세요.'
+      : '결재 중인 기간이라 고칠 수 없어요. 고치려면 회수한 뒤 다시 상신하세요.';
+    return '결재 중이거나 결재가 끝난 기간이라 고칠 수 없어요. 고치려면 먼저 회수해 주세요.';
   }
   /** 금액·계기판 칸 읽기(2026-10-20 AU2 #9) — 숫자와 세 자리마다 쉼표만 받는다(앞뒤 빈칸·전각 숫자는 괜찮다).
    *  빈칸 = null. 다른 글자(소수점·음수 기호·「원」·「만」·띄어 쓴 두 수·자리가 틀린 쉼표)가 섞이면 NaN — 예전처럼 숫자 밖의 글자를
@@ -89,12 +105,12 @@
     if (s === '') return null;
     return /^\d+$/.test(s) || /^\d{1,3}(,\d{3})+$/.test(s) ? Number(s.replace(/,/g, '')) : NaN;
   }
-  var NUM_BAD = '숫자만 넣어 주세요(쉼표는 세 자리마다 — 예: 11,000)';
+  var NUM_BAD = '숫자만 넣어 주세요. 쉼표는 세 자리마다 넣어요(예: 11,000)';
   /** 숫자 칸 표시 — 못 읽는 글이면 빨간 테두리(need)·aria-invalid, 고치면 푼다(이 함수가 단 표시만). 읽은 값(numIn)을 돌려준다. */
   function numMark(el) {
     if (!el) return null;
     var v = numIn(el.value), bad = typeof v === 'number' && isNaN(v);
-    if (bad) { el.classList.add('need'); el.setAttribute('aria-invalid', 'true'); el.dataset.numbad = '1'; el.title = NUM_BAD; }
+    if (bad) { el.classList.add('need'); el.setAttribute('aria-invalid', 'true'); el.dataset.numbad = '1'; el.title = NUM_BAD + '.'; }
     else if (el.dataset.numbad) { el.classList.remove('need'); el.removeAttribute('aria-invalid'); delete el.dataset.numbad; el.removeAttribute('title'); }
     return v;
   }
@@ -102,7 +118,7 @@
   function numStop(el, what) {
     var v = numMark(el);
     if (!(typeof v === 'number' && isNaN(v))) return false;
-    toast((what ? what + ' — ' : '') + NUM_BAD + '.', true);
+    toast((what ? what + '에는 ' : '') + NUM_BAD + '.', true);
     try { el.focus(); el.scrollIntoView({ block: 'nearest' }); } catch (e) { }
     return true;
   }
@@ -117,7 +133,7 @@
     //   401 을 돌려주면 apiRetry 가 refresh 를 시도하고, 그것도 안 되면 그대로 실패한다.
     var at = ss(K_AT);
     if (!at) {
-      return Promise.resolve(new Response('{"error":"로그인이 풀렸습니다. 다시 로그인해 주세요."}',
+      return Promise.resolve(new Response(JSON.stringify({ error: '로그인이 만료됐어요. 다시 로그인해 주세요.' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }));
     }
     h.Authorization = 'Bearer ' + at;
@@ -150,8 +166,8 @@
   /** 세션이 끊겼다는 표시. 빈 배열과 구별해야 "0건"을 정상으로 보여 주지 않는다. */
   function AuthGone() { this.authGone = true; }
   /** 권한이 없다는 표시(403) — 로그인은 살아 있다. 로그인 만료로 보고 로그아웃시키지 않는다(2026-10-20 AU2 #17). */
-  function NoPerm() { this.noPerm = true; this.message = '권한이 없습니다'; }
-  var NO_PERM_MSG = '이 자료를 볼 권한이 없습니다. 관리자에게 문의해 주세요.';
+  function NoPerm() { this.noPerm = true; this.message = '권한이 없어요'; }
+  var NO_PERM_MSG = '이 자료를 볼 권한이 없어요. 관리자에게 문의해 주세요.';
   function fetchAll(path) {
     var acc = [];
     function page(off) {
@@ -436,11 +452,11 @@
       .then(function (res) {
         b.disabled = false; b.textContent = '로그인';
         if (!res.ok || !res.j || !res.j.ok) {
-          var msg = (res.j && res.j.error) || '로그인에 실패했습니다.';
+          var msg = (res.j && res.j.error) || '로그인하지 못했어요.';
           // ★ 같은 사이트의 다른 도구(통합관제 등)에 저장된 **이메일**을 브라우저가 이 칸에 자동으로
           //   채워, 앱 아이디 대신 이메일로 로그인하다 막히는 일이 실제로 있었다(2026-09-23).
           //   앱 아이디에 '@' 가 들어간 사람도 있어 막지는 않고, 실패했을 때만 짚어 준다.
-          if (u.indexOf('@') > 0) msg += ' — 이메일이 아니라 앱에서 쓰는 아이디를 넣으셨는지 확인해 주세요.';
+          if (u.indexOf('@') > 0) msg = endDot(msg) + ' 이메일이 아니라 앱에서 쓰는 아이디를 넣었는지 확인해 주세요.';
           loginErr(msg); return;
         }
         ss(K_AT, res.j.access_token); ss(K_RT, res.j.refresh_token);
@@ -449,7 +465,7 @@
         enter();
       }).catch(function () {
         b.disabled = false; b.textContent = '로그인';
-        loginErr('서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
+        loginErr('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.');
       });
   }
 
@@ -582,13 +598,14 @@
     if (!RANGE && inGrace(CYC)) return graceBand();
     if (pv() && !RANGE) return pv().band ? pv().band() : '';
     if (RANGE) {
-      return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(cycleName(RANGE.from) + ' – ' + cycleName(RANGE.to) + '</b>') +
-        ' (' + cyclesInView().length + '개 기간)을 한꺼번에 보고 있습니다 — 조회만 되고 고칠 수 없습니다.</span>' +
+      // 닫는 </b> 는 esc 밖에(2026-10-24 검수 — 안에 있어 「</b>」가 글자로 보이고 뒤 문장까지 굵었다)
+      return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(cycleName(RANGE.from) + ' – ' + cycleName(RANGE.to)) + '</b>' +
+        ' (' + cyclesInView().length + '개 기간)을 한꺼번에 보고 있어요. 조회만 하고 고칠 수는 없어요.</span>' +
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
     if (cmpCycle(CYC, cur) < 0) {
-      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + cycleName(CYC) + ' (' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을 보고 있습니다. ' +
-        '운행일지·영수증·정산이 모두 이 기간 기준입니다.</span>' +
+      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + cycleName(CYC) + ' (' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을 보고 있어요. ' +
+        '운행일지, 영수증, 정산 모두 이 기간 기준이에요.</span>' +
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
     return '';
@@ -599,12 +616,12 @@
     var P = pv(), cur = curCyc(), key = cycKey(CYC);
     var r = cycleRange(CYC, kindOfView()), span = cycleSpan(CYC, kindOfView());
     var st = isAll() ? '' : P ? (P.status ? P.status(key) : '') : ((myAppr(key) || {}).status || '');
-    var say = isAll() ? '아직 상신하지 않은 사람은 지금 상신하면 됩니다.'
-      : st === 'approved' ? '결재가 끝났습니다.' : st === 'submitted' ? '결재 중입니다.'
-      : st === 'rejected' ? '반려됐습니다 — 고쳐서 다시 상신해 주세요.'
+    var say = isAll() ? '아직 상신하지 않은 사람은 지금 상신하면 돼요.'
+      : st === 'approved' ? '결재가 끝났어요.' : st === 'submitted' ? '결재 중이에요.'
+      : st === 'rejected' ? '반려됐어요. 고쳐서 다시 상신해 주세요.'
       : '아직 상신 전이면 지금 상신해 주세요.';
-    return '<div class="cycband grace" data-graceband>' + ic('cal', 15) + '<span><b>' + cycleName(CYC) + ' (' + esc(span) + ') 마감 · ' +
-      esc(dueText(r, Date.now())) + '</b> — ' + say + '</span>' +
+    return '<div class="cycband grace" data-graceband>' + ic('cal', 15) + '<span><b>' + cycleName(CYC) + ' (' + esc(span) + ') · ' +
+      esc(dueText(r, Date.now())) + '</b>. ' + say + '</span>' +
       '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + ' 보기 →</button></div>';
   }
   /** 내 결재 상태 한 마디(주기 목록에 붙인다). */
@@ -658,8 +675,8 @@
       opts.replace('value="' + t0 + '"', 'value="' + t0 + '" selected') +
       '</select><span class="dim">까지</span><button class="btn sm pri" id="cpGo">보기</button></div>' +
       // 「통행료 채우기」 화면은 없앴다(2026-10-15 — 통행료는 영수증으로). 모든 갈래가 같은 안내.
-      '<div class="cp-note">여러 기간을 볼 때는 조회만 됩니다. 상신·결재 문서·영수증 올리기는 한 기간을 골라서 합니다. ' +
-      '<span class="kbdhint"><span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 기간으로 넘깁니다.</span></div>';
+      '<div class="cp-note">여러 기간을 볼 때는 조회만 할 수 있어요. 상신, 결재 문서, 영수증 올리기는 한 기간을 골라서 하세요. ' +
+      '<span class="kbdhint"><span class="kbd">[</span> <span class="kbd">]</span> 키로 앞뒤 기간으로 넘어가요.</span></div>';
     $('cycPop').innerHTML = h;
   }
   function openCyclePop(open) {
@@ -689,7 +706,7 @@
     // ★ 통행료 채우기에 쳐 둔 값은 기간이 바뀌면 사라진다. 40칸을 말없이 날리지 않는다.
     if (!(opt && opt.silent) && unsavedFills()) {
       openCyclePop(false);
-      toast('저장하지 않은 통행료 ' + n0(unsavedFills()) + '구간이 있습니다. 「통행료 채우기」에서 먼저 저장해 주세요.', true);
+      toast('저장하지 않은 통행료가 ' + n0(unsavedFills()) + '구간 있어요. ‘통행료 채우기’에서 먼저 저장해 주세요.', true);
       return;
     }
     var cur = currentCycle();
@@ -861,7 +878,7 @@
       ALL_TRIPS = both[0] || [];
       LOADED_ALL = wantAll;
       // fetchAll 은 41,000행에서 멈춘다. 닿았으면 잘렸다는 것을 숨기지 않는다.
-      if (ALL_TRIPS.length >= 41000) toast('운행이 너무 많아 일부만 불러왔습니다. 기간을 줄여 주세요.', true);
+      if (ALL_TRIPS.length >= 41000) toast('운행이 너무 많아 일부만 불러왔어요. 기간을 줄여 주세요.', true);
       if (out) {
         // 업무 결재 포털 가입 대기·거절 계정은 직원으로 치지 않는다(가입 신청은 「권한 관리」에 따로 나온다).
         USERS = {}; (out[0] || []).forEach(function (u) { if (!u.signup_status || u.signup_status === 'active') USERS[u.username] = u; });
@@ -895,13 +912,13 @@
       if (seq !== LOAD_SEQ) return;
       LOADING = false;
       if (e && e.authGone) {
-        toast('로그인이 만료되었습니다. 다시 로그인해 주세요.', true);
+        toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true);
         setTimeout(signOut, 900);
         return;
       }
       // 스켈레톤에 갇히지 않게 다시 그린다 — 다시 시도할 수단도 화면에 남긴다.
-      //   403(권한 없음)은 로그인을 끊지 않고 「권한이 없습니다」로(2026-10-20 AU2 #17).
-      LOAD_ERR = e && e.noPerm ? NO_PERM_MSG : '데이터를 불러오지 못했습니다.';
+      //   403(권한 없음)은 로그인을 끊지 않고 「권한이 없어요」로(2026-10-20 AU2 #17).
+      LOAD_ERR = e && e.noPerm ? NO_PERM_MSG : '데이터를 불러오지 못했어요.';
       render();
       toast(LOAD_ERR, true);
       if (e && e.noPerm) console.warn('권한 없음(403) — 로그인은 그대로 둡니다'); else console.error(e);
@@ -985,19 +1002,19 @@
     //   점검 결과를 개인 것으로 덮어써 버린다. 결과를 돌려주기만 한다.
     return [
       { k: 'jump', sev: 'bad', ico: 'gauge', t: '계기판이 크게 튄 곳', rows: jump, n: jump.length,
-        d: '같은 사람이 같은 차에서 1,000km 넘게 건너뛰었습니다. 차를 바꿨거나 숫자를 잘못 넣은 것입니다.' },
+        d: '같은 사람이 같은 차에서 1,000km 넘게 건너뛰었어요. 차를 바꿨거나 숫자를 잘못 넣은 경우예요.' },
       { k: 'shared', sev: 'bad', ico: 'car', t: '한 차를 두 사람이 쓴 번호판', rows: sharedRows, n: shared.length,
-        d: shared.length ? shared.join(' · ') + ' — 번호판을 잘못 고르면 남의 차 기록이 됩니다.' : '없습니다.' },
+        d: shared.length ? shared.join(' · ') + '. 번호판을 잘못 고르면 남의 차 기록이 돼요.' : '없어요.' },
       { k: 'nopurp', sev: 'bad', ico: 'alert', t: '운행목적 미선택', rows: nopurp, n: nopurp.length,
-        d: '목적이 비어 있으면 업무용으로 안 잡혀 비용 정산에서 통째로 빠집니다.' },
+        d: '목적이 비어 있으면 업무용으로 잡히지 않아 비용 정산에서 빠져요.' },
       { k: 'rate', sev: 'bad', ico: 'won', t: '유류단가 미등록', rows: [], n: missKeys.length,
-        d: missKeys.length ? missKeys.join(' · ') + ' 단가가 없어 기본 단가 159원/km 로 계산됩니다. 실제 단가와 다를 수 있으니 등록해 주세요.' : '없습니다.' },
+        d: missKeys.length ? missKeys.join(' · ') + ' 단가가 없어 기본 단가 159원/km로 계산해요. 실제 단가와 다를 수 있으니 등록해 주세요.' : '없어요.' },
       { k: 'unk', sev: 'warn', ico: 'ticket', t: '통행료 미확정', rows: unk, n: unk.length,
-        d: '운행 통행료는 0원으로 잡힙니다. 통행료를 낸 운행이면 「2 영수증·통행료」에서 통행료 영수증을 올리세요 — 그날 운행 금액이 없으면 영수증 금액이 정산에 들어갑니다.' },
+        d: '지금은 통행료가 0원으로 계산돼요. 통행료를 냈으면 ‘영수증·통행료’ 단계에서 영수증을 올려 주세요. 그날 운행 금액이 없으면 영수증 금액으로 정산해요.' },
       { k: 'overlap', sev: 'warn', ico: 'list', t: '시간이 겹치는 운행', rows: overlap, n: overlap.length,
-        d: '같은 사람이 같은 시간에 두 건을 기록했습니다.' },
+        d: '같은 사람이 같은 시간에 두 건을 기록했어요.' },
       { k: 'zero', sev: 'warn', ico: 'list', t: '0km 운행', rows: zero, n: zero.length,
-        d: '거리가 0인 기록입니다. 잘못 눌렀거나 바로 껐을 때 생깁니다.' }
+        d: '거리가 0인 기록이에요. 잘못 눌렀거나 바로 껐을 때 생겨요.' }
     ];
 
   }
@@ -1097,10 +1114,10 @@
   var EV_SUBS = ['주차', '통행료', '주유', '계기판'];
   var EV_SUB_DESC = {
     // 웹 8차(2026-10-17 「직원들이 잘 모를 것 같은데… 좀 쉽게」) — 맨 위 한 줄은 할 일만
-    '주차': '주차비를 낸 날마다 영수증이 하나 있으면 됩니다 — 주차 영수증 사진을 올리세요. 운행에 주차비를 안 적은 날은 영수증 금액이 그 운행에 들어갑니다.',
-    '통행료': '통행료를 낸 날마다 증빙이 하나 있으면 됩니다 — 영수증 사진을 올리거나, 하이패스 이용내역 PDF(한 달치)를 한 번에 올리세요.',
-    '주유': '주유 영수증은 증빙용입니다. 유류비는 거리 × 단가로 따로 계산됩니다.',
-    '계기판': '월초·월말 계기판 사진을 올립니다. 운행 기록의 계기판 숫자와 맞는지 확인하는 데 씁니다.'
+    '주차': '주차비를 낸 날마다 주차 영수증 사진을 하나씩 올려 주세요. 운행에 주차비를 적지 않은 날은 영수증 금액이 그 운행에 들어가요.',
+    '통행료': '통행료를 낸 날마다 증빙이 하나 있으면 돼요. 영수증 사진이나 하이패스 이용내역 PDF(한 달치)를 올려 주세요.',
+    '주유': '주유 영수증은 증빙용이에요. 유류비는 거리 × 단가로 따로 계산해요.',
+    '계기판': '월초·월말 계기판 사진을 올려 주세요. 운행 기록의 계기판 숫자와 비교해요.'
   };
   var EVSUB_FX = '';
   // 지금 차례도 사람마다(2026-10-21 — 같은 탭에서 다른 사람으로 들어오면 앞사람의 차례(계기판 등)에서 열리고 3단계로 넘어갈 수 있었다. evsubmax 와 같은 열쇠 모양)
@@ -1162,7 +1179,7 @@
     var word = cat === '주차' ? '주차비' : '통행료', H = MC.days.reduce(function (a, d) { return a + (d.H || 0); }, 0);
     return '<div class="evamt" data-evamtbox><dl class="cdl"><dt><b>정산에 들어가는 ' + word + '</b></dt><dd><b>' + n0(MS.settle) + '원</b></dd>' +
       '<dt>올린 ' + cat + ' 영수증</dt><dd>' + n0(MS.R) + '원</dd>' + (H ? '<dt>하이패스 이용내역</dt><dd>' + n0(H) + '원</dd>' : '') + '</dl>' +
-      '<p>운행 금액이 있는 날은 운행 금액으로, 운행 없는 날 영수증은 빼고 정산합니다(두 번 더하지 않습니다).</p></div>';
+      '<p>운행 금액이 있는 날은 운행 금액으로 정산하고 영수증 금액은 더하지 않아요. 운행이 없는 날의 영수증은 정산에서 빠져요.</p></div>';
   }
   /** 영수증 화면 위 — 주차 → 통행료 → 주유 → 계기판 차례와 지금 차례의 할 일. */
   function evSubHtml(by, unk) {
@@ -1181,7 +1198,7 @@
       var st = i < cur ? 'done' : i === cur ? 'now' : '';
       var n = (by[c] || {}).n || 0, lf = st === 'done' && left[c] > 0;
       return '<button role="listitem" class="evs ' + st + (lf ? ' left' : '') + '" data-evsub="' + i + '"' + (st === 'now' ? ' aria-current="step"' : '') +
-        (lf ? ' title="확인할 날 ' + n0(left[c]) + '일이 남았습니다"' : '') + '>' +
+        (lf ? ' title="확인할 날이 ' + n0(left[c]) + '일 남았어요"' : '') + '>' +
         '<i>' + (lf ? '!' : st === 'done' ? '✓' : i + 1) + '</i><b>' + esc(c) + '</b><span>' + n0(n) + '장</span>' +
         (need[c] ? '<em class="evq" title="확인할 것 ' + n0(need[c]) + '">확인 ' + n0(need[c]) + '</em>' : '') + '</button>' +
         (i < 3 ? '<span class="evsarrow" aria-hidden="true">›</span>' : '');
@@ -1189,7 +1206,7 @@
     var body = '<div class="evsubcard' + (EVSUB_FX ? ' stepfx ' + EVSUB_FX : '') + '">' +
       '<div class="evsh"><span class="evsn">' + (cur + 1) + ' / 4</span><b>' + esc(name) + '</b>' +
       // 결재 중·결재 완료 기간은 「올리세요」 대신 올릴 수 없다는 말(2026-10-19 마지막 검증 — 잠긴 기간에도 할 일 문구가 나왔다)
-      '<span class="dim">' + esc(myCycLocked() ? lockWhy(myName()) + ' 이 기간에는 영수증을 올리거나 지울 수 없습니다 — 아래는 확인만 하세요.' : EV_SUB_DESC[name]) + '</span>' +
+      '<span class="dim">' + esc(myCycLocked() ? lockWhy(myName()) + ' 이 기간에는 영수증을 올리거나 지울 수 없어요. 아래 내용은 확인만 하세요.' : EV_SUB_DESC[name]) + '</span>' +
       // 올린 영수증 표(「내역」)는 화면 맨 아래라 지우려는 분이 한참 내려가며 찾았다 — 바로 가는 단추(2026-10-19 로봇 넷 중 셋)
       //   계기판은 영수증이 아니라 사진(2026-10-20 V3 다듬기 — 「계기판 영수증 1건」)
       ((by[name] || {}).n ? '<button type="button" class="btn sm evjump" data-evjump>' + (name === '계기판' ? '계기판 사진 ' + n0(by[name].n) + '장' : esc(name) + ' 영수증 ' + n0(by[name].n) + '건') + ' 보기·지우기 ↓</button>' : '') +
@@ -1210,11 +1227,11 @@
         '<div class="evpk" data-evdrop="' + esc(name) + '"><span class="ico" aria-hidden="true">' + ic('upload', 24) + '</span><b>영수증 사진·PDF를 여기에 끌어 놓으세요</b>' +
           '<button class="btn' + (hot ? ' pri cta' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 15) +
           (name === '통행료' ? '영수증 사진 올리기' : '주차 영수증 올리기') + '</button>' +
-          '<span class="dim">' + (name === '통행료' ? '통행료 영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다' : '영수증 사진(또는 PDF) — 여러 장을 한 번에 올려도 됩니다') + '</span></div>' +
+          '<span class="dim">' + (name === '통행료' ? '통행료 영수증 사진이나 PDF를 여러 장 한 번에 올려도 돼요.' : '영수증 사진이나 PDF를 여러 장 한 번에 올려도 돼요.') + '</span></div>' +
         (name === '통행료'
           ? '<div class="evpk"><b>하이패스 이용내역 PDF</b><label class="btn" data-hpquick>' + ic('ticket', 15) + '하이패스 이용내역 PDF 올리기' +
               '<input type="file" id="hpQuick" accept="application/pdf,.pdf" multiple class="sr"></label>' +
-              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역 › PDF 로 받은 한 달치 파일 — 통과 시각으로 운행을 찾아 그날 통행료 증빙이 됩니다(그날 영수증 사진은 따로 안 올려도 되고, 올려도 한 번만 셉니다). 하이패스 홈페이지 영수증 출력 화면을 PDF 로 저장한 것도 됩니다.</span></div>'
+              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역에서 PDF로 다운로드한 한 달치 파일이에요. 통과 시각으로 운행을 찾아 그날 통행료 증빙이 돼요. 하이패스로 낸 통행료는 영수증 사진을 따로 올리지 않아도 되고, 올려도 한 번만 계산해요. 하이패스 홈페이지의 영수증 출력 화면을 PDF로 저장한 파일도 돼요.</span></div>'
           : '') +
         '</div>' + evAmtHtml(name);
     }
@@ -1229,19 +1246,19 @@
         //   정산 규칙은 그대로 — 창에서 고른 줄만 운행 고치기와 같은 길(trip-edit)로 적는다. 결재 중·완료 기간은 제안하지 않는다.
         //   ★ 단추는 빨강(.pri)이 아니다 — 이 차례 카드의 빨간 단추는 하나(올리기 또는 「다음」, 2026-10-20 디자인 v2)
         var SGn = unkLock ? null : tollSugPlan();
-        var sugLine = SGn && SGn.n.unk ? '<span class="tsline" data-tollsug><span class="tsl"><b>통행료 미확정 ' + n0(unk.length) + '건</b> — 영수증·하이패스로 맞춘 제안: ' +
+        var sugLine = SGn && SGn.n.unk ? '<span class="tsline" data-tollsug><span class="tsl"><b>통행료 미확정 ' + n0(unk.length) + '건</b>. 영수증·하이패스로 맞춘 제안: ' +
           '없음 ' + n0(SGn.n.none) + '건 · 금액 ' + n0(SGn.n.amount) + '건' + (SGn.n.pick ? ' · 직접 고르기 ' + n0(SGn.n.pick) + '건' : '') +
           (SGn.n.auto ? ' · 영수증으로 채움 ' + n0(SGn.n.auto) + '건' : '') + '</span>' +
           '<button type="button" class="btn sm tsopen" data-tollsugopen>' + ic('check', 13) + '제안 보기·맞추기</button></span>' : '';
         main += '<div class="hpnote' + (sugLine ? ' tsnote' : '') + '" data-tollunk style="margin-top:12px">' + ic('ticket', 15) + '<span>' +
-          (sugLine || '<b>통행료 미확정 ' + n0(unk.length) + '건</b> — ') +
-          (unkLock ? lockWhy(myName()) + ' 고칠 수 없습니다. 이 운행들의 통행료는 0원으로 정산됩니다.'
-            : (sugLine ? '<span class="tsrest">' : '') + '자동 계산이 안 된 업무 운행입니다. 통행료를 냈으면 영수증 사진이나 하이패스 이용내역 PDF를 올리세요(그날 운행 금액이 없으면 영수증 금액이 들어갑니다). ' +
-              '안 냈으면 아래 운행을 눌러 통행료 「없음」으로 고치면 됩니다.' + (sugLine ? '</span>' : '') +
+          (sugLine || '<b>통행료 미확정 ' + n0(unk.length) + '건</b>. ') +
+          (unkLock ? lockWhy(myName()) + ' 고칠 수 없어요. 이 운행들의 통행료는 0원으로 정산돼요.'
+            : (sugLine ? '<span class="tsrest">' : '') + '자동 계산이 안 된 업무 운행이에요. 통행료를 냈으면 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요. 영수증 금액은 그날 통행료 금액이 적힌 운행이 없을 때만 정산에 들어가요. ' +
+              '안 냈으면 아래 운행을 눌러 통행료를 ‘없음’으로 고쳐 주세요.' + (sugLine ? '</span>' : '') +
               '<span class="unklist">' + unkSorted.slice(0, 12).map(function (t) {
                 return '<button type="button" class="btn sm" data-edit="' + t.id + '" title="이 운행 고치기">' + esc(md(t.start_time) + ' ' + hm(t.start_time)) +
                   ' · ' + esc(t.visit_place || placeShort(t.end_address) || '방문처 없음') + '</button>';
-              }).join('') + (unkSorted.length > 12 ? '<span class="dim">외 ' + n0(unkSorted.length - 12) + '건 — 1단계 운행 기록에서 보기</span>' : '') + '</span>') +
+              }).join('') + (unkSorted.length > 12 ? '<span class="dim">외 ' + n0(unkSorted.length - 12) + '건은 1단계 운행 기록에서 확인하세요.</span>' : '') + '</span>') +
           '</span></div>';
       }
     }
@@ -1268,7 +1285,7 @@
         : cur < 3 ? '<button class="' + nextCls + '" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
         : (stepNow() === 2 && !cycleLocked(myName()) && !isMulti()
           ? '<button class="' + nextCls + '" data-stepmove="1" data-from="2">다음: 3 검증·상신 →</button>'
-          : '<span class="dim" style="font-size:13px">마지막 차례입니다.</span>')) +
+          : '<span class="dim" style="font-size:13px">영수증 단계의 마지막 차례예요.</span>')) +
       '</div></div>';
     EVSUB_FX = '';
     return '<section class="sect">' + steps + body + '</section>';
@@ -1344,8 +1361,8 @@
       // 기간 경계에 걸친 이은 영수증 — 금액은 그대로, 문구만(2026-10-17 사용자). 이 구분 것만.
       var XL0 = xlinkOf(me, r), XL = { here: XL0.here.filter(function (x) { return x.e.category === cat; }), there: XL0.there.filter(function (x) { return x.e.category === cat; }) };
       var xlHtml = !(XL.here.length + XL.there.length) ? '' :
-        '<div class="hpnote warn" data-xlink style="margin-top:10px">' + ic('alert', 15) + '<span><b>기간 경계에 걸친 영수증 ' + n0(XL.here.length + XL.there.length) + '장</b> — ' +
-        '영수증 날짜와 이은 운행의 기간이 다릅니다. 금액은 그대로 두니 직접 판단해 주세요.' +
+        '<div class="hpnote warn" data-xlink style="margin-top:10px">' + ic('alert', 15) + '<span><b>기간 경계에 걸친 영수증 ' + n0(XL.here.length + XL.there.length) + '장</b>. ' +
+        '영수증 날짜와 연결한 운행의 기간이 달라요. 금액은 그대로 두었으니 직접 확인해 주세요.' +
         XL.here.concat(XL.there).slice(0, 5).map(function (x) { return '<span class="xlitem">' + esc(x.say) + '</span>'; }).join('') +
         (XL.here.length + XL.there.length > 5 ? '<span class="xlitem dim">외 ' + n0(XL.here.length + XL.there.length - 5) + '장</span>' : '') + '</span></div>';
       var word = cat === '주차' ? '주차비' : '통행료', isToll = cat === '통행료';
@@ -1393,8 +1410,8 @@
       // 다음 날 날짜로 올라온 전날 영수증 — 두 번 정산 의심(2026-10-20 사용자 결정 ② · money-rule.js d.twice = 서버 R14). 자동으로 옮기지 않고 그 줄에 안내만.
       var twMd = function (d) { return d.twice.prev.slice(5).replace('-', '.'); };
       var twTxt = function (d) {
-        return canLink ? '전날(' + twMd(d) + ') 운행 영수증이면 「다른 운행에 붙이기」로 전날 운행에 이어 주세요 — 그대로 두면 두 번 정산될 수 있습니다'
-          : '전날(' + twMd(d) + ') 운행 영수증일 수 있습니다 — 그대로면 두 번 정산될 수 있습니다';
+        return canLink ? '전날(' + twMd(d) + ') 운행 영수증이면 ‘다른 운행에 붙이기’로 전날 운행에 연결해 주세요. 그대로 두면 두 번 정산될 수 있어요.'
+          : '전날(' + twMd(d) + ') 운행 영수증일 수 있어요. 그대로 두면 두 번 정산될 수 있어요.';
       };
       var rows = MC.days.map(function (d) {
         var aiNote = [];
@@ -1415,14 +1432,14 @@
         //   금액 다름 + 「모름」 운행 + 증빙이 남는 날(2026-10-21) — 「금액 다름 — 이 날 모름 운행 HH:MM 에 금액을 넣으세요(제안 X원)」
         var sgd = sgOf(d), sgGo = !!(sgd && sgd.diff > 0);
         var dupG = d.show ? DUPD[d.day] || [] : [], dupN = dupG.reduce(function (s, g) { return s + g.ev.length; }, 0);
-        var res = !d.show ? '<span class="dim">10월분 전 — 확인 안 함</span>'
-          : d.st === 'no_receipt' ? bad(myCycLocked() ? '영수증 없음' : isToll ? '영수증 없음 — 사진이나 하이패스 PDF를 올려 주세요' : '영수증 없음 — 영수증 사진을 올려 주세요')
-          : d.st === 'mismatch' ? bad(sgGo ? '금액 다름 — ' + window.TollSuggest.rowSay(sgd) : '금액 다름 — 운행 금액이나 영수증을 확인')
-          : d.st === 'no_trip' ? warnR('운행 없는 날 — 정산에서 빠짐')
+        var res = !d.show ? '<span class="dim">10월분 전이라 확인하지 않아요.</span>'
+          : d.st === 'no_receipt' ? bad(myCycLocked() ? '영수증 없음' : isToll ? '영수증 없음. 사진이나 하이패스 PDF를 올려 주세요.' : '영수증 없음. 영수증 사진을 올려 주세요.')
+          : d.st === 'mismatch' ? bad(sgGo ? '금액 다름. ' + endDot(window.TollSuggest.rowSay(sgd)) :'금액 다름. 운행 금액이나 영수증을 확인해 주세요.')
+          : d.st === 'no_trip' ? warnR('운행 없는 날. 정산에서 빠져요.')
           : d.st === 'filled' && d.twice ? warnR('두 번 정산 의심') +
             '<div class="mtw" data-twice="' + esc(d.twice.prev) + '">' + esc(twTxt(d)) + '</div>'
-          : dupG.length ? warnR('같은 금액 영수증 ' + n0(dupN) + '장 — 확인') +
-            '<div class="mtw" data-dupday="' + esc(d.day) + '">' + esc('같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) 「확인」에서 골라 주세요 — 고를 때까지 운행 ' + word + '는 비워 두고, 정산에는 영수증 합계가 들어갑니다') + '</div>'
+          : dupG.length ? warnR('같은 금액 영수증 ' + n0(dupN) + '장. 확인해 주세요.') +
+            '<div class="mtw" data-dupday="' + esc(d.day) + '">' + esc('같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) ‘확인’에서 골라 주세요. 고르기 전까지는 운행 ' + word + '를 비워 두고 영수증 합계로 정산해요.') + '</div>'
           : d.st === 'filled' ? ok('맞음 · 영수증 금액을 넣음')
           : ok('맞음');
         if (aiNote.length) res += ' ' + bad('사진 금액과 다름');
@@ -1460,7 +1477,7 @@
             (aiNote.length ? '<div class="mai">' + esc(aiNote.join(', ')) + '</div>' : '') + '</td>' +
           '<td class="n" data-l="정산 금액"><b>' + won(d.settle) + '</b></td><td>' + res + '</td><td class="mact">' + act + '</td></tr>';
       }).join('');
-      if (!MC.days.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없습니다' : '통행료·통행료 영수증이 없습니다', '', '') + xlHtml;
+      if (!MC.days.length) return box(true, cat === '주차' ? '주차비·주차 영수증이 없어요' : '통행료·통행료 영수증이 없어요', '', '') + xlHtml;
       // ── 한 줄 요약 + 「자세히 보기」(2026-10-15 2차 「영수증 한 번에 맞추기」) ──
       //   칸 많은 표는 접어 두고, 문제 있는 날(영수증 없음·금액 다름·운행 없는 영수증)만 펼쳐 보인다.
       var fold = MFOLD[cat] !== false, nFlag = nBad + nNoTrip + nTwice + nDupF;
@@ -1471,12 +1488,12 @@
       if (MS.noTripShowN) parts.push('운행 없는 날 영수증 <em>' + n0(MS.noTripShowN) + '장</em>(정산에서 빠짐)');
       if (nTwice) parts.push('두 번 정산 의심 <em>' + n0(nTwice) + '일</em>');
       if (nDupF) parts.push('같은 금액 영수증 확인 <em>' + n0(nDupF) + '일</em>');
-      if (!nBad && !MS.noTripShowN && !nTwice && !nDupF) parts.push(fillTrips ? '나머지는 모두 맞습니다' : (isToll ? '통행료 증빙이 모두 맞습니다' : '주차비 영수증이 모두 맞습니다'));
+      if (!nBad && !MS.noTripShowN && !nTwice && !nDupF) parts.push(fillTrips ? '나머지는 모두 맞아요' : (isToll ? '통행료 증빙이 모두 맞아요' : '주차비 영수증이 모두 맞아요'));
       // 할 일 — 동사로(웹 8차)
       var how = [];
-      if (MS.none) how.push(isToll ? '「영수증 없음」 날은 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요(실제로 안 냈으면 그 줄을 눌러 통행료를 「없음」으로)'
-        : '「영수증 없음」 날은 영수증 사진을 올려 주세요(실제로 안 냈으면 그 줄을 눌러 주차비를 「없음」으로)');
-      if (MS.diff) how.push('「금액 다름」 날은 운행 금액과 증빙(하이패스 이용내역·영수증)이 다릅니다 — 줄을 누르면 그 운행을, 아래 내역에서 영수증을 고칠 수 있고, 고치기 전까지는 운행 금액으로 정산됩니다');
+      if (MS.none) how.push(isToll ? '영수증이 없는 날은 영수증 사진이나 하이패스 이용내역 PDF를 올려 주세요. 실제로 안 냈으면 그 줄을 눌러 통행료를 ‘없음’으로 고쳐 주세요'
+        : '영수증이 없는 날은 영수증 사진을 올려 주세요. 실제로 안 냈으면 그 줄을 눌러 주차비를 ‘없음’으로 고쳐 주세요');
+      if (MS.diff) how.push('금액이 다른 날은 운행 금액과 증빙(하이패스 이용내역·영수증)이 달라요. 줄을 눌러 운행을 고치거나 내역에서 영수증을 고쳐 주세요. 고치기 전까지는 운행 금액으로 정산해요');
       // 금액 다름인 날 — 하루 단위 차이와 상황만(2026-10-19 버그 사냥 B2·B7·B8). 특정 운행 금액(「X원으로 고쳐」)은 제안하지 않는다 —
       //   그대로 따르면 두 번 정산될 수 있다. 문구는 money-rule.js adviceOf(서버 driving-verify R10 과 같은 글자).
       //   그날 「모름」 운행이 있으면(2026-10-21) toll-suggest.js unkTips — 영수증 지우기 권유 없이 「모름 운행에 금액을」(서버 R10 과 같은 글자) + 제안 금액.
@@ -1485,20 +1502,21 @@
         if (!a) return;
         var g = sgOf(d), tips = g ? window.TollSuggest.unkTips(a.tips, g.unk.map(function (t) { return hm(t.start_time); }), d.gap ? d.gap.diff : 0) : a.tips;
         var sug = g && g.diff > 0 ? g.items.filter(function (x) { return x.kind === 'amount'; }).map(function (x) { return hm(x.trip.start_time) + ' ' + won(x.amount); }) : [];
-        how.push(dn(d.day) + ' ' + a.head + ': ' + tips.join(' / ') + (sug.length ? ' — 제안 ' + sug.join(' · ') + '(위 「제안 보기·맞추기」에서 한 번에 넣을 수 있습니다)' : ''));
+        how.push(dn(d.day) + ' ' + a.head + ': ' + tips.join(' / ') + (sug.length ? '. 제안: ' + sug.join(' · ') + '. ‘제안 보기·맞추기’에서 한 번에 넣을 수 있어요' : ''));
       });
-      if (nNoTrip) how.push('「운행 없는 날」 영수증은 정산에서 빠집니다 — 다른 날 운행 것이면 그 줄의 「다른 운행에 붙이기」, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 아래 내역에서 지워 주세요');
-      if (nTwice) how.push('「두 번 정산 의심」 날은 영수증 금액이 전날 운행 금액과 같습니다 — 전날 운행 영수증을 다음 날 날짜로 올렸으면 그 줄의 「다른 운행에 붙이기」로 전날 운행에 이어 주세요(그대로 두면 전날 운행 금액과 이 영수증이 둘 다 정산됩니다). ' +
-        '그 날 운행 영수증이 맞으면 줄을 눌러 그 운행 ' + word + '를 적어 주세요 — 그러면 이 표시가 없어집니다');
-      if (nDupF) how.push('「같은 금액 영수증」 날은 운행 ' + word + '가 비어 영수증 금액을 넣을 차례인데 같은 금액 영수증이 여러 장입니다 — 그 줄의 「확인」에서 ' +
-        '실제로 여러 번 냈으면(왕복 등) 「합계 적기」, 같은 영수증을 두 번 올렸으면 「한 번만 적기」를 골라 주세요(겹친 영수증은 아래 내역에서 지웁니다)');
+      if (nNoTrip) how.push('운행 없는 날의 영수증은 정산에서 빠져요. 다른 날 운행의 영수증이면 그 줄의 ‘다른 운행에 붙이기’를 누르고, 그날 운행이 빠졌으면 1단계에서 운행을 넣고, 잘못 올렸으면 내역에서 지워 주세요');
+      if (nTwice) how.push('두 번 정산 의심인 날은 영수증 금액이 전날 운행 금액과 같아요. 그대로 두면 전날 운행 금액과 이 영수증이 둘 다 정산돼요. 전날 운행 영수증을 다음 날 날짜로 올렸으면 그 줄의 ‘다른 운행에 붙이기’로 전날 운행에 연결해 주세요. ' +
+        '그날 운행 영수증이 맞으면 줄을 눌러 그 운행의 ' + word + '를 적어 주세요. 그러면 이 표시가 없어져요');
+      if (nDupF) how.push('운행에 ' + word + '를 적지 않아 영수증 금액이 들어갈 날인데 같은 금액 영수증이 여러 장이면, 그 줄의 ‘확인’에서 골라 주세요. ' +
+        '실제로 여러 번 냈으면(왕복 등) 합계 적기, 같은 영수증을 두 번 올렸으면 한 번만 적기를 고르면 돼요. 겹친 영수증은 내역에서 지워 주세요');
       // 결재 중·결재 완료 기간 — 고칠 수 없으니 할 일 대신 한 줄(2026-10-19 마지막 검증)
-      if (myCycLocked() && how.length) how = [lockWhy(me) + ' 이 기간에는 영수증·운행을 고칠 수 없습니다. 고쳐야 하면 결재하는 분에게 반려를 요청하세요'];
-      var rule = '증빙이 있는 날은 「맞음」입니다. 정산에는 <b>운행 금액</b>이 들어가고 영수증은 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
-        '운행에 ' + word + '를 안 적은 날은 <b>영수증 금액</b>이 그 운행에 들어갑니다.' +
-        (isToll ? ' 하이패스 이용내역 PDF로 맞춘 통행료는 그 자체가 증빙이고, 같은 금액의 영수증 사진을 또 올려도 한 번만 셉니다.' : '') +
-        ' 줄을 누르면 그 운행을 고칠 수 있습니다.' +
-        (nOld ? ' 10월분(09.21) 전 날은 확인하지 않습니다(금액은 같게 셉니다).' : '');
+      //   할 일은 상태에 맞게(lockHow — 결재 완료면 관리자에게 정정 문의, 결재 중이면 회수·반려 요청). 끝 마침표는 아래 join 이 붙인다
+      if (myCycLocked() && how.length) how = [lockWhy(me) + ' 이 기간에는 영수증·운행을 고칠 수 없어요. ' + lockHow(me).replace(/\.$/, '')];
+      var rule = '증빙이 있는 날은 ‘맞음’이에요. 정산에는 <b>운행 금액</b>이 들어가고, 영수증은 맞는지 확인만 해요. ' +
+        '운행에 ' + word + '를 적지 않은 날은 <b>영수증 금액</b>이 그 운행에 들어가요.' +
+        (isToll ? ' 하이패스 이용내역 PDF로 맞춘 통행료는 그 자체가 증빙이라, 같은 금액의 영수증 사진을 또 올려도 한 번만 계산해요.' : '') +
+        ' 줄을 누르면 그 운행을 고칠 수 있어요.' +
+        (nOld ? ' 10월분(09.21) 전 날은 확인하지 않아요. 금액은 똑같이 계산해요.' : '');
       // 한 줄 안내 + 「자세히 보기」(2026-10-20 디자인 v2 P_Evid) — 접혀 있으면 할 일 글(.mhow)은 숨기고 갈래별 수만 한 줄로 보인다.
       //   「자세히 보기 (N일)」로 펼치면 예전처럼 할 일 글 + 규칙 + 모든 날. 결재 중·완료 기간 한 줄(고칠 수 없음)은 늘 보인다.
       var line = [];
@@ -1509,13 +1527,13 @@
       if (nTwice) line.push('두 번 정산 의심 ' + n0(nTwice) + '일');
       if (nDupF) line.push('같은 금액 영수증 ' + n0(nDupF) + '일');
       var hideHow = fold && line.length > 0 && !myCycLocked();
-      var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? ' — 줄의 단추로 바로 처리합니다. 설명은 「자세히 보기」에 있습니다.' : '') + '</div>' : '';
+      var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히 보기’에 있어요.' : '') + '</div>' : '';
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
         (fold ? '자세히 보기 (' + n0(MC.days.length) + '일)' : '접기') + '</button>';
       var table = '<div class="scroll"' + (fold && !nFlag ? ' hidden' : '') + '><table class="mtable mday' + (fold ? ' fold' : '') + '"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행 금액</th>' +
         '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th><th><span class="sr">할 일</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
-        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었습니다 — 「자세히 보기」로 볼 수 있습니다.</div>' : '');
+        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. ‘자세히 보기’를 누르면 보여요.</div>' : '');
       return box(!nBad && !nNoTrip && !nTwice && !nDupF, parts.join(' · '),
         // 올린 영수증 합이 정산과 왜 다른지 한 마디(2026-10-17 모르는 로봇 「영수증 7,500원인데 정산 4,400원 — 잘못 들어간 줄」)
         '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) +
@@ -1545,14 +1563,14 @@
       var tbl = '<div class="mcompare"><div><span>주유 영수증 합계</span><b>' + won(paid) + '</b><i>' + n0(paidEv.length) + '장</i></div>' +
         '<div class="mop">' + (good ? '≥' : '<') + '</div>' +
         '<div><span>엑셀 청구 유류비</span><b>' + won(claim) + '</b><i>업무 ' + n0(kmSum) + 'km × 단가</i></div></div>';
-      if (!claim && !paid) return box(true, '업무 운행 유류비가 없습니다', '', '');
-      return box(good, good ? '주유 영수증이 청구 유류비보다 많습니다 — 정상' : '청구 유류비가 주유 영수증보다 <em>' + won(claim - paid) + '</em> 많습니다',
-        good ? '실제로 넣은 기름값(영수증) 안에서 업무 유류비를 청구합니다.' : '빠진 주유 영수증을 올리거나 운행 거리·목적을 확인해 주세요.', tbl);
+      if (!claim && !paid) return box(true, '업무 운행 유류비가 없어요', '', '');
+      return box(good, good ? '주유 영수증이 청구 유류비보다 많아서 정상이에요' : '청구 유류비가 주유 영수증보다 <em>' + won(claim - paid) + '</em> 많아요',
+        good ? '업무 유류비는 실제로 넣은 기름값(영수증) 안에서 청구해요.' : '빠진 주유 영수증을 올리거나 운행 거리·목적을 확인해 주세요.', tbl);
     }
     if (cat === '계기판') {
       var plates = [];
       biz.forEach(function (t) { if (t.end_odometer != null) { var p = t.plate_no || ''; if (plates.indexOf(p) < 0) plates.push(p); } });
-      if (!plates.length) return box(true, '이번 기간에 업무 운행이 없습니다', '', '');
+      if (!plates.length) return box(true, '이번 기간에 업무 운행이 없어요', '', '');
       var shots = evs.filter(function (e) { return (e.photo_path || '') !== ''; });
       var plateOf = function (e) { return e.vehicle_plate || (plates.length === 1 ? plates[0] : null); };
       var anyBad = 0, needRun = 0;
@@ -1563,7 +1581,7 @@
         if (!mine.length) { anyBad++; return '<tr class="flagged"><td>' + esc(p || '차량 미지정') + '</td><td class="n">' + n0(lastEnd) + 'km</td><td class="n"><span class="dim">사진 없음</span></td><td>' + bad('사진을 올려 주세요') + '</td></tr>'; }
         var hit = null;
         mine.forEach(function (e) { var ai = aiOf(e); if (ai && ai.odometer_km != null && isFinite(Number(ai.odometer_km)) && (!hit || Number(e.date_millis) > Number(hit.e.date_millis))) hit = { e: e, v: Math.round(Number(ai.odometer_km)) }; });
-        if (!hit) { needRun++; return '<tr><td>' + esc(p || '차량 미지정') + '</td><td class="n">' + n0(lastEnd) + 'km</td><td class="n"><span class="dim">아직 안 읽음</span></td><td><span class="mres">「검증하기」 때 읽습니다</span></td></tr>'; }
+        if (!hit) { needRun++; return '<tr><td>' + esc(p || '차량 미지정') + '</td><td class="n">' + n0(lastEnd) + 'km</td><td class="n"><span class="dim">아직 안 읽음</span></td><td><span class="mres">검증할 때 읽어요</span></td></tr>'; }
         var dk = ymd(Number(hit.e.date_millis)), fin = -1;
         carT.forEach(function (t) {
           var d = ymd(t.start_time), x = d < dk ? t.end_odometer : d === dk ? t.start_odometer : null;
@@ -1575,15 +1593,15 @@
         else if (diff < -1000) { anyBad++; res = bad('사진 숫자 확인 필요'); }
         else if (diff < -3) { anyBad++; res = bad('운행일지가 더 큼'); }
         else res = ok('정상 (사진 ≥ 운행일지)');
-        if (after) { anyBad++; res += ' ' + bad('사진 뒤 운행 ' + after + '건 — 다시 찍어 주세요'); }
+        if (after) { anyBad++; res += ' ' + bad('사진을 찍은 뒤 운행이 ' + after + '건 있어요. 다시 찍어 주세요.'); }
         return '<tr' + (diff < -3 || after ? ' class="flagged"' : '') + '><td>' + esc(p || '차량 미지정') + '<div class="dim">' + esc(dn(dk)) + ' 사진</div></td>' +
           '<td class="n">' + (fin >= 0 ? n0(fin) + 'km' : '—') + '</td><td class="n"><b>' + n0(hit.v) + 'km</b></td><td>' + res + '</td></tr>';
       }).join('');
       var tblO = '<div class="scroll"><table class="mtable"><thead><tr><th>차량</th><th class="n">운행일지 최종 km</th><th class="n">계기판 사진 km</th><th>결과</th></tr></thead><tbody>' + rowsO + '</tbody></table></div>';
       return box(!anyBad && !needRun,
-        anyBad ? '맞지 않는 차가 <em>' + n0(anyBad) + '건</em> 있습니다' : needRun ? '사진 숫자를 아직 읽지 않았습니다' : '계기판 사진이 운행일지 최종 km 와 같거나 큽니다 — 정상',
-        '계기판 사진 숫자가 운행일지 마지막 km 와 <b>같거나 커야</b> 합니다(사진 찍고 조금 더 달린 것은 정상).' +
-          (needRun ? ' 사진의 숫자는 3단계 「검증하기」를 누르면 Gemini 가 읽어 여기에도 나옵니다.' : ''),
+        anyBad ? '맞지 않는 차가 <em>' + n0(anyBad) + '건</em> 있어요' : needRun ? '사진 숫자를 아직 읽지 않았어요' : '계기판 사진이 운행일지 최종 km와 같거나 커서 정상이에요',
+        '계기판 사진 숫자가 운행일지 마지막 km와 <b>같거나 커야</b> 해요. 사진을 찍고 조금 더 달린 것은 괜찮아요.' +
+          (needRun ? ' 사진의 숫자는 3단계에서 검증하면 AI가 읽어 여기에도 보여요.' : ''),
         tblO);
     }
     return '';
@@ -1606,7 +1624,7 @@
     apiRetry('/rest/v1/driving_step_progress?on_conflict=username,cycle', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ username: myName(), cycle: k, step: n, updated_at: new Date().toISOString() })
-    }).then(function (r) { if (!r.ok) toast('단계 위치를 저장하지 못했습니다(이 화면에서는 그대로 보입니다).', true); })
+    }).then(function (r) { if (!r.ok) toast('단계 위치를 저장하지 못했어요. 이 화면에서는 그대로 보여요.', true); })
       .catch(function () { });
   }
   /** 다음·이전 단계로. dir = +1 | -1, from = 지금 보고 있는 단계(1~5). 화면이 그 방향으로 밀려 들어온다. */
@@ -1623,7 +1641,7 @@
     STEP_FX = dir > 0 ? 'fwd' : 'back';
     go(STEP_VIEW[to - 1]);
     paintPills();                      // 메뉴 동그라미도 바로 바꾼다(톡 튀는 효과)
-    toast(dir > 0 ? (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 넘어갔습니다.') : (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 돌아왔습니다. 고친 뒤 다시 「다음 단계」를 눌러 주세요.'));
+    toast(dir > 0 ? (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 넘어갔어요.') : (to + ' ' + STEP_NAMES[to - 1] + ' 단계로 돌아왔어요. 고친 뒤 ‘다음 단계’를 다시 눌러 주세요.'));
   }
   var STEP_FX = '';
   function stepInfo() {
@@ -1648,7 +1666,7 @@
       { v: 'evid', t: '영수증·통행료', n: unk,
         sub: (ev.length ? '영수증 ' + n0(ev.length) + '장' : '영수증 없음') + (unk ? ' · 통행료 미확정 ' + n0(unk) : '') },
       { v: 'verify', t: '검증·상신', n: 0,
-        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '상신함' : st === 'rejected' ? '반려됨 — 다시 상신' : '아직 안 함' },
+        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '상신함' : st === 'rejected' ? '반려됨 · 다시 상신' : '아직 안 함' },
       { v: 'settle', t: '정산·엑셀', n: 0, sub: st === 'approved' ? '받을 수 있음' : '결재 후' }
     ];
     var cur = -1;
@@ -1669,7 +1687,7 @@
     //   결재함·안전교육 숫자는 기간 잠금과 상관없어 그대로.
     set('pCheck', S.sent ? 0 : S.fix, S.fixBad > 0, function (n) { return '운행 기록에서 확인할 것 ' + n0(n) + '건' + (S.fixBad ? '(고칠 것 ' + n0(S.fixBad) + '건)' : ''); });
     set('pEvid', S.sent ? 0 : S.noPhoto, false, function (n) { return '사진 없는 영수증 ' + n0(n) + '장'; });
-    set('pToll', S.sent ? 0 : S.unk, false, function (n) { return '통행료 미확정 업무 운행 ' + n0(n) + '건 — 통행료 차례에서 운행을 눌러 정해 주세요'; });
+    set('pToll', S.sent ? 0 : S.unk, false, function (n) { return '통행료 미확정 업무 운행 ' + n0(n) + '건. ‘영수증·통행료’ 단계의 통행료에서 운행을 눌러 정해 주세요.'; });
     // 단계 동그라미 — 여러 주기를 함께 볼 때는 상태가 없다(번호만).
     S.steps.forEach(function (x, i) {
       var el = $('sn' + (i + 1)); if (!el) return;
@@ -1847,9 +1865,9 @@
       var s = safeOf(TRIPS);
       if (s.score < 0) {
         // blank() 는 설명을 esc() 하므로 태그를 넣으면 '<b>' 가 글자로 보인다 — 평문으로 쓴다.
-        return h + blank('평가할 운행이 없습니다.',
-          '안전운전 점수는 앱이 자동으로 기록한 운행만 봅니다. ' +
-          '수기로 넣은 운행은 GPS 기록이 없어 평가하지 않습니다.', 'gauge');
+        return h + blank('평가할 운행이 없어요.',
+          '안전운전 점수는 앱이 자동으로 기록한 운행만 평가해요. ' +
+          '수기로 넣은 운행은 GPS 기록이 없어 평가하지 않아요.', 'gauge');
       }
       var g = safeGrade(s.score);
       h += '<div class="hero fade">' +
@@ -1872,7 +1890,7 @@
         ? '<button class="btn sm" data-safeall="' + (SAFE_ALL ? 0 : 1) + '">' + (SAFE_ALL ? '90점 미만만 보기' : '전체 보기 (' + n0(sorted.length) + '건)') + '</button>' : '';
       h += sect(SAFE_ALL ? '평가한 운행 전체' : '점수가 낮은 운행', SAFE_ALL ? n0(sorted.length) + '건 · 낮은 순' : '90점 미만 ' + n0(low.length) + '건', allBtn,
         list.length ? safeTripTable(list)
-          : '<div class="panel" style="padding:16px 20px;color:var(--ink-600)">90점 미만인 운행이 없습니다.</div>');
+          : '<div class="panel" style="padding:16px 20px;color:var(--ink-600)">90점 미만인 운행이 없어요.</div>');
       h += safeRuleNote();
       return h;
     }
@@ -1939,7 +1957,7 @@
     ].filter(function (x) { return x[1] > 0; });
     if (!items.length) {
       return '<div class="panel" style="padding:22px 20px;text-align:center;color:var(--ink-3)">' +
-        '위험 운전이 한 번도 없었습니다.</div>';
+        '위험 운전이 한 번도 없었어요.</div>';
     }
     return '<div class="panel"><table class="kv"><tbody>' +
       items.map(function (x) {
@@ -1949,7 +1967,7 @@
   }
 
   function safeTripTable(rows) {
-    if (!rows.length) return blank('평가한 운행이 없습니다.', null, 'list');
+    if (!rows.length) return blank('평가한 운행이 없어요.', null, 'list');
     return '<div class="panel"><div class="scroll" data-rows><table class="mc"><thead><tr>' +
       '<th>날짜</th><th class="n">점수</th><th>구간</th><th>방문처</th><th class="n">과속</th>' +
       '<th class="n">급가감속</th><th class="n">최고</th></tr></thead><tbody>' +
@@ -1972,14 +1990,14 @@
   function safeRuleNote() {
     return '<section class="sect"><div class="panel" style="padding:18px 20px;font-size:13px;' +
       'line-height:1.7;color:var(--ink-3)">' +
-      '<b style="color:var(--ink-2)">100점에서 깎습니다.</b> ' +
+      '<b style="color:var(--ink-2)">100점에서 깎아요.</b> ' +
       '과속 −3 · 어린이보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3 · ' +
       '지속과속 −2(운행당 −10까지)<br>' +
-      '밤 10시~새벽 6시에 출발한 운행은 깎인 점수를 <b>1.5배</b>로 칩니다.<br>' +
-      '여러 운행의 평균은 <b>주행거리로 가중</b>합니다 — 짧은 운행이 과대 반영되지 않게 합니다.<br>' +
-      '<b style="color:var(--ink-2)">수기로 넣은 운행은 평가하지 않습니다</b> — GPS 기록이 없어 ' +
-      '위반이 0으로 잡히면 점수가 부풀려집니다.<br>' +
-      '앱의 안전운전 점수와 같은 식으로 계산합니다. 앱과 다르게 나오면 알려 주세요.' +
+      '밤 10시~새벽 6시에 출발한 운행은 깎인 점수를 <b>1.5배</b>로 계산해요.<br>' +
+      '여러 운행의 평균은 <b>주행거리로 가중</b>해서, 짧은 운행이 너무 크게 반영되지 않아요.<br>' +
+      '<b style="color:var(--ink-2)">수기로 넣은 운행은 평가하지 않아요.</b> GPS 기록이 없으면 ' +
+      '위반이 0으로 잡혀 점수가 부풀려져요.<br>' +
+      '앱의 안전운전 점수와 같은 식으로 계산해요. 앱과 다르게 나오면 알려 주세요.' +
       '</div></section>';
   }
 
@@ -1998,19 +2016,19 @@
       return t.username === mine && isUnknownToll(t) && (t.purpose || '') === BUSINESS;
     });
     var h = head('통행료 채우기', rows.length
-      ? n0(rows.length) + '건이 비어 있습니다'
-      : '비어 있는 통행료가 없습니다');
+      ? n0(rows.length) + '건이 비어 있어요'
+      : '비어 있는 통행료가 없어요');
 
     // ★ 결재가 끝난 주기는 서버가 통행료도 막는다. 채우게 두면 전부 채운 뒤
     //   저장에서야 '결재가 끝난 기간' 으로 다 튕긴다 — 먼저 말한다.
     if (rows.length && cycleLocked(mine)) {
       return h + lockedNote(lockTitle(mine),
-        '비어 있는 ' + n0(rows.length) + '건은 정산에 0원으로 들어갔습니다. ' + lockHow(mine));
+        '비어 있는 ' + n0(rows.length) + '건은 정산에 0원으로 들어갔어요. ' + lockHow(mine));
     }
 
     if (!rows.length) {
-      return h + blank('채울 것이 없습니다.',
-        '자동계산과 하이패스 대조로 모두 정해졌습니다.', 'check');
+      return h + blank('채울 통행료가 없어요.',
+        '자동 계산과 하이패스 비교로 모두 정해졌어요.', 'check');
     }
 
     // 구간별로 묶는다. 같은 구간을 전에 사람이 확정한 적이 있으면 그 금액을 권한다.
@@ -2050,14 +2068,14 @@
 
     h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;' +
       'line-height:1.7;color:var(--ink-3)">' +
-      '같은 구간끼리 묶었습니다. <b style="color:var(--ink-2)">시내 운행처럼 요금소를 안 지난 구간은 ' +
-      '「없음」</b>을 누르시면 그 구간 전체가 한 번에 정리됩니다.<br>' +
-      '전에 정하신 금액이 있으면 「지난번 N원」 버튼이 붙어 있습니다 — 누르면 그대로 들어갑니다.<br>' +
-      '잘못 눌렀으면 칸을 비우세요. 비운 줄은 \'아직 안 정함\' 으로 돌아갑니다.<br>' +
-      '<b style="color:var(--ink-2)">업무용 운행만</b> 보입니다. 출퇴근·비업무용은 정산과 제출 서류에 ' +
-      '들어가지 않아 채우실 필요가 없습니다.' +
-      '<div style="margin-top:12px">한국도로공사 <b style="color:var(--ink-2)">하이패스 이용내역 PDF</b> 가 ' +
-      '있으면 한 번에 확정됩니다. ' +
+      '같은 구간끼리 묶었어요. <b style="color:var(--ink-2)">시내 운행처럼 요금소를 지나지 않은 구간은 ' +
+      '‘없음’</b>을 누르면 그 구간 전체가 한 번에 정리돼요.<br>' +
+      '전에 정한 금액은 ‘지난번 N원’ 버튼을 누르면 그대로 들어가요.<br>' +
+      '잘못 눌렀으면 칸을 비우세요. 비운 줄은 아직 안 정한 상태로 돌아가요.<br>' +
+      '<b style="color:var(--ink-2)">업무용 운행만</b> 보여요. 출퇴근·비업무용은 정산과 제출 서류에 ' +
+      '들어가지 않아 채우지 않아도 돼요.' +
+      '<div style="margin-top:12px">한국도로공사 <b style="color:var(--ink-2)">하이패스 이용내역 PDF</b>가 ' +
+      '있으면 한 번에 확정돼요. ' +
       '<button class="btn sm" data-v="hipass" style="margin-left:4px">하이패스 대조 ' + ic('chev', 13) +
       '</button></div>' +
       '</div></section>';
@@ -2097,7 +2115,7 @@
           // 정한 줄은 0원도 숫자로 보여 준다 — 어디까지 했는지 눈에 보이게.
           (v == null ? '' : n0(v)) + '">' +
           (x.hint ? ' <button class="btn sm" data-tfhint="' + i + '" ' +
-            'title="전에 정하신 금액 — 눌러서 그대로 씁니다">지난번 ' +
+            'title="전에 정한 금액을 그대로 넣어요">지난번 ' +
             n0(x.hint) + '원</button>' : '') +
           '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
@@ -2167,16 +2185,15 @@
       if (FILLS[x.key] != null) return;
       left += x.rows.length; groups++;
     });
-    if (!left) { toast('남은 것이 없습니다.'); return; }
+    if (!left) { toast('남은 것이 없어요.'); return; }
     $('pTitle').textContent = '남은 것 전부 「없음」';
     $('pSub').textContent = n0(groups) + '개 구간 · ' + n0(left) + '건';
     $('pBody').innerHTML =
-      '<div class="anote">남은 <b>' + n0(left) + '건</b>을 <b>통행료 없음(0원)</b>으로 확정합니다.</div>' +
+      '<div class="anote">남은 <b>' + n0(left) + '건</b>을 <b>통행료 없음(0원)</b>으로 확정할까요?</div>' +
       '<div class="form"><div class="frow"><div class="fbody">' +
-      '<div class="fhint">자동계산은 요금소를 안 지난 것이 <b>확실한</b> 운행을 이미 0원으로 ' +
-      '확정해 둡니다. 여기 남은 것은 자동으로 못 정한 운행이라, 실제로 요금소를 지난 것이 ' +
-      '섞여 있으면 <b>그만큼 회사가 덜 지급</b>합니다.<br>' +
-      '요금소를 지난 운행이 있으면 취소하고 그 구간만 금액을 넣어 주십시오.</div>' +
+      '<div class="fhint">자동 계산으로 정하지 못한 운행이라, 요금소를 지난 운행이 ' +
+      '섞여 있으면 <b>그 통행료만큼 덜 받아요</b>.<br>' +
+      '요금소를 지난 운행이 있으면 취소하고 그 구간만 금액을 넣어 주세요.</div>' +
       '</div></div></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
@@ -2193,8 +2210,8 @@
       if (v == null) return;
       x.rows.forEach(function (t) { items.push({ id: t.id, amount: v }); n++; });
     });
-    if (!items.length) { toast('정한 것이 없습니다.', true); return; }
-    if (items.length > 500) { toast('한 번에 500건까지만 저장됩니다. 나눠서 저장해 주세요.', true); return; }
+    if (!items.length) { toast('정한 것이 없어요.', true); return; }
+    if (items.length > 500) { toast('한 번에 500건까지 저장할 수 있어요. 나눠서 저장해 주세요.', true); return; }
     var btn = $('tfSave'); btn.disabled = true; btn.textContent = '저장 중…';
     apiRetry('/functions/v1/toll-apply', {
       method: 'POST',
@@ -2203,7 +2220,7 @@
       .then(function (res) {
         btn.disabled = false; btn.textContent = n0(n) + '건 저장';
         if (!res.ok || !res.j || !res.j.ok) {
-          toast((res.j && res.j.error) || '저장하지 못했습니다.', true); return;
+          toast((res.j && res.j.error) || '저장하지 못했어요.', true); return;
         }
         var skipped = res.j.skipped || [];
         // ★ applied 가 0 이면 한 건도 안 써진 것이다. 예전에는 '0 || items.length' 라
@@ -2211,8 +2228,8 @@
         var applied = Number(res.j.applied) || 0;
         if (!applied) {
           toast(skipped.length
-            ? '한 건도 저장되지 않았습니다 — ' + skipped[0].why
-            : '한 건도 저장되지 않았습니다.', true);
+            ? '한 건도 저장하지 못했어요. 이유: ' + endDot(skipped[0].why)
+            : '한 건도 저장하지 못했어요.', true);
           return;                        // 친 값은 그대로 둔다
         }
         // 건너뛴 운행이 있는 구간의 값은 남긴다 — 부분 성공 뒤 다시 저장할 수 있게.
@@ -2225,12 +2242,12 @@
         AUDIT = null;
         loadAll();                       // 서버 값을 다시 받아 화면을 맞춘다
         // 다 저장됐으면 영수증 › 통행료 차례로 돌아간다(2026-10-14 사용자 — 「채운 다음은 통행료 칸에 반영된 화면으로」).
-        if (!skipped.length && !isMulti()) { tollBack(n0(applied) + '건 저장했습니다 — 통행료에 반영됐습니다.'); return; }
-        toastOk(n0(applied) + '건 저장했습니다.',
-          skipped.length ? skipped.length + '건은 건너뛰었습니다 (' + skipped[0].why + ')' : null);
+        if (!skipped.length && !isMulti()) { tollBack(n0(applied) + '건을 저장해 통행료에 반영했어요.'); return; }
+        toastOk(n0(applied) + '건 저장했어요.',
+          skipped.length ? skipped.length + '건은 건너뛰었어요. 이유: ' + endDot(skipped[0].why) : null);
       }).catch(function () {
         btn.disabled = false; btn.textContent = n0(n) + '건 저장';
-        toast('저장하지 못했습니다.', true);
+        toast('저장하지 못했어요.', true);
       });
   }
 
@@ -2250,9 +2267,9 @@
       (ME.is_admin ? kv('운행일지 관리자', '예') : '') +
       // 2026-10-07 — 업무용 차량을 운전하는가(운행일지 씀/안 씀). 바꾸는 것은 관리자가 「권한 관리」에서 한다.
       kv('차량 운전', (usesDriving(myName())
-        ? '<b>운전합니다</b> <span class="dim">— 운행일지와 개인경비를 모두 씁니다</span>'
-        : '<b>운전하지 않습니다</b> <span class="dim">— 개인경비 지출결의와 결재만 씁니다</span>') +
-        '<div class="fhint">나중에 바뀌면 관리자에게 말씀하시면 바꿔 드립니다.</div>') +
+        ? '<b>운전해요.</b> <span class="dim">운행일지와 개인경비를 모두 써요.</span>'
+        : '<b>운전하지 않아요.</b> <span class="dim">개인경비 지출결의와 결재만 써요.</span>') +
+        '<div class="fhint">바뀌면 관리자에게 알려 주세요. 바꿔 드려요.</div>') +
       '</tbody></table></div>');
 
     h += sect('결재 서명', null, '', signPanel());
@@ -2262,7 +2279,7 @@
       '<div class="panel" style="padding:8px 20px 20px"><div class="form" style="border-top:0;margin-top:0">' +
       frow('현재 비밀번호', mineUserField() + '<input class="inp pw" type="password" id="pwCur" autocomplete="current-password">') +
       frow('새 비밀번호', '<input class="inp pw" type="password" id="pwNew" autocomplete="new-password">',
-        '4자 이상. <b>앱과 웹이 같은 비밀번호</b>를 씁니다 — 바꾸면 앱에서도 새 것으로 들어가셔야 합니다.') +
+        '4자 이상 입력해 주세요. <b>앱과 웹은 같은 비밀번호</b>를 써서, 바꾸면 앱에서도 새 비밀번호로 로그인해야 해요.') +
       frow('새 비밀번호 확인', '<input class="inp pw" type="password" id="pwNew2" autocomplete="new-password">') +
       '</div><div style="margin-top:14px;text-align:right">' +
       '<button class="btn pri" id="btnPwSave">비밀번호 바꾸기</button></div></div>');
@@ -2287,12 +2304,12 @@
       '<div class="signbox"><img id="signPreview" alt="결재 서명" src="' + esc(shown) + '"></div>' +
       '<div class="signtx">' +
       (SIGN_DRAFT
-        ? '<b>이 서명으로 저장할까요?</b><div class="fhint">흰 배경은 투명하게 바꾸고 여백은 잘라 냈습니다.</div>' +
+        ? '<b>이 서명으로 저장할까요?</b><div class="fhint">흰 배경은 투명하게 바꾸고 여백은 잘라 냈어요.</div>' +
           '<div class="signbtn"><button class="btn pri" id="btnSignSave">이 서명으로 저장</button> ' +
           '<button class="btn" id="btnSignCancel">취소</button></div>'
-        : '<b>' + (MYSIGN && MYSIGN.image ? '올린 서명을 쓰고 있습니다' : '기본 도장(이름)을 쓰고 있습니다') + '</b>' +
-          '<div class="fhint">상신·승인하면 결재란에 이 그림과 날짜가 찍힙니다. 서명·도장 파일(JPG·PNG·PDF)을 올리면 그것으로 바뀝니다. ' +
-          '바꿔도 <b>이미 결재된 문서는 그대로</b>입니다.</div>' +
+        : '<b>' + (MYSIGN && MYSIGN.image ? '올린 서명을 쓰고 있어요' : '기본 도장(이름)을 쓰고 있어요') + '</b>' +
+          '<div class="fhint">상신·승인하면 결재란에 이 그림과 날짜가 찍혀요. 서명·도장 파일(JPG, PNG, PDF)을 올려 바꿔도 ' +
+          '<b>이미 결재된 문서는 그대로</b>예요.</div>' +
           '<div class="signbtn"><label class="btn" for="signFile">' + ic('stamp') + '서명·도장 파일 올리기</label>' +
           '<input type="file" id="signFile" accept="image/png,image/jpeg,application/pdf,.pdf" hidden> ' +
           (MYSIGN && MYSIGN.image ? '<button class="btn" id="btnSignReset">기본 도장으로 되돌리기</button>' : '') +
@@ -2322,7 +2339,7 @@
             var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
             g.drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); ok(cv);
           };
-          im.onerror = function () { URL.revokeObjectURL(url); no(new Error('그림 파일을 읽지 못했습니다')); };
+          im.onerror = function () { URL.revokeObjectURL(url); no(new Error('그림 파일을 읽지 못했어요.')); };
           im.src = url;
         });
     return src.then(function (cv) {
@@ -2333,7 +2350,7 @@
         if (d[i + 3] < 20 || lum > 215) { d[i + 3] = 0; continue; }
         if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
       }
-      if (x1 < 0) throw new Error('파일에서 서명을 찾지 못했습니다(흰 바탕만 있습니다)');
+      if (x1 < 0) throw new Error('파일에서 서명을 찾지 못했어요. 흰 바탕만 있는 파일이에요.');
       g.putImageData(img, 0, 0);
       var pad = 4, cw = x1 - x0 + 1 + pad * 2, ch = y1 - y0 + 1 + pad * 2;
       var k = Math.min(1, 360 / cw, 180 / ch);
@@ -2341,7 +2358,7 @@
       out.width = Math.max(1, Math.round(cw * k)); out.height = Math.max(1, Math.round(ch * k));
       out.getContext('2d').drawImage(cv, x0 - pad, y0 - pad, cw, ch, 0, 0, out.width, out.height);
       var png = out.toDataURL('image/png');
-      if (png.length > 390000) throw new Error('서명 그림이 너무 복잡합니다. 서명만 잘라서 올려 주세요');
+      if (png.length > 390000) throw new Error('서명 그림이 너무 복잡해요. 서명만 잘라서 올려 주세요.');
       return png;
     });
   }
@@ -2351,20 +2368,20 @@
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ username: myName(), image: image })
     }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
-      if (!rows || !rows[0]) { if (b) b.disabled = false; toast('서명을 저장하지 못했습니다. 잠시 뒤에 다시 해 주세요.', true); return; }
+      if (!rows || !rows[0]) { if (b) b.disabled = false; toast('서명을 저장하지 못했어요. 잠시 후 다시 해 주세요.', true); return; }
       MYSIGN = rows[0]; SIGNS[MYSIGN.id] = MYSIGN.image || ''; SIGN_DRAFT = null;
-      toast(image ? '서명을 저장했습니다. 이제부터 상신·승인하는 문서에 찍힙니다.' : '기본 도장으로 되돌렸습니다.');
+      toast(image ? '서명을 저장했어요. 이후 상신·승인하는 문서에 쓰여요.' : '기본 도장으로 되돌렸어요.');
       render();
-    }).catch(function () { if (b) b.disabled = false; toast('서명을 저장하지 못했습니다.', true); });
+    }).catch(function () { if (b) b.disabled = false; toast('서명을 저장하지 못했어요.', true); });
   }
 
   function savePassword() {
     var cur = ($('pwCur') || {}).value || '';
     var a = ($('pwNew') || {}).value || '', b2 = ($('pwNew2') || {}).value || '';
     if (!cur) { toast('현재 비밀번호를 넣어 주세요.', true); return; }
-    if (a.length < 4) { toast('새 비밀번호는 4자 이상이어야 합니다.', true); return; }
-    if (a !== b2) { toast('새 비밀번호 확인이 다릅니다.', true); return; }
-    if (a === cur) { toast('지금 쓰시는 것과 다른 비밀번호를 넣어 주세요.', true); return; }
+    if (a.length < 4) { toast('새 비밀번호는 4자 이상 입력해 주세요.', true); return; }
+    if (a !== b2) { toast('새 비밀번호 확인이 달라요.', true); return; }
+    if (a === cur) { toast('지금 쓰는 것과 다른 비밀번호를 넣어 주세요.', true); return; }
     var btn = $('btnPwSave'); btn.disabled = true; btn.textContent = '바꾸는 중…';
     apiRetry('/functions/v1/driving-account', {
       method: 'POST', body: JSON.stringify({ action: 'change_password', current: cur, next: a })
@@ -2372,13 +2389,13 @@
       .then(function (res) {
         btn.disabled = false; btn.textContent = '비밀번호 바꾸기';
         if (!res.ok || !res.j || !res.j.ok) {
-          toast((res.j && res.j.error) || '바꾸지 못했습니다.', true); return;
+          toast((res.j && res.j.error) || '바꾸지 못했어요.', true); return;
         }
         ['pwCur', 'pwNew', 'pwNew2'].forEach(function (id) { if ($(id)) $(id).value = ''; });
-        toast(res.j.message || '비밀번호를 바꿨습니다.');
+        toast(res.j.message || '비밀번호를 바꿨어요.');
       }).catch(function () {
         btn.disabled = false; btn.textContent = '비밀번호 바꾸기';
-        toast('바꾸지 못했습니다.', true);
+        toast('바꾸지 못했어요.', true);
       });
   }
 
@@ -2412,8 +2429,8 @@
           '<button class="btn sm pri" data-signup="' + esc(x.username) + '" data-ok="1"' + (busy ? ' disabled' : '') + '>승인</button> ' +
           '<button class="btn sm" data-signup="' + esc(x.username) + '" data-ok="0"' + (busy ? ' disabled' : '') + '>거절</button></td></tr>';
       }).join('') + '</tbody></table></div></div>' +
-      '<div class="anote">업무 결재 포털에서 들어온 신청입니다. 승인하면 그 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다. ' +
-      '적힌 회사 메일은 <b>본인 확인이 안 된 값</b>입니다. 승인할 때 <b>조직도의 누구인지</b> 고르면 바로 결재자로 고를 수 있게 됩니다.</div>');
+      '<div class="anote">업무 결재 포털에서 들어온 신청으로, 승인하면 그 아이디로 포털, 운행일지 웹, 앱에 로그인할 수 있어요. ' +
+      '적힌 회사 메일은 <b>본인 확인 전</b>이에요. 승인할 때 <b>조직도의 누구인지</b> 고르면 바로 결재자로 고를 수 있어요.</div>');
   }
   /** 가입 승인 때 이을 조직도 후보 — 아직 계정이 안 이어진 사람. 이름이 같은 사람을 맨 앞에. */
   function signupOrgOptions(x) {
@@ -2444,15 +2461,15 @@
     var oo = ok ? signupOrgOptions(x) : null;
     // 창 맨 위 구분선은 머리 줄 밑줄과 겹쳐 빈 줄처럼 보였다(내 계정과 같게 뺀다, 2026-10-19)
     $('pBody').innerHTML = '<div class="form" style="border-top:0;margin-top:0"><div class="anote">' + esc(x.name || u) + ' 님의 가입 신청을 <b>' +
-      (ok ? '승인' : '거절') + '</b>합니다.' +
-      (ok ? ' 승인하면 이 아이디로 포털·운행일지 웹·앱에 로그인할 수 있습니다.' +
-          (x.uses_driving === false ? ' <b>업무용 차량을 운전하지 않는 분</b>이라 개인경비·결재함만 보입니다.' : '')
-        : ' 거절하면 이 아이디로는 로그인할 수 없고, 적어 낸 차량번호는 비웁니다.') + '</div>' +
+      (ok ? '승인' : '거절') + '</b>할까요?' +
+      (ok ? ' 승인하면 이 아이디로 포털, 운행일지 웹, 앱에 로그인할 수 있어요.' +
+          (x.uses_driving === false ? ' <b>업무용 차량을 운전하지 않는 분</b>이라 개인경비·결재함만 보여요.' : '')
+        : ' 거절하면 이 아이디로는 로그인할 수 없고, 적어 낸 차량번호는 비워요.') + '</div>' +
       // ★ 결재자로 고를 수 있게 하려면 조직도에 이어야 한다(결재자 = 조직도에 있고 계정이 이어진 사람, 2026-10-02 결정).
       //   관리자가 본인 확인 뒤 직접 고른다 — 이름만 같다고 자동으로 잇지 않는다(가로채기 방지, 10/6 검증로봇).
       (ok ? '<div class="frow"><label class="flab" for="suOrg">조직도</label><div class="fbody">' +
         '<select class="inp" id="suOrg">' + oo.html + '</select>' +
-        '<div class="fhint">이으면 <b>결재자로 고를 수 있게</b> 됩니다. 본인이 맞는지 확인하고 고르세요.</div>' +
+        '<div class="fhint">조직도에 연결하면 <b>결재자로 고를 수 있어요</b>. 본인이 맞는지 확인하고 고르세요.</div>' +
         '<div id="suOrgNew" class="form" style="margin-top:10px" hidden>' +
         '<div class="frow"><label class="flab" for="suDiv">본부</label><div class="fbody"><input class="inp" id="suDiv" maxlength="60" placeholder="예) 버스사업본부"></div></div>' +
         '<div class="frow"><label class="flab" for="suTeam">팀</label><div class="fbody"><input class="inp" id="suTeam" maxlength="60" value="' + esc(x.dept || '') + '"></div></div>' +
@@ -2460,11 +2477,11 @@
         '<div class="frow"><label class="flab" for="suRank">직급</label><div class="fbody"><input class="inp" id="suRank" maxlength="30" value="' + esc(x.position || '') + '"></div></div>' +
         // 팀즈 결재 알림이 이 주소로 간다 — 신청서의 메일은 본인 확인이 안 된 값이라 관리자가 보고 확정한다(R9).
         '<div class="frow"><label class="flab" for="suOMail">알림 메일</label><div class="fbody"><input class="inp" id="suOMail" maxlength="80" value="' + esc(x.email || '') + '" placeholder="아이디@atecmobility.com">' +
-        '<div class="fhint">팀즈 결재 알림이 이 주소로 갑니다. <b>본인 회사 메일이 맞는지</b> 확인하세요. 모르면 비워 두세요.</div></div></div>' +
+        '<div class="fhint">팀즈 결재 알림이 이 주소로 가요. <b>본인 회사 메일이 맞는지</b> 확인하고, 모르면 비워 두세요.</div></div></div>' +
         '</div></div></div>' : '') +
       '<div class="frow"><label class="flab" for="suMine">본인 비밀번호</label><div class="fbody">' +
       mineUserField() + '<input class="inp" type="password" id="suMine" autocomplete="current-password">' +
-      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호입니다.</div></div></div></div>';
+      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호를 입력해 주세요.</div></div></div></div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnSignupGo" data-u="' + esc(u) + '" data-ok="' + (ok ? '1' : '0') + '">' + (ok ? '승인' : '거절') + '</button>';
     $('panel').classList.add('open');
@@ -2486,7 +2503,7 @@
     if (orgPick === 'new') {
       var tv = function (id) { return (($(id) || {}).value || '').trim(); };
       newOrg = { division: tv('suDiv'), team: tv('suTeam'), role: tv('suRole'), rank: tv('suRank'), email: tv('suOMail').toLowerCase() };
-      if (newOrg.email && !/^[a-z0-9._-]+@atecmobility\.com$/.test(newOrg.email)) { toast('알림 메일은 @atecmobility.com 주소만 됩니다. 모르면 비워 두세요.', true); $('suOMail').focus(); return; }
+      if (newOrg.email && !/^[a-z0-9._-]+@atecmobility\.com$/.test(newOrg.email)) { toast('알림 메일은 @atecmobility.com 주소만 쓸 수 있어요. 모르면 비워 두세요.', true); $('suOMail').focus(); return; }
       if (!newOrg.division) { toast('조직도에 새로 넣으려면 본부를 넣어 주세요.', true); $('suDiv').focus(); return; }
     }
     var go = $('btnSignupGo'); if (go) go.disabled = true;
@@ -2496,8 +2513,8 @@
       .then(function (res) {
         SIGNUP_BUSY = '';
         if (go) go.disabled = false;
-        if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return; }
-        var done = endDot(res.j.message || '처리했습니다.');
+        if (!res.ok || !res.j || !res.j.ok) { toast((res.j && res.j.error) || '처리하지 못했어요.', true); return; }
+        var done = endDot(res.j.message || '처리했어요.');
         closePanel();
         SIGNUPS = null;
         if (!ok) { toast(done); render(); return; }
@@ -2505,13 +2522,13 @@
           if (msg) toast(done + ' ' + msg, /못했/.test(msg)); else toast(done);
           loadAll();                     // 승인한 사람이 직원 목록·조직도·결재자 후보에 바로 보이게
         });
-      }).catch(function () { SIGNUP_BUSY = ''; if (go) go.disabled = false; toast('처리하지 못했습니다.', true); });
+      }).catch(function () { SIGNUP_BUSY = ''; if (go) go.disabled = false; toast('처리하지 못했어요.', true); });
   }
   /** 승인한 계정을 조직도에 잇는다 — 이미 계정이 이어진 줄은 건드리지 않는다(username=is.null 조건). */
   function linkSignupOrg(u, x, pick, newOrg) {
     if (!pick) return Promise.resolve('');
     // 이미 조직도 어딘가에 이어진 계정이면 또 잇지 않는다(한 사람이 두 줄 — R9).
-    if (ORG.some(function (o) { return o.username === u; })) return Promise.resolve('이 계정은 이미 조직도에 이어져 있어 그대로 두었습니다.');
+    if (ORG.some(function (o) { return o.username === u; })) return Promise.resolve('이 계정은 이미 조직도에 연결돼 있어 그대로 두었어요.');
     var now = new Date().toISOString();
     var req;
     if (pick === 'new') {
@@ -2533,11 +2550,11 @@
     }
     return req.then(function (r) { return r.ok ? r.json() : null; })
       .then(function (rows) {
-        return rows && rows.length ? '조직도에 이었습니다 — 이제 결재자로 고를 수 있습니다.'
+        return rows && rows.length ? '조직도에 연결했어요. 이제 결재자로 고를 수 있어요.'
           : pick === 'new'
-            ? '조직도에 새로 넣지 못했습니다. 「조직도」에서 직접 추가해 주세요.'
-            : '조직도에는 잇지 못했습니다(이미 다른 계정이 이어졌을 수 있습니다). 「조직도」에서 직접 이어 주세요.';
-      }).catch(function () { return '조직도에는 잇지 못했습니다. 「조직도」에서 직접 이어 주세요.'; });
+            ? '조직도에 새로 넣지 못했어요. ‘조직도’에서 직접 추가해 주세요.'
+            : '조직도에 연결하지 못했어요. 이미 다른 계정이 연결됐을 수 있으니 ‘조직도’에서 직접 연결해 주세요.';
+      }).catch(function () { return '조직도에 연결하지 못했어요. ‘조직도’에서 직접 연결해 주세요.'; });
   }
   function viewPerm() {
     if (!LOADED) return head('권한 관리') + skeleton();
@@ -2551,12 +2568,12 @@
     var h = head('권한 관리', list.length + '명 · 관리자 ' + admins + '명 · 권한 주는 관리자 ' + MGRS.length + '명');
     h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;' +
       'line-height:1.7;color:var(--ink-3)">' +
-      '<b style="color:var(--ink-2)">운행일지 관리자</b>는 전 직원의 운행·정산·증빙을 보고, ' +
-      '계기판을 고칠 수 있습니다.<br>' +
-      '바꿀 때마다 <b>본인 비밀번호</b>를 한 번 더 확인합니다 — 자리를 비운 사이 남이 ' +
-      '권한을 주는 일을 막기 위해서입니다.<br>' +
-      '<b style="color:var(--ink-2)">권한 주는 관리자</b>는 마스터 계정이 지정합니다. 이 화면에서 다른 직원을 관리자로 ' +
-      '지정·해제하고 비밀번호를 초기화할 수 있습니다(마스터 계정과 다른 권한 주는 관리자는 바꿀 수 없습니다).</div></section>';
+      '<b style="color:var(--ink-2)">운행일지 관리자</b>는 전 직원의 운행, 정산, 증빙을 보고 ' +
+      '계기판을 고칠 수 있어요.<br>' +
+      '자리를 비운 사이 다른 사람이 권한을 주지 못하도록, 바꿀 때마다 <b>본인 비밀번호</b>를 ' +
+      '한 번 더 확인해요.<br>' +
+      '<b style="color:var(--ink-2)">권한 주는 관리자</b>는 마스터 계정이 지정해요. 이 화면에서 다른 직원을 관리자로 ' +
+      '지정·해제하고 비밀번호를 초기화할 수 있어요. 마스터 계정이나 다른 ‘권한 주는 관리자’ 계정은 권한도 비밀번호도 바꿀 수 없어요.</div></section>';
     h += signupSect();
     // 찾기·거르기(2026-10-07) — 치는 즉시 표가 좁혀진다(다시 그리지 않고 줄만 감춤 → 한글 조합이 안 끊긴다).
     var roleOf = function (u) {
@@ -2605,8 +2622,8 @@
             return (fixed ? '<span class="dim kfix">' + fixed + '</span>' : '') + kmenu((x.name || u) + ' 님 작업', it);
           })() +
           '</td></tr>';
-      }).join('') + '<tr class="permnone" hidden><td colspan="6"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없습니다.</div>' +
-        '<div class="d">이름 두 글자, 아이디 일부, 「대전센터」 같은 소속으로도 찾을 수 있습니다.</div></div></td></tr>' +
+      }).join('') + '<tr class="permnone" hidden><td colspan="6"><div class="blank" style="padding:28px 0"><div class="t">찾는 직원이 없어요.</div>' +
+        '<div class="d">이름 두 글자, 아이디 일부, ‘대전센터’ 같은 소속으로도 찾을 수 있어요.</div></div></td></tr>' +
       '</tbody></table></div></div>');
     setTimeout(permFilter, 0);              // 그린 뒤 지금 찾기·거르기를 적용
     return h;
@@ -2721,22 +2738,22 @@
     if (kind === 'pw') {
       body += '<div class="frow"><label class="flab" for="rsNew">새 비밀번호</label><div class="fbody">' +
         '<input class="inp" type="text" id="rsNew" autocomplete="off" placeholder="4자 이상">' +
-        '<div class="fhint">본인에게 직접 알려 주셔야 합니다. ' +
-        '<b>앱과 웹이 같은 비밀번호</b>를 씁니다.</div></div></div>';
+        '<div class="fhint">본인에게 직접 알려 주세요. ' +
+        '<b>앱과 웹은 같은 비밀번호</b>를 써요.</div></div></div>';
     } else if (kind === 'mgr') {
       body += '<div class="anote">' + esc(nm) + ' 님을 <b>' +
-        (enabled ? '권한 주는 관리자로 지정' : '권한 주는 관리자에서 해제') + '</b>합니다.' +
-        (enabled ? ' 운행일지 관리자도 함께 켜지고, 「권한 관리」에서 다른 직원을 관리자로 지정·해제하고 비밀번호를 초기화할 수 있게 됩니다.'
-          : ' 운행일지 관리자 권한은 그대로 남습니다.') + '</div>';
+        (enabled ? '권한 주는 관리자로 지정' : '권한 주는 관리자에서 해제') + '</b>할까요?' +
+        (enabled ? ' 운행일지 관리자도 함께 켜지고, ‘권한 관리’에서 다른 직원을 관리자로 지정·해제하고 비밀번호를 초기화할 수 있게 돼요.'
+          : ' 운행일지 관리자 권한은 그대로 남아요.') + '</div>';
     } else {
       body += '<div class="anote">' + esc(nm) + ' 님을 <b>' +
-        (enabled ? '운행일지 관리자로 지정' : '관리자에서 해제') + '</b>합니다.' +
-        (enabled ? ' 전 직원의 운행·정산·증빙을 보게 되고 계기판을 고칠 수 있습니다.' : '') +
+        (enabled ? '운행일지 관리자로 지정' : '관리자에서 해제') + '</b>할까요?' +
+        (enabled ? ' 전 직원의 운행, 정산, 증빙을 보고 계기판을 고칠 수 있게 돼요.' : '') +
         '</div>';
     }
     body += '<div class="frow"><label class="flab" for="rsMine">본인 비밀번호</label><div class="fbody">' +
       mineUserField() + '<input class="inp" type="password" id="rsMine" autocomplete="current-password">' +
-      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호입니다.</div>' +
+      '<div class="fhint">지금 로그인한 <b>' + esc(myName()) + '</b> 계정의 비밀번호를 입력해 주세요.</div>' +
       '</div></div></div>';
     $('pBody').innerHTML = body;
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
@@ -2753,7 +2770,7 @@
     if (kind === 'admin' || kind === 'mgr') payload.enabled = enabled;
     else {
       var np = ($('rsNew') || {}).value || '';
-      if (np.length < 4) { toast('새 비밀번호는 4자 이상이어야 합니다.', true); return; }
+      if (np.length < 4) { toast('새 비밀번호는 4자 이상 입력해 주세요.', true); return; }
       payload.next = np;
     }
     var btn = $('btnPermGo'); btn.disabled = true; btn.textContent = '처리 중…';
@@ -2762,7 +2779,7 @@
       .then(function (res) {
         btn.disabled = false; btn.textContent = '확인';
         if (!res.ok || !res.j || !res.j.ok) {
-          toast((res.j && res.j.error) || '처리하지 못했습니다.', true); return;
+          toast((res.j && res.j.error) || '처리하지 못했어요.', true); return;
         }
         if (kind === 'admin' && USERS[target]) USERS[target].is_admin = enabled;
         if (kind === 'mgr') {
@@ -2771,10 +2788,10 @@
           ACCT.managers = ml;
         }
         closePanel(); render();
-        toast(res.j.message || '처리했습니다.');
+        toast(res.j.message || '처리했어요.');
       }).catch(function () {
         btn.disabled = false; btn.textContent = '확인';
-        toast('처리하지 못했습니다.', true);
+        toast('처리하지 못했어요.', true);
       });
   }
 
@@ -2790,9 +2807,9 @@
   function openDrvSet(target, on) {
     var nm = nameOf(target);
     openPanel(on ? '운전함으로 바꾸기' : '운전 안 함으로 바꾸기', nm + ' (' + target + ')',
-      '<div class="anote" style="margin-top:0">' + esc(nm) + ' 님을 <b>' + (on ? '업무용 차량을 운전하는 직원' : '운전하지 않는 직원') + '</b>으로 바꿉니다. ' +
-      (on ? '운행일지와 개인경비를 모두 쓰게 됩니다(앱은 다시 로그인하면 바뀝니다).'
-        : '운행일지 화면이 감춰지고 <b>개인경비 지출결의·결재함·내 계정</b>만 보입니다. 이미 있는 운행 기록은 지워지지 않습니다.') + '</div>',
+      '<div class="anote" style="margin-top:0">' + esc(nm) + ' 님을 <b>' + (on ? '업무용 차량을 운전하는 직원' : '운전하지 않는 직원') + '</b>으로 바꿀까요? ' +
+      (on ? '운행일지와 개인경비를 모두 쓰게 돼요. 앱은 다시 로그인하면 바뀌어요.'
+        : '운행일지 화면이 숨겨지고 <b>개인경비 지출결의, 결재함, 내 계정</b>만 보여요. 이미 있는 운행 기록은 지워지지 않아요.') + '</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnDrvSetGo" data-target="' + esc(target) + '" data-on="' + (on ? '1' : '0') + '">바꾸기</button>');
   }
@@ -2807,16 +2824,16 @@
       var code = typeof res.j === 'string' ? res.j : '';
       if (!res.ok || code !== 'ok') {
         if (btn) { btn.disabled = false; btn.textContent = '바꾸기'; }
-        toast(code === 'NOT_ALLOWED' ? '운행일지 관리자만 바꿀 수 있습니다.'
-          : code === 'BAD_TARGET' ? '그 계정을 찾지 못했습니다.'
-          : (res.j && (res.j.message || res.j.error)) || '바꾸지 못했습니다. 잠시 뒤 다시 해 보세요.', true); return;
+        toast(code === 'NOT_ALLOWED' ? '운행일지 관리자만 바꿀 수 있어요.'
+          : code === 'BAD_TARGET' ? '그 계정을 찾지 못했어요.'
+          : (res.j && (res.j.message || res.j.error)) || '바꾸지 못했어요. 잠시 후 다시 해 주세요.', true); return;
       }
       if (USERS[target]) USERS[target].uses_driving = !!on;
       closePanel(); render();
-      toast(nameOf(target) + ' 님을 ' + (on ? '「운전함」' : '「운전 안 함」') + '으로 바꿨습니다.');
+      toast(nameOf(target) + ' 님을 ' + (on ? '‘운전함’' : '‘운전 안 함’') + '으로 바꿨어요.');
     }).catch(function () {
       if (btn) { btn.disabled = false; btn.textContent = '바꾸기'; }
-      toast('바꾸지 못했습니다.', true);
+      toast('바꾸지 못했어요.', true);
     });
   }
 
@@ -2994,10 +3011,10 @@
        · 상신자 본인이 그 장이면 그 칸은 비운다(빗금).
        · 센터·파트 없이 팀 직속이면 센터·파트장 칸은 말없이 비운다(담당 → 팀장 → 사업부장).
        · 그 자리에 장이 없거나, 둘 이상이거나, 장에게 앱 계정이 없거나 조직도에서 내려가 있으면 비우고 까닭을 적는다
-         (「센터·파트장: 조직도에 직책이 없습니다 — 직접 골라 주세요」).
+         (「센터·파트장: 조직도에 직책이 없어요. 직접 골라 주세요.」).
      미리 채운 칸도 지금처럼 칸마다 바꾸거나 × 로 비울 수 있다 — 결재선의 정본은 여전히 상신자다. */
   /** 결재 카드(상신 전)의 안내 — 세 문서가 같은 글을 쓴다. */
-  var APPR_HINT = '결재선은 상신 창을 열면 조직도(센터·파트장 → 팀장 → 사업부장)로, 관리자가 지정해 두었으면 그 결재선으로 미리 채워집니다. 칸마다 바꾸거나 비울 수 있습니다.';
+  var APPR_HINT = '상신 창을 열면 관리자가 지정한 결재선이, 없으면 조직도의 센터·파트장, 팀장, 사업부장 순서로 미리 채워져요. 칸마다 바꾸거나 비울 수 있어요.';
   var AUTO_LEVELS = [
     { box: '센터·파트장', roles: ['센터장', '파트장'], key: 'unit' },
     { box: '팀장', roles: ['팀장'], key: 'team' },
@@ -3020,11 +3037,11 @@
       var heads = ORG.filter(function (o) { return lv.roles.indexOf(String(o.role || '').trim()) >= 0 && same(o, lv.key); });
       if (self && heads.some(function (o) { return o === self || (o.id != null && o.id === self.id) || (self.username && o.username === self.username); })) return;   // 본인이 장
       var on = heads.filter(function (o) { return o.active !== false; });
-      var note = function (why) { notes.push({ box: lv.box, why: why, t: lv.box + ': ' + why + ' — 직접 골라 주세요' }); };
-      if (!on.length) { note(heads.length ? '조직도에서 내려간 분뿐입니다(' + heads.map(function (o) { return o.name; }).join('·') + ')' : '조직도에 직책이 없습니다'); return; }
-      if (on.length > 1) { note('직책이 ' + on.length + '명입니다(' + on.map(function (o) { return o.name; }).join('·') + ')'); return; }
+      var note = function (why) { notes.push({ box: lv.box, why: why, t: lv.box + ': ' + why + '. 직접 골라 주세요.' }); };
+      if (!on.length) { note(heads.length ? '조직도에서 내려간 분뿐이에요(' + heads.map(function (o) { return o.name; }).join('·') + ')' : '조직도에 직책이 없어요'); return; }
+      if (on.length > 1) { note('직책이 ' + on.length + '명이에요(' + on.map(function (o) { return o.name; }).join('·') + ')'); return; }
       var h = on[0];
-      if (!h.username || !canApprove(h.username)) { note(h.name + ' 님은 앱 계정이 없습니다'); return; }
+      if (!h.username || !canApprove(h.username)) { note(h.name + ' 님은 앱 계정이 없어요'); return; }
       steps.push({ approver: h.username, box: lv.box });
     });
     return { steps: steps, notes: notes };
@@ -3032,7 +3049,7 @@
   /** 이 계정 사람의 자동 결재선. 조직도에 없으면 steps 없이 까닭 하나. */
   function autoLine(u) {
     var me = orgOf(u);
-    if (!me) return { steps: [], notes: [{ box: '', why: '조직도에 없습니다', t: '조직도에 없어 결재선을 미리 채우지 못했습니다 — 직접 골라 주세요' }] };
+    if (!me) return { steps: [], notes: [{ box: '', why: '조직도에 없어요', t: '조직도에 없어 결재선을 미리 채우지 못했어요. 직접 골라 주세요.' }] };
     return lineAt({ division: me.division || '', team: me.team || '', unit: me.unit || '' }, me);
   }
 
@@ -3089,10 +3106,10 @@
       if (self && v === self) return;                                 // 본인 칸은 비움(자동과 같은 규칙)
       if (canApprove(v)) { steps.push({ approver: v, box: b }); return; }
       // 지정한 분이 지금 결재할 수 없다 — 그 칸만 자동으로. keep = 칸이 채워져도 상신 창에 까닭을 남긴다.
-      var why = '관리자가 지정한 ' + nameOf(v) + ' 님은 지금 결재할 수 없습니다';
-      if (a) { steps.push(a); notes.push({ box: b, keep: true, why: why, t: b + ': ' + why + ' — 조직도로 채웠습니다' }); }
-      else if (an.length) notes = notes.concat(an.map(function (n) { return { box: b, why: why + ' · ' + n.why, t: b + ': ' + why + ' · ' + n.why + ' — 직접 골라 주세요' }; }));
-      else notes.push({ box: b, why: why, t: b + ': ' + why + ' — 직접 골라 주세요' });
+      var why = '관리자가 지정한 ' + nameOf(v) + ' 님은 지금 결재할 수 없어요';
+      if (a) { steps.push(a); notes.push({ box: b, keep: true, why: why, t: b + ': ' + why + '. 조직도로 채웠어요.' }); }
+      else if (an.length) notes = notes.concat(an.map(function (n) { return { box: b, why: why + '. ' + n.why, t: b + ': ' + why + '. ' + n.why + '. 직접 골라 주세요.' }; }));
+      else notes.push({ box: b, why: why, t: b + ': ' + why + '. 직접 골라 주세요.' });
     });
     // 칸 없는 까닭(조직도에 없음)은 자동 칸이 하나라도 남을 때만
     if (anyAuto) al.notes.forEach(function (n) { if (!n.box) notes.push(n); });
@@ -3226,11 +3243,12 @@
   }
 
   function apprStatusText(a) {
-    if (!a) return { t: '아직 상신하지 않았습니다', cls: '' };
+    if (!a) return { t: '아직 상신하지 않았어요', cls: '' };
     if (a.status === 'approved') return { t: '결재 완료', cls: 'ok' };
     if (a.status === 'rejected' && reopenInfo(a)) {
       var ro = reopenInfo(a);
-      return { t: '정정 중 — 관리자(' + nameOf(ro.reopened_by) + ')' + (ro.reopen_reason ? ' · ' + ro.reopen_reason : '') + ' — 고친 뒤 다시 상신하세요', cls: 'bad' };
+      // 사유가 마침표로 끝나면 「..」이 되지 않게 사유 끝 부호를 떼고 잇는다(2026-10-24 검수)
+      return { t: '정정 중 · 관리자(' + nameOf(ro.reopened_by) + ')' + (ro.reopen_reason ? ' · ' + String(ro.reopen_reason).trim().replace(/[.\s]+$/, '') : '') + '. 고친 뒤 다시 상신하세요.', cls: 'bad' };
     }
     if (a.status === 'rejected') {
       var r = (a.steps || []).filter(function (s) { return s.result === 'rejected'; })[0];
@@ -3238,14 +3256,14 @@
       var who = r && r.forced_by ? '관리자(' + nameOf(r.forced_by) + ')' : ((r && r.name) || '');
       // 승인했다가 취소하고 반려한 칸(2026-10-19)은 「승인 취소」를 붙인다 — 반려와 같은 띠·같은 다시 상신
       if (r && r.recalled && !r.forced_by) who += '(승인 취소)';
-      return { t: '반려 — ' + who + (r && r.comment ? ' · ' + r.comment : ''), cls: 'bad' };
+      return { t: '반려 · ' + who + (r && r.comment ? ' · ' + r.comment : ''), cls: 'bad' };
     }
-    // 상신한 본인에게는 「회수했습니다」, 결재하는 분에게는 「회수됨」(결재자가 회수한 것처럼 읽혔다 — 2026-10-15)
-    if (a.status === 'withdrawn') return { t: a.username === myName() ? '회수했습니다' : '회수됨', cls: '' };
+    // 상신한 본인에게는 「회수했어요」, 결재하는 분에게는 「회수됨」(결재자가 회수한 것처럼 읽혔다 — 2026-10-15)
+    if (a.status === 'withdrawn') return { t: a.username === myName() ? '회수했어요' : '회수됨', cls: '' };
     var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0];
     if (!cur) return { t: '결재 중', cls: 'warn' };
     // 내 차례면 3인칭으로 부르지 않는다. 눌러야 할 사람에게 눌러야 한다고 말해야 한다.
-    if (cur.approver === myName()) return { t: '내 차례입니다', cls: 'bad' };
+    if (cur.approver === myName()) return { t: '내 차례예요', cls: 'bad' };
     return { t: (cur.name || cur.approver) + ' 님 결재 중', cls: 'warn' };
   }
 
@@ -3304,10 +3322,10 @@
   function openSubmit(kind) {
     SUB_KIND = kindDef(kind) ? kind : '';
     APPR_SWAP = false;
-    if (isMulti()) { toast('상신은 한 기간씩 합니다. 위에서 기간을 하나 골라 주세요.', true); return; }
+    if (isMulti()) { toast('상신은 한 기간씩 해요. 기간을 하나 골라 주세요.', true); return; }
     var a = SUB_KIND ? kindDef(SUB_KIND).mine(CYCKEY()) : myAppr();
     if (a && (a.status === 'submitted' || a.status === 'approved')) {
-      toast(a.status === 'approved' ? '이미 결재가 끝났습니다.' : '이미 상신했습니다.', true); return;
+      toast(a.status === 'approved' ? '이미 결재가 끝났어요.' : '이미 상신했어요.', true); return;
     }
     // 미리 채우는 차례(2026-10-14 사용자 결정):
     //   ① 이 기간에 넣다 만 결재선(창을 닫거나 「검증 결과 보기」로 나갔다 와도 다시 넣지 않게 — 다 비운 것도 그대로)
@@ -3405,8 +3423,8 @@
     var list;
     if (!all.length) {
       list = '<div class="acnone">' +
-        (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.' : '이 자리에는 결재자로 넣을 분이 없습니다.') +
-        '<br><span style="font-size:12px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 나옵니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
+        (APPR_Q.trim() ? '‘' + esc(APPR_Q.trim()) + '’ 검색 결과가 없어요.' : '이 자리에는 결재자로 넣을 분이 없어요.') +
+        '<br><span style="font-size:12px">조직도에 올라 있고 앱 계정이 연결된 분만 결재자로 나와요. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
     } else {
       var lastG = null;
       list = all.map(function (u, i) {
@@ -3457,7 +3475,7 @@
   function addApprover(u) {
     if (!u) return;
     var box = APPR_BOX || nextEmptyBox(APPR_BOXES[0]);
-    if (!box) { toast('칸이 다 찼습니다. 바꿀 칸의 × 를 눌러 비운 뒤 넣어 주세요.', true); return; }
+    if (!box) { toast('칸이 다 찼어요. 바꿀 칸의 ×를 눌러 비운 뒤 넣어 주세요.', true); return; }
     // 같은 분이 다른 칸에 있어도 그대로 둔다(한 분이 여러 칸을 맡을 수 있다). 이 칸에 있던 분만 바꾼다.
     DRAFT = DRAFT.filter(function (s) { return s.box !== box; });
     DRAFT.push({ approver: u, box: box });
@@ -3515,25 +3533,25 @@
     });
     // 대표이사 — 고르지 않는 칸. 사업부장이 올린 문서만 출력한 종이에 대표이사가 손으로 서명하는 빈칸, 나머지는 빗금.
     h += isDivHead(myName())
-      ? '<div class="ag-cell hand" title="출력한 문서에 대표이사가 손으로 서명하는 칸입니다"><div class="ag-h">대표이사</div>' +
+      ? '<div class="ag-cell hand" title="출력한 문서에 대표이사가 손으로 서명하는 칸이에요"><div class="ag-h">대표이사</div>' +
         '<div class="ag-b"><small>수기 서명</small></div></div>'
-      : '<div class="ag-cell hand slash" title="전자 결재는 사업부장에서 끝납니다"><div class="ag-h">대표이사</div><div class="ag-b"></div></div>';
+      : '<div class="ag-cell hand slash" title="전자 결재는 사업부장에서 끝나요"><div class="ag-h">대표이사</div><div class="ag-b"></div></div>';
     h += '</div>';
     // 결재 순서 — 채워진 칸을 왼쪽부터.
     h += '<div class="ag-order">' + (DRAFT.length
       ? '결재 순서: ' + DRAFT.map(function (s, i) { return (i + 1) + '. ' + esc(stepText(s)); }).join(' → ')
-      : '아직 넣은 분이 없습니다. 결재받을 칸을 누르고 이름을 넣어 주세요.') + '</div>';
+      : '아직 넣은 분이 없어요. 결재받을 칸을 누르고 이름을 넣어 주세요.') + '</div>';
     // 미리 채운 출처 + 비운 칸의 까닭(그 칸을 아직 비워 둔 동안만) — 2026-10-14
     var fs = FILL_SRC[draftKey()];
     if (fs) {
       // keep = 관리자가 지정한 분을 못 써서 자동으로 채운 칸 — 채워져 있어도 까닭을 남긴다(2026-10-14)
       var left = (fs.notes || []).filter(function (n) { return !n.box || n.keep || !draftAt(n.box); });
       h += '<div class="ag-fill" data-fill="' + esc(fs.src) + '">' + (fs.src === 'prev'
-        ? '이번 기간에 반려·회수된 결재선을 불러왔습니다.'
-        : fs.src === 'last' ? '지난번 결재선을 불러왔습니다.'
-        : fs.src === 'admin' ? '관리자가 지정한 결재선을 불러왔습니다' + (fs.part ? '(지정하지 않은 칸은 조직도로 채움).' : '.')
-          : '조직도에서 결재선을 미리 채웠습니다(센터·파트장 → 팀장 → 사업부장).') +
-        (fs.edited ? ' 그 뒤 직접 바꾼 칸이 있습니다.' : ' 칸마다 바꾸거나 × 로 비울 수 있습니다.') + '</div>' +   // 직접 고친 뒤에도 「미리 채웠습니다」만 남아 헷갈렸다(2026-10-15)
+        ? '이번 기간에 반려·회수된 결재선을 불러왔어요.'
+        : fs.src === 'last' ? '지난번 결재선을 불러왔어요.'
+        : fs.src === 'admin' ? '관리자가 지정한 결재선을 불러왔어요.' + (fs.part ? ' 지정하지 않은 칸은 조직도로 채웠어요.' : '')
+          : '조직도의 센터·파트장, 팀장, 사업부장 순서로 결재선을 미리 채웠어요.') +
+        (fs.edited ? ' 그 뒤 직접 바꾼 칸이 있어요.' : ' 칸마다 바꾸거나 ×로 비울 수 있어요.') + '</div>' +   // 직접 고친 뒤에도 「미리 채웠습니다」만 남아 헷갈렸다(2026-10-15)
         (left.length ? '<div class="ag-notes">' + left.map(function (n) {
           return '<div data-agnote="' + esc(n.box) + '">' + ic('alert', 13) + '<span>' + esc(n.t) + '</span></div>';
         }).join('') + '</div>' : '');
@@ -3545,8 +3563,8 @@
       //   할 짓이 아니다. 이름을 두어 글자만 쳐도 좁혀지게 바꿨다.
       //   부서·직급으로도 찾힌다("광역", "팀장").
       h += '<div class="aadd">' +
-        '<input id="apprQ" autocomplete="off" aria-label="' + esc(APPR_BOX) + ' 칸에 넣을 분 찾기" placeholder="「' + esc(APPR_BOX) +
-        '」 칸에 넣을 분 — 이름을 쓰거나 아래 조직도에서 고르세요" value="' + esc(APPR_Q) + '">' +
+        '<input id="apprQ" autocomplete="off" aria-label="' + esc(APPR_BOX) + ' 칸에 넣을 분 찾기" placeholder="' + esc(APPR_BOX) +
+        ' 칸에 넣을 분의 이름을 쓰거나 조직도에서 고르세요" value="' + esc(APPR_Q) + '">' +
         '<div class="acand" id="apprCand">' + apprCandHtml() + '</div></div>';
     }
 
@@ -3559,9 +3577,9 @@
       h += '<div style="margin-top:10px"><button class="btn sm" id="btnPrevLine">' + ic('list', 13) + '<span>' + nw('지난번 결재선 불러오기 —') + ' ' +
         prev.map(function (s) { return nw(stepText(s)); }).join(' → ') + '</span></button></div>';
     }
-    h += '<div class="anote" style="margin-top:10px">결재받을 <b>칸을 누르고 이름</b>을 넣으세요. <b>비워 둔 칸은 빗금(/)</b>으로 찍히고 건너뜁니다. ' +
-      '결재는 왼쪽 칸부터 차례로 진행되고 <b>사업부장에서 끝납니다</b>' +
-      (isDivHead(myName()) ? '. 「대표이사」 칸은 출력한 문서에 대표이사가 손으로 서명하는 빈칸입니다.</div>' : '(대표이사 칸은 빗금).</div>');
+    h += '<div class="anote" style="margin-top:10px">결재받을 <b>칸을 누르고 이름</b>을 넣으세요. <b>비워 둔 칸은 빗금(/)</b>으로 찍히고 건너뛰어요. ' +
+      '결재는 왼쪽 칸부터 진행되고 <b>사업부장에서 끝나요</b>' +
+      (isDivHead(myName()) ? '. 대표이사 칸은 출력한 문서에 대표이사가 손으로 서명해요.</div>' : '. 대표이사 칸도 빗금이에요.</div>');
 
     // 상신 의견(선택, 2026-10-21 사용자) — 결재 창의 「의견」 칸과 같은 모양. 보낸 글은 서버가 이 상신의 요약(snapshot.note)에 굳히고
     //   결재선 모두가 결재함에서 본다. 결재선을 고쳐 창을 다시 그려도 적던 글은 그대로(SUB_NOTE). 다시 상신이면 그때 의견을 불러와 채운다.
@@ -3573,31 +3591,30 @@
       SUB_NOTE[nk] = nprev; SUB_NOTE_PREV[nk] = !!nprev;
     }
     h += '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="subNote">의견</label><div class="fbody">' +
-      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재하는 분께 남길 말(선택) — 예: 9/30 통행료 두 장은 왕복입니다">' +
+      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재자에게 남길 말(선택). 예: 9/30 통행료 두 장은 왕복이에요">' +
       esc(SUB_NOTE[nk]) + '</textarea>' +
-      '<div class="fhint">' + (SUB_NOTE_PREV[nk] ? '지난번 상신 때 남긴 의견을 불러왔습니다 — 고치거나 지울 수 있습니다. ' : '') +
-      '결재선 모두가 결재함에서 봅니다(300자까지).</div></div></div>';
+      '<div class="fhint">' + (SUB_NOTE_PREV[nk] ? '지난번 상신 때 남긴 의견을 불러왔어요. 고치거나 지울 수 있어요. ' : '') +
+      '결재선의 모든 결재자가 결재함에서 봐요(300자까지).</div></div></div>';
 
     var warn = [];
     if (KD) warn = KH.warn || [];
     else {
-    if (T.unk) warn.push('통행료 미확정 ' + n0(T.unk) + '건이 0원으로 올라갑니다');
+    if (T.unk) warn.push('통행료 미확정 ' + n0(T.unk) + '건은 0원으로 정산돼요.');
     // ★ 상신은 **내 운행**을 올리는 것이다. audit() 는 지금 화면 범위(관리자면 전 직원)를 봐서,
     //   '전체 마감 현황 → 내 것 결재 상신' 에서 회사 전체 건수가 경고로 떴다(2026-09-23 검증로봇).
     //   합계를 본인 것으로 고친 것(paintPills)과 같은 규칙.
     var mineU = myName();
     var A = auditOf(ALL_TRIPS.filter(function (t) { return t.username === mineU; }))
       .filter(function (f) { return f.sev === 'bad' && f.n > 0; });
-    if (A.length) warn.push('점검에서 ' + A.reduce(function (s, f) { return s + f.n; }, 0) + '건이 걸려 있습니다');
+    if (A.length) warn.push('점검에서 걸린 기록이 ' + A.reduce(function (s, f) { return s + f.n; }, 0) + '건 있어요.');
     }
     if (warn.length) {
-      h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(warn.join(' · ')) + '</span></div>';
+      h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(warn.map(endDot).join(' ')) + '</span></div>';
     }
-    h += '<div class="anote">상신하면 <b>지금 자료가 그대로 저장</b>되고, 결재자는 그 자료를 봅니다. ' +
+    h += '<div class="anote"><b>지금 자료로 결재가 진행</b>돼요. 상신한 뒤에 이 기간의 ' +
       // 종류마다 무엇이 잠기는지(lockNoun, 조사까지) — 없으면 예전 그대로 「경비를」(개인경비 글자 그대로). 법인카드 「카드 내역을」.
-      (KD ? '상신 뒤에는 이 기간의 ' + esc(KD.lockNoun || '경비를') + ' <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. '
-        : '상신 뒤에는 이 기간의 운행·영수증을 <b>고칠 수 없습니다</b> — 고치려면 「회수」하세요. ') +
-      '상신을 누르면 먼저 검증을 돌리고, 맞지 않는 곳이 있으면 올리기 전에 한 번 보여 드립니다.</div>';
+      (KD ? esc(KD.lockNoun || '경비를') : '운행·영수증을') + ' 고치려면 <b>먼저 회수해야 해요</b>. ' +
+      '상신을 누르면 먼저 검증하고, 맞지 않는 곳이 있으면 올리기 전에 알려 드려요.</div>';
 
     $('pBody').innerHTML = h;
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
@@ -3612,7 +3629,7 @@
     var e = j.error == null ? '' : String(j.error), m = j.message == null ? '' : String(j.message);
     var t = /^[A-Z][A-Z0-9_]+$/.test(e) && m ? m : (e || m);
     // 서버가 영어 기본 글만 주면(「Internal Server Error」 등) 우리말로 — 상신 500 이 영어로 떴다(2026-10-20 V3 U7). 상태 번호는 괄호에.
-    if (t && !/[가-힣]/.test(t)) t = '서버에서 처리하지 못했습니다' + (status ? '(오류 ' + status + ')' : '') + '. 잠시 뒤 다시 해 주세요.';
+    if (t && !/[가-힣]/.test(t)) t = '서버에서 처리하지 못했어요' + (status ? '(오류 ' + status + ')' : '') + '. 잠시 후 다시 해 주세요.';
     return t;
   }
   /** 낡은 결재 화면(409 STALE, 2026-10-20 서버·웹 약속) — 서버 문구를 띄우고 창을 닫은 뒤 그 종류의 결재 목록을 새로 받아 다시 그린다.
@@ -3631,14 +3648,14 @@
     // 알림 — 결재함은 이미 새로 읽었다(예전 서버 글 「새로 고쳐 다시 열어 주세요」는 실제와 달랐다, 2026-10-20 V3 U6) · 바뀐 금액 · 맡아 둔 사유
     var say = function (fresh) {
       var a1 = fresh ? apprFind(+payload.id, (payload && payload.kind) || '') : null, c1 = a1 && a1.snapshot ? a1.snapshot.cost : null;
-      var amt = c0 != null && c1 != null ? (Number(c0) !== Number(c1) ? '(금액 ' + won(c0) + ' → ' + won(c1) + ')' : '(금액은 그대로 ' + won(c1) + ')') : '';
-      toast('그 사이 문서가 바뀌었습니다' + amt + (fresh ? ' — 결재함을 새로 읽었습니다. 카드를 다시 열어 확인한 뒤 결재해 주세요.' : ' — 결재함을 다시 불러옵니다.') +
-        (why ? ' 적던 사유는 다시 열면 그대로 있습니다.' : ''), true);
+      var amt = c0 != null && c1 != null ? (Number(c0) !== Number(c1) ? '(전 금액 ' + won(c0) + ' · 새 금액 ' + won(c1) + ')' : '(금액은 그대로 ' + won(c1) + ')') : '';
+      toast('그 사이 문서가 바뀌었어요' + amt + (fresh ? '. 결재함을 새로 불러왔으니 카드를 다시 열어 확인한 뒤 결재해 주세요.' : '. 결재함을 다시 불러올게요.') +
+        (why ? ' 적던 사유는 다시 열면 그대로 있어요.' : ''), true);
     };
     (kd ? Promise.resolve(kd.reload ? kd.reload() : null)
       : fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc').then(function (rows) { APPR = rows || []; }))
       .then(function () { paintPills(); render(); say(true); }, function (e) {
-        if (e && e.authGone) { toast('로그인이 만료되었습니다. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return; }
+        if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return; }
         say(false);
         loadAll();
       });
@@ -3651,7 +3668,7 @@
     var manyQ = Object.keys(qs).length > 1, many = ch.length > 1;
     return ch.slice(0, 4).map(function (c) {
       var q = String(c.quarter == null ? '' : c.quarter).split('-');
-      return (manyQ && q.length === 2 ? q[1] + '분기 ' : '') + (many && c.region ? c.region + ' ' : '') + n0(c.from) + ' → ' + n0(c.to) + '원';
+      return (manyQ && q.length === 2 ? q[1] + '분기 ' : '') + (many && c.region ? c.region + ' ' : '') + n0(c.from) + '원에서 ' + n0(c.to) + '원으로';
     }).join(' · ') + (ch.length > 4 ? ' 외 ' + n0(ch.length - 4) + '곳' : '');
   }
   /** 상신 뒤 유류단가가 바뀌었다(409 RATE_CHANGED, 2026-10-20 서버·웹 약속 — 운행일지 승인) — 승인 창 아랫줄에서 묻는다:
@@ -3664,9 +3681,9 @@
     if (!go || !$('panel').classList.contains('open') || go.dataset.act !== 'approve' || +go.dataset.id !== +payload.id ||
       (go.dataset.kind || '') !== (payload.kind || '')) return false;
     var what = rateChangeText(j.changes);
-    var head = endDot(String(j.message || '상신 뒤 유류단가가 바뀌었습니다').replace(/[.\s]+$/, '') + (what ? '(' + what + ')' : ''));
+    var head = endDot(String(j.message || '상신 뒤 유류단가가 바뀌었어요').replace(/[.\s]+$/, '') + (what ? '(' + what + ')' : ''));
     RATE_ASK = { payload: payload, okMsg: okMsg, head: head };
-    $('pFoot').innerHTML = '<span class="st subwarn warn" data-rateask>' + esc(head) + '<br>이대로 승인하면 옛 단가로 정산됩니다.</span>' +
+    $('pFoot').innerHTML = '<span class="st subwarn warn" data-rateask>' + esc(head) + '<br>이대로 승인하면 옛 단가로 정산돼요.</span>' +
       '<button class="btn" id="btnRateReject">반려하기</button>' +
       '<button class="btn pri" id="btnRateGo">그래도 승인</button>';
     var b = $('btnRateGo'); if (b) { try { b.focus(); } catch (e) { } }
@@ -3676,7 +3693,7 @@
     var fel = fd ? document.querySelector('#pFoot [data-rateask]') : null;
     if (fel) {
       fel.setAttribute('data-ratediff', String(fd));
-      fel.innerHTML = esc(head) + '<br>이대로 승인하면 옛 단가로 정산됩니다 — 새 단가로 셈하면 유류비가 ' + won(Math.abs(fd)) + ' ' + (fd < 0 ? '적습니다' : '많습니다') + '.';
+      fel.innerHTML = esc(head) + '<br>이대로 승인하면 옛 단가로 정산돼요. 새 단가로 계산하면 유류비가 ' + won(Math.abs(fd)) + ' ' + (fd < 0 ? '적어요' : '많아요') + '.';
     }
     return true;
   }
@@ -3691,7 +3708,7 @@
           // 상신 뒤 유류단가가 바뀜 — 이대로 승인할지 반려할지 승인 창에서 묻는다
           if (ej.error === 'RATE_CHANGED' && payload && payload.action === 'approve' && !payload.ack_rate_change &&
             apprRateAsk(payload, okMsg, ej)) return 'ask';
-          toast(apiErrText(ej, res.st) || '처리하지 못했습니다.', true); return false;
+          toast(apiErrText(ej, res.st) || '처리하지 못했어요.', true); return false;
         }
         // 방금 결재한 건(승인·반려·승인 취소)은 결재함 「그 밖의 건」 기간 거르기와 상관없이 보이게 — 9월분을 10월분 화면에서
         //   승인하면 카드가 사라져 「승인 취소·반려」를 못 찾았다(2026-10-19 로봇)
@@ -3701,9 +3718,9 @@
         if (payload && payload.id) Object.keys(APPR_KEEP).forEach(function (x) { if (x.indexOf((payload.kind || 'd') + ':' + payload.id + ':') === 0) delete APPR_KEEP[x]; });
         if (acted) inboxNextMark(payload);    // 결재함 내 차례에서 승인·반려했으면 다음 문서를 바로 연다(2026-10-20 D2)
         var midOk = payload && payload.action === 'approve' && res.j.row && res.j.row.status === 'submitted';
-        toastOk(endDot(res.j.message || okMsg || '처리했습니다.') +
-          (midOk ? ' 다음 분이 결재하기 전까지는 아래 「그 밖의 건」에서 승인을 취소할 수 있습니다.' : '') +
-          (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) : ''), res.j.warning);
+        toastOk(endDot(res.j.message || okMsg || '처리했어요.') +
+          (midOk ? ' 다음 결재자가 결재하기 전까지는 ‘그 밖의 건’에서 승인을 취소할 수 있어요.' : '') +
+          (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) + '.' : ''), res.j.warning);
         closePanel();
         TRIP_CACHE = {};                   // 잠금 상태가 바뀌었다 — 다른 주기 캐시도 믿지 않는다
         // 개인경비 결재 건이면 그 모듈이 자기 결재 목록을 다시 받는다.
@@ -3711,17 +3728,17 @@
         if (kd) {
           return Promise.resolve(kd.reload ? kd.reload() : null)
             .then(function () { paintPills(); render(); return true; })
-            .catch(function () { toast('처리는 됐습니다. 목록을 다시 불러옵니다.'); loadAll(); return true; });
+            .catch(function () { toast('처리는 됐어요. 목록을 다시 불러올게요.'); loadAll(); return true; });
         }
         // 처리는 이미 끝났다. 뒤이은 목록 재조회가 실패해도 '연결 실패' 로 오인시키지 않는다 —
         // 그러면 사용자가 상신을 다시 눌러 헷갈린다. 전체를 다시 불러오게 한다.
         return fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc')
           .then(function (rows) { APPR = rows || []; paintPills(); render(); return true; })
           .catch(function (e) {
-            if (e && e.authGone) { toast('로그인이 만료되었습니다. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return true; }
-            toast('처리는 됐습니다. 목록을 다시 불러옵니다.'); loadAll(); return true;
+            if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return true; }
+            toast('처리는 됐어요. 목록을 다시 불러올게요.'); loadAll(); return true;
           });
-      }).catch(function () { toast('서버에 연결하지 못했습니다.', true); return false; });
+      }).catch(function () { toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true); return false; });
   }
 
   /**
@@ -3730,7 +3747,7 @@
    */
   function openApprAct(act, id, kind) {
     var a = apprFind(id, kind), kd = kindDef(kind);
-    if (!a) { toast('결재 건을 찾지 못했습니다. 새로고침해 주세요.', true); return; }
+    if (!a) { toast('결재 건을 찾지 못했어요. 새로고침해 주세요.', true); return; }
     var s = a.snapshot || {};
     var cname = keyName(a.cycle, a.cycle);
     if (kd && kd.cycName) cname = kd.cycName(a);
@@ -3744,7 +3761,7 @@
         // 금액 규칙 v3(version 3) — 운행 없는 날의 영수증은 정산에서 뺐다
         (Number(s.no_trip_n) > 0 ? kv('제외', '<span class="st warn">운행 없는 영수증 ' + n0(s.no_trip_n) + '장 ' + won(s.no_trip_amt || 0) + ' 정산 제외</span>') : '') +
         kv('합계', '<b style="font-size:15px">' + won(s.cost) + '</b>') +
-        ((s.rate_miss || []).length ? kv('주의', '<span class="st bad">유류단가 미등록 — 기본 단가 159원/km 로 계산</span>') : '')
+        ((s.rate_miss || []).length ? kv('주의', '<span class="st bad">유류단가 미등록 · 기본 단가 159원/km로 계산</span>') : '')
       : '';
     APPR_BACK = null; RATE_ASK = null;
     // 결재 중인 건은 아래 결재 요약(청구 금액·운행·검증)이 같은 숫자를 또 보여 준다 — 위 줄은 뺀다(2026-10-16 3차: 운행·유류비·합계가 두 번).
@@ -3765,9 +3782,9 @@
     var rcNext = act === 'recall_reject' ? (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0] : null;
     var body = '';
     if (act === 'withdraw') {
-      body = '<div class="anote" style="margin-top:0">상신을 회수합니다. 결재선은 그대로 남고, <b>' +
-        (kd ? (kd.withdrawText || '이 기간의 경비를 다시 고칠 수 있게') : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 됩니다. ' +
-        '고친 뒤 다시 상신하면 그때의 자료로 새로 고정됩니다.</div>' + apprTrack(a);
+      body = '<div class="anote" style="margin-top:0">상신을 회수할까요? 결재선은 그대로 남고, <b>' +
+        (kd ? (kd.withdrawText || '이 기간의 경비를 다시 고칠 수 있게') : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 돼요. ' +
+        '고친 뒤 다시 상신하면 그때 자료로 결재가 진행돼요.</div>' + apprTrack(a);
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
         // 지금까지의 의견(담당 상신 의견 → 앞 결재자 승인 의견) — 「의견」 칸 바로 위(2026-10-21)
@@ -3775,25 +3792,25 @@
         '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="apprWhy">' +
         (act === 'approve' ? '의견' : act === 'reopen' ? '정정 사유' : '반려 사유') + '</label><div class="fbody">' +
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
-        (act === 'approve' ? '선택 — 남기면 상신자가 볼 수 있습니다.' : '무엇을 고쳐야 하는지 적어 주세요. 상신자에게 그대로 전달됩니다.') +
+        (act === 'approve' ? '남기면 상신자가 볼 수 있어요(선택).' : '무엇을 고쳐야 하는지 적어 주세요. 상신자에게 그대로 전달돼요.') +
         // 그 사이 문서가 바뀌어(STALE) 창이 닫혔을 때 적던 사유 — 다시 열면 그대로 채운다(2026-10-20 V3 B8)
         '">' + esc(APPR_KEEP[(kind || 'd') + ':' + a.id + ':' + act] || '') + '</textarea>' +
-        (APPR_KEEP[(kind || 'd') + ':' + a.id + ':' + act] ? '<div class="fhint" data-whykept>적던 사유를 다시 채웠습니다 — 바뀐 문서를 확인한 뒤 보내 주세요.</div>' : '') +
+        (APPR_KEEP[(kind || 'd') + ':' + a.id + ':' + act] ? '<div class="fhint" data-whykept>적던 사유를 다시 채웠어요. 바뀐 문서를 확인한 뒤 보내 주세요.</div>' : '') +
         '</div></div>' +
         '<div class="anote">' + (act === 'recall_reject'
-          ? '<b>승인을 취소하고 반려합니다 — 상신한 분에게 돌아갑니다.</b> 결재란 내 칸의 이름·날짜(승인 도장)는 지워지고, 이 문서는 「반려」로 바뀝니다. ' +
-            (rcNext ? '다음 결재자 ' + esc(stepWho(rcNext) || rcNext.approver) + ' 님은 결재하지 않아도 됩니다. ' : '') +
-            '상신한 분이 고쳐서 다시 상신하면 결재선을 처음부터 다시 탑니다.'
+          ? '<b>승인을 취소하고 상신자에게 반려해요.</b> 결재란의 내 이름과 날짜가 지워지고 문서는 반려 상태가 돼요. ' +
+            (rcNext ? '다음 결재자 ' + esc(stepWho(rcNext) || rcNext.approver) + ' 님은 결재하지 않아도 돼요. ' : '') +
+            '상신자가 고쳐서 다시 상신하면 결재선을 처음부터 다시 거쳐요.'
           : act === 'approve'
-          ? '승인하면 결재란에 <b>이름과 날짜</b>가 찍힙니다. 위 금액과 검증 결과는 <b>상신 때 저장된 값</b>입니다. ' +
-            '마지막 결재자가 승인하면 결재 완료본을 받을 수 있습니다.'
+          ? '승인하면 결재란에 <b>이름과 날짜</b>가 찍혀요. 위 금액과 검증 결과는 <b>상신할 때의 값</b>이에요. ' +
+            '마지막 결재자가 승인하면 결재 완료 문서를 다운로드할 수 있어요.'
           : act === 'reopen'
-            ? '결재가 끝난 건을 <b>정정하도록 다시 엽니다</b>. 잠금이 풀려 상신자가 고친 뒤 다시 상신하고, 결재선을 처음부터 다시 탑니다. ' +
-              '지금의 결재 완료본(결재선·금액·문서)은 <b>이력에 그대로 남습니다</b>. 누가 왜 열었는지도 기록됩니다.'
+            ? '결재가 끝난 건을 <b>정정할 수 있게 다시 열어요</b>. 상신자가 고친 뒤 다시 상신하면 결재선을 처음부터 다시 거쳐요. ' +
+              '지금의 결재 완료 문서와 결재선, 금액은 <b>이력에 그대로 남고</b>, 누가 왜 열었는지도 기록돼요.'
           : act === 'force_reject'
-            ? '결재자가 자리에 없어 결재가 멈췄을 때 쓰는 <b>관리자 권한 반려</b>입니다. 승인을 대신할 수는 없습니다. ' +
-              '반려하면 이 기간의 잠금이 풀려 상신자가 고쳐서 다시 상신할 수 있고, 누가 반려했는지 기록에 남습니다.'
-            : '반려하면 상신자가 자료를 고쳐 다시 상신할 수 있습니다.') + '</div>';
+            ? '결재자가 자리에 없어 결재가 멈췄을 때 쓰는 <b>관리자 권한 반려</b>예요. 승인은 대신할 수 없어요. ' +
+              '반려하면 상신자가 고쳐서 다시 상신할 수 있고, 누가 반려했는지 기록에 남아요.'
+            : '반려하면 상신자가 자료를 고쳐 다시 상신할 수 있어요.') + '</div>';
     }
     if (act === 'approve' || act === 'reject') body += inboxNextHint(id, kind);   // 「다음 문서가 바로 열립니다」(2026-10-20 D2, 결재함에서 연 창만)
     openPanel(nameOf(a.username) + ' · ' + (kd ? kd.tag + ' ' : '') + title, cname,
@@ -3858,7 +3875,7 @@
     //   빨간 「승인」(맨 앞 카드 하나)이 화면에 하나다(2026-10-20 V3 다듬기)
     [mine, SP.ndMine].forEach(function (l) { turnOrder(l).forEach(function (k) { if (INBOX_ORDER.indexOf(k) < 0) INBOX_ORDER.push(k); }); });
     var h = head(SP.split ? MODE_NAME[SP.mode] + ' 결재함' : '결재함',
-      nTurn ? '내 차례 ' + nTurn + '건' : '내 차례인 건이 없습니다');
+      nTurn ? '내 차례 ' + nTurn + '건' : '내 차례인 건이 없어요');
     // 다른 갈래로 가는 줄 — 갈래마다 한 줄(2026-10-09 세 갈래). 그쪽에 내 차례가 있으면 건수를, 없으면 문서가 있다는 것만.
     SP.other.forEach(function (o) {
       var oName = MODE_NAME[o.mode];
@@ -3871,11 +3888,11 @@
       h += sect('내 차례', mine.length + '건', '', '<div class="panel ibturn ibcards">' + turnGroups(mine) + '</div>');
     } else if (!SP.ndMine.length && isApproverMe()) {
       // 결재선에 든 적이 없는 사람(사원)에게는 큰 빈 상자를 보이지 않는다 — 머리글의 「내 차례인 건이 없습니다」로 충분(2026-10-15 2차)
-      h += blank('결재할 것이 없습니다.', '다른 분 차례이거나 아직 상신되지 않았습니다.', 'check');
+      h += blank('결재할 문서가 없어요.', '다른 분 차례이거나 아직 상신 전이에요.', 'check');
     }
     if (SP.ndMine.length) {
       h += sect('운행일지 결재 — 내 차례', SP.ndMine.length + '건', '',
-        '<div class="fhint" style="margin:-4px 0 10px">운행일지를 쓰지 않으셔도 결재선에 들어 있는 운행일지는 여기서 결재합니다.</div>' +
+        '<div class="fhint" style="margin:-4px 0 10px">운행일지를 쓰지 않아도, 결재선에 든 운행일지는 여기서 결재해요.</div>' +
         '<div class="panel ibturn ibcards">' + turnGroups(SP.ndMine) + '</div>');
     }
     if (others.length) {
@@ -3902,15 +3919,15 @@
         '</div>';
       h += sect('그 밖의 건', shown.length + '건', chips, fbar +
         '<div class="panel ibcards">' + (shown.length ? shown.slice(0, CAP).map(apprCard).join('')
-          : '<div class="blank"><div class="t">해당하는 건이 없습니다.</div>' +
-            (!INBOX_ALLCYC ? '<div class="d">다른 달 문서는 「전체 기간」을 눌러 보세요.</div>' : '') + '</div>') + '</div>' +
-        (shown.length > CAP ? '<div class="fhint" style="margin-top:8px">최근 ' + CAP + '건만 보입니다. 위에서 상태로 좁혀 보세요(전체 ' +
+          : '<div class="blank"><div class="t">해당하는 건이 없어요.</div>' +
+            (!INBOX_ALLCYC ? '<div class="d">다른 달 문서는 ‘전체 기간’을 눌러 보세요.</div>' : '') + '</div>') + '</div>' +
+        (shown.length > CAP ? '<div class="fhint" style="margin-top:8px">최근 ' + CAP + '건만 보여요. 상태로 좁혀 보세요(전체 ' +
           n0(shown.length) + '건).</div>' : ''));
     }
     if (SP.ndOthers.length) {
       h += sect('운행일지 결재 기록', SP.ndOthers.length + '건', '',
         '<div class="panel ibcards">' + SP.ndOthers.slice(0, 20).map(apprCard).join('') + '</div>' +
-        (SP.ndOthers.length > 20 ? '<div class="fhint" style="margin-top:8px">최근 20건만 보입니다.</div>' : ''));
+        (SP.ndOthers.length > 20 ? '<div class="fhint" style="margin-top:8px">최근 20건만 보여요.</div>' : ''));
     }
     return h;
   }
@@ -4083,18 +4100,18 @@
           var ms = noteMs(s.acted_at);
           if (s.result === 'approved') {
             if (allOk && i === steps.length - 1) {
-              push('done:' + s.acted_at, ms, '결재 완료 — ' + noteWho(s) + '이 마지막으로 승인' + noteBox(s), s.comment);
-            } else push('a' + s.seq + ':' + s.acted_at, ms, noteWho(s) + '이 승인' + noteBox(s), s.comment);
+              push('done:' + s.acted_at, ms, noteWho(s) + noteBox(s) + '이 마지막으로 승인해 결재가 끝났어요', s.comment);
+            } else push('a' + s.seq + ':' + s.acted_at, ms, noteWho(s) + noteBox(s) + '이 승인했어요', s.comment);
           } else if (s.result === 'rejected') {
             push('r' + s.seq + ':' + s.acted_at, ms, s.forced_by
-              ? '관리자 ' + nameOf(s.forced_by) + ' 님이 반려(결재자 대신)'
-              : s.recalled ? noteWho(s) + '이 승인을 취소하고 반려' + noteBox(s)
-                : noteWho(s) + '이 반려' + noteBox(s), s.comment || '');
+              ? '관리자 ' + nameOf(s.forced_by) + ' 님이 결재자 대신 반려했어요'
+              : s.recalled ? noteWho(s) + noteBox(s) + '이 승인을 취소하고 반려했어요'
+                : noteWho(s) + noteBox(s) + '이 반려했어요', s.comment || '');
           }
         });
         if (reo) {
           var rms = noteMs(reo.reopened_at) || noteMs(a.closed_at);
-          push('reopen:' + (reo.reopened_at || a.closed_at), rms, nameOf(reo.reopened_by) + ' 님이 정정으로 다시 열었습니다', reo.reopen_reason);
+          push('reopen:' + (reo.reopened_at || a.closed_at), rms, nameOf(reo.reopened_by) + ' 님이 정정으로 다시 열었어요', reo.reopen_reason);
         }
       }
       // 승인 취소·반려(2026-10-19) — 차례가 왔다가 없어진 다음 결재자에게 「결재할 필요가 없어졌습니다」
@@ -4103,7 +4120,7 @@
         var rn = rc && steps.filter(function (s) { return s.seq === rc.seq + 1; })[0];
         if (rn && rn.approver === me && rc.approver !== me) {
           push('rc' + rc.seq + ':' + rc.acted_at, noteMs(rc.acted_at),
-            noteWho(rc) + '이 승인을 취소하고 반려해서 결재할 필요가 없어졌습니다', rc.comment || '');
+            noteWho(rc) + '이 승인을 취소하고 반려해서 결재할 필요가 없어졌어요', rc.comment || '');
         }
       }
       if (a.status === 'submitted') {
@@ -4112,7 +4129,7 @@
           var prev = steps.filter(function (s) { return s.seq < a.cur_seq && s.acted_at; }).pop();
           var tms = noteMs(prev && prev.acted_at) || noteMs(a.submitted_at);
           push('turn' + a.cur_seq + ':' + (a.submitted_at || ''), tms,
-            nameOf(a.username) + ' 님 ' + D.tag + ' ' + D.month + ' 결재 차례', '', cur);
+            nameOf(a.username) + ' 님 ' + D.tag + ' ' + D.month + ' 결재 차례예요', '', cur);
         }
       }
     });
@@ -4129,10 +4146,10 @@
     k: 'notice:money-v3-receipt', ms: Date.parse('2026-10-15T00:00:00+09:00'), doc: '운행일지 공지',
     // 2026-10-16 사용자 결정: 영수증이 없어도 금액은 정산에 남고 「영수증 없음」(R06)으로 표시만 한다 — 결재선 모두가 본다. 띠는 앞에 [안내] 를 따로 붙인다.
     title: '10월분부터 통행료·주차비는 영수증을 꼭 올려 주세요',
-    text: '10월분부터 통행료·주차비는 영수증을 꼭 올려 주세요 — 자동 계산이나 하이패스로 들어간 통행료도 마찬가지입니다' +
-      '(하이패스 이용내역 PDF로 맞춘 것은 영수증으로 칩니다). 영수증이 없으면 「영수증 없음」으로 표시되어 결재하는 분들도 함께 봅니다. ' +
-      '운행에 금액이 없으면 올린 영수증 금액이 운행에 들어가고, 금액이 있으면 영수증과 맞는지 확인만 합니다(두 번 더하지 않습니다). ' +
-      '업무 운행이 없는 날의 영수증은 정산에서 빠집니다.'
+    text: '10월분부터 통행료·주차비는 영수증을 꼭 올려 주세요. 자동 계산이나 하이패스로 들어간 통행료도 마찬가지예요. ' +
+      '하이패스 이용내역 PDF로 맞춘 통행료는 영수증으로 인정해요. 영수증이 없으면 ‘영수증 없음’으로 표시되고 결재자도 함께 봐요. ' +
+      '운행에 금액이 없으면 올린 영수증 금액이 운행에 들어가고, 금액이 있으면 영수증과 맞는지 확인만 하고 두 번 더하지 않아요. ' +
+      '업무 운행이 없는 날의 영수증은 정산에서 빠져요.'
   }];
   function noticeKey(k) { return 'drv.noticex.' + myName() + '.' + k; }
   function noticeClosed(k) { try { return localStorage.getItem(noticeKey(k)) === '1'; } catch (e) { return false; } }
@@ -4165,7 +4182,7 @@
       var b = $(p[0]); if (b) { b.hidden = !n; b.textContent = t; }
     });
     var bb = $('bellBtn');
-    if (bb) bb.setAttribute('aria-label', n ? '알림 — 읽지 않은 ' + n + '건' : '알림');
+    if (bb) bb.setAttribute('aria-label', n ? '알림 · 읽지 않은 ' + n + '건' : '알림');
     var ub = $('uBtn');
     if (ub) ub.setAttribute('aria-label', '내 정보' + (n ? ' · 읽지 않은 알림 ' + n + '건' : ''));
     if (ub) ub.title = '내 정보' + (n ? ' · 읽지 않은 알림 ' + n + '건' : '');      // 좁은 폰에서 이름 위 숫자의 뜻(2026-10-19)
@@ -4190,7 +4207,7 @@
               '<span class="nx">' + esc(e.txt) + (u ? '<span class="sr"> (안 읽음)</span>' : '') + '</span>' +
               (e.why ? '<span class="nw">' + esc(e.why) + '</span>' : '') + '</span></button>';
           }).join('') + '</div>'
-        : '<div class="nempty">' + ic('check', 20) + '<b>새 알림이 없습니다</b><span>결재가 진행되거나 내 차례가 되면 여기에 뜹니다.</span></div>');
+        : '<div class="nempty">' + ic('check', 20) + '<b>새 알림이 없어요</b><span>결재가 진행되거나 내 차례가 되면 여기에 보여요.</span></div>');
   }
   function openNotePop(on) {
     var pop = $('notePop'); if (!pop) return;
@@ -4291,10 +4308,11 @@
     var m = /<div class="abrief (ok|warn|bad)/.exec(String(ext || ''));
     return m ? m[1] : '';
   }
-  /** 그 결재 건의 판정을 아직 받는 중인가 — 판정 띠가 「검증 결과를 불러오는 중입니다」(세 모듈 같은 글, 2026-10-20 V3 B7). */
+  /** 그 결재 건의 판정을 아직 받는 중인가 — 판정 띠가 「검증 결과를 불러오는 중…」(세 모듈 같은 글, 2026-10-20 V3 B7).
+   *  끝(「입니다」·「이에요」·「…」)은 보지 않는다 — 세 모듈(drv-verify·drv-expense·drv-card)이 말투를 바꿔도 같이 잡히게(2026-10-24 해요체). */
   function apprLoading(a) {
     var kd = kindDef(kindOf(a)), ext = kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '');
-    return /<div class="abrief[^>]*>[\s\S]*?검증 결과를 불러오는 중입니다/.test(String(ext || ''));
+    return /<div class="abrief[^>]*>[\s\S]*?검증 결과를 불러오는 중/.test(String(ext || ''));
   }
   /** 내 차례 묶음의 보이는 차례(종류:id) — 확인 필요 → 이상 없음(turnGroups 와 같은 차례). 판정을 받는 중이면 [](묶지 않고 뼈대만, V3 B7). */
   function turnOrder(list) {
@@ -4310,7 +4328,7 @@
     //   첫 카드가 바뀌었다(2026-10-20 V3 B7 — 누르려던 「승인」 자리에 다른 문서가 올 수 있다). 받는 동안은 자리표시(뼈대)만.
     //   모듈이 받으면(못 받아도) 다시 그린다 — 못 받은 문서는 판정 띠가 「불러오지 못했습니다」라 「확인 필요」로 묶인다.
     if (list.some(function (a) { return apprLoading(a); })) {
-      return '<div class="ibload" aria-busy="true"><span class="sr" role="status">검증 결과를 받는 중입니다</span>' +
+      return '<div class="ibload" aria-busy="true"><span class="sr" role="status">검증 결과를 받는 중…</span>' +
         '<div class="sk" style="width:38%;height:14px"></div><div class="sk" style="width:100%;height:64px;margin-top:12px"></div>' +
         (list.length > 1 ? '<div class="sk" style="width:100%;height:64px;margin-top:12px"></div>' : '') + '</div>';
     }
@@ -4327,7 +4345,7 @@
     var grp = function (cls, label, n, desc) {
       return '<h3 class="ibgrp ' + cls + '"><span class="d2chip ' + cls + '">' + label + ' ' + n0(n) + '</span><span class="ibgd">' + desc + '</span></h3>';
     };
-    return (need.length ? grp('warn', '확인 필요', need.length, '검증에서 볼 것이 있거나 결과를 받는 중인 문서 — 먼저 봐 주세요') + need.map(function (a, i) { return card(a, i); }).join('') : '') +
+    return (need.length ? grp('warn', '확인 필요', need.length, '검증에서 볼 것이 있거나 결과를 받는 중이라 먼저 볼 문서') + need.map(function (a, i) { return card(a, i); }).join('') : '') +
       (ok.length ? grp('ok', '이상 없음', ok.length, '금액·검증 모두 이상 없는 문서') + ok.map(function (a, i) { return card(a, need.length + i); }).join('') : '');
   }
   /** 내 차례에서 이 문서 다음 것(종류:id) — 마지막이면 맨 앞(남은 것). 없으면 ''. */
@@ -4342,7 +4360,7 @@
     var nk = inboxNextOf((kind || 'd') + ':' + id);
     if (!nk) return '';
     var p = nk.split(':'), b = apprFind(+p[1], p[0] === 'd' ? '' : p[0]);
-    return b ? '<div class="anote d2nexthint">' + ic('chev', 13) + '승인·반려하면 다음 문서(' + esc(nameOf(b.username)) + ')가 바로 열립니다.</div>' : '';
+    return b ? '<div class="anote d2nexthint">' + ic('chev', 13) + '승인·반려하면 다음 문서(' + esc(nameOf(b.username)) + ')가 바로 열려요.</div>' : '';
   }
   /** 승인·반려가 끝나면 — 다음 문서의 「문서 보기」를 편 채로 다시 그리고(apvSlot), 그 카드로 옮겨 깜빡이고(noteFocusCard), 승인 단추에 초점을 둔다. */
   function inboxNextMark(payload) {
@@ -4391,7 +4409,7 @@
     var detWhat = canAct ? (nItems ? '확인 항목 ' + n0(nItems) + '건' : '') : (brief || longSt ? '자세히' : '');
     var detBtn = detWhat ? '<button type="button" class="btn sm adetbtn" data-adet aria-expanded="' + det + '">' +
       (det ? (canAct ? '확인 항목 접기' : '접기') : detWhat) + ic('chev', 12) + '</button>' : '';
-    var recallTip = '다음 분이 결재하기 전이라 승인을 취소할 수 있습니다.';
+    var recallTip = '다음 결재자가 결재하기 전이라 승인을 취소할 수 있어요.';
     // 폰 「⋯」(2026-10-24 사용자 「결재함 한 건 높이 줄이기」) — 엑셀 받기·승인 취소·정정 열기·회수는 폰(≤600)에서 「⋯」 메뉴 하나로.
     //   PC·태블릿은 지금처럼 줄에 펼친다(.amx 단추). 메뉴 항목은 같은 data-* 를 가진 단추라 같은 처리기가 받는다(kmenu).
     var moreIt = [], recall = canRecall(a), reopen = canReopen(a);
@@ -4443,7 +4461,7 @@
       '</div>' +
       // 폰(≤600px) 결재 — 근거(판정·금액·결재선)를 먼저 보이고 단추는 카드 아래 고정 줄 [반려 1 : 승인 3](2026-10-20 D2 시안 M_Approve).
       //   PC·태블릿은 위 머리 줄 단추 그대로(CSS 가 폭에 따라 하나만 보인다 — 같은 data-appr 단추).
-      (canAct ? '<div class="amact"><span class="amnext">' + (opt.next ? '승인·반려하면 다음 문서(' + esc(opt.next) + ')가 바로 열립니다' : '내 차례 마지막 문서입니다') + '</span>' +
+      (canAct ? '<div class="amact"><span class="amnext">' + (opt.next ? '승인·반려하면 다음 문서(' + esc(opt.next) + ')가 바로 열려요' : '내 차례 마지막 문서예요') + '</span>' +
         '<div class="amgrid"><button class="btn" data-appr="reject" data-id="' + a.id + '"' + kattr + '>반려</button>' +
         '<button class="btn' + (opt.lead === false ? '' : ' pri') + '" data-appr="approve" data-id="' + a.id + '"' + kattr + '>승인</button></div></div>' : '') +
       '</div>';
@@ -4476,7 +4494,7 @@
        · 모두 접은 채로 시작해 「문서 보기」로 편다(2026-10-19 — 예전에는 내 차례 카드를 펼쳐서 시작). 누른 것은 카드마다 sessionStorage 에 남긴다.
        · 실패해도 카드는 그대로 — 짧은 안내만. 서버에서 더 받는 것은 단추가 받는 그 고정본뿐이다(RLS 그대로). */
   var APV = { cache: {}, q: [], busy: 0, io: null, MAX: 1 };
-  var APV_FAIL = '미리보기를 만들지 못했습니다 — 「PDF 받기」로 열어 보세요';
+  var APV_FAIL = '미리보기를 만들지 못했어요. ‘PDF 받기’로 열어 보세요.';
   var APV_PDFATTR = { '': 'data-fzpdf', expense: 'data-xfzpdf', card: 'data-cfzpdf' };
   function apvProv(kind) { return kind ? (EXT.kinds[kind] || {}).previewBytes : EXT.previewBytes; }
   // 그림 열쇠 — 결재란이 바뀌면 열쇠도 바뀐다(2026-10-21 매뉴얼 로봇: 중간 승인은 상태·상신·완료 시각이 그대로라
@@ -4501,8 +4519,8 @@
     var ops = opt && opt.ops === false ? '' : opinionsHtml(a), nOps = ops ? apprOpinions(a).length : 0;
     return '<div class="apv' + (open ? ' open' : '') + '" data-apv="' + esc(apvKey(kind, a)) + '" data-apvk="' + esc(kind || '') + '" data-apvid="' + esc(a.id) + '">' +
       '<div class="apvbar"><button type="button" class="btn sm" data-apvtog aria-expanded="' + open + '">' + (open ? '문서 접기' : '문서 보기') + '</button>' +
-      (nOps ? '<span class="apvopn" title="「문서 보기」를 누르면 의견을 봅니다">의견 ' + n0(nOps) + '</span>' : '') +
-      '<span class="dim apvhint">쪽을 누르면 크게 봅니다</span></div>' +
+      (nOps ? '<span class="apvopn" title="‘문서 보기’를 누르면 의견이 보여요">의견 ' + n0(nOps) + '</span>' : '') +
+      '<span class="dim apvhint">쪽을 누르면 크게 보여요</span></div>' +
       (ops ? '<div class="apvops"' + (open ? '' : ' hidden') + '>' + ops + '</div>' : '') +
       '<div class="apvpages" aria-label="결재 문서 미리보기"' + (open ? '' : ' hidden') + '></div></div>';
   }
@@ -4538,7 +4556,7 @@
       return;
     }
     if (c && c.err) { box.innerHTML = '<div class="apverr" role="status">' + esc(APV_FAIL) + '</div>'; box.dataset.k = key; return; }
-    if (!box.firstChild) box.innerHTML = '<div class="apvwait" role="status"><div class="apvsk"></div><span>결재 문서를 그리는 중입니다…</span></div>';
+    if (!box.firstChild) box.innerHTML = '<div class="apvwait" role="status"><div class="apvsk"></div><span>결재 문서를 그리는 중…</span></div>';
     if (c) return;                              // 만드는 중 — 끝나면 apvDone 이 붙인다
     if (APV.io) APV.io.observe(box); else apvWant(el);
   }
@@ -4630,7 +4648,7 @@
     var who = card && card.querySelector('.ahd b'), cyc = card && card.querySelector('.ahd .acyc');
     openPanel('결재 문서 미리보기', [who && who.textContent, cyc && cyc.textContent].filter(Boolean).join(' · '),
       '<div id="apvBig" data-k="' + esc(key) + '" data-n="' + (n || 0) + '"><div class="pdfwait"><div class="spin"></div>' +
-      '<div role="status">결재 문서를 그리는 중입니다…</div></div></div>',
+      '<div role="status">결재 문서를 그리는 중…</div></div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
       '<button class="btn pri" ' + APV_PDFATTR[kind || ''] + '="' + esc(id) + '">' + ic('dl', 14) + 'PDF 받기</button>', true);
     apvWant(el, true);
@@ -4817,13 +4835,14 @@
   /** 잠긴 까닭을 한 마디로. '결재가 끝나' / '결재 중이라' */
   function lockWhy(u) { return cycleApproved(u) ? '결재가 끝나' : '결재 중이라'; }
   function lockTitle(u) {
-    return cycleName(CYC) + (cycleApproved(u) ? ' 결재가 끝났습니다' : ' 결재 중입니다');
+    return cycleName(CYC) + (cycleApproved(u) ? ' 결재가 끝났어요' : ' 결재 중이에요');
   }
   /** 잠겼을 때 무엇을 하면 되는지. */
   function lockHow(u) {
-    if (cycleApproved(u)) return '결재가 끝나 확정됐습니다. 정정이 필요하면 관리자에게 문의해 주세요.';
+    // 결재가 끝났다는 말은 앞 제목·문장(lockTitle·lockWhy)이 한다 — 여기서는 할 일만(2026-10-24 검수: 같은 말 두 번)
+    if (cycleApproved(u)) return '정정이 필요하면 관리자에게 문의해 주세요.';
     var a = APPR.filter(function (x) { return x.username === u && x.cycle === CYCKEY() && x.status === 'submitted'; })[0];
-    return a ? withdrawHow(a) : '고치시려면 「이번 달 마감」에서 <b>회수</b>한 뒤 수정해 다시 상신하세요.';
+    return a ? withdrawHow(a) : '고치려면 ‘이번 달 마감’에서 <b>회수</b>한 뒤 다시 상신하세요.';
   }
   /**
    * 결재 중인 건을 고치려면 무엇을 해야 하는지. 아무도 승인하지 않았으면 회수, 한 분이라도 승인했으면
@@ -4831,10 +4850,10 @@
    */
   function withdrawHow(a) {
     var anyDone = (a.steps || []).some(function (x) { return x.result; });
-    if (!anyDone) return '고치시려면 「이번 달 마감」에서 <b>회수</b>한 뒤 수정해 다시 상신하세요.';
+    if (!anyDone) return '고치려면 ‘이번 달 마감’에서 <b>회수</b>한 뒤 다시 상신하세요.';
     var cur = (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0];
-    return '이미 승인한 분이 있어 회수할 수 없습니다. 고치시려면 지금 차례인 <b>' +
-      esc(cur ? (cur.name || nameOf(cur.approver)) : '결재자') + '</b> 님에게 반려를 요청해 주세요.';
+    return '이미 승인한 결재자가 있어 회수할 수 없어요. 고치려면 ' +
+      (cur ? '지금 차례인 <b>' + esc(cur.name || nameOf(cur.approver)) + '</b> 님에게' : '지금 차례인 결재자에게') + ' 반려를 요청하세요.';
   }
   /** 영수증 화면(2단계)을 지금 단계(1단계)보다 먼저 연 것인가 — 맨 아래 띠가 「지금은 1단계 차례」라고 말하는 경우와 같은 조건. */
   function evAhead() {
@@ -4844,9 +4863,9 @@
   function fixHowPlain(a) {
     if (!a) return '';
     var anyDone = (a.steps || []).some(function (x) { return x.result; });
-    if (!anyDone) return '고치려면 아래 「회수」를 누른 뒤 고쳐서 다시 상신하세요.';
+    if (!anyDone) return '고치려면 회수한 뒤 다시 상신하세요.';
     var cur = (a.steps || []).filter(function (x) { return x.seq === a.cur_seq; })[0];
-    return '고치려면 ' + (cur ? (cur.name || nameOf(cur.approver)) : '지금 차례인 결재자') + ' 님에게 반려를 요청하세요.';
+    return '고치려면 ' + (cur ? (cur.name || nameOf(cur.approver)) + ' 님에게' : '지금 차례인 결재자에게') + ' 반려를 요청하세요.';
   }
   /** 그 사람의 가장 최근 운행 — 계기판 기본값에 쓴다. */
   function lastTripOf(u) {
@@ -4920,7 +4939,7 @@
         } else {
           apr = myApprTag(x.key) || (T.n ? '<span class="st dim">미상신</span>' : '<span class="dim">—</span>');
         }
-        return '<tr class="clk" tabindex="0" data-cyc="' + cycKey(x.c) + '" title="' + esc(cycleName(x.c)) + ' 로 가기">' +
+        return '<tr class="clk" tabindex="0" data-cyc="' + cycKey(x.c) + '" title="' + esc(cycleName(x.c)) + ' 보기">' +
           '<td><span class="lead">' + cycleName(x.c) + '</span></td>' +
           '<td class="dim">' + esc(cycleSpan(x.c)) + '</td>' +
           '<td class="n">' + n0(T.n) + '</td><td class="n">' + km(T.km) + '</td>' +
@@ -4935,8 +4954,8 @@
       (sum.park ? n0(sum.park) : '—') + '</td><td class="n total">' + n0(sum.cost) + '</td><td></td><td class="n">' +
       (sum.unk ? n0(sum.unk) : '—') + '</td><td></td></tr></tfoot></table></div></div>');
 
-    h += '<div class="anote">합계는 <b>기간별 합계를 그대로 더한 값</b>입니다. 줄을 누르면 그 기간으로 가서 ' +
-      '상신·결재 문서·영수증 올리기를 할 수 있습니다. 통행료 미확정은 0원으로 잡혀 있습니다.</div>';
+    h += '<div class="anote">합계는 <b>기간별 합계를 더한 값</b>이고, 통행료 미확정은 0원으로 계산했어요. ' +
+      '줄을 누르면 그 기간으로 가서 상신, 결재 문서, 영수증 올리기를 할 수 있어요.</div>';
     return h;
 
     function fact(k, v, sub) {
@@ -4968,8 +4987,9 @@
     var a = myAppr();
     if (!a || a.status !== 'rejected') return '';
     var rsx = apprStatusText(a);
-    return '<div class="hpnote warn" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(rsx.t) + '</b>' +
-      (/다시 상신/.test(rsx.t) ? '' : ' — 고친 뒤 「3 검증·상신」에서 다시 상신하세요.') + '</span></div>';
+    // 상태 글(반려 사유로 끝남)과 할 일 사이에 마침표 한 번(2026-10-24 검수 — 줄표를 뺀 자리에서 두 글이 붙어 읽혔다)
+    return '<div class="hpnote warn" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(/다시 상신/.test(rsx.t) ? rsx.t : endDot(rsx.t)) + '</b>' +
+      (/다시 상신/.test(rsx.t) ? '' : ' 고친 뒤 ‘검증·상신’ 단계에서 다시 상신하세요.') + '</span></div>';
   }
   /* ══════════════════ 마감 현황 ══════════════════ */
   function viewClose() {
@@ -4990,16 +5010,16 @@
     var notSent = !isAll() && !myAppr();
     if (approved) {
       // 끝난 것(초록)과 결재 중(주황)은 다른 상태다 — 같은 색이면 '다 됐다'로 읽는다.
-      if (cycleApproved(myName())) { verdict = '<em>결재가 끝났습니다</em>'; clean = ' clean'; }
-      else { verdict = '<em>결재 중입니다</em>'; clean = ' wait'; }
+      if (cycleApproved(myName())) { verdict = '<em>결재가 끝났어요</em>'; clean = ' clean'; }
+      else { verdict = '<em>결재 중이에요</em>'; clean = ' wait'; }
     } else if (badN) {
-      verdict = '손봐야 할 기록이 <em>' + n0(badN) + '건</em> 있습니다';
+      verdict = '고칠 기록이 <em>' + n0(badN) + '건</em> 있어요';
     } else if (T.unk) {
-      verdict = '통행료 <em>' + n0(T.unk) + '건</em>을 채운 뒤 상신하면 끝납니다';
+      verdict = '통행료 <em>' + n0(T.unk) + '건</em>을 채우고 상신하면 끝나요';
     } else if (!T.n) {
-      verdict = '아직 기록된 운행이 없습니다'; clean = ' clean';
+      verdict = '아직 기록된 운행이 없어요'; clean = ' clean';
     } else {
-      verdict = notSent && closed ? '<em>손볼 것이 없습니다</em> — 상신하세요' : '<em>손볼 것이 없습니다</em>'; clean = ' clean';
+      verdict = notSent && closed ? '<em>고칠 기록이 없어요.</em> 상신하세요' : '<em>고칠 기록이 없어요</em>'; clean = ' clean';
     }
 
     // 본인 마감 화면의 제목 줄은 homeA 가 그린다(오른쪽에 지금 단계 단추 — 2026-10-20 디자인 v2). 여기서는 그 위·아래 띠만 모은다.
@@ -5016,9 +5036,9 @@
     if (pp) {
       h += '<div class="hpnote warn">' + ic('alert', 16) + '<span><b>' + esc(cycleName(pp.cyc)) + '(' +
         esc(cycleSpan(pp.cyc)) + ')</b>' + (pp.cyc.x ? '를 ' : '을 ') +
-        (pp.a && pp.a.status === 'rejected' && reopenInfo(pp.a) ? '관리자가 정정으로 다시 열었습니다. 고친 뒤 다시 상신해 주세요.'   // 정정 열기는 반려가 아니다(2026-10-15)
-          : pp.a && pp.a.status === 'rejected' ? '반려받은 뒤 아직 다시 상신하지 않았습니다.'
-          : pp.a && pp.a.status === 'withdrawn' ? '회수한 뒤 아직 다시 상신하지 않았습니다.' : '아직 상신하지 않았습니다.') +
+        (pp.a && pp.a.status === 'rejected' && reopenInfo(pp.a) ? '관리자가 정정으로 다시 열었어요. 고친 뒤 다시 상신해 주세요.'   // 정정 열기는 반려가 아니다(2026-10-15)
+          : pp.a && pp.a.status === 'rejected' ? '반려받은 뒤 아직 다시 상신하지 않았어요.'
+          : pp.a && pp.a.status === 'withdrawn' ? '회수한 뒤 아직 다시 상신하지 않았어요.' : '아직 상신하지 않았어요.') +
         '</span><button class="btn sm" data-cyc="' + cycKey(pp.cyc) + '">' + CR.short(pp.cyc) + ' 마감하기</button>' +
         '<button class="iconbtn" data-prevx="' + esc(pp.key) + '" aria-label="이 안내 닫기" title="이 안내 닫기">' + ic('close', 14) + '</button></div>';
     }
@@ -5038,7 +5058,7 @@
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll)) +
       // 잠긴 뒤에는 채울 수 없다 — 빨갛게 '여기를 보라'고 하지 않고, 어떻게 올라갔는지만 적는다.
       fact('통행료 미확정', n0(T.unk) + '<small>건</small>',
-        T.unk ? (approved ? '0원으로 상신됨' : '0원으로 정산됩니다') : '전부 확정', T.unk > 0 && !approved) +
+        T.unk ? (approved ? '0원으로 상신됨' : '0원으로 정산') : '전부 확정', T.unk > 0 && !approved) +
       '</div></div>';
 
     // 결재 — 히어로 바로 아래. 이 주기가 지금 어디까지 갔는지가 제일 궁금하다.
@@ -5097,19 +5117,19 @@
     if (S.sent || (cur === 0 && !S.trips.length && !S.ev.length)) return null;
     if (cur === 0) {
       // 「2 영수증·통행료 →」 단추는 이 화면이 아니라 운행 기록·기록 점검 화면 맨 아래에 있다 — 그 화면을 말한다(2026-10-20 V3 U2)
-      if (S.fixBad) return { n: 1, t: '운행 기록 ' + n0(S.fixBad) + '건을 먼저 손보세요',
-        d: '계기판이 튀거나 목적이 비어 있으면 비용이 틀리게 잡힙니다. 「기록 ' + n0(S.fixBad) + '건 고치기」로 고친 뒤 그 화면 맨 아래 「2 영수증·통행료 →」를 누르세요.',
+      if (S.fixBad) return { n: 1, t: '운행 기록 ' + n0(S.fixBad) + '건을 먼저 고치세요',
+        d: '계기판 값이 튀거나 목적이 비어 있으면 비용이 잘못 계산돼요. 기록을 고친 뒤 ‘영수증·통행료’ 단계로 넘어가세요.',
         b: { t: '기록 ' + n0(S.fixBad) + '건 고치기', a: 'data-v="check"', i: 'list' } };
       // 운행 기록 화면은 「일반업무」로 걸러져 열린다 — 같은 수를 말한다(전체 6건이라 해 놓고 4건이 보였다, 2026-10-19 로봇)
       var biz = S.trips.filter(function (t) { return (t.purpose || '') === BUSINESS; }).length;
       return { n: 1, t: '운행 기록을 확인하세요',
-        d: '「운행 기록 확인하기」에서 업무 운행 ' + n0(biz) + '건' + (biz !== S.trips.length ? '(전체 ' + n0(S.trips.length) + '건)' : '') + '이 맞는지 보고, 그 화면 맨 아래 「2 영수증·통행료 →」를 누르세요.',
+        d: '업무 운행 ' + n0(biz) + '건' + (biz !== S.trips.length ? '(전체 ' + n0(S.trips.length) + '건)' : '') + '이 맞는지 확인하고 ‘영수증·통행료’ 단계로 넘어가세요.',
         b: { t: '운행 기록 확인하기', a: 'data-v="trips"', i: 'list' } };
     }
-    if (cur === 1) return { n: 2, t: '영수증·통행료를 차례대로 정리하세요', d: '주차 → 통행료 → 주유 → 계기판 순서로 하나씩 확인합니다.',
+    if (cur === 1) return { n: 2, t: '영수증·통행료를 차례대로 정리하세요', d: '주차, 통행료, 주유, 계기판 순서로 하나씩 확인하세요.',
       b: { t: '영수증·통행료 정리하기', a: 'data-v="evid"', i: 'receipt' } };
-    return { n: 3, t: S.status === 'rejected' ? '고쳐서 다시 검증하고 상신하세요' : '기록이 정리됐습니다 — 검증하고 상신하세요',
-      d: closed ? 'Gemini 가 영수증 사진과 입력값을 맞춰 본 뒤 결재선을 골라 상신합니다.' : '기간 중에도 상신할 수 있습니다. 상신하면 이 기간의 기록은 고칠 수 없습니다.',
+    return { n: 3, t: S.status === 'rejected' ? '고쳐서 다시 검증하고 상신하세요' : '기록을 정리했어요. 검증하고 상신하세요',
+      d: closed ? '검증에서 AI가 영수증 사진과 입력값을 비교해요. 끝나면 결재선을 골라 상신하세요.' : '기간 중에도 상신할 수 있지만, 상신하면 이 기간의 기록은 고칠 수 없어요.',
       b: { t: '검증하고 상신하기', a: 'data-v="verify"', i: 'check' } };
   }
   /** 이번 기간 남은 일(고칠 수 있는 기간에만) → { list: [{ k, sev, t, d, b1, b2, nx }], done: [{ t, d }], M(moneyOf) }.
@@ -5131,7 +5151,7 @@
       var same = days.every(function (d) { return d.T === days[0].T; });
       list.push({ k: 'norcp-' + cat, sev: 'bad', t: cat + ' 영수증이 없는 날 ' + n0(days.length) + '일',
         d: days.slice(0, 4).map(function (d) { return dayDow(d.day); }).join(' · ') + (days.length > 4 ? ' 외 ' + n0(days.length - 4) + '일' : '') +
-          ' — 운행 ' + word + ' ' + (same ? (days.length > 1 ? '각 ' : '') + won0(days[0].T) : '합계 ' + won0(sum)),
+          ', 운행 ' + word + ' ' + (same ? (days.length > 1 ? '각 ' : '') + won0(days[0].T) : '합계 ' + won0(sum)),
         b1: { t: '사진 올리기', a: 'data-evupcat="' + cat + '"', i: 'camera' },
         b2: cat === '통행료' ? { t: '하이패스 PDF', hp: 1 } : { t: '영수증 보기', a: 'data-evstep="' + cat + '"', i: 'eye' }, nx: cat + ' 영수증' });
     });
@@ -5143,15 +5163,15 @@
       var tg = mm[0].d.target || mm[0].d.trips[0];
       list.push({ k: 'diff', sev: 'bad', t: '금액이 다른 날 ' + n0(mm.length) + '일',
         d: mm.slice(0, 2).map(function (x) { return dayDow(x.d.day) + ' ' + x.cat + ' 운행 ' + won0(x.d.T) + ' · ' + evTxt(x.d); }).join(' / ') +
-          (mm.length > 2 ? ' 외 ' + n0(mm.length - 2) + '일' : '') + ' — 어느 쪽이 맞는지 확인',
+          (mm.length > 2 ? ' 외 ' + n0(mm.length - 2) + '일' : '') + '. 어느 쪽이 맞는지 확인해 주세요.',
         b1: tg ? { t: '운행 금액 고치기', a: 'data-edit="' + esc(String(tg.id)) + '"', i: 'edit' } : null,
         b2: { t: '영수증 보기', a: 'data-evstep="' + mm[0].cat + '"', i: 'eye' }, nx: '금액이 다른 날' });
     }
     // 계기판 사진 없음(R12) — 예전 마감 화면 띠와 같은 기준
     var miss = odoPhotoMissing();
     if (miss.length) list.push({ k: 'odo', sev: 'bad',
-      t: '계기판 사진이 없습니다' + (miss.length > 1 || miss[0] ? ' (' + miss.map(function (p) { return p || '차량 미지정'; }).join(', ') + ')' : ''),
-      d: '마지막 운행 뒤 계기판을 찍어 올려 주세요 — 검증에서 운행일지 최종 km 와 대조합니다',
+      t: '계기판 사진이 없어요' + (miss.length > 1 || miss[0] ? ' (' + miss.map(function (p) { return p || '차량 미지정'; }).join(', ') + ')' : ''),
+      d: '마지막 운행 후 계기판 사진을 올려 주세요. 검증 때 운행일지 최종 km와 비교해요.',
       b1: { t: '계기판 사진 올리기', a: 'data-odoshot="1"', i: 'camera' }, nx: '계기판 사진' });
     // 운행 없는 날 영수증(R13) — 정산에서 빠짐
     var nt = [];
@@ -5163,7 +5183,7 @@
       var ntCats = CATS.slice().reverse().filter(function (c) { return nt.some(function (x) { return x.cat === c; }); });
       list.push({ k: 'notrip', sev: 'warn', t: '운행 없는 날 영수증 ' + n0(nt.length) + '장 · ' + won0(ntSum),
         d: nt.slice(0, 3).map(function (x) { return dayDow(x.d.day) + ' ' + x.cat + ' ' + won0(x.e.amount); }).join(' · ') +
-          (nt.length > 3 ? ' 외 ' + n0(nt.length - 3) + '장' : '') + ' — 그날 업무 운행이 없어 정산에서 빠집니다',
+          (nt.length > 3 ? ' 외 ' + n0(nt.length - 3) + '장' : '') + '. 그날 업무 운행이 없어 정산에서 빠져요.',
         b1: { t: '다른 운행에 붙이기', a: 'data-evlink="' + ntCats.join(',') + '" data-evlinkid="' + esc(String(e0.e.id)) + '"', i: 'link' },
         b2: nt.length === 1 ? { t: '지우기', a: 'data-evdel="' + esc(String(e0.e.id)) + '"', i: 'trash', danger: 1 } : { t: '영수증 보기', a: 'data-evstep="' + e0.cat + '"', i: 'eye' },
         nx: '운행 없는 날 영수증' });
@@ -5173,21 +5193,21 @@
     CATS.forEach(function (cat) { M[cat].days.forEach(function (d) { if (d.show && d.twice && d.twice.ev.length) tw.push({ cat: cat, d: d }); }); });
     if (tw.length) list.push({ k: 'twice', sev: 'warn', t: '두 번 정산 의심 ' + n0(tw.length) + '일',
       d: tw.slice(0, 2).map(function (x) { return dayDow(x.d.day) + ' ' + x.cat + ' 영수증 ' + won0(x.d.twice.amount) + '(전날 ' + x.d.twice.prev.slice(5).replace('-', '.') + ' 운행 금액과 같음)'; }).join(' / ') +
-        ' — 전날 운행 영수증이면 「다른 운행에 붙이기」로 이어 주세요',
+        '. 전날 운행 영수증이면 그 운행에 연결해 주세요.',
       b1: { t: '다른 운행에 붙이기', a: 'data-evlink="' + tw[0].cat + '" data-evlinkid="' + esc(String(tw[0].d.twice.ev[0].id)) + '"', i: 'link' },
       b2: { t: '영수증 보기', a: 'data-evstep="' + tw[0].cat + '"', i: 'eye' }, nx: '두 번 정산 의심' });
     // 같은 금액 영수증(2026-10-21 통행료 버그 2) — 영수증으로 채울 날인데 같은 금액 영수증이 여러 장 → 영수증 적기가 적기 전에 묻는다
     var dq = myCycLocked() ? [] : dupFillDays(M).filter(function (x) { return x.ask.length && x.d.show; });
     if (dq.length) list.push({ k: 'dupfill', sev: 'warn', t: '같은 금액 영수증 확인 ' + n0(dq.length) + '일',
       d: dq.slice(0, 2).map(function (x) { return dayDow(x.d.day) + ' ' + x.cat + ' ' + x.ask.map(function (g) { return won0(g.a) + ' ' + n0(g.ev.length) + '장'; }).join(' · '); }).join(' / ') +
-        (dq.length > 2 ? ' 외 ' + n0(dq.length - 2) + '일' : '') + ' — 같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지 골라 주세요',
+        (dq.length > 2 ? ' 외 ' + n0(dq.length - 2) + '일' : '') + '. 같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지 골라 주세요.',
       b1: { t: '확인하기', a: 'data-dupfill="' + esc(dq[0].cat + '|' + dq[0].d.day) + '"', i: 'check' },
       b2: { t: '영수증 보기', a: 'data-evstep="' + dq[0].cat + '"', i: 'eye' }, nx: '같은 금액 영수증' });
     // 통행료 미확정(R02) — 자동 계산이 안 된 업무 운행
     var unk = S.trips.filter(function (t) { return isUnknownToll(t) && (t.purpose || '') === BUSINESS; }).sort(function (a, b) { return a.start_time - b.start_time; });
     if (unk.length) list.push({ k: 'unk', sev: 'warn', t: '통행료 미확정 운행 ' + n0(unk.length) + '건',
       d: unk.slice(0, 3).map(function (t) { return md(t.start_time) + ' ' + (t.visit_place || placeShort(t.end_address) || '방문처 없음'); }).join(' · ') +
-        (unk.length > 3 ? ' 외 ' + n0(unk.length - 3) + '건' : '') + ' — 냈으면 영수증을 올리고, 안 냈으면 운행을 눌러 「없음」으로',
+        (unk.length > 3 ? ' 외 ' + n0(unk.length - 3) + '건' : '') + '. 냈으면 영수증을 올리고, 안 냈으면 운행에서 ‘없음’을 고르세요.',
       b1: { t: '통행료 차례로', a: 'data-evstep="통행료"', i: 'ticket' }, b2: { t: '운행 고치기', a: 'data-edit="' + esc(String(unk[0].id)) + '"', i: 'edit' },
       nx: '통행료 미확정' });
     // 주유 영수증(R11) — 청구 유류비(업무 거리 × 단가)보다 적음. 2단계 주유 차례의 맞춰보기와 같은 계산
@@ -5195,13 +5215,13 @@
     var claim = Math.round(biz.reduce(function (a, t) { return a + tripFuel(t); }, 0));
     var fuelEv = S.ev.filter(function (e) { return e.category === '주유' && (Number(e.amount) || 0) > 0; });
     var paid = fuelEv.reduce(function (a, e) { return a + (Number(e.amount) || 0); }, 0);
-    if (claim > paid + 1) list.push({ k: 'fuel', sev: 'warn', t: paid ? '주유 영수증이 청구 유류비보다 적습니다' : '주유 영수증이 없습니다',
-      d: '청구 유류비 ' + won0(claim) + ' · 주유 영수증 ' + won0(paid) + (fuelEv.length ? '(' + n0(fuelEv.length) + '장)' : '') + ' — 빠진 주유 영수증을 올려 주세요',
+    if (claim > paid + 1) list.push({ k: 'fuel', sev: 'warn', t: paid ? '주유 영수증이 청구 유류비보다 적어요' : '주유 영수증이 없어요',
+      d: '청구 유류비 ' + won0(claim) + ' · 주유 영수증 ' + won0(paid) + (fuelEv.length ? '(' + n0(fuelEv.length) + '장)' : '') + '. 빠진 주유 영수증을 올려 주세요.',
       b1: { t: '주유 영수증 올리기', a: 'data-evupcat="주유"', i: 'receipt' }, nx: '주유 영수증' });
     // 사진 없는 영수증(R07)
     var noPh = S.ev.filter(function (e) { return Number(e.amount) > 0 && !e.photo_path; });
     if (noPh.length) list.push({ k: 'nophoto', sev: 'warn', t: '사진 없는 영수증 ' + n0(noPh.length) + '장',
-      d: '사진이 없으면 결재 문서에 빈 칸으로 나갑니다 — 앱에서 사진을 붙이거나, 지우고 다시 올려 주세요',
+      d: '사진이 없으면 결재 문서에 빈칸으로 나가요. 앱에서 사진을 첨부하거나, 지우고 다시 올려 주세요.',
       b1: { t: '영수증 보기', a: 'data-v="evid"', i: 'eye' }, nx: '사진 없는 영수증' });
     audits.filter(function (f) { return f.sev !== 'bad'; }).forEach(function (f) { list.push(auditTask(f)); });
     // 끝난 일 — 확인한 것만(남은 일이 있는 구분은 넣지 않는다)
@@ -5219,17 +5239,17 @@
   /** 남은 일 카드(8칸). */
   function closeTasksHtml(TK, step) {
     var h = '<section class="ccard ctasks" aria-label="남은 일" data-ctasks><div class="chd"><h2>남은 일<small>' + n0(TK.list.length) + '건</small></h2>' +
-      '<span class="note">상신은 남은 일이 있어도 됩니다 — 결재하는 분께 표시됩니다</span></div>' +
+      '<span class="note">남은 일이 있어도 상신할 수 있고, 결재자에게도 보여요.</span></div>' +
       (step ? '<p class="cnowl" data-cstep><b>지금 ' + step.n + '단계 · ' + esc(step.t) + '</b><span>' + esc(step.d) + '</span></p>' : '');
     h += TK.list.length ? '<ul class="ctlist">' + TK.list.map(function (x) {
       return '<li class="ctask ' + x.sev + '" data-ctask="' + esc(x.k) + '">' + ic('alert', 20) +
         '<span class="ctt"><b>' + esc(x.t) + '</b><span>' + esc(x.d) + '</span></span>' +
         '<span class="ctb">' + ctBtn(x.b1) + ctBtn(x.b2) + '</span></li>';
-    }).join('') + '</ul>' : '<div class="cnone">' + ic('check', 18) + '남은 일이 없습니다</div>';
+    }).join('') + '</ul>' : '<div class="cnone">' + ic('check', 18) + '남은 일이 없어요</div>';
     if (TK.done.length) h += '<details class="cdone"><summary><b>끝난 일 ' + n0(TK.done.length) + '</b>' +
       TK.done.slice(0, 4).map(function (x) { return '<span class="ci">' + ic('check', 14) + esc(x.t) + '</span>'; }).join('') +
       '<span class="cm" aria-hidden="true"></span></summary><ul>' + TK.done.map(function (x) {
-        return '<li>' + ic('check', 14) + '<span><b>' + esc(x.t) + '</b>' + (x.d ? ' — ' + esc(x.d) : '') + '</span></li>';
+        return '<li>' + ic('check', 14) + '<span><b>' + esc(x.t) + '</b>' + (x.d ? ': ' + esc(x.d) : '') + '</span></li>';
       }).join('') + '</ul></details>';
     return h + '</section>';
   }
@@ -5245,12 +5265,12 @@
       '<dt>업무 운행</dt><dd>' + n0(T.biz) + '건 · ' + km(T.bizKm) + ' km</dd>' +
       (other ? '<dt>출퇴근 등</dt><dd>' + n0(other) + '건 · ' + km(T.km - T.bizKm) + ' km</dd>' : '') +
       (T.manual ? '<dt>수기 입력</dt><dd>' + n0(T.manual) + '건</dd>' : '') + '</dl>' +
-      '<p class="cfoot">상신할 때 한 번 더 계산합니다. 금액은 원 단위입니다.</p></section>';
+      '<p class="cfoot">금액은 원 단위이고, 상신할 때 한 번 더 계산해요.</p></section>';
   }
   /** 마감 화면 「최근 운행」 — 날짜 · 시간 · 구분 · 방문처 · 차량 · 거리 · 통행료 · 증빙(딱지). 폰은 두 줄 카드(table.mc).
    *  증빙 = 그날 금액 규칙 v3 결과(통행료·주차 중 나쁜 쪽): 영수증 없음 · 금액 다름 · 두 번 정산 의심 · 맞음 / 통행료 미확정 / 업무가 아니거나 금액 없는 날 —. */
   function closeTripTable(rows, M) {
-    if (!rows.length) return blank('이 기간에 운행 기록이 없습니다.', null, 'list');
+    if (!rows.length) return blank('이 기간에 운행 기록이 없어요.', null, 'list');
     var flags = flaggedIds(), of = {}, RK = { no_receipt: 4, mismatch: 3, twice: 2, dup: 2, ok: 1 };
     // 같은 금액 영수증 확인을 기다리는 날(2026-10-21 통행료 버그 2) — 「맞음」 대신 「같은 금액 확인」
     var dupDay = {};
@@ -5299,18 +5319,18 @@
     // 상태 한 줄 — 상신한 기간·빈 기간·반려(예전과 같은 말)
     var verdict = '', desc = '', clean = '';
     if (st === 'approved') {
-      verdict = '<em>결재가 끝났습니다</em>'; clean = ' clean';
+      verdict = '<em>결재가 끝났어요</em>'; clean = ' clean';
       // 2026-10-15 2차: 큰 「정산·엑셀 받기 →」는 뺐다 — 아래 결재 띠의 「PDF 받기」·「엑셀 받기」(결재 완료본)와 같은 일이다.
-      desc = '아래 결재 띠에서 결재 완료본 PDF·엑셀을 받을 수 있습니다.';
+      desc = '결재 완료 문서를 PDF나 엑셀로 다운로드하세요.';
     } else if (st === 'submitted') {
-      verdict = '<em>결재 중입니다</em>'; clean = ' wait';
+      verdict = '<em>결재 중이에요</em>'; clean = ' wait';
       // 2026-10-19 웹 사용성 1차: 「결재 중」을 세 번 말하던 것 → 큰 제목 + 고치는 방법 한 줄(결재 띠 아래 같은 안내는 뺐다)
       desc = fixHowPlain(myAppr());
     } else if (empty) {
-      verdict = '아직 기록된 운행이 없습니다'; clean = ' clean'; desc = '앱에서 운행을 기록하면 여기에 모입니다.';
+      verdict = '아직 기록된 운행이 없어요'; clean = ' clean'; desc = '앱에서 운행을 기록하면 여기에 모여요.';
     } else if (st === 'rejected') {
       // 반려된 기간(2026-10-16 3차) — 사유 띠는 viewClose 가 맨 위에(rejBandHtml)
-      verdict = '반려됐습니다 — 고쳐서 <em>다시 상신</em>하세요'; desc = step ? step.d : '';
+      verdict = '반려됐어요. 고쳐서 <em>다시 상신</em>하세요'; desc = step ? step.d : '';
     }
     // 마감일 당일·마감 뒤 며칠은 빨강·굵게(AU6-L7) — 상신한 뒤에는 빨갛게 하지 않는다(AU6-M1 과 같은 원칙)
     var hot = !sentNow && /오늘 마감|지남/.test(when);
@@ -5399,7 +5419,7 @@
     //   위 「지금 할 일」이 이미 「검증하고 상신하기 →」(3단계)이면 같은 길을 또 달지 않는다.
     if (!a) {
       btn = '<button class="btn sm" data-pdf="">' + ic('dl', 13) + 'PDF 미리보기</button>' +
-        (nowVerify ? '' : '<button class="btn sm" data-v="verify" title="① 검증 → ② PDF 미리보기 → ③ 상신 순서로 합니다">3 검증·상신 →</button>');
+        (nowVerify ? '' : '<button class="btn sm" data-v="verify" title="검증, PDF 미리보기, 상신 순서로 진행해요">3 검증·상신 →</button>');
     } else if (canWithdraw) {
       btn = '<button class="btn sm" data-appr="withdraw" data-id="' + a.id + '">회수</button>';
     }
@@ -5409,12 +5429,12 @@
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
       // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
-      (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선을 불러올 수도 있습니다.</div>') +
+      (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선도 불러올 수 있어요.</div>') +
       (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x, { ops: false }); })(EXT.apprExtra(a)) : '') +
       // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
-      (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없습니다. ' +
+      (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없어요. ' +
         withdrawHow(a) + '</div>' : '') +
-      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote">고친 뒤 「3 검증·상신」에서 다시 상신합니다.</div>' : '') +
+      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote">고친 뒤 ‘검증·상신’ 단계에서 다시 상신하세요.</div>' : '') +
       '</div></section>';
   }
 
@@ -5425,7 +5445,7 @@
     var np = Object.keys(who).length, g = {};
     for (var k in f) g[k] = f[k];
     g.d = n0(f.n) + '건' + (np ? ' · ' + n0(np) + '명' : '') +
-      (f.rows && f.rows.length ? (byPerson === false ? ' — 누르면 그 운행을 봅니다' : ' — 누르면 운행 기록에서 사람별로 봅니다') : '');
+      (f.rows && f.rows.length ? (byPerson === false ? '. 누르면 그 운행으로 가요.' : '. 누르면 사람별 운행 기록으로 가요.') : '');
     return issueRow(g);
   }
   function issueRow(f) {
@@ -5493,7 +5513,7 @@
   }
   /** 직원별 금액 표. 관리 화면에서는 소속을 맨 앞에 두고 팀별로 묶어 팀 합계를 붙인다(2026-10-07). */
   function personTable(rows) {
-    if (!rows.length) return blank('집계할 운행이 없습니다.', null, 'users');
+    if (!rows.length) return blank('집계할 운행이 없어요.', null, 'users');
     var all = isAll(), cols = all ? 10 : 9;
     var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable mc"><thead><tr>' +
       (all ? '<th>파트·센터</th>' : '') + '<th>이름</th>' + (all ? '' : '<th>소속</th>') + '<th class="n">운행</th><th class="n">거리(km)</th>' +
@@ -5600,7 +5620,7 @@
           return '<tr><td>' + (g.attr ? '<button type="button" class="plink"' + g.attr + ' title="' + esc(g.label) + '만 보기">' + esc(g.label) + '</button>' : esc(g.label)) + '</td>' +
             '<td class="n">' + n0(g.n) + '</td><td class="n">' + n0(g.done) + '</td><td class="n">' + bar(g.done, g.n) + '</td></tr>';
         }).join('') + '</tbody><tfoot><tr><td>합계</td><td class="n">' + n0(tn) + '</td><td class="n">' + n0(td) + '</td><td class="n"><span class="d2pn">' + pct(td, tn) + '%</span></td></tr></tfoot></table>'
-        : '<div class="d2empty">이 기간에 운행한 사람이 없습니다.</div>') +
+        : '<div class="d2empty">이 기간에 운행한 사람이 없어요.</div>') +
       '</div></section>';
   }
   /** 운행일지 챙길 사람 — 이 기간 운행이 있는데 상신 전 · 회수 · 반려(결재 완료 출력 「챙겨야 할 사람」·서버 remind 와 같은 규칙).
@@ -5668,7 +5688,7 @@
     var all = !!FOLLOW_ALL[kind], shown = all ? people : people.slice(0, FOLLOW_N);
     var stChip = function (p) {
       return p.st === 'rejected' ? '<span class="d2chip bad">반려</span>'
-        : '<span class="d2chip neu"' + (p.st === 'withdrawn' ? ' title="회수한 뒤 다시 상신하지 않았습니다"' : '') + '>미상신</span>';
+        : '<span class="d2chip neu"' + (p.st === 'withdrawn' ? ' title="회수한 뒤 다시 상신하지 않았어요"' : '') + '>미상신</span>';
     };
     var who = function (u) { var o = orgPath(u); return [orgName(o), o.unit].filter(Boolean).join(' · '); };
     var btn = function (p) {
@@ -5676,7 +5696,7 @@
       // 다른 기간 안내를 보낸 날이면 그 기간 이름(「10월분 보냄」) — 한 사람에게 하루 한 번이라 오늘은 더 못 보낸다(V3 U8)
       var other = s && s.cycle && s.cycle !== cyc ? keyShort(s.cycle, s.cycle) : '';
       if (s && gone(p.u)) return '<span class="d2sent" title="' + esc(hm(s.at) + ' ' + (other ? other + ' 마감 안내 ' : '') + (s.result === 'pending' ? '보내는 중' : '보냄') +
-        (other ? ' — 한 사람에게 하루 한 번만 갑니다' : '')) + '">' + ic('check', 13) + (s.result === 'pending' ? '보내는 중' : other ? esc(other) + ' 보냄' : '오늘 보냄') + '</span>';
+        (other ? '. 한 사람에게 하루 한 번만 보낼 수 있어요.' : '')) + '">' + ic('check', 13) + (s.result === 'pending' ? '보내는 중' : other ? esc(other) + ' 보냄' : '오늘 보냄') + '</span>';
       // 팀즈가 받지 않음 — 폰에서도 보이게 글로(예전엔 「오늘 보냄」에 마우스를 올려야 보였다) + 다시 보내기
       var fail = s ? '<span class="d2fail" title="' + esc(hm(s.at) + ' 팀즈 응답 ' + s.result) + '">' + ic('alert', 13) + '못 보냄</span>' : '';
       return fail + '<button type="button" class="btn sm d2rbtn" data-remind="' + esc(kind + '|' + p.u) + '" aria-label="' + esc(nameOf(p.u)) + ' 님에게 팀즈 알림' + (s ? ' 다시 보내기' : '') + '">' +
@@ -5684,11 +5704,11 @@
     };
     var hd = '<div class="d2hd"><div class="d2t"><h2 id="d2fh-' + kind + '">챙길 사람</h2><span class="cnt">' + n0(people.length) + '명</span></div>' +
       // 「새 기능」 딱지는 REMIND_NEW_UNTIL(한국 날짜)까지만 — 뗄 날이 없었다(2026-10-20 V3 다듬기). 늘리려면 날짜만 고친다.
-      '<div class="d2act">' + (ymd(Date.now()) <= REMIND_NEW_UNTIL ? '<span class="d2new" title="' + REMIND_NEW_UNTIL + '까지 보입니다">새 기능</span>' : '') +
+      '<div class="d2act">' + (ymd(Date.now()) <= REMIND_NEW_UNTIL ? '<span class="d2new" title="' + REMIND_NEW_UNTIL + '까지 보여요">새 기능</span>' : '') +
       '<button type="button" class="btn pri d2all" data-remindall="' + kind + '"' + (bulk.length ? '' : ' disabled') + '>' + sendIco(15) +
       (bulk.length ? '미상신 ' + n0(bulk.length) + '명에게 알림' : notYet.length ? '미상신 모두 오늘 보냄' : '미상신 없음') + '</button></div></div>';
     var body = people.length
-      ? '<table class="d2tbl d2fol"><caption class="sr">챙길 사람 — 반려·미상신</caption><thead><tr><th scope="col">이름 · 팀</th><th scope="col">상태</th>' +
+      ? '<table class="d2tbl d2fol"><caption class="sr">챙길 사람(반려·미상신)</caption><thead><tr><th scope="col">이름 · 팀</th><th scope="col">상태</th>' +
         '<th scope="col">남은 일</th><th scope="col" class="n">마지막 활동</th><th scope="col" class="n"><span class="sr">팀즈 알림</span></th></tr></thead><tbody>' +
         shown.map(function (p) {
           return '<tr data-fol="' + esc(p.u) + '"><td class="d2who"><b>' + esc(nameOf(p.u)) + '</b><small>' + esc(who(p.u)) + '</small></td>' +
@@ -5699,9 +5719,9 @@
         }).join('') + '</tbody></table>' +
         (people.length > FOLLOW_N ? '<button type="button" class="d2more" data-followall="' + kind + '" aria-expanded="' + all + '">' +
           (all ? '처음 ' + FOLLOW_N + '명만 보기' : n0(people.length) + '명 모두 보기') + ic('chev', 14) + '</button>' : '')
-      : '<div class="d2empty">' + ic('check', 15) + '챙길 사람이 없습니다 — ' + (opt.none || '이 기간 자료가 있는 사람은 모두 상신했습니다') + '.</div>';
+      : '<div class="d2empty">' + ic('check', 15) + '챙길 사람이 없어요. ' + (opt.none || '이 기간 자료가 있는 사람은 모두 상신했어요') + '.</div>';
     return '<section class="sect d2top ' + (opt.wide ? 'd2s12' : 'd2s8') + '" aria-labelledby="d2fh-' + kind + '"><div class="panel d2pad">' + hd + body +
-      '<div class="d2note">알림은 팀즈 개인 채팅으로 한 분씩 갑니다(조직도의 회사 메일) · 한 사람에게 하루 한 번 · 보내기 전에 받는 사람과 글을 보여 드립니다.</div>' +
+      '<div class="d2note">알림은 팀즈 개인 채팅으로 한 사람씩 가고(조직도의 회사 메일 계정), 한 사람에게는 하루 한 번만 가요. 보내기 전에 받는 사람과 글을 보여 드려요.</div>' +
       '</div></section>';
   }
   function remindCall(payload) {
@@ -5724,7 +5744,7 @@
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>');
     remindCall({ action: 'remind', kind: kind, cycle: L.cyc, users: users, dry: true }).then(function (res) {
       if (RMD.job !== job || !$('panel').classList.contains('open')) return;
-      if (!res.ok) { RMD.job = null; closePanel(); toast((res.j && res.j.error) || '받는 사람을 확인하지 못했습니다. 잠시 뒤 다시 해 주세요.', true); return; }
+      if (!res.ok) { RMD.job = null; closePanel(); toast((res.j && res.j.error) || '받는 사람을 확인하지 못했어요. 잠시 후 다시 해 주세요.', true); return; }
       var list = res.j.results || [], ready = list.filter(function (x) { return x.r === 'ready'; }), skip = list.filter(function (x) { return x.r !== 'ready'; });
       var flow = res.j.flow !== false;
       job.users = ready.map(function (x) { return x.u; });
@@ -5734,26 +5754,26 @@
       var groups = {};
       skip.forEach(function (x) { (groups[x.r] = groups[x.r] || []).push(nameOf(x.u)); });
       var hourly = Number(res.j.hourly) || 0;      // 서버가 쓰는 시간당 상한(결재 알림과 함께) — 화면이 숫자를 지어내지 않는다
-      var body = '<div class="anote" style="margin-top:0">팀즈 개인 채팅으로 <b>한 분씩</b> 보냅니다(조직도의 회사 메일). 한 사람에게 <b>하루 한 번</b>만 갑니다. ' +
-        (hourly ? '결재 알림과 합쳐 한 시간에 ' + n0(hourly) + '건까지라' : '결재 알림과 함께 시간당 보낼 수 있는 수가 정해져 있어') +
-        ', 한꺼번에 많이 보내면 그동안 결재 알림이 늦어질 수 있습니다.</div>' +
-        (flow ? '' : '<div class="awarn">' + ic('alert', 15) + '<span>팀즈 알림이 설정되지 않아 지금은 보낼 수 없습니다 — 관리자에게 문의해 주세요.</span></div>') +
+      var body = '<div class="anote" style="margin-top:0">조직도의 회사 메일 계정으로 팀즈 개인 채팅을 <b>한 사람씩</b> 보내고, 한 사람에게는 <b>하루 한 번</b>만 가요. ' +
+        (hourly ? '결재 알림과 합쳐 한 시간에 ' + n0(hourly) + '건까지라' : '결재 알림과 합쳐 시간당 보낼 수 있는 수가 정해져 있어') +
+        ', 한꺼번에 많이 보내면 결재 알림이 늦어질 수 있어요.</div>' +
+        (flow ? '' : '<div class="awarn">' + ic('alert', 15) + '<span>팀즈 알림이 설정되지 않아 지금은 보낼 수 없어요. 관리자에게 문의해 주세요.</span></div>') +
         '<div class="d2rmh">받는 사람 <b>' + n0(ready.length) + '명</b></div>' +
         (ready.length ? '<ul class="d2rmlist">' + ready.map(function (x) {
           return '<li><div class="d2rmrow"><span class="d2rmn"><b>' + esc(nameOf(x.u)) + '</b><small>' + esc(whoOf(x.u)) + '</small></span>' +
             '<span class="d2chip ' + (x.st === 'rejected' ? 'bad' : 'neu') + '">' + esc(stName[x.st] || '') + '</span></div>' +
             '<details><summary>보낼 글 보기</summary><pre class="d2rmtext">' + esc(x.text || '') + '</pre></details></li>';
-        }).join('') + '</ul>' : '<div class="d2empty">보낼 사람이 없습니다.</div>') +
-        (skip.length ? '<div class="d2rmskip"><b>보내지 않는 사람 ' + n0(skip.length) + '명</b> — ' + Object.keys(groups).map(function (k) {
+        }).join('') + '</ul>' : '<div class="d2empty">보낼 사람이 없어요.</div>') +
+        (skip.length ? '<div class="d2rmskip"><b>보내지 않는 사람 ' + n0(skip.length) + '명</b>: ' + Object.keys(groups).map(function (k) {
           return esc((why[k] || k) + ' ' + groups[k].length + '명(' + groups[k].join(', ') + ')');
         }).join(' · ') + '</div>' : '') +
-        (more ? '<div class="d2rmskip">한 번에 ' + MAX + '명까지 보냅니다 — 나머지 ' + n0(more) + '명은 보낸 뒤 다시 눌러 주세요.</div>' : '') +
-        (ready.length ? '<div class="d2rmh">보낼 글 <span class="dim">— 그대로 갑니다(사람마다 까닭·건수만 다릅니다). 예: ' + esc(nameOf(ready[0].u)) + ' 님</span></div>' +
+        (more ? '<div class="d2rmskip">한 번에 ' + MAX + '명까지 보내요. 나머지 ' + n0(more) + '명은 보낸 뒤 다시 눌러 주세요.</div>' : '') +
+        (ready.length ? '<div class="d2rmh">보낼 글 <span class="dim">' + esc(nameOf(ready[0].u)) + ' 님에게 갈 글이에요. 사람마다 이유와 건수만 달라요.</span></div>' +
           '<pre class="d2rmtext" id="d2rmFirst">' + esc(ready[0].text || '') + '</pre>' : '');
       openPanel('팀즈 알림 보내기', sub, body, '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
         '<button class="btn pri" id="btnRemindGo"' + (ready.length && flow ? '' : ' disabled') + '>' + sendIco(15) + (ready.length ? n0(ready.length) + '명에게 보내기' : '보낼 사람 없음') + '</button>');
     }).catch(function () {
-      if (RMD.job === job) { RMD.job = null; closePanel(); toast('서버에 연결하지 못했습니다.', true); }
+      if (RMD.job === job) { RMD.job = null; closePanel(); toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true); }
     });
   }
   function sendRemind() {
@@ -5764,12 +5784,12 @@
     remindCall({ action: 'remind', kind: job.kind, cycle: job.cyc, users: job.users }).then(function (res) {
       RMD.job = null;
       closePanel();
-      if (!res.ok) { toast((res.j && res.j.error) || '보내지 못했습니다. 잠시 뒤 다시 해 주세요.', true); }
-      else toast(endDot(res.j.message || '보냈습니다'), !(res.j.sent > 0));
+      if (!res.ok) { toast((res.j && res.j.error) || '보내지 못했어요. 잠시 후 다시 해 주세요.', true); }
+      else toast(endDot(res.j.message || '보냈어요'), !(res.j.sent > 0));
       delete RMD.by[job.kind];
       remindLoad(job.kind);
     }).catch(function () {
-      RMD.job = null; closePanel(); toast('서버에 연결하지 못했습니다. 보냈는지 「오늘 보냄」 표시로 확인해 주세요.', true);
+      RMD.job = null; closePanel(); toast('서버에 연결하지 못했어요. 보냈는지 ‘오늘 보냄’ 표시로 확인해 주세요.', true);
       delete RMD.by[job.kind]; remindLoad(job.kind);
     });
   }
@@ -5822,15 +5842,15 @@
     //   예전 큰 제목(「결재 완료 N명 · 결재 중 · 반려 · 미상신」)과 두 색 막대는 「상신 현황」으로 옮겼다(같은 네 갈래 · 회수는 미상신).
     h += apprSumCard(c, rows.length, esc(cycleName(CYC)) + ' · ' + esc(cycleSpan(CYC)) + ' · ' + dueText(r, now) +
       (closed ? '' : ' · ' + hm(now) + ' 기준'));
-    h += '<div class="d2grid">' + followCard('driving', CYCKEY(), followOfDriving(rows, V), { none: '이 기간 운행한 사람은 모두 상신했습니다' }) + teamDoneCard(rows) + '</div>';
+    h += '<div class="d2grid">' + followCard('driving', CYCKEY(), followOfDriving(rows, V), { none: '이 기간 운행한 사람은 모두 상신했어요' }) + teamDoneCard(rows) + '</div>';
 
     // ── 검증 · 업무용 비용 — 회사(보는 범위) 전체(관리자 본인에게 시키는 말이 아니다) ──
     h += '<div class="hero fade d2facts"><div class="eyebrow"><span class="dot' + (rows.length && c.approved === rows.length ? ' ok' : '') + '"></span>검증 · 업무용 비용</div>' +
       '<div class="facts">' +
       // 결재 상태 숫자는 위 큰 제목 한 줄이 말한다(예전에는 숫자 칸에 한 번 더, 분류도 달랐다 — 2026-10-19). 여기는 검증·금액만.
       // 불일치와 확인 필요를 나눠 센다(2026-10-19 사용성 2차 — 「불일치 0명」인데 표에는 「확인 1」이 붙은 사람이 있어 헷갈렸다)
-      fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했습니다' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
-      (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', c.vwarn ? '불일치는 없고 사람이 한 번 볼 것만 있음' : '') : '') +   // 0명이면 설명 없음(2026-10-20)
+      fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했어요' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
+      (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', c.vwarn ? '불일치는 없고 한 번 볼 것만 있어요' : '') : '') +   // 0명이면 설명 없음(2026-10-20)
       fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
         (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) +
       '</div></div>';
@@ -5847,17 +5867,17 @@
     if (tc) h += sect(ORGF.team ? '파트·센터별 비용' : '팀별 비용', null, '', tc);
 
     h += sect('직원별', rows.length + '명',
-      '<button class="btn sm" id="btnStatusCsv" title="이 표를 CSV 로 받습니다">' + ic('dl', 13) + '목록 CSV</button>',
+      '<button class="btn sm" id="btnStatusCsv" title="이 표를 CSV로 다운로드해요">' + ic('dl', 13) + '목록 CSV</button>',
       statusTable(rows, V));
 
-    h += '<div class="anote">상신 상태는 이 기간의 운행일지 결재 건, 검증은 상신한 사람은 상신 때 결과, 아직 상신하지 않은 사람은 마지막 검증 결과입니다. ' +
-      '결재 완료본 받기·관리자 반려·정정 열기는 「결재 완료 출력」에서 합니다. 이름을 누르면 그 사람의 운행 기록으로 갑니다.</div>';
+    h += '<div class="anote">상신 칸은 이 기간 운행일지 결재 상태예요. 검증 칸은 상신했으면 상신할 때의 결과, 상신 전이면 마지막 검증 결과예요. ' +
+      '결재 완료 문서 다운로드, 관리자 반려, 정정 열기는 ‘결재 완료 출력’에서 하세요. 이름을 누르면 그 사람의 운행 기록으로 가요.</div>';
     h += sect('산정 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
-      '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
+      '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계해요.<br>' +
       '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
-      '주차비·통행료 = 금액 규칙 v3 — 운행 금액(영수증과 대조) · 운행 금액이 없는 날은 영수증 금액 · 운행 없는 날의 영수증은 뺌<br>' +
-      '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산합니다. 리포트와 다르면 알려 주세요.</div>');
+      '주차비·통행료 = 금액 규칙 v3: 운행 금액(영수증과 비교), 운행 금액이 없는 날은 영수증 금액, 운행 없는 날의 영수증은 제외<br>' +
+      '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산해요. 리포트와 다르면 알려 주세요.</div>');
     return h;
 
     function fact(k, v, sub, alert) {
@@ -5867,12 +5887,12 @@
   }
   /** 현황 표 — 소속별로 묶고(팀 합계), 사람마다 상신 상태 · 검증 · 금액 · 인쇄. */
   function statusTable(rows, V) {
-    if (!rows.length) return blank('집계할 운행이 없습니다.', null, 'users');
+    if (!rows.length) return blank('집계할 운행이 없어요.', null, 'users');
     // 2026-10-16 3차: 1280 폭에서 표(1068px)가 칸(954px)을 넘었다 — 운행·거리를 한 칸으로, 「통행료 미확정」은 「미확정」, 단추 칸은 줄을 바꿀 수 있게.
     var cols = 11;
     var stCell = function (x) {
       var L = ST_LABEL[x.st] || ['미상신', 'dim'];
-      return '<span class="st ' + L[1] + '" title="' + esc(x.a ? apprStatusText(x.a).t : '아직 상신하지 않았습니다') + '">' + esc(L[0]) + '</span>';
+      return '<span class="st ' + L[1] + '" title="' + esc(x.a ? apprStatusText(x.a).t : '아직 상신하지 않았어요') + '">' + esc(L[0]) + '</span>';
     };
     var h = '<div class="panel"><div class="scroll tall" data-rows><table class="ptable stable mc"><thead><tr>' +
       '<th>파트·센터</th><th>이름</th><th>상신</th><th>검증</th><th class="n bz" title="업무 운행 건수·거리(괄호는 출퇴근 등을 더한 전체 건수)">업무 운행</th>' +
@@ -5931,7 +5951,7 @@
     a.download = 'ATEC_운행일지_현황_' + cycKey(CYC) + (orgFilterOn() ? '_' + orgScopeName().replace(/[\\/:*?"<>|\s]+/g, '') : '') + '.csv';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    toast('CSV 를 내려받았습니다.');
+    toast('현황 목록을 CSV로 다운로드했어요.');
   }
 
   /* ══════════════════ 좁히기 공통 (기간 · 날짜 · 정렬 · 나눠 보기) ══════════════════ */
@@ -5978,9 +5998,9 @@
     var cs = cyclesInView().slice().reverse().slice(0, 6);
     return head(title, esc(viewName())) +
       '<div class="panel" style="padding:30px 26px;text-align:center">' +
-      '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(what) + '은 한 기간씩 합니다</div>' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(what) + ' 화면은 한 기간만 열 수 있어요</div>' +
       '<div class="dim" style="font-size:13px;line-height:1.7;max-width:460px;margin:0 auto 16px">' +
-      '지금은 여러 기간을 함께 보고 있습니다(조회 전용). 어느 기간을 다룰지 골라 주세요.</div>' +
+      '지금은 여러 기간을 함께 보고 있어서 조회만 돼요. 어느 기간을 다룰지 골라 주세요.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
       cs.map(function (c) {
         return '<button class="btn sm" data-cyc="' + cycKey(c) + '">' + esc(cycleName(c)) + '</button>';
@@ -6094,24 +6114,24 @@
       // 2026-10-20 AU6-M5: 기본 목적(일반업무)은 사용자가 건 조건으로 세지 않는다 — 빈 기간에 「일반업무 조건에 맞는 운행이 없습니다」 +
       //   「전체 보기」가 떴는데, 누르면 목적이 다시 일반업무로 돌아가 아무것도 안 바뀌었다(헛단추). 단추는 보일 운행이 실제로 있을 때만,
       //   누르면 목적까지 비워 이 기간 운행을 모두 보인다(afterPaint). 줄인 표(마감 화면 최근 운행)는 조건과 상관없는 이 기간 운행이라 조건을 말하지 않는다.
-      if (opt.compact) return blank('이 기간에 운행 기록이 없습니다.', null, 'list');
+      if (opt.compact) return blank('이 기간에 운행 기록이 없어요.', null, 'list');
       var on = [];
       if (FILT.who) on.push(nameOf(FILT.who) + ' 님');
       if (FILT.car) on.push(FILT.car);
       if (FILT.purp && FILT.purp !== BUSINESS) on.push(FILT.purp === '-' ? '목적 미선택' : FILT.purp);
       if (dateFilterOn()) on.push('날짜 조건');
-      if (FILT.q) on.push('"' + FILT.q + '" 검색');
+      if (FILT.q) on.push('‘' + FILT.q + '’ 검색');
       if (FILT.chip && FILT.chip !== 'all') on.push('점검 항목');
       var allN = TRIPS.length;                 // 아무 조건 없이 이 기간(보는 범위)의 운행
-      if (!allN) return blank('이 기간에 운행 기록이 없습니다.', null, 'list');
+      if (!allN) return blank('이 기간에 운행 기록이 없어요.', null, 'list');
       var clr = function (label) { return '<button class="btn sm" id="btnClearFilt">' + esc(label) + '</button>'; };
       if (on.length) {
-        return blankAct(on.join(' · ') + ' 조건에 맞는 운행이 없습니다.', '「전체 보기」를 누르면 조건을 풀고 이 기간 운행 ' + n0(allN) + '건을 모두 봅니다.', 'list', clr('전체 보기'));
+        return blankAct(on.join(' · ') + ' 조건에 맞는 운행이 없어요.', '조건을 풀면 이 기간 운행 ' + n0(allN) + '건을 모두 볼 수 있어요.', 'list', clr('전체 보기'));
       }
       // 걸린 것은 기본 목적(일반업무)뿐 — 이 기간에 업무 운행만 없다. 다른 목적 운행을 보는 단추(가장 많은 목적 이름).
       var ps = {}; TRIPS.forEach(function (t) { var p = t.purpose || '목적 미선택'; ps[p] = (ps[p] || 0) + 1; });
       var top = Object.keys(ps).sort(function (a, b) { return ps[b] - ps[a]; });
-      return blankAct('이 기간에 업무 운행이 없습니다.', '정산은 업무 운행(일반업무)만 합니다. 다른 목적 운행이 ' + n0(allN) + '건 있습니다.', 'list',
+      return blankAct('이 기간에 업무 운행이 없어요.', '정산은 업무 운행(일반업무)만 해요. 다른 목적 운행이 ' + n0(allN) + '건 있어요.', 'list',
         clr((top.length === 1 ? top[0] : top[0] + ' 등') + ' ' + n0(allN) + '건 보기'));
     }
     var flags = flaggedIds();
@@ -6224,7 +6244,7 @@
     //   PC 는 그대로 한 줄(접는 단추는 숨고 칸들은 그 줄에 그대로 놓인다). 걸린 조건은 단추에 글로.
     var tfold = isAll();
     if (tfold) {
-      var tfw = filterWords(); if (FILT.q) tfw.push('「' + FILT.q + '」');
+      var tfw = filterWords(); if (FILT.q) tfw.push('‘' + FILT.q + '’');
       h += '<div class="bar tfbar' + (TFOLD_OPEN ? ' open' : '') + '"><button type="button" class="btn tfoldbtn" data-tfold aria-expanded="' + TFOLD_OPEN + '" aria-controls="tfFields">' +
         ic('list', 14) + '<span class="tft">조건' + (tfw.length ? ' · ' + esc(tfw.join(' · ')) : '') + '</span><span class="tfar" aria-hidden="true">▾</span></button>' +
         '<div class="tfields" id="tfFields">';
@@ -6256,7 +6276,7 @@
     h += '<div class="sp" style="flex:1"></div>';
     if (!isMulti()) h += '<button class="btn sm" id="btnAddTrip">＋ 운행 추가</button>';
     // 예전 이름은 「엑셀」이었는데 받는 것은 CSV 목록이다. 양식 엑셀(운행기록부)은 정산 화면에 있다.
-    h += '<button class="btn sm" id="btnCsv" title="지금 보이는 목록을 CSV 로 받습니다(양식 엑셀은 정산·엑셀 화면)">' +
+    h += '<button class="btn sm" id="btnCsv" title="지금 보이는 목록을 CSV로 다운로드해요. 양식 엑셀은 ‘정산·엑셀’ 화면에 있어요.">' +
       ic('dl', 13) + '목록 CSV</button>';
     h += '</div>';
 
@@ -6292,11 +6312,11 @@
     var found = A.filter(function (f) { return f.n > 0; });
     var okOnes = A.filter(function (f) { return f.n === 0; });
 
-    var h = head(scopeTitle('기록 점검'), esc(viewName()) + ' · 금액이 틀어지기 쉬운 기록을 찾아 줍니다');
+    var h = head(scopeTitle('기록 점검'), esc(viewName()) + ' · 금액이 틀어지기 쉬운 기록을 찾아 줘요');
 
     if (!found.length) {
       h += '<div class="hero fade"><div class="eyebrow"><span class="dot" style="background:var(--ok)"></span>점검 완료</div>' +
-        '<p class="verdict clean"><em>이번 기간은 손볼 것이 없습니다</em></p>' +
+        '<p class="verdict clean"><em>이번 기간은 고칠 기록이 없어요</em></p>' +
         '<div class="facts"><div class="fact"><div class="k">검사 항목</div><div class="v">' +
         A.length + '<small>가지</small></div><div class="sub">전부 이상 없음</div></div></div></div>';
     } else {
@@ -6317,11 +6337,11 @@
 
     h += sect('점검 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
-      '<b style="color:var(--ink-2)">계기판이 크게 튄 곳</b> — 같은 사람·같은 차에서 1,000km 이상 벌어진 지점. 계기판 숫자를 잘못 적었을 수 있습니다.<br>' +
-      '<b style="color:var(--ink-2)">한 차를 두 사람이</b> — 번호판을 잘못 고르면 남의 차 기록이 됩니다.<br>' +
-      '<b style="color:var(--ink-2)">운행목적 미선택</b> — 업무용으로 안 잡혀 금액이 조용히 0원이 됩니다.<br>' +
-      '<b style="color:var(--ink-2)">유류단가 미등록</b> — 기본 단가 159원/km 로 계산돼 실제와 어긋납니다.<br>' +
-      '<b style="color:var(--ink-2)">통행료 미확정</b> — 정산에서 0원으로 잡혀 회사가 덜 내주게 됩니다.</div>');
+      '<b style="color:var(--ink-2)">계기판이 크게 튄 곳</b>: 같은 사람, 같은 차에서 1,000km 이상 벌어진 지점이에요. 계기판 숫자를 잘못 적었을 수 있어요.<br>' +
+      '<b style="color:var(--ink-2)">한 차를 두 사람이</b>: 번호판을 잘못 고르면 남의 차 기록이 돼요.<br>' +
+      '<b style="color:var(--ink-2)">운행목적 미선택</b>: 업무용으로 잡히지 않아 금액이 0원이 돼요.<br>' +
+      '<b style="color:var(--ink-2)">유류단가 미등록</b>: 기본 단가 159원/km로 계산돼 실제와 달라요.<br>' +
+      '<b style="color:var(--ink-2)">통행료 미확정</b>: 정산에서 0원으로 잡혀 실제보다 덜 받아요.</div>');
     return h;
   }
 
@@ -6333,7 +6353,7 @@
     var mine = myName();
     var locked = !isAll() && !isMulti() && cycleLocked(mine);
     var h = head(scopeTitle(isAll() ? '영수증' : '영수증·통행료'), esc(viewName()) +
-      ' · 앱에서 올린 것과 여기서 올린 것이 함께 모입니다');
+      ' · 앱과 이 화면에서 올린 영수증이 함께 모여요');
     var stepMode = !isAll() && !isMulti();
     var unkMine = stepMode ? ALL_TRIPS.filter(function (t) { return t.username === mine && !t.deleted_at && (t.purpose || '') === BUSINESS && isUnknownToll(t); }) : [];
     var byAll = {};
@@ -6353,11 +6373,11 @@
 
     if (!all.length) {
       return h + (locked
-        ? blank('등록된 영수증이 없습니다.', cycleName(CYC) + ' — ' + lockWhy(mine) + ' 더 올릴 수 없습니다.', 'receipt')
+        ? blank('등록된 영수증이 없어요.', cycleName(CYC) + '에는 ' + lockWhy(mine) + ' 더 올릴 수 없어요.', 'receipt')
         : '<div class="panel"><div class="blank"><div class="ico">' + ic('receipt', 21) + '</div>' +
-          '<div class="t">등록된 영수증이 없습니다.</div>' +
-          '<div class="d">앱에서 올리시거나 ' + (stepMode ? '위 차례 카드의 「영수증 올리기」로' : '여기서') + ' 사진·스캔 PDF 를 올리시면 여기에 모입니다.<br>' +
-          'A4 에 여러 장 붙여 스캔한 것도 그대로 올리면 됩니다.</div>' +
+          '<div class="t">등록된 영수증이 없어요.</div>' +
+          '<div class="d">앱이나 ' + (stepMode ? '‘영수증 올리기’로' : '이 화면에서') + ' 올린 사진과 스캔 PDF가 여기에 모여요.<br>' +
+          'A4에 여러 장 붙여 스캔한 파일도 올릴 수 있어요.</div>' +
           (upBtn ? '<div style="margin-top:16px"><button class="btn pri" id="btnEvUp">' + ic('receipt', 14) +
           '영수증 올리기</button></div>' : '') + '</div></div>');
     }
@@ -6384,7 +6404,7 @@
       ? '<div class="eyebrow"><span class="dot"></span>정산에 들어가는 주차·통행료 · 마감 화면과 같음</div>' +
         '<p class="verdict">' + won(Tst.park + Tst.toll) + '</p>' +
         '<div class="evsettle" data-evsettle>주차비 <b>' + won(Tst.park) + '</b> · 통행료 <b>' + won(Tst.toll) + '</b> · 올린 영수증 합계 ' + won(settle) +
-        (Tst.park + Tst.toll !== settle ? '<br><span class="dim">올린 영수증 합계와 다른 까닭: 운행에 금액이 이미 있으면 영수증은 맞춰 보기만 하고(두 번 더하지 않음), 업무 운행이 없는 날의 영수증은 빠집니다.</span>' : '') +
+        (Tst.park + Tst.toll !== settle ? '<br><span class="dim">정산 금액이 올린 영수증 합계와 달라요. 운행에 금액이 있는 날은 운행 금액이 들어가고, 업무 운행이 없는 날의 영수증은 빠져요.</span>' : '') +
         '</div>'
       : '<div class="eyebrow"><span class="dot"></span>올린 주차·통행료 영수증 합계</div><p class="verdict">' + won(settle) + '</p>') +
       '<div class="facts">' +
@@ -6395,7 +6415,7 @@
       '</div></div>';
 
     if (locked) h += '<div class="hpnote">' + ic('check', 16) + '<span><b>' + esc(lockTitle(mine)) +
-      '.</b> 영수증을 더 올리거나 지울 수 없습니다. ' + lockHow(mine) + '</span></div>';
+      '.</b> 영수증을 더 올리거나 지울 수 없어요. ' + lockHow(mine) + '</span></div>';
 
     // ── 좁히기: 구분 · 날짜 · 사람 ──
     var cats = ['all', '주차', '통행료', '주유', '계기판'];
@@ -6424,8 +6444,8 @@
     // 여러 줄 골라 지우기(2026-10-19) — 내가 올린 줄이 보일 때만 고르기 칸. 못 지우는 줄(잠긴 기간·다른 분 것)은 막고 까닭을 단다.
     var selOn = rows.some(function (e) { return e.username === mine; });
     var evWhyNot = function (e) {
-      return e.username !== mine ? '다른 분이 올린 영수증은 지울 수 없습니다'
-        : evLocked(e) ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없습니다' : '';
+      return e.username !== mine ? '다른 분이 올린 영수증은 지울 수 없어요'
+        : evLocked(e) ? '결재 중이거나 결재가 끝난 기간이라 지울 수 없어요' : '';
     };
     var thDate = thSort('날짜', 'date', 'ev', -1);
     if (selOn) thDate = thDate.replace(/^<th class="/, '<th class="mselth ').replace(/^(<th[^>]*>)/, function (m) { return m + mselAll('ev'); });
@@ -6466,7 +6486,7 @@
             : e.photo_path ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>'
             : '<span class="dim" style="font-size:12px">사진 없음</span>') +
           (e.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="' +
-            (e.photo_path === e.scan_path ? '영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진입니다' : '스캔한 A4 원본') + '" href="' +
+            (e.photo_path === e.scan_path ? '영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이에요' : '스캔한 A4 원본') + '" href="' +
             esc(photoUrl(e.scan_path)) + '">원본</a>' : '') +
           // 잘못 올린 것을 못 지우면 정산 금액이 부풀어 오른 채로 남는다.
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">지우기</button>' : '') +
@@ -6474,7 +6494,7 @@
       }).join('') + '</tbody><tfoot><tr><td colspan="' + (isAll() ? 4 : 3) + '">보이는 ' + n0(rows.length) +
       '건 합계</td><td class="n total">' + n0(sumShown) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>' +
         (selOn ? mselBar('ev') : '')
-        : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 영수증이 없습니다.</div>' +
+        : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 영수증이 없어요.</div>' +
           '<div style="margin-top:12px"><button class="btn sm" data-fclear>조건 지우기</button></div></div></div>') + '</div>');
     return h;
   }
@@ -6531,10 +6551,10 @@
   }
   function gemTag(t) { return '<span class="gem">' + gemSvg(12) + esc(t || 'Gemini') + '</span>'; }
   function openEvUpload(defCat) {
-    if (isMulti()) { toast('영수증은 한 기간씩 올립니다. 위에서 기간을 하나 골라 주세요.', true); return; }
-    if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 기간에는 올릴 수 없습니다.', true); return; }
+    if (isMulti()) { toast('영수증은 한 기간씩 올려요. 기간을 하나 골라 주세요.', true); return; }
+    if (cycleLocked(myName())) { toast(lockWhy(myName()) + ' 이 기간에는 올릴 수 없어요.', true); return; }
     // 올리는 중에 뒤로가기로 창이 닫혔을 수 있다. 그 사이 새 창을 열면 돌고 있는 올리기가 새 목록을 건드린다.
-    if (EV_SENDING) { toast('앞서 누른 영수증을 아직 올리는 중입니다. 끝난 뒤 다시 열어 주세요.'); return; }
+    if (EV_SENDING) { toast('앞서 누른 영수증을 아직 올리는 중이에요. 끝나면 다시 열어 주세요.'); return; }
     evFreeUrls();
     EVUP = { busy: false, items: [], pages: [], sent: false, defCat: EV_CATS.indexOf(defCat) >= 0 ? defCat : '' };
     var r = cycleRange(CYC);
@@ -6547,14 +6567,14 @@
     $('pBody').innerHTML =
       '<div class="drop gemdrop" id="evDrop" style="margin:0 0 14px">' +
       '<div class="gemorb">' + gemSvg(28) + '</div>' +
-      '<div class="gemchip">' + gemSvg(12) + 'Gemini 가 읽어 줍니다</div>' +
+      '<div class="gemchip">' + gemSvg(12) + 'AI가 읽어 드려요</div>' +
       (odo
-        ? '<div class="dt">계기판 사진을 올리면 <b class="gemtxt">Gemini</b> 가 km 를 읽어 드립니다</div>' +
-          '<div class="dd">JPG · PNG · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
-          '날짜는 <b>사진을 찍은 날</b>로 미리 넣습니다 — 맞는지 확인해 주세요</div>'
-        : '<div class="dt">영수증을 올리면 <b class="gemtxt">Gemini</b> 가 구분·날짜·금액을 읽어 드립니다</div>' +
-          '<div class="dd">JPG · PNG · PDF · 여러 장도 됩니다. PC 에서는 여기에 끌어다 놓아도 됩니다<br>' +
-          '<b>A4 에 여러 장 붙여 스캔한 것도 그대로</b> 올리세요 — 영수증마다 한 줄씩 나눠 적습니다</div>') +
+        ? '<div class="dt">계기판 사진을 올리면 <b class="gemtxt">AI</b>가 km를 읽어 드려요</div>' +
+          '<div class="dd">JPG, PNG 파일을 여러 장 올릴 수 있어요. PC에서는 여기에 끌어다 놓아도 돼요.<br>' +
+          '날짜는 <b>사진을 찍은 날</b>로 미리 넣어요. 맞는지 확인해 주세요.</div>'
+        : '<div class="dt">영수증을 올리면 <b class="gemtxt">AI</b>가 구분, 날짜, 금액을 읽어 드려요</div>' +
+          '<div class="dd">JPG, PNG, PDF 파일을 여러 장 올릴 수 있어요. PC에서는 여기에 끌어다 놓아도 돼요.<br>' +
+          '<b>A4에 여러 장 붙여 스캔한 파일도 그대로</b> 올리세요. 영수증마다 한 줄씩 나눠 적어요.</div>') +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>' +
@@ -6565,7 +6585,7 @@
           cars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') + '</select>'
         : '<input class="inp" id="evCar" style="max-width:200px" placeholder="예) 12가3456" value="' +
           esc(my.plate_no || '') + '">') +
-      '<div class="fhint">올리는 것 전부에 같이 붙습니다</div></div></div></div>' +
+      '<div class="fhint">올리는 파일 모두에 같이 적혀요.</div></div></div></div>' +
       '<div id="evList"></div>' +
       '<div id="evNote" class="fhint" style="margin-top:10px"></div>' +
       '<div id="evAiNote" class="fhint"></div>';
@@ -6580,8 +6600,8 @@
     askAi().then(function (on) {
       var el = $('evAiNote');
       if (el) el.innerHTML = on
-        ? gemTag('Gemini') + ' 가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드립니다. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
-        : 'Gemini 읽기가 꺼져 있어 구분·날짜·금액을 직접 넣습니다. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b> 로 줄을 늘리세요.';
+        ? gemTag('AI') + '가 사진에서 <b>구분·날짜·금액</b>을 읽어 미리 채워 드려요. 틀릴 수 있으니 <b>올리기 전에 꼭 확인</b>해 주세요.'
+        : 'AI 읽기가 꺼져 있어 구분, 날짜, 금액을 직접 넣어야 해요. 한 장에 영수증이 여럿이면 줄 끝의 <b>＋</b>로 줄을 늘리세요.';
     });
   }
 
@@ -6686,8 +6706,8 @@
     var list = Array.prototype.slice.call(files || []);
     if (!list.length || EVUP.busy) return;
     var tooBig = list.filter(function (f) { return f.size > 30e6; });
-    if (tooBig.length) { evNote('<b style="color:var(--red)">30MB 가 넘는 파일이 있습니다: ' +
-      esc(tooBig[0].name) + '</b>'); return; }
+    if (tooBig.length) { evNote('<b style="color:var(--red)">‘' +
+      esc(tooBig[0].name) + '’ 파일이 30MB를 넘어요.</b> 더 작은 사진이나 PDF로 골라 주세요.'); return; }
 
     evRead();                      // ★ 다시 그리기 전에 쳐 둔 값을 지킨다(안 부르면 금액이 다 날아갔다)
     EVUP.busy = true;
@@ -6705,7 +6725,7 @@
         return fileToJpegs(file, function (n, total) {
           if (!live()) return;
           evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
-            (total > 3 ? ' <span class="dim">(다른 탭으로 가시면 잠시 멈추고, 돌아오시면 이어집니다)</span>' : ''));
+            (total > 3 ? ' <span class="dim">다른 탭으로 가면 잠시 멈췄다가, 돌아오면 이어서 바꿔요.</span>' : ''));
         }).then(function (blobs) {
           return shotP.then(function (shot) {
             if (!live()) return;
@@ -6735,10 +6755,10 @@
       paintEvList();
       var m = String((e && e.message) || '');
       evNote('<b style="color:var(--red)">' + esc(
-        m === 'pdfjs' ? 'PDF 를 읽는 도구를 불러오지 못했습니다. 사진으로 올려 주세요.'
-          : m === 'toomany' ? 'PDF 가 30장을 넘습니다. 나눠서 올려 주세요.'
-            : m === 'image' ? '이미지를 읽지 못했습니다. 다른 파일로 해 보세요.'
-              : '파일을 읽지 못했습니다. 다른 파일로 다시 올려 주세요.') + '</b>');
+        m === 'pdfjs' ? 'PDF 읽기 도구를 불러오지 못했어요. 새로고침하거나 사진으로 올려 주세요.'
+          : m === 'toomany' ? 'PDF가 30장을 넘어요. 나눠서 올려 주세요.'
+            : m === 'image' ? '이미지를 읽지 못했어요. 다른 파일로 올려 주세요.'
+              : '파일을 읽지 못했어요. 다른 파일로 다시 올려 주세요.') + '</b>');
       if (m && m !== 'pdfjs' && m !== 'toomany' && m !== 'image') console.warn('영수증 읽기 실패', m);
     });
   }
@@ -6752,7 +6772,7 @@
     var now = Date.now(), inside = now >= EVUP.lo && now < EVUP.hi;
     var it = { page: pi, cat: EVUP.defCat || '', amt: '', memo: '', crop: null, ai: false, km: null, amtMiss: false, hint: '',
       date: inside ? ymd(now) : '', dateBy: inside ? 'today' : '', dhShot: false,
-      dh: inside ? '' : '날짜를 골라 주세요 — 오늘은 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다' };
+      dh: inside ? '' : '오늘이 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 기간 밖이라 날짜를 골라 주세요' };
     // 계기판에는 날짜가 없다 — 사진을 찍은 날로(사진 날짜가 없는 PDF 쪽은 위 규칙 그대로)
     if (it.cat === '계기판') evShotDate(it);
     return it;
@@ -6840,8 +6860,8 @@
     var day = ymd(ms), d0 = Date.parse(day + 'T00:00:00+09:00'), inside = d0 >= EVUP.lo && d0 < EVUP.hi;
     it.date = inside ? day : '';
     it.dateBy = inside ? 'shot' : '';
-    it.dh = inside ? '사진 정보의 찍은 날로 넣었습니다 — 맞는지 확인해 주세요'
-      : '찍은 날을 넣어 주세요 — 사진 정보의 날짜(' + day.replace(/-/g, '.') + ')가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다';   // 점 꼴 — 「2026-09-」에서 줄이 끊기지 않게
+    it.dh = inside ? '사진을 찍은 날로 넣었어요. 맞는지 확인해 주세요.'
+      : '사진 정보의 날짜(' + day.replace(/-/g, '.') + ')가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 기간 밖이에요. 찍은 날을 넣어 주세요.';   // 점 꼴 — 「2026-09-」에서 줄이 끊기지 않게
     it.dhShot = true;
     return true;
   }
@@ -6850,10 +6870,10 @@
   function evHintOf(it) {
     var odo = it.cat === '계기판', p = [];
     if (it.dh && !it.dhShot) p.push(it.dh);
-    if (!odo && it.km != null) p.push('계기판 ' + n0(it.km) + ' km');
-    if (!odo && it.amtMiss) p.push('금액을 읽지 못했습니다');
+    if (!odo && it.km != null) p.push('계기판 ' + n0(it.km) + ' km로 읽었어요.');
+    if (!odo && it.amtMiss) p.push('금액을 읽지 못했어요. 직접 넣어 주세요.');
     if (it.hint) p.push(it.hint);
-    return p.join(' · ');
+    return p.map(endDot).join(' ');
   }
 
   function blobToB64(blob) {
@@ -7068,21 +7088,21 @@
                 else {
                   // ★ 기본 날짜(오늘)로 두면 8월 영수증이 10월분 정산에 그대로 들어간다. 비워서 사람이 정하게 한다.
                   it.date = '';
-                  it.dh = '사진의 날짜가 ' + x.date + ' 입니다 — ' + cycleName(CYC) + '(' + cycleSpan(CYC) +
-                    ') 영수증이 아니면 이 줄을 빼 주세요';
+                  it.dh = '사진 날짜(' + String(x.date).replace(/-/g, '.') + ')가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) +
+                    ') 기간 밖이에요. 이 기간 영수증이 아니면 이 줄을 빼 주세요.';
                 }
               } else if (!(it.cat === '계기판' && evShotDate(it))) {
                 // 날짜를 못 읽음 — 계기판(늘 날짜가 없다)이면 위 조건에서 사진을 찍은 날로 넣었다. 영수증이나 찍은 날이 없는 장(PDF 쪽)만 비운다.
-                it.date = ''; it.dh = '날짜를 읽지 못했습니다 — 직접 넣어 주세요';
+                it.date = ''; it.dh = '날짜를 읽지 못했어요. 직접 넣어 주세요.';
               }
               if (x.kind !== 'odometer') {
                 if (x.amount != null) it.amt = String(x.amount);
                 else it.amtMiss = true;              // 「금액을 읽지 못했습니다」 — 계기판으로 바꾸면 보이지 않는다(evHintOf)
               }
-              if (x.legible === false) hint.push('글자가 흐립니다 — 직접 확인해 주세요');
+              if (x.legible === false) hint.push('글자가 흐려요. 직접 확인해 주세요.');
               // 영수증 자리를 받지 못했으면 장 전체를 따로 올리지 않고 원본 장을 이 줄의 사진으로 쓴다(올리기 — 2026-10-21). 그렇다고 알린다.
-              if (many && !crops[k]) hint.push('영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이 됩니다');
-              it.hint = hint.join(' · ');
+              if (many && !crops[k]) hint.push('영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진이 돼요.');
+              it.hint = hint.join(' ');
               return it;
             });
             // 0원으로 읽힌 영수증(하이패스 할인·면제 줄 등)은 올릴 것이 없다 — 저절로 뺀다(2026-10-15 사용자).
@@ -7090,7 +7110,7 @@
             var zero = recs.filter(function (x) { return x.kind !== 'odometer' && x.amount != null && Number(x.amount) === 0; }).length;
             if (zero) {
               rows = rows.filter(function (it, k) { var x = recs[k]; return !(x.kind !== 'odometer' && x.amount != null && Number(x.amount) === 0); });
-              toast('0원으로 읽힌 영수증 ' + n0(zero) + '건은 올릴 필요가 없어 뺐습니다.');
+              toast('0원으로 읽힌 영수증 ' + n0(zero) + '건은 올릴 필요가 없어 목록에서 뺐어요.');
             }
             // 이 장의 (손대지 못하게 막아 둔) 빈 줄을 AI 가 찾은 줄들로 바꾼다.
             var at = -1;
@@ -7106,7 +7126,7 @@
           if (EVUP !== session) return;
           pg.ai = 'fail';
           console.error('AI 판독 실패:', e && e.message);
-          evNote('<span class="dim">Gemini 가 읽지 못한 장이 있습니다. 그 줄은 직접 넣어 주세요.</span>');
+          evNote('<span class="dim">AI가 읽지 못한 장이 있어요. 그 줄은 직접 넣어 주세요.</span>');
         }).then(function () {
           if (EVUP !== session) return;
           // ★ 줄을 갈아 끼웠으면 evRead 를 부르지 않는다 — 화면은 아직 옛 줄 번호라, 뒤 줄의 값이
@@ -7159,7 +7179,7 @@
       var pool = g('[data-evcatsel]') === '통행료' && amt > 0 ? left[day] : null, i = pool ? pool.indexOf(amt) : -1;
       if (i >= 0) pool.splice(i, 1);
       box.hidden = i < 0;
-      box.textContent = i < 0 ? '' : '이 날 통행료는 하이패스 이용내역으로 이미 증빙됐습니다 — 같은 통행료면 안 올려도 됩니다(올려도 한 번만 셉니다).';
+      box.textContent = i < 0 ? '' : '이 날 통행료는 하이패스 이용내역으로 이미 증빙됐어요. 같은 통행료면 올리지 않아도 되고, 올려도 한 번만 계산해요.';
     });
   }
 
@@ -7169,8 +7189,8 @@
   function evOdoCells(it, hintHtml) {
     return '<td class="n eva" data-l="계기판 km" data-evodo style="flex-wrap:wrap;row-gap:2px">' +
       (it.km != null ? '<b class="evkm" style="white-space:nowrap">' + n0(it.km) + ' km</b>'
-        : '<span class="evkm dim" style="font-size:12px;line-height:1.5">읽지 못함 — 검증 때 다시 읽습니다</span>') + '</td>' +
-      '<td class="evm"><div class="evguide" style="font-size:13px;line-height:1.5;color:var(--ink-600)">검증 때 운행일지 마지막 km 와 맞춰 봅니다</div>' +
+        : '<span class="evkm dim" style="font-size:12px;line-height:1.5">읽지 못했어요. 검증 때 다시 읽어요.</span>') + '</td>' +
+      '<td class="evm"><div class="evguide" style="font-size:13px;line-height:1.5;color:var(--ink-600)">검증 때 운행일지 마지막 km와 비교해요.</div>' +
       hintHtml + '</td>';
   }
 
@@ -7207,15 +7227,15 @@
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
           return '<tr data-evrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
-            '<td colspan="4" class="evg"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">Gemini</b> 가 이 장에서 영수증을 읽는 중…</span>' +
+            '<td colspan="4" class="evg"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">AI</b>가 이 장에서 영수증을 읽는 중…</span>' +
             '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
             '<td class="n evx"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
         }
         // 사진 정보로 넣은 날짜 안내는 Gemini 딱지 없이(Gemini 가 한 일이 아니다) — 그것이 있으면 「가 채웠습니다」 줄은 내지 않는다(안내 줄이 셋이 되지 않게)
         var ht = evHintOf(it), shot = it.dhShot ? it.dh : '';
         var hintHtml = (shot ? '<div class="evhint" data-evshot>' + esc(shot) + '</div>' : '') +
-          (ht ? '<div class="evhint">' + (it.ai ? gemTag() + ' ' : '') + esc(ht) + '</div>'
-            : (it.ai && !shot ? '<div class="evhint ok">' + gemTag() + ' 가 채웠습니다 — 사진과 맞는지 확인해 주세요</div>' : ''));
+          (ht ? '<div class="evhint">' + (it.ai ? gemTag('AI') + ' ' : '') + esc(ht) + '</div>'
+            : (it.ai && !shot ? '<div class="evhint ok">' + gemTag('AI') + '가 채웠어요. 사진과 맞는지 확인해 주세요.</div>' : ''));
         return '<tr data-evrow="' + i + '" class="' + (first ? 'pgfirst' : '') + (it.ai ? ' evai' : '') + '">' +
           '<td class="evth">' + thumb + '</td>' +
           '<td class="evc"><select class="inp' + (it.cat ? '' : ' need') + '" data-evcatsel style="width:108px" aria-label="' + (i + 1) + '번째 구분">' +
@@ -7232,19 +7252,19 @@
               esc(it.memo) + '" aria-label="' + (i + 1) + '번째 메모">' + hintHtml +
               '<div class="evhint hpdup" data-evhp hidden></div></td>') +
           '<td class="n evx" style="white-space:nowrap">' +
-          '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘립니다" aria-label="같은 장에 줄 추가">＋</button> ' +
+          '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘려요" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">빼기</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
       n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · ' +
       (nOdo < n ? '영수증 ' + n0(n - nOdo) + '건' + (nOdo ? ' · ' : '') : '') + (nOdo ? '계기판 사진 ' + n0(nOdo) + '건' : '') +
-      (running ? ' · <b class="gemtxt">Gemini 가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
+      (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
     evHpNotes();
     if (b) {
       b.disabled = running > 0;
       // 읽는 동안은 Gemini 색으로 돌며 빛이 지나간다(검증 버튼과 같은 모양).
       b.classList.toggle('gembtn', running > 0); b.classList.toggle('running', running > 0);
-      b.innerHTML = running ? gemSvg(16) + '<span class="gl">Gemini 가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
+      b.innerHTML = running ? gemSvg(16) + '<span class="gl">AI가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
     }
     // 채울 빈 칸이 있을 때만 보인다.
     if (f) f.hidden = n < 2 || running > 0 || !EVUP.items.some(function (x, i) { return i && (!x.cat || (!x.date && !x.ai)); });
@@ -7270,8 +7290,8 @@
   });
 
   function runEvUpload() {
-    if (EVUP.busy) { toast('아직 파일을 읽는 중입니다. 잠시만 기다려 주세요.'); return; }
-    if (EVUP.pages.some(function (p) { return p.ai === 'run'; })) { toast('Gemini 가 아직 읽는 중입니다. 기다리거나 「직접 입력」을 눌러 주세요.'); return; }
+    if (EVUP.busy) { toast('아직 파일을 읽는 중이에요. 잠시만 기다려 주세요.'); return; }
+    if (EVUP.pages.some(function (p) { return p.ai === 'run'; })) { toast('AI가 아직 읽는 중이에요. 기다리거나 ‘직접 입력’을 눌러 주세요.'); return; }
     if (!EVUP.items.length) { toast('올릴 파일을 골라 주세요.', true); return; }
     evRead();
     var car = String(($('evCar') || {}).value || '').trim();
@@ -7289,15 +7309,15 @@
       var ms = Date.parse(it.date + 'T00:00:00+09:00');
       if (!isFinite(ms)) { bad('의 날짜를 골라 주세요.', '[data-evdate]'); return; }
       if (ms < EVUP.lo || ms >= EVUP.hi) {
-        bad(' 날짜가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 밖입니다.', '[data-evdate]'); return;
+        bad(' 날짜가 ' + cycleName(CYC) + '(' + cycleSpan(CYC) + ') 기간 밖이에요.', '[data-evdate]'); return;
       }
       it.ms = ms;
       // 계기판 사진은 금액 칸이 없다(2026-10-21) — 금액을 보지 않고 0 으로 올린다(계기판으로 바꾸기 전에 쳐 둔 금액·메모는 올리지 않는다)
       if (it.cat === '계기판') { it.amtN = 0; continue; }
-      if (it.amtBad) { bad('의 금액에 숫자가 아닌 글자가 있습니다 — ' + NUM_BAD + '.', '[data-evamt]'); return; }
+      if (it.amtBad) { bad(' 금액에는 ' + NUM_BAD + '.', '[data-evamt]'); return; }
       var amt = Number(it.amt || 0);
-      if (!isFinite(amt) || amt < 0 || amt > 5000000) { bad('의 금액이 범위를 벗어났습니다.', '[data-evamt]'); return; }
-      if (!amt) { bad('의 금액을 넣어 주세요. 계기판 사진만 0원이어도 됩니다.', '[data-evamt]'); return; }
+      if (!isFinite(amt) || amt < 0 || amt > 5000000) { bad('의 금액이 범위를 벗어났어요.', '[data-evamt]'); return; }
+      if (!amt) { bad('의 금액을 넣어 주세요. 계기판 사진만 0원으로 올릴 수 있어요.', '[data-evamt]'); return; }
       it.amtN = Math.round(amt);
     }
 
@@ -7365,7 +7385,7 @@
       evFreeUrls();
       EVUP.items = []; EVUP.pages = [];
       closePanel();
-      toastOk('영수증 ' + n0(done) + '건을 올렸습니다.');
+      toastOk('영수증 ' + n0(done) + '건을 올렸어요.');
       AUDIT = null; loadAll();
     }).catch(function (e) {
       EVUP.busy = false; EV_SENDING = false;
@@ -7375,7 +7395,7 @@
       EVUP.items.splice(0, done);
       paintEvList();
       if (done) { AUDIT = null; loadAll(); }
-      var failTxt = done ? done + '건까지 올렸습니다. ' + (total - done) + '건이 남았습니다 — ' + evWhy(e) : '올리지 못했습니다 — ' + evWhy(e);
+      var failTxt = done ? done + '건까지 올렸고 ' + (total - done) + '건이 남았어요. ' + evWhy(e) : '올리지 못했어요. ' + evWhy(e);
       evNote('<b style="color:var(--red)">' + esc(failTxt) + '</b>');
       // 폰에서는 안내 줄이 창 아래쪽(화면 밖)에 있어 실패를 몰랐다(2026-10-20 AU6-M6) — 토스트로도 알리고 그 줄로 굴린다
       toast(failTxt, true);
@@ -7387,12 +7407,12 @@
   function evWhy(e) {
     var m = String((e && e.message) || '');
     console.error('증빙 올리기 실패:', m);
-    if (/413|too large/i.test(m)) return '파일이 너무 큽니다. 사진을 줄여서 다시 올려 주세요.';
+    if (/413|too large/i.test(m)) return '파일이 너무 커요. 사진을 줄여서 다시 올려 주세요.';
     // 403 은 로그인 만료가 아니라 권한·잠금 판정이다(2026-10-20 AU2 #17) — 결재가 올라간 기간이거나 권한이 없다
-    if (/CYCLE_LOCKED|row-level security|403|permission/i.test(m) && !/401|jwt/i.test(m)) return '올릴 권한이 없거나 결재가 올라간 기간입니다. 기간을 확인해 주세요.';
-    if (/401|jwt|로그인/i.test(m)) return '로그인이 풀렸습니다. 다시 로그인한 뒤 올려 주세요.';
-    if (/409|duplicate/i.test(m)) return '같은 파일이 이미 올라가 있습니다. 목록을 다시 확인해 주세요.';
-    return '잠시 뒤 「올리기」를 다시 눌러 주세요.';
+    if (/CYCLE_LOCKED|row-level security|403|permission/i.test(m) && !/401|jwt/i.test(m)) return '올릴 권한이 없거나 결재가 올라간 기간이에요. 기간을 확인해 주세요.';
+    if (/401|jwt|로그인/i.test(m)) return '로그인이 만료됐어요. 다시 로그인한 뒤 올려 주세요.';
+    if (/409|duplicate/i.test(m)) return '같은 파일이 이미 올라가 있어요. 목록을 다시 확인해 주세요.';
+    return '잠시 후 ‘올리기’를 다시 눌러 주세요.';
   }
 
   function evDelete(id) {
@@ -7403,7 +7423,7 @@
       (e.amount ? ' · ' + won(e.amount) : '');
     // 주차·통행료 영수증이면 그 금액이 운행에 들어가 있는지 먼저 본다(2026-10-20 AU2 ①) — 보는 동안 「지우기」를 잠깐 막는다
     var money = e.category === '주차' || e.category === '통행료';
-    $('pBody').innerHTML = '<div class="anote">이 영수증을 지웁니다. 되돌릴 수 없습니다.</div>' +
+    $('pBody').innerHTML = '<div class="anote">이 영수증을 지울까요? 지우면 되돌릴 수 없어요.</div>' +
       (money ? '<div id="evUndo" class="undowait dim">이 영수증 금액이 들어간 운행이 있는지 보는 중…</div>' : '') +
       (e.photo_path ? '<div class="form"><div class="frow"><div class="fbody">' +
         '<img src="' + esc(SB + '/storage/v1/object/public/evidence/' + e.photo_path) + '" ' +
@@ -7435,7 +7455,7 @@
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.status); });
         return r.json().then(function (rows) {
           if (!Array.isArray(rows) || !rows.length) {
-            throw new Error('지워지지 않았습니다. 이 기간이 상신됐거나 권한이 없을 수 있습니다 — 새로 고침 후 다시 확인해 주세요');
+            throw new Error('지워지지 않았어요. 이 기간이 상신됐거나 권한이 없을 수 있으니, 새로고침한 뒤 다시 확인해 주세요.');
           }
         });
       })
@@ -7462,7 +7482,7 @@
   }
   function evDelWhy(err) {
     var m = err && String(err.message || '');
-    return m.indexOf('지워지지 않았습니다') === 0 ? m : '지우지 못했습니다. 잠시 뒤 다시 해 보세요.';
+    return m.indexOf('지워지지 않았어요') === 0 ? m : '지우지 못했어요. 잠시 후 다시 해 주세요.';
   }
   function runEvDelete(id) {
     var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
@@ -7474,9 +7494,9 @@
       .then(function (fileGone) {
         return (picked.length ? applyUndo(picked) : Promise.resolve(null)).then(function (u) {
           closePanel(); AUDIT = null; TRIP_CACHE = {}; loadAll();
-          var m = '지웠습니다.' + undoSay(u);
-          if (u && u.fail) toast(m + (fileGone ? '' : ' 기록은 지웠지만 사진 파일은 남았습니다.'), true);
-          else toastOk(m, fileGone ? null : '기록은 지웠지만 사진 파일은 남았습니다.');
+          var m = '지웠어요.' + undoSay(u);
+          if (u && u.fail) toast(m + (fileGone ? '' : ' 기록은 지웠지만 사진 파일은 남았어요.'), true);
+          else toastOk(m, fileGone ? null : '기록은 지웠지만 사진 파일은 남았어요.');
         });
       })
       .catch(function (err) {
@@ -7537,7 +7557,7 @@
       Object.keys(g.ids).forEach(function (id) { n++; sum += (g.meta[id] || {}).amt || 0; });
       Array.prototype.forEach.call(document.querySelectorAll('input[data-mselall="' + grp + '"]'), function (a) {
         a.disabled = !nOk; a.checked = nOk > 0 && n === nOk; a.indeterminate = n > 0 && n < nOk;
-        var lab = a.closest('label'); if (lab) lab.title = nOk ? '보이는 줄 모두 고르기' : '고를 수 있는 줄이 없습니다';
+        var lab = a.closest('label'); if (lab) lab.title = nOk ? '보이는 줄 모두 고르기' : '고를 수 있는 줄이 없어요';
       });
       Array.prototype.forEach.call(document.querySelectorAll('[data-mselbar="' + grp + '"]'), function (bar) {
         bar.hidden = !n;
@@ -7581,7 +7601,7 @@
     if (!def || !ids.length || g.busy) return;
     var sum = ids.reduce(function (s, id) { return s + ((g.meta[id] || {}).amt || 0); }, 0);
     openPanel(def.noun + ' ' + n0(ids.length) + '건 지우기', '합계 ' + won(sum),
-      '<div class="anote" style="margin-top:0">고른 ' + n0(ids.length) + '건을 지웁니다. 되돌릴 수 없습니다.' + (def.note ? ' ' + esc(def.note) : '') + '</div>' +
+      '<div class="anote" style="margin-top:0">고른 ' + n0(ids.length) + '건을 지울까요? 지우면 되돌릴 수 없어요.' + (def.note ? ' ' + esc(def.note) : '') + '</div>' +
       '<ul class="mselist">' + ids.map(function (id) { return '<li data-mselid="' + esc(id) + '">' + esc((g.meta[id] || {}).line || id) + '</li>'; }).join('') + '</ul>' +
       (def.undoPlan ? '<div id="mselUndo" class="undowait dim">고른 영수증 금액이 들어간 운행이 있는지 보는 중…</div>' : '') +
       '<div class="mselprog" aria-live="polite"></div>',
@@ -7615,7 +7635,7 @@
       if (i >= ids.length) return finish();
       var id = ids[i++];
       if (btn) btn.textContent = '지우는 중… ' + i + '/' + ids.length;
-      if (prog) prog.textContent = ids.length + '건 중 ' + i + '번째를 지우는 중입니다.';
+      if (prog) prog.textContent = ids.length + '건 중 ' + i + '번째를 지우는 중…';
       mark(id, 'now');
       Promise.resolve().then(function () { return def.del(id); })
         .then(function (r) { ok++; if (r === false) warn++; delete g.ids[id]; gone[String(id)] = 1; mark(id, 'done'); },
@@ -7628,11 +7648,11 @@
       (undo.length ? applyUndo(undo) : Promise.resolve(null)).then(function (u) {
         g.busy = false;
         closePanel();
-        var msg = !bad.length ? n0(ok) + '건을 지웠습니다.'
-          : n0(ids.length) + '건 중 ' + n0(ok) + '건을 지웠습니다. ' + n0(bad.length) + '건(' +
+        var msg = !bad.length ? n0(ok) + '건을 지웠어요.'
+          : n0(ids.length) + '건 중 ' + n0(ok) + '건을 지웠고, ' + n0(bad.length) + '건(' +
             bad.slice(0, 3).map(function (x) { return (g.meta[x.id] || {}).line || x.id; }).join(', ') + (bad.length > 3 ? ' 외' : '') +
-            ')은 지우지 못했습니다 — ' + String(bad[0].why).replace(/[.\s]+$/, '') + '. 못 지운 줄은 고른 채로 남겨 두었습니다.';
-        if (!bad.length && warn) msg += ' 사진 파일 ' + n0(warn) + '개는 남았습니다.';
+            ')은 지우지 못했어요. ' + String(bad[0].why).replace(/[.\s]+$/, '') + '. 못 지운 줄은 고른 채로 남겨 두었어요.';
+        if (!bad.length && warn) msg += ' 사진 파일 ' + n0(warn) + '개는 남았어요.';
         toast(msg + undoSay(u), !!bad.length || !!(u && u.fail));
         if (u && u.ok) TRIP_CACHE = {};
         if (def.done) def.done(ok); else render();
@@ -7640,7 +7660,7 @@
     }
   }
   mselDef('ev', {
-    noun: '영수증', note: '사진도 함께 지워집니다.',
+    noun: '영수증', note: '사진도 함께 지워져요.',
     // 그 영수증 금액이 운행에 들어가 있으면 확인 창에서 함께 되돌린다(2026-10-20 AU2 ①)
     undoPlan: function (ids) {
       var moves = ids.map(function (id) { var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0]; return e ? { e: e, to: null } : null; })
@@ -7649,12 +7669,12 @@
     },
     del: function (id) {
       var e = EVID.filter(function (x) { return String(x.id) === String(id); })[0];
-      if (!e) return Promise.reject(new Error('이미 없는 줄입니다'));
+      if (!e) return Promise.reject(new Error('이미 없는 줄이에요'));
       return evDelOne(e);
     },
     // 여러 건 알림은 줄 이름이 이미 길다 — 까닭만 짧게
     why: function (err) {
-      return String((err && err.message) || '').indexOf('지워지지 않았습니다') === 0 ? '이 기간이 상신됐거나 권한이 없을 수 있습니다' : '잠시 뒤 다시 해 보세요';
+      return String((err && err.message) || '').indexOf('지워지지 않았어요') === 0 ? '이 기간이 상신됐거나 권한이 없을 수 있어요' : '잠시 후 다시 해 주세요';
     },
     done: function () { AUDIT = null; loadAll(); }
   });
@@ -7700,14 +7720,14 @@
     var q = FINQ[kind] || '';
     return '<div class="finbar"><label class="field finq">' + ic('search', 15) +
       '<input data-finq="' + esc(kind) + '" data-fk="finq:' + esc(kind) + '" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="이름으로 찾기"' +
-      ' value="' + esc(q) + '" title="이름 일부만 쳐도 됩니다 · 여러 명은 띄어서 · Esc 로 지우기" aria-label="이름으로 찾기 — 여러 명은 띄어서">' +
+      ' value="' + esc(q) + '" title="이름 일부만 써도 돼요. 여러 명은 띄어 쓰고, Esc로 지워요." aria-label="이름으로 찾기 — 여러 명은 띄어서">' +
       '<button type="button" class="permx finqx" data-finqx="' + esc(kind) + '" aria-label="찾기 지우기"' + (q ? '' : ' hidden') + '>' + ic('close', 12) + '</button></label>' +
       '<span class="finqn" data-finqn="' + esc(kind) + '" aria-live="polite"></span></div>';
   }
   /** 찾는 이름이 없을 때 표 안 한 줄(finSync 가 보인다) */
   function finNone(cols) {
-    return '<tr class="finnone" hidden><td colspan="' + cols + '"><div class="blank" style="padding:22px 0"><div class="t">찾는 이름이 없습니다.</div>' +
-      '<div class="d">이름 일부만 쳐도 됩니다. 여러 명은 띄어서 칩니다.</div></div></td></tr>';
+    return '<tr class="finnone" hidden><td colspan="' + cols + '"><div class="blank" style="padding:22px 0"><div class="t">찾는 이름이 없어요.</div>' +
+      '<div class="d">이름 일부만 써도 돼요. 여러 명은 띄어 쓰세요.</div></div></td></tr>';
   }
   /** 묶음 차례 = 표에 보이는 차례(팀 → 파트·센터 → 이름). team = 고른 사람이 모두 한 팀이면 그 팀 이름(파일 이름), 아니면 ''. */
   function finOrder(list, getU) {
@@ -7975,23 +7995,23 @@ window.EduGuard = {
     var clean = !ob.length && (amTarget ? round.length > 0 : true);
 
     var h = head('안전교육', esc(key) + ' 회차 · 시청 기간 ' + eduOpenLabel(key) + '~' + eduDeadlineLabel(key) + ' · ' + eduDday(key));
-    var verdict = ob.length ? '의무 교육 <em>' + ob.length + '편</em>이 남았습니다'
-      : amTarget && !round.length ? '이번 회차 영상이 아직 없습니다'
-        : amTarget ? '<em>이수를 마치셨습니다</em>'
-          : '의무 대상이 아닙니다 · 자율 학습으로 볼 수 있습니다';
+    var verdict = ob.length ? '의무 교육 <em>' + ob.length + '편</em>이 남았어요'
+      : amTarget && !round.length ? '이번 회차 영상이 아직 없어요'
+        : amTarget ? '<em>이수를 마쳤어요</em>'
+          : '의무 대상은 아니지만 자율 학습으로 볼 수 있어요';
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' + (clean ? ' style="background:var(--ok)"' : '') + '></span>' +
       esc(key) + ' 회차</div>' +
       '<p class="verdict' + (clean ? ' clean' : '') + '">' + verdict + '</p>' +
       '<div class="facts">' +
       '<div class="fact"><div class="k">이번 회차 내 이수</div><div class="v">' + done + '<small> / ' + round.length + '편</small></div>' +
-      '<div class="sub">' + (amTarget ? '의무 대상입니다' : '의무 대상 아님') + '</div></div>' +
+      '<div class="sub">' + (amTarget ? '의무 대상' : '의무 대상 아님') + '</div></div>' +
       '<div class="fact"><div class="k">남은 의무</div><div class="v' + (ob.length ? ' alert' : '') + '">' + ob.length + '<small>편</small></div>' +
       // D-day 는 위 머리 줄에 한 번만(2026-10-19) — 여기서는 마감 날짜
       '<div class="sub">' + (ob.length ? (carry ? '이월 ' + carry + '편 포함 · ' : '') + '가장 급한 마감 ' + eduDeadlineLabel(ob[0].month) : '남은 것 없음') + '</div></div>' +
       '<div class="fact"><div class="k">전체 영상</div><div class="v">' + EDUV.length + '<small>편</small></div></div>' +
       '</div></div>';
 
-    if (!EDUV.length) return h + blank('등록된 교육 영상이 없습니다.', null, 'play');
+    if (!EDUV.length) return h + blank('등록된 교육 영상이 없어요.', null, 'play');
     var by = {}, keys = [];
     EDUV.forEach(function (v) { if (!by[v.month]) { by[v.month] = []; keys.push(v.month); } by[v.month].push(v); });
     // 순서: 이번 회차 → 지난 회차(최근 것부터) → 공개 예정(2026-10-19 웹 사용성 1차 — 공개 예정이 의무 영상보다 위에 있었다)
@@ -8012,15 +8032,15 @@ window.EduGuard = {
             (v.description ? '<div class="edud">' + esc(v.description) + '</div>' : '') +
             (open ? '<div class="track' + (ok ? ' ok' : '') + '"><i style="width:' + Math.max(0, Math.min(100, p)) + '%"></i></div>' +
               '<div class="edup' + (ok ? ' ok' : '') + '">' + (ok ? '✅ 시청 완료' : p + '%') + '</div>'
-              : '<div class="edup">' + eduOpenLabel(v.month) + '부터 시청할 수 있습니다</div>') +
+              : '<div class="edup">' + eduOpenLabel(v.month) + '부터 시청할 수 있어요</div>') +
             '</div>' +
             (open ? '<button class="btn sm" data-eduplay="' + esc(v.id) + '">' + ic('play', 12) + (ok ? '다시 보기' : p > 0 ? '이어 보기' : '보기') + '</button>' : '') +
             '</div>';
         }).join('') + '</div>');
     });
     h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;color:var(--ink-600);line-height:1.7">' +
-      '· 앞으로 건너뛰기와 배속 변경은 불가합니다<br>· 되감기는 자유이며, 나갔다 와도 이어서 볼 수 있습니다<br>' +
-      '· 앱과 웹의 진도는 함께 쌓입니다(어느 쪽에서 봐도 같은 기록)</div></section>';
+      '· 앞으로 건너뛰기와 배속 변경은 할 수 없어요<br>· 되감기는 자유롭고, 나갔다 와도 이어서 볼 수 있어요<br>' +
+      '· 앱과 웹의 진도는 함께 쌓여요</div></section>';
     return h;
   }
 
@@ -8055,14 +8075,14 @@ window.EduGuard = {
   }
   function eduOpenWatch(id) {
     var v = EDUV.filter(function (x) { return String(x.id) === String(id); })[0];
-    if (!v) { toast('영상 정보를 찾을 수 없습니다.', true); return; }
-    if (!eduIsOpen(v.month)) { toast(eduOpenLabel(v.month) + '부터 시청할 수 있습니다.', true); return; }
+    if (!v) { toast('영상 정보를 찾을 수 없어요.', true); return; }
+    if (!eduIsOpen(v.month)) { toast(eduOpenLabel(v.month) + '부터 시청할 수 있어요.', true); return; }
     eduStop();
     openPanel(v.title, v.month + ' 회차 · 마감 ' + eduDeadlineLabel(v.month) + ' · ' + eduDday(v.month),
       '<div class="eduplayer"><div id="eduYt"></div></div>' +
       '<div class="edustat"><b id="eduPct"></b><div class="edusb"><div class="track"><i id="eduBar"></i></div>' +
       '<div id="eduMsg" class="dim">영상을 불러오는 중…</div></div></div>' +
-      '<div class="fhint">· 앞으로 건너뛰기와 배속 변경은 불가합니다<br>· 되감기는 자유이며, 나갔다 와도 이어서 볼 수 있습니다</div>' +
+      '<div class="fhint">· 앞으로 건너뛰기와 배속 변경은 할 수 없어요<br>· 되감기는 자유롭고, 나갔다 와도 이어서 볼 수 있어요</div>' +
       '<div id="eduCongrats" hidden></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>', true);
     // 창을 연 뒤에 시청 상태를 만든다(openPanel 은 열려 있던 시청 창을 멈춘다).
@@ -8104,11 +8124,11 @@ window.EduGuard = {
               savedSeconds: W.sec,
               now: function () { return Date.now(); },
               onSave: function (p, s) { eduSave(W, p, s); },
-              onBlockedSeek: function () { if (W === EDUW) eduMsg('⛔ 앞으로 건너뛰기는 불가합니다'); }
+              onBlockedSeek: function () { if (W === EDUW) eduMsg('⛔ 앞으로 건너뛸 수 없어요'); }
             });
             if (W.sec > 3) W.player.seekTo(W.sec, true);
             W.ticker = setInterval(function () { if (W.guard) W.guard.tick(); }, 250);
-            eduMsg(W.sec > 3 ? '이전 위치에서 재개합니다 · ▶ 재생을 누르세요' : '▶ 재생을 눌러 시작하세요');
+            eduMsg(W.sec > 3 ? '지난번 본 곳부터 이어서 봐요. ▶ 재생을 누르세요.' : '▶ 재생을 눌러 시작하세요.');
           },
           onStateChange: function (e) {
             if (W !== EDUW) return;
@@ -8118,10 +8138,10 @@ window.EduGuard = {
             if (W.guard) W.guard.onStateChange(e.data);
           },
           onPlaybackRateChange: function () { if (W.guard) W.guard.onRateChange(); },
-          onError: function (e) { if (W === EDUW) eduMsg('⚠️ 영상 로드 오류(' + e.data + ') — 네트워크 확인 후 재시도'); }
+          onError: function (e) { if (W === EDUW) eduMsg('⚠️ 영상을 불러오지 못했어요(오류 ' + e.data + '). 네트워크를 확인하고 다시 해 주세요.'); }
         }
       });
-    }, function () { if (W === EDUW) eduMsg('⚠️ 영상 로드 오류(-1) — 네트워크 확인 후 재시도'); });
+    }, function () { if (W === EDUW) eduMsg('⚠️ 영상을 불러오지 못했어요(오류 -1). 네트워크를 확인하고 다시 해 주세요.'); });
   }
   /** 가드가 부르는 저장. 앱처럼 서버 시작값 미만이면 보내지 않고, 처음 100% 일 때만 completed_at 을 싣는다.
    *  저장은 한 줄로 세운다 — 앞 저장이 끝난 뒤에 '처음 100%' 를 판단해야 completed_at 이 두 번 안 간다. */
@@ -8141,12 +8161,12 @@ window.EduGuard = {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([row]), keepalive: !!W.gone
       }).then(function (r) {
-        if (!r.ok) { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했습니다 — 네트워크 확인 후 다시 재생해 주세요'); return; }
+        if (!r.ok) { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했어요. 네트워크를 확인하고 다시 재생해 주세요.'); return; }
         eduLocalRow(row);
         if (first) { W.start = 100; eduCongrats(W); }
         if (W === EDUW) eduMsg(p >= 100 ? '✅ 시청 완료!' : '재생 중 · 자동 저장');
       });
-    }).catch(function () { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했습니다 — 네트워크 확인 후 다시 재생해 주세요'); });
+    }).catch(function () { if (W === EDUW) eduMsg('⚠️ 진도를 저장하지 못했어요. 네트워크를 확인하고 다시 재생해 주세요.'); });
   }
   /** 저장이 된 값을 화면 자료(EDUP)에도 넣는다 — 다시 받지 않아도 목록 %·메뉴 숫자가 맞게. */
   function eduLocalRow(row) {
@@ -8218,10 +8238,10 @@ window.EduGuard = {
     if (T.unk) {
       h += '<section class="sect"><button class="issue sv-warn" data-issue="unk" style="border-radius:var(--r-lg);border:1px solid var(--line);background:var(--surface)">' +
         '<span class="ico">' + ic('ticket', 17) + '</span>' +
-        '<span class="bd"><span class="t">통행료 미확정 ' + n0(T.unk) + '건이 0원으로 정산됩니다</span>' +
+        '<span class="bd"><span class="t">통행료 미확정 ' + n0(T.unk) + '건이 0원으로 정산돼요</span>' +
         '<span class="d">' + (!isAll() && myCycLocked()
-          ? lockWhy(myName()) + ' 이 기간에는 영수증을 올릴 수 없습니다. 고쳐야 하면 결재하는 분에게 반려를 요청하세요.'
-          : '통행료를 낸 운행이면 「2 영수증·통행료」에서 영수증을 올리세요 — 그날 운행 금액이 없으면 영수증 금액이 합계에 들어갑니다.') + '</span></span>' +
+          ? lockWhy(myName()) + ' 이 기간에는 영수증을 올릴 수 없어요. ' + lockHow(myName())
+          : '통행료를 냈다면 ‘영수증·통행료’ 단계에서 영수증을 올리세요. 그날 운행 금액이 없으면 영수증 금액이 합계에 들어가요.') + '</span></span>' +
         '<span class="go">' + ic('chev', 15) + '</span></button></section>';
     }
 
@@ -8233,14 +8253,14 @@ window.EduGuard = {
       // 두 단추는 한 묶음(같은 줄·같은 높이 — 폰에서 두 줄로 갈라지던 것, 2026-10-19)
       '<span class="hdbtns">' + (isMulti() ? '' : '<button class="btn sm" data-print="' + esc(myName()) + '">' + ic('receipt', 13) +
         (isAll() ? '내 운행기록부' : '운행기록부 (엑셀 · PDF)') + '</button>') +
-      '<button class="btn sm" id="btnCsv" title="운행 목록을 CSV 로 받습니다">' + ic('dl', 13) + '목록 CSV</button></span>', personTable(rows));
+      '<button class="btn sm" id="btnCsv" title="운행 목록을 CSV로 다운로드해요">' + ic('dl', 13) + '목록 CSV</button></span>', personTable(rows));
 
     h += sect('산정 기준', null, '',
       '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
-      '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
+      '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계해요.<br>' +
       '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
       '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '-' + pad(b[1]); }).join(' · ')) + '<br>' +
-      '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산합니다. 리포트와 다르면 알려 주세요.</div>');
+      '<b style="color:var(--ink-2)">회사 월간 리포트와 같은 식</b>으로 계산해요. 리포트와 다르면 알려 주세요.</div>');
     return h;
   }
 
@@ -8645,25 +8665,25 @@ window.EduGuard = {
 
   /** 엑셀 파일을 만들어 내려받는다. 차량이 여러 대면 대수만큼 파일이 나온다(앱과 같다). */
   function downloadXlsx(who) {
-    if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
+    if (!LOADED) { toast('아직 불러오는 중이에요.'); return; }
     var mine = who || myName();
     if (who && who !== myName() && !isAll()) {
-      toast('다른 분 운행기록부는 관리 › 현황에서 뽑을 수 있습니다.', true);
+      toast('다른 분 운행기록부는 관리 › 현황에서 다운로드할 수 있어요.', true);
       return;
     }
-    if (!window.Xlsx) { toast('엑셀 모듈을 불러오지 못했습니다. 새로고침해 주세요.', true); return; }
+    if (!window.Xlsx) { toast('엑셀 모듈을 불러오지 못했어요. 새로고침해 주세요.', true); return; }
 
     // ★ 파일은 xlsxFiles() 하나로만 만든다. 예전에는 여기에 같은 일을 하는 코드가 따로 있어,
     //   '번호판이 장과 안 맞는 영수증' 수정이 결재 문서 엑셀에만 들어가고 이 버튼에는 빠졌다(2026-10-02 재검증).
     var files = xlsxFiles(mine);
-    if (!files.length) { toast('고르신 목적에 해당하는 운행·영수증이 없습니다.', true); return; }
+    if (!files.length) { toast('고른 목적에 해당하는 운행·영수증이 없어요.', true); return; }
     files.forEach(function (f, i) {
       // 여러 장이면 브라우저가 한꺼번에 받는 것을 막을 수 있어 조금씩 띄운다.
       setTimeout(function () { saveBlob(f.bytes, f.name); }, i * 400);
     });
     var warn = sheetSumWarn(files, expectCost(mine));
     if (warn) toast(warn, true);
-    else toast(files.length > 1 ? '엑셀 ' + files.length + '개를 내려받습니다(차량별로 한 장씩).' : '엑셀을 내려받습니다.');
+    else toast(files.length > 1 ? '엑셀 ' + files.length + '개를 차량별로 다운로드해요.' : '엑셀을 다운로드해요.');
   }
   /** 화면 합계(= 서버 집계 규칙)로 본 그 사람의 이번 주기 금액. 일반업무만 담을 때만 견줄 수 있다 — 아니면 null. */
   function expectCost(mine) {
@@ -8677,8 +8697,8 @@ window.EduGuard = {
     files.forEach(function (f) { if (f.sum == null) known = false; else sum += f.sum; });
     // 1원도 봐주지 않는다(2026-10-08) — 정산 금액은 원 단위로 정확히 맞아야 한다(±1원 허용이 실제 차이를 숨겼다).
     if (!known || Math.round(sum) - Math.round(Number(expect)) === 0) return '';
-    return '문서 총계 ' + won(sum) + ' 가 집계 금액 ' + won(expect) + ' 과 ' +
-      n0(Math.abs(Math.round(sum) - Math.round(Number(expect)))) + '원 다릅니다. 관리자에게 알려 주세요.';
+    return '문서 총계(' + won(sum) + ')와 집계 금액(' + won(expect) + ')이 ' +
+      n0(Math.abs(Math.round(sum) - Math.round(Number(expect)))) + '원 달라요. 관리자에게 알려 주세요.';
   }
 
   function saveBlob(bytes, filename, type) {
@@ -8765,12 +8785,12 @@ window.EduGuard = {
 
   /** 인쇄 전에 담을 운행목적을 고르게 한다. 앱 내보내기 창과 같은 자리다. */
   function doPrint(who) {
-    if (!LOADED) { toast('아직 불러오는 중입니다.'); return; }
-    if (isMulti()) { toast('운행기록부는 한 기간씩 만듭니다. 위에서 기간을 하나 골라 주세요.', true); return; }
+    if (!LOADED) { toast('아직 불러오는 중이에요.'); return; }
+    if (isMulti()) { toast('운행기록부는 한 기간씩 만들어요. 기간을 하나 골라 주세요.', true); return; }
     // 개인 화면에서는 본인 것만 뽑는다. 남의 이름으로 부르면 운행은 없어도
     // 머리 정보(이름·부서·차량)가 찍히므로 여기서 막는다.
     if (who && who !== myName() && !isAll()) {
-      toast('다른 분 운행기록부는 관리 › 현황에서 뽑을 수 있습니다.', true);
+      toast('다른 분 운행기록부는 관리 › 현황에서 인쇄할 수 있어요.', true);
       return;
     }
     var target = who || myName();
@@ -8781,13 +8801,13 @@ window.EduGuard = {
       openPanel(done ? '결재 완료본' : '결재 문서',
         nameOf(target) + ' · ' + cycleName(CYC) + ' · ' + cycleSpan(CYC),
         '<div class="hpnote" style="margin-top:0">' + ic('check', 16) + '<span><b>' +
-        (done ? '결재가 끝났습니다.' : '결재 중입니다.') + '</b> 상신할 때 저장한 자료로 문서를 만듭니다. ' +
+        (done ? '결재가 끝났어요.' : '결재 중이에요.') + '</b> 상신할 때의 자료로 만든 문서예요. ' +
         // 상신 뒤 덧붙인 하이패스 영수증 원본은 더해진다(2026-10-23) — 「언제 받아도 같은 내용」만 말하면 틀린다
-        '금액·운행은 언제 받아도 같습니다(상신 뒤 덧붙인 하이패스 영수증 원본만 「덧붙임」 표시를 달고 더해집니다).</span></div>' + apprTrack(ap) +
+        '금액과 운행은 언제 다운로드해도 같고, 상신 뒤 첨부한 하이패스 영수증 원본만 ‘덧붙임’ 표시와 함께 더해져요.</span></div>' + apprTrack(ap) +
         // 결재 완료본에는 검증 결과 쪽이 없다(2026-10-14) — 안내 글도 그대로 말한다.
-        '<div class="anote"><b>PDF</b> — ' + (done ? '운행기록부(결재란 포함) · 영수증 사진이 한 권으로 나옵니다.'
-          : '운행기록부(결재란 포함) · 검증 결과 · 영수증 사진이 한 권으로 나옵니다. 결재가 끝나기 전에는 쪽마다 「결재 중」이 찍힙니다.') + '<br>' +
-        '<b>엑셀</b> — 앱에서 받는 것과 같은 양식입니다(차량별로 한 장씩). 업무(일반업무) 운행만 담깁니다.</div>',
+        '<div class="anote"><b>PDF</b>: ' + (done ? '운행기록부(결재란 포함)와 영수증 사진이 한 권으로 나와요.'
+          : '운행기록부(결재란 포함), 검증 결과, 영수증 사진이 한 권으로 나와요. 결재가 끝나기 전에는 쪽마다 ‘결재 중’이 찍혀요.') + '<br>' +
+        '<b>엑셀</b>: 앱에서 다운로드하는 것과 같은 양식이고, 차량마다 한 장씩이에요. 업무(일반업무) 운행만 들어가요.</div>',
         '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
         // 단추 이름은 결재 띠와 같게 「엑셀 받기」·「PDF 받기」(2026-10-16 3차) — 무엇을 받는지는 창 제목(결재 완료본·결재 문서)이 말한다.
         '<button class="btn" data-fzxlsx="' + ap.id + '">' + ic('dl', 14) + '엑셀 받기</button>' +
@@ -8802,14 +8822,14 @@ window.EduGuard = {
         return '<label class="radio"><input type="checkbox" name="ppurp" value="' + esc(p) + '"' +
           (PRINT_PURPOSES.indexOf(p) >= 0 ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
       }).join('') + '</div>' +
-      '<div class="fhint">차량일지를 <b>제출</b>하실 때는 <b>일반업무</b>만 고르십시오. ' +
-      '앱에서 엑셀로 내려받을 때와 같은 기준입니다.</div>' +
+      '<div class="fhint">차량일지를 <b>제출</b>할 때는 <b>일반업무</b>만 고르세요. ' +
+      '앱에서 엑셀로 다운로드할 때와 같은 기준이에요.</div>' +
       '</div></div></div>' +
-      '<div class="anote"><b>엑셀</b> — 앱에서 내려받는 것과 같은 파일입니다. ' +
-      '받아서 계기판을 고치시면 운행거리·유류비·합계가 <b>수식으로 따라 바뀝니다</b>. ' +
-      '차량을 두 대 이상 모셨으면 <b>차량별로 한 장씩</b> 나옵니다.<br>' +
-      '<b>PDF 미리보기</b> — 운행기록부 · 검증 결과 · 영수증 사진이 한 권으로 나옵니다. ' +
-      (ap && (ap.status === 'rejected' || ap.status === 'withdrawn') ? (ap.status === 'rejected' ? '반려된' : '회수한') + ' 기간이라 다시 상신하기 전까지' : '아직 상신 전이라') + ' 쪽마다 <b>「미리보기」</b>가 찍힙니다. 결재가 끝나면 같은 자리에서 <b>결재 완료본</b>을 받습니다.</div>';
+      '<div class="anote"><b>엑셀</b>: 앱에서 다운로드하는 것과 같은 파일이에요. ' +
+      '엑셀에서 계기판 값을 고치면 운행거리, 유류비, 합계가 <b>수식으로 따라 바뀌어요</b>. ' +
+      '차량을 두 대 이상 운행했으면 <b>차량별로 한 장씩</b> 나와요.<br>' +
+      '<b>PDF 미리보기</b>: 운행기록부, 검증 결과, 영수증 사진이 한 권으로 나와요. ' +
+      (ap && (ap.status === 'rejected' || ap.status === 'withdrawn') ? (ap.status === 'rejected' ? '반려된' : '회수한') + ' 기간이라 다시 상신하기 전까지' : '아직 상신 전이라') + ' 쪽마다 <b>‘미리보기’</b>가 찍혀요. 결재가 끝나면 <b>결재 완료 문서</b>를 다운로드할 수 있어요.</div>';
     $('pFoot').innerHTML = '<span style="flex:1"></span>' +
       '<button class="btn" data-close>취소</button>' +
       '<button class="btn" data-pdf="' + esc(target) + '">' + ic('dl', 14) + 'PDF 미리보기</button>' +
@@ -8834,10 +8854,10 @@ window.EduGuard = {
       // 공백·줄바꿈·&nbsp;(U+00A0) 를 지우고 남는 글자가 있는지 본다.
       //  ※ 예전에는 백슬래시가 빠져 [s+NBSP] 였다 — 영문 s 를 지우고 일반 공백은 남겼다.
       function (td) { return td.textContent.replace(/[\s\u00a0]/g, '') !== ''; });
-    if (!anyRow) { toast('고르신 목적에 해당하는 운행이 없습니다.', true); return; }
+    if (!anyRow) { toast('고른 목적에 해당하는 운행이 없어요.', true); return; }
     var imgs = Array.prototype.slice.call(host.querySelectorAll('img'));
     var left = imgs.length;
-    toast(left ? '영수증 ' + left + '장을 불러오는 중입니다…' : '인쇄 창을 엽니다…');
+    toast(left ? '영수증 ' + left + '장을 불러오는 중…' : '인쇄 창을 여는 중…');
     if (!left) { setTimeout(function () { window.print(); }, 120); return; }
     // 사진이 다 뜬 뒤에 인쇄해야 빈 칸으로 찍히지 않는다.
     var fire = function () { if (--left <= 0) setTimeout(function () { window.print(); }, 200); };
@@ -8879,7 +8899,7 @@ window.EduGuard = {
       (filterWords().length ? '_' + filterWords().join('_').replace(/[\\/:*?"<>|\s]+/g, '') : '') + '.csv';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    toast('CSV 를 내려받았습니다.');
+    toast('운행 목록을 CSV로 다운로드했어요.');
   }
 
   /* ══════════════════ 관리 화면 ══════════════════ */
@@ -8898,7 +8918,7 @@ window.EduGuard = {
 
     var h = head('직원 현황', list.length + '명 · ' + esc(viewName()));
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 기간</div>' +
-      '<p class="verdict">' + (idle ? '<em>' + idle + '명</em>이 한 건도 기록하지 않았습니다' : '<em>전원 기록</em>했습니다') + '</p>' +
+      '<p class="verdict">' + (idle ? '<em>' + idle + '명</em>이 한 건도 기록하지 않았어요' : '<em>전원 기록</em>했어요') + '</p>' +
       '<div class="facts">' +
       '<div class="fact"><div class="k">등록 인원</div><div class="v">' + list.length + '<small>명</small></div></div>' +
       '<div class="fact"><div class="k">기록 있음</div><div class="v">' + (list.length - idle) + '<small>명</small></div></div>' +
@@ -8946,7 +8966,7 @@ window.EduGuard = {
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' +
       (problem.length ? '' : ' style="background:var(--ok)"') + '></span>차량 배정</div>' +
       '<p class="verdict' + (problem.length ? '' : ' clean') + '">' +
-      (problem.length ? '<em>' + problem.length + '대</em>에 이상이 있습니다' : '<em>이상 없습니다</em>') + '</p>' +
+      (problem.length ? '<em>' + problem.length + '대</em>에 이상이 있어요' : '<em>이상이 없어요</em>') + '</p>' +
       '<div class="facts">' +
       '<div class="fact"><div class="k">운행한 차량</div><div class="v">' + plates.length + '<small>대</small></div></div>' +
       '<div class="fact"><div class="k">등록된 차량</div><div class="v">' + VEHICLES.length + '<small>대</small></div></div>' +
@@ -8973,7 +8993,7 @@ window.EduGuard = {
             '<td class="m2">' + (multi ? '<span class="st bad">사용자 ' + us.length + '명</span> ' : '') +
             (wide ? '<span class="st bad">계기판 폭 ' + n0(v.max - v.min) + 'km</span>' : '') +
             (!multi && !wide ? '<span class="st dim">정상</span>' : '') + '</td></tr>';
-        }).join('') + '</tbody></table></div></div>' : blank('운행 기록이 없습니다.', null, 'car'));
+        }).join('') + '</tbody></table></div></div>' : blank('운행 기록이 없어요.', null, 'car'));
 
     var idleCars = VEHICLES.filter(function (v) { return v && v.plate_no && !used[v.plate_no]; })
       .sort(function (a, b) { return (a.plate_no || '').localeCompare(b.plate_no || ''); });
@@ -9010,7 +9030,7 @@ window.EduGuard = {
   }
   function eduAdmVideos() {
     var add = '<button class="btn pri sm" data-eduadd>＋ 영상 등록</button>';
-    if (!EDUV.length) return sect('영상', '0편', add, blank('등록된 교육 영상이 없습니다.', '「＋ 영상 등록」으로 회차마다 유튜브 링크를 올려 주세요.', 'play'));
+    if (!EDUV.length) return sect('영상', '0편', add, blank('등록된 교육 영상이 없어요.', '회차마다 유튜브 영상을 등록해 주세요.', 'play'));
     return sect('영상', EDUV.length + '편', add, '<div class="panel"><div class="scroll" data-rows><table id="eduVT"><thead><tr>' +
       '<th>회차</th><th>제목</th><th class="n"></th></tr></thead><tbody>' +
       EDUV.map(function (v) {
@@ -9033,7 +9053,7 @@ window.EduGuard = {
       '<div class="form">' +
       row('제목', '<input class="inp" id="evTitle" autocomplete="off" value="' + esc(v ? v.title : '') + '">') +
       row('YouTube 링크', '<input class="inp" id="evLink" autocomplete="off" inputmode="url" placeholder="https://youtu.be/xxxxx" value="' +
-        esc(v ? 'https://youtu.be/' + v.youtube_id : '') + '">', 'youtu.be · youtube.com/watch?v= · shorts · 11자 ID 모두 됩니다') +
+        esc(v ? 'https://youtu.be/' + v.youtube_id : '') + '">', 'youtu.be, youtube.com/watch?v=, shorts 링크나 11자 ID 모두 돼요.') +
       row('대상 회차', '<input class="inp" id="evMonth" autocomplete="off" placeholder="YYYY-MM" value="' + esc(v ? v.month : eduNowKey()) + '">',
         'YYYY-MM · 그달 21일 공개, 다음 달 20일 마감') +
       row('설명', '<textarea class="inp" id="evDesc" rows="3" placeholder="(선택)">' + esc(v ? v.description || '' : '') + '</textarea>') +
@@ -9045,8 +9065,8 @@ window.EduGuard = {
     var t = ($('evTitle') || {}).value || '', link = ($('evLink') || {}).value || '';
     var month = ($('evMonth') || {}).value || '', desc = ($('evDesc') || {}).value || '';
     var yid = parseYoutubeId(link);
-    var bad = !t.trim() ? '제목을 입력하세요' : yid == null ? '유효한 YouTube 링크가 아닙니다'
-      : !/^\d{4}-\d{2}$/.test(month) ? '대상월은 YYYY-MM 형식입니다' : '';
+    var bad = !t.trim() ? '제목을 입력해 주세요.' : yid == null ? 'YouTube 링크가 올바르지 않아요.'
+      : !/^\d{4}-\d{2}$/.test(month) ? '대상 회차는 YYYY-MM 형식으로 입력해 주세요.' : '';
     var e = $('evErr');
     if (bad) { if (e) e.textContent = bad; return; }
     if (e) e.textContent = '';
@@ -9060,7 +9080,7 @@ window.EduGuard = {
         method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ month: month, title: t.trim(), youtube_id: yid, description: desc.trim(), created_by: myName() })
       });
-    eduAdmWrite(req, id ? '영상을 고쳤습니다.' : '영상을 등록했습니다.', !!id, btn, '저장');
+    eduAdmWrite(req, id ? '영상을 수정했어요.' : '영상을 등록했어요.', !!id, btn, '저장');
   }
   /** 쓰기 결과 처리 — PATCH 는 고친 줄이 돌아와야 성공(서버 규칙에 걸리면 0줄 200 이 온다). */
   function eduAdmWrite(req, okMsg, needRow, btn, label) {
@@ -9071,17 +9091,17 @@ window.EduGuard = {
     }).then(function (ok) {
       if (!ok) {
         if (btn) { btn.disabled = false; btn.textContent = label; }
-        toast('저장하지 못했습니다. 관리자 권한과 네트워크를 확인해 주세요.', true); return;
+        toast('저장하지 못했어요. 관리자 권한과 네트워크를 확인해 주세요.', true); return;
       }
       closePanel(); toastOk(okMsg); eduReload();
     }).catch(function () {
       if (btn) { btn.disabled = false; btn.textContent = label; }
-      toast('저장하지 못했습니다. 네트워크를 확인해 주세요.', true);
+      toast('저장하지 못했어요. 네트워크를 확인해 주세요.', true);
     });
   }
   function eduDelAsk(v) {
     openPanel('영상 삭제', v.month + ' 회차',
-      '<div class="anote">"' + esc(v.title) + '" 을(를) 삭제할까요?<br>시청 이력은 보존되며 목록·의무에서만 제외됩니다.</div>',
+      '<div class="anote">‘' + esc(v.title) + '’ 영상을 삭제할까요?<br>시청 기록은 남고, 목록과 의무 시청에서 빠져요.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnEduDelGo" data-id="' + esc(v.id) + '">삭제</button>');
   }
@@ -9089,7 +9109,7 @@ window.EduGuard = {
     var btn = $('btnEduDelGo'); if (btn) { btn.disabled = true; btn.textContent = '삭제 중…'; }
     eduAdmWrite(apiRetry('/rest/v1/edu_videos?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted: true })
-    }), '영상을 삭제했습니다.', true, btn, '삭제');
+    }), '영상을 삭제했어요.', true, btn, '삭제');
   }
   /** 고른 회차의 사람별 집계 — 앱 StatusTab 과 같은 계산(정수 나눗셈·정렬까지). */
   function eduAdmStats(sel) {
@@ -9131,15 +9151,15 @@ window.EduGuard = {
       return '<option value="' + esc(m) + '"' + (m === sel ? ' selected' : '') + '>' + esc(m) + ' 회차</option>';
     }).join('') + '</select></label>';
     var note = !vids.length
-      ? '<div class="eduwarn" role="alert">⚠ 이 회차에 등록된 영상이 없습니다 — 「영상 관리」에서 ' + esc(sel) + ' 로 등록해 주세요</div>'
+      ? '<div class="eduwarn" role="alert">⚠ 이 회차에 등록된 영상이 없어요. ‘영상 관리’에서 ' + esc(sel) + ' 회차 영상을 등록해 주세요.</div>'
       : '<div class="dim" style="font-size:12px;margin-bottom:12px">영상 ' + vids.length + '개 · 직전 평가기간(21~20일) 평균 ' + EDU_THRESHOLD + '점 미만 대상</div>';
     var h = '<div class="bar">' + pick + '</div>' + note;
     var clean = st.length > 0 && vids.length > 0 && !left;
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"' + (clean ? ' style="background:var(--ok)"' : '') + '></span>' +
       esc(sel) + ' 회차 시청 현황</div>' +
       '<p class="verdict' + (clean ? ' clean' : '') + '">' +
-      (!st.length ? '이 달의 교육 대상자가 없습니다' : !vids.length ? '영상이 없어 수료를 따질 수 없습니다'
-        : left ? '<em>' + left + '명</em>이 아직 수료하지 않았습니다' : '<em>전원 수료</em>했습니다') + '</p>' +
+      (!st.length ? '이 달의 교육 대상자가 없어요' : !vids.length ? '영상이 없어 수료를 판단할 수 없어요'
+        : left ? '<em>' + left + '명</em>이 아직 수료하지 않았어요' : '<em>전원 수료</em>했어요') + '</p>' +
       '<div class="facts">' +
       '<div class="fact"><div class="k">대상</div><div class="v" id="eduNT">' + st.length + '<small>명</small></div></div>' +
       '<div class="fact"><div class="k">수료</div><div class="v" id="eduND" style="color:var(--ok)">' + doneN + '<small>명</small></div></div>' +
@@ -9147,7 +9167,7 @@ window.EduGuard = {
       '<div class="fact"><div class="k">전체 평균 진행률</div><div class="v" id="eduNA">' + overall + '<small>%</small></div>' +
       (st.length && vids.length ? '<div class="sub">수료율 ' + Math.floor(doneN * 100 / st.length) + '%</div>' : '') + '</div>' +
       '</div><div class="track' + (overall >= 100 ? ' ok' : '') + '"><i style="width:' + Math.min(100, overall) + '%"></i></div></div>';
-    if (!st.length) return h + blank('이 달의 교육 대상자가 없습니다.', '직전 평가기간 평균 ' + EDU_THRESHOLD + '점 미만인 직원이 대상이 됩니다.', 'cap');
+    if (!st.length) return h + blank('이 달의 교육 대상자가 없어요.', '직전 평가기간 평균 ' + EDU_THRESHOLD + '점 미만인 직원이 대상이에요.', 'cap');
     h += sect('대상자', st.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table id="eduST"><thead><tr>' +
       '<th>소속</th><th>이름</th><th class="n">전월</th><th>진행률</th><th>상태</th><th>영상별</th></tr></thead><tbody>' +
       st.map(function (x) {
@@ -9177,28 +9197,28 @@ window.EduGuard = {
   function viewHipass() {
     if (!LOADED) return head(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조') + skeleton();
     var h = head(isAll() ? '하이패스 대조 (전체)' : '하이패스 이용내역',
-      isAll() ? '영수증 PDF 를 읽어 전 직원 통행료를 확정합니다'
-              : '하이패스 이용내역 PDF를 읽어 통과 시각으로 운행을 찾고, 확정하면 그날 통행료 증빙이 됩니다');
+      isAll() ? '하이패스 이용내역 PDF로 전 직원 통행료를 확정해요.'
+              : 'PDF를 올리면 통과 시각으로 맞는 운행을 찾아 줘요. 확정하면 그날 통행료 증빙이 돼요.');
     if (isMulti()) return singleOnly(isAll() ? '하이패스 대조 (전체)' : '하이패스 대조', '하이패스 대조');
 
     // ★ 개인 화면에서 내 주기가 결재 완료면 서버가 전부 튕긴다. 먼저 말한다.
     //   (전체 화면은 사람마다 다르므로 묶음 줄에서 따로 표시한다.)
     if (!isAll() && cycleLocked(myName())) {
       return h + lockedNote(lockTitle(myName()),
-        '이 기간의 통행료는 바꿀 수 없습니다. 영수증을 올려도 서버가 모두 되돌립니다. ' + lockHow(myName()));
+        '이 기간은 통행료를 바꿀 수 없고, 영수증을 올려도 반영되지 않아요. ' + lockHow(myName()));
     }
 
     var T = totals(TRIPS);
     if (LOADED && T.unk) {
       h += '<div class="hpnote">' + ic('ticket', 16) +
-        '<span>이번 기간에 <b>통행료 미확정 ' + n0(T.unk) + '건</b>이 있습니다. ' +
-        '채우지 않으면 정산에서 0원으로 잡힙니다.</span></div>';
+        '<span>이번 기간에 <b>통행료 미확정 ' + n0(T.unk) + '건</b>이 있어요. ' +
+        '채우지 않으면 0원으로 정산돼요.</span></div>';
     }
 
     h += '<div class="drop" id="hpDrop">' +
       '<div class="dico">' + ic('receipt', 22) + '</div>' +
       '<div class="dt">하이패스 이용내역 PDF를 여기에 끌어다 놓으세요</div>' +
-      '<div class="dd">한국도로공사 하이패스 누리집 › 이용내역 › PDF · 영수증 출력 화면을 PDF 로 저장한 것도 됩니다 · 여러 개도 됩니다</div>' +
+      '<div class="dd">한국도로공사 하이패스 누리집 › 이용내역에서 PDF로 다운로드할 수 있어요. 영수증 출력 화면을 PDF로 저장한 파일도 되고, 여러 개를 함께 올려도 돼요.</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="hpFile" accept="application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>';
@@ -9240,31 +9260,31 @@ window.EduGuard = {
             return '<div><span class="mono">' + esc(r.atText) + '</span> ' +
               esc(r.office || '') + ' <b>' + n0(r.amount) + '</b></div>';
           }).join('') +
-          '<p class="fhint">그 시각에 이 차량의 운행 기록이 없습니다. 운행을 먼저 넣으면 맞춰집니다.</p>' +
+          '<p class="fhint">그 시각에 이 차량의 운행 기록이 없어요. 운행을 먼저 넣으면 맞춰져요.</p>' +
           '</div></details>' : '') +
         (unOut.length ? '<details class="hpun hpout" data-hpout><summary>이 기간 밖의 기록 ' + n0(unOut.length) +
-          '건 — 그 기간 화면에서 올려 주세요</summary><div class="hpunb">' +
+          '건은 그 기간 화면에서 올려 주세요</summary><div class="hpunb">' +
           unOut.slice(0, 60).map(function (r) {
             return '<div><span class="mono">' + esc(r.atText) + '</span> ' + esc(r.office || '') + ' <b>' + n0(r.amount) + '</b>' +
               ' <span class="dim">' + esc(hpCycName(r)) + '</span></div>';
           }).join('') +
-          '<p class="fhint">지금 보는 기간은 ' + esc(viewName()) + '(' + esc(viewSpan()) + ')입니다. 이 기록의 운행은 ' +
+          '<p class="fhint">이 기록의 운행은 지금 보는 기간(' + esc(viewSpan()) + ')이 아니라 ' +
           esc(unOut.map(hpCycName).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).join('·') || '다른 기간') +
-          '에 들어 있을 수 있습니다 — 이 화면에서 운행을 새로 넣지 말고, 그 기간 화면에서 이 PDF 를 올려 주세요.</p>' +
+          '에 있을 수 있어요. 운행을 새로 넣지 말고 그 기간 화면에서 이 PDF를 올려 주세요.</p>' +
           '</div></details>' : '');
 
       if (!g.plate) {
-        h += blank('차량을 골라 주세요.', '어느 차의 카드인지 정해야 운행과 맞출 수 있습니다.', 'car');
+        h += blank('차량을 골라 주세요.', '어느 차의 카드인지 골라야 운행과 맞출 수 있어요.', 'car');
       } else if (!(g.matched || []).length) {
         h += unOut.length && !unIn.length
-          ? blank('이 기간에 맞는 운행이 없습니다.', '이 카드의 기록 ' + n0(unOut.length) + '건이 모두 지금 보는 기간(' + viewSpan() + ') 밖입니다 — 그 기간 화면에서 올려 주세요.', 'ticket')
-          : blank('맞는 운행이 없습니다.', '통과 시각이 이 차량의 운행 시간 안에 들지 않습니다.', 'ticket');
+          ? blank('이 기간에 맞는 운행이 없어요.', '이 카드의 기록 ' + n0(unOut.length) + '건이 모두 지금 보는 기간(' + viewSpan() + ') 밖이에요. 그 기간 화면에서 올려 주세요.', 'ticket')
+          : blank('맞는 운행이 없어요.', '통과 시각이 이 차량의 운행 시간 안에 들지 않아요.', 'ticket');
         h += unHtml;
       } else if (!todo.length) {
         // 전부 맞은 상태. 여기서 표를 그대로 두면 '아직 할 일이 있다' 로 읽힌다.
         h += '<div class="panel"><div class="blank"><div class="ico" style="color:var(--ok)">' +
-          ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐습니다.</div>' +
-          '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같습니다. 맨 아래 「← 통행료로 돌아가기」로 돌아가세요.</div></div></div>';   // 돌아가는 단추는 맨 아래 하나(2026-10-15 2차)
+          ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐어요.</div>' +
+          '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같아요. 이제 통행료로 돌아가세요.</div></div></div>';   // 돌아가는 단추는 맨 아래 하나(2026-10-15 2차)
         h += unHtml;
       } else {
         var allOn = todo.length && todo.every(function (x) { return x.pick || x.locked; });
@@ -9297,14 +9317,14 @@ window.EduGuard = {
             '<td class="m1 hpck"><label class="mselhit"><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
             ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + (keep ? ' 운행 원본 붙이기' : ' 운행 확정하기')) + '"' +
             (e.pick ? ' checked' : '') +
-            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없습니다"' : '') + '></label></td>' +
+            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없어요."' : '') + '></label></td>' +
             '<td class="m1 hpwhen"><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
             hm(t.start_time) + '–' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
             (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
             // 원본만 붙이기 — 폰에서도 보이게 운행 칸에(차이 칸은 「그대로」)
             (keep ? '<div class="hpkeepl" data-hpkeepl>원본만 붙이기 — 금액은 그대로</div>' : '') +
             // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
-            (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있습니다 — 확정해도 한 번만 셉니다</div>' : '') + '</td>' +
+            (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있어요. 확정해도 정산은 한 번만 돼요.</div>' : '') + '</td>' +
             '<td data-l="지금">' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
             '<td class="n lead mr" data-u="원">' + n0(e.sum) + '</td>' +
             '<td class="n" data-l="차이">' + diff + '</td>' +
@@ -9317,7 +9337,7 @@ window.EduGuard = {
 
         if (done.length) {
           h += '<details class="hpun"><summary>이미 확정된 ' + n0(done.length) +
-            '건 — 영수증과 같아 손댈 것 없음</summary><div class="hpunb">' +
+            '건은 영수증과 같아 고칠 것이 없어요</summary><div class="hpunb">' +
             done.slice(0, 60).map(function (e) {
               return '<div><span class="mono">' + md(e.trip.start_time) + ' ' + hm(e.trip.start_time) +
                 '</span> ' + esc(dong(e.trip.start_address)) + ' → ' + esc(dong(e.trip.end_address)) +
@@ -9358,8 +9378,8 @@ window.EduGuard = {
      상신 때 결재본에 굳히고 그 PDF 를 지우거나 덮어쓰지 못하게 막는다. 결재 문서 출력이 맨 뒤에 원본 쪽을 붙인다.
      보관에 실패해도(15MB 넘음 · 저장소가 PDF 를 안 받음 · 네트워크) 맞추기·확정은 그대로 — 안내만 한다(그 줄에 pdf 가 없을 뿐). */
   var HP_PDF_MAX = 15 * 1024 * 1024;
-  var HP_KEEP_FAIL = '원본 PDF 를 보관하지 못했습니다 — 맞춘 금액은 그대로 저장됩니다.';
-  var HP_KEEP_BIG = '원본 PDF 가 15MB 를 넘어 보관하지 않았습니다 — 맞춘 금액은 그대로 저장됩니다.';
+  var HP_KEEP_FAIL = '원본 PDF를 보관하지 못했어요. 맞춘 금액은 그대로 저장돼요.';
+  var HP_KEEP_BIG = '원본 PDF가 15MB를 넘어 보관하지 않았어요. 맞춘 금액은 그대로 저장돼요.';
   function hpHex(buf) {
     return Array.prototype.map.call(new Uint8Array(buf), function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('');
   }
@@ -9399,7 +9419,7 @@ window.EduGuard = {
             var lm = Number(f.lastModified);
             // 경로 꼴은 hipass.js keepPath 하나(서버 toll-apply 가 같은 꼴만 받는다 — web/test/hipass-keep.test.mjs)
             var path = window.Hipass.keepPath(me, isFinite(lm) && lm > 0 ? lm : Date.now(), hpHex(h));
-            if (!path) throw new Error('이 아이디로는 저장소 경로를 만들 수 없습니다');
+            if (!path) throw new Error('이 아이디로는 저장소 경로를 만들 수 없어요');
             return hpPut(path, f);
           })
           .then(function (p) { out.paths[fi] = p; }, function (e) { out.fail++; console.warn('하이패스 PDF 보관 못 함:', f.name, e && e.message); });
@@ -9441,9 +9461,9 @@ window.EduGuard = {
      2026-10-23 오후: 서버는 관리자 「하이패스 대조 (전체)」 확정(items)에서도 남의 운행 줄의 pdf 를 버린다(toll-apply evidence.ts) ·
        줄에 운행 주인 폴더의 원본이 아닌 pdf(그 전에 남은 관리자 폴더 경로 등)가 있으면 「없음」으로 보고 주인이 다시 올리면 바꿔 넣는다 ·
        출구 글은 끝이 같으면 같은 영업소(PDF 꼴마다 다르다) — hipass.js needPdf(운행 주인 아이디를 넘긴다)와 서버 attachPdf 가 같은 규칙. */
-  var HP_ATTACH_NOPATH = '원본을 보관하지 못해 붙이지 못했습니다 — 다시 올려 주세요';
+  var HP_ATTACH_NOPATH = '원본을 보관하지 못해 첨부하지 못했어요. 다시 올려 주세요';
   // 30초를 기다려도 원본 보관(hpKeep)이 안 끝났다 — 실패가 아니라 아직 올리는 중이다(2026-10-23 오후). 그 줄은 고른 채 두고 다시 누르게 한다.
-  var HP_ATTACH_SLOW = '원본 PDF 를 아직 보관하는 중입니다 — 잠시 뒤 「원본 붙이기」를 다시 눌러 주세요';
+  var HP_ATTACH_SLOW = '원본 PDF를 아직 보관하는 중이에요. 잠시 후 ‘원본 붙이기’를 다시 눌러 주세요';
   /** 이미 맞춘(same) 내 운행·안 잠긴 것의 근거를 받아 HP.ej 에 둔다(이미 받은 운행은 다시 안 받는다).
    *  → Promise<참|거짓>(하나라도 못 받으면 거짓 — 그 운행은 same 그대로, 거절하지 않는다). */
   function hpScanKeep(groups) {
@@ -9503,25 +9523,25 @@ window.EduGuard = {
   }
   /** 확정이 다 된 뒤 한 줄 — 금액 확정만이면 예전 글 그대로. back = 통행료 차례로 돌아갈 때 */
   function hpOkMsg(a, k, back) {
-    if (!k) return a + '건 확정했습니다' + (back ? ' — 통행료에 반영됐습니다.' : '.');
-    if (!a) return '원본 ' + k + '건을 붙였습니다 — 금액은 그대로입니다.';
-    return a + '건 확정 · 원본 ' + k + '건을 붙였습니다' + (back ? ' — 통행료에 반영됐습니다.' : '.');
+    if (!k) return a + '건을 확정했어요.' + (back ? ' 통행료에 반영됐어요.' : '');
+    if (!a) return '금액은 그대로 두고 원본 ' + k + '건을 첨부했어요.';
+    return a + '건을 확정하고 원본 ' + k + '건을 첨부했어요.' + (back ? ' 통행료에 반영됐어요.' : '');
   }
 
   function hpFiles(files) {
     // ★ 운행을 다 못 받은 상태로 대조하면 "맞는 운행이 없습니다" 가 되고,
     //   로드가 끝나도 다시 맞추지 않아 PDF 를 또 올려야 했다.
-    if (!LOADED) { toast('운행을 불러오는 중입니다. 잠시 뒤에 올려 주세요.'); return; }
+    if (!LOADED) { toast('운행을 불러오는 중이에요. 잠시 후 다시 올려 주세요.'); return; }
     if (!files || !files.length) return;
     files = Array.prototype.slice.call(files);   // 고른 파일을 붙잡아 둔다 — 원본 보관(hpKeep)이 나중에 다시 읽는다
-    if (!window.Hipass) { toast('영수증 해독기를 불러오지 못했습니다.', true); return; }
+    if (!window.Hipass) { toast('PDF 읽기 도구를 불러오지 못했어요. 새로고침한 뒤 다시 올려 주세요.', true); return; }
     // 사진만 골랐으면 읽지 말고 어디로 올리는지 알려 준다(웹 8차)
     if (!Array.prototype.some.call(files, function (f) { return /pdf/i.test(f.type || '') || /pdf$/i.test(f.name || ''); })) {
       HP.noteBad = true; HP.groups = [];
-      HP.note = '사진 파일입니다. 여기는 하이패스 이용내역 PDF만 받습니다 — 영수증 사진은 「← 통행료로 돌아가기」를 눌러 「영수증 사진 올리기」로 올려 주세요.';
+      HP.note = '여기는 하이패스 이용내역 PDF만 올릴 수 있어요. 영수증 사진은 통행료 화면에서 올려 주세요.';
       render(); return;
     }
-    HP.busy = true; HP.note = 'PDF 를 읽는 중입니다…';
+    HP.busy = true; HP.note = 'PDF를 읽는 중…';
     HP.pdfJob = null; HP.pdfDone = false; HP.keepNote = '';         // 앞서 올린 PDF 의 보관 일은 버린다(그 기록도 새로 읽는다)
     HP.ej = {};                                                       // 이미 맞춘 운행의 근거(원본 붙이기, 2026-10-23)도 새로 받는다
     render();
@@ -9545,11 +9565,11 @@ window.EduGuard = {
           var mg = window.Hipass.mergeFiles ? window.Hipass.mergeFiles(lists) : { recs: [].concat.apply([], lists.filter(Boolean)), removed: 0 };
           recs = mg.recs; dup = mg.removed;
           recs.forEach(function (r) { r.srcs = srcOf[rk(r)] || []; });
-          if (dup) toast('여러 파일에 겹친 기록 ' + n0(dup) + '건은 한 번만 셉니다(뺐습니다).');
+          if (dup) toast('여러 파일에 겹친 기록 ' + n0(dup) + '건은 한 번만 계산해요.');
           if (!recs.length) {
             HP.noteBad = true;
-            HP.note = bad ? '읽지 못한 파일이 있습니다. 한국도로공사 이용내역 PDF 가 맞는지 확인해 주세요. 영수증 사진은 「영수증 사진 올리기」로 올려도 됩니다.'
-              : '영수증에서 통행 기록을 찾지 못했습니다.';
+            HP.note = bad ? '읽지 못한 파일이 있어요. 한국도로공사 이용내역 PDF가 맞는지 확인하고, 영수증 사진은 ‘영수증 사진 올리기’로 올려 주세요.'
+              : 'PDF에서 통행 기록을 찾지 못했어요.';
             HP.groups = []; render(); return;
           }
           HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
@@ -9561,9 +9581,9 @@ window.EduGuard = {
           // 지금 보는 기간 밖의 기록 수(2026-10-20 AU2 #7) — 그 기간 화면에서 올리라고 한 줄 더한다(카드마다 아래 「이 기간 밖의 기록」에 목록)
           var nOut = recs.filter(function (r) { return !hpInView(r); }).length;
           // 다음에 할 일까지 한 줄로(웹 8차 — 「확정하기」를 눌러야 증빙이 된다는 것을 몰랐다)
-          var base = n0(recs.length) + '건을 읽었습니다.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐습니다.' : '') + (bad ? ' (읽지 못한 파일 ' + bad + '개)' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
+          var base = n0(recs.length) + '건을 읽었어요.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐어요.' : '') + (bad ? ' 읽지 못한 파일이 ' + bad + '개 있어요.' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
             (nOut ? ' 지금 보는 기간(' + viewSpan() + ') 밖의 기록 ' + n0(nOut) + '건은 그 기간 화면에서 올려 주세요.' : '');
-          var how = isAll() ? '' : ' 아래 운행이 맞으면 「확정하기」를 누르세요 — 확정하면 그날 통행료 증빙이 되고 통행료 차례로 돌아갑니다.';
+          var how = isAll() ? '' : ' 운행이 맞으면 ‘확정하기’를 눌러 주세요. 확정하면 그날 통행료 증빙이 돼요.';
           HP.note = base + how;
           // 이미 맞춘 운행 중 원본이 없는 것 → 「원본만 붙이기」(2026-10-23). 근거를 받은 뒤에 그린다 —
           //   먼저 그리면 「이 카드는 다 확정됐습니다」가 보였다가 표로 바뀐다(받는 동안은 「읽는 중」 그대로 · 10초가 넘으면 기다리지 않는다).
@@ -9573,9 +9593,9 @@ window.EduGuard = {
             hpMarkKeep(grs);
             var nk = hpKeepCount(grs), nfix = grs.reduce(function (s, g) { return s + (g.matched || []).filter(function (e) { return !hpDone(e) && e.kind !== 'keep'; }).length; }, 0);
             // 원본만 붙이기뿐이면 「확정하기」 대신 그 단추 이름으로
-            if (nk) HP.note = base + (nfix ? how : '') + ' 이미 맞춘 운행 ' + n0(nk) + '건은 원본 PDF 만 붙입니다(금액은 그대로)' +
-              (nfix || isAll() ? '.' : ' — 아래 「원본 붙이기」를 누르세요.');
-            if (!ok) { HP.noteBad = true; HP.note += ' 이미 맞춘 운행에 원본이 붙어 있는지 확인하지 못했습니다 — 다시 올려 주세요.'; }
+            if (nk) HP.note = base + (nfix ? how : '') + ' 이미 맞춘 운행 ' + n0(nk) + '건은 금액을 그대로 두고 원본 PDF만 첨부해요' +
+              (nfix || isAll() ? '.' : '. ‘원본 붙이기’를 눌러 주세요.');
+            if (!ok) { HP.noteBad = true; HP.note += ' 이미 맞춘 운행에 원본이 첨부돼 있는지 확인하지 못했어요. 다시 올려 주세요.'; }
             render();
           });
         });
@@ -9599,16 +9619,16 @@ window.EduGuard = {
     if (!picked.length) {
       // 예전에는 말없이 돌아갔다 — 왜 아무 일도 안 일어나는지 알 수가 없었다.
       var anyLocked = (g.matched || []).some(function (e) { return e.locked; });
-      toast(anyLocked ? '고르신 것이 없습니다. 결재가 끝난 운행은 바꿀 수 없습니다.'
+      toast(anyLocked ? '고른 운행이 없어요. 결재가 끝난 운행은 바꿀 수 없어요.'
                       : '확정할 운행을 골라 주세요.', true);
       return;
     }
     var over = picked.filter(function (e) { return e.who === 'person' && e.kind === 'diff-person'; });
     if (over.length && !force) {
       // 브라우저 기본 confirm 대신 다른 확인(전부 없음·지우기)과 같은 패널을 쓴다.
-      $('pTitle').textContent = '직접 넣은 값을 덮습니다';
+      $('pTitle').textContent = '직접 넣은 값을 덮어쓸까요?';
       $('pSub').textContent = n0(over.length) + '건';
-      $('pBody').innerHTML = '<div class="anote">영수증 금액으로 바꿉니다. 앱이나 웹에서 직접 넣으신 값은 사라집니다.</div>';
+      $('pBody').innerHTML = '<div class="anote">영수증 금액으로 바뀌고, 앱이나 웹에서 직접 넣은 값은 사라져요.</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button>' +
         '<button class="btn pri" id="btnHpOverGo" data-gi="' + gi + '">' + n0(over.length) + '건 덮어쓰기</button>';
       $('panel').classList.add('open');
@@ -9624,7 +9644,7 @@ window.EduGuard = {
     // 원본 PDF 보관(hpKeep)이 끝나기를 기다린다(30초까지 — 넘으면 확정 줄들은 pdf 없이 · 원본만 붙이기는 보내지 않고 다시 누르게). 보관은 거절하지 않는다.
     var job = HP.pdfJob;
     var kept = job ? Promise.race([job, new Promise(function (ok) { setTimeout(function () { ok(null); }, 30000); })]) : Promise.resolve(null);
-    toast(job && !HP.pdfDone ? '원본 PDF 를 보관하는 중입니다 — 끝나면 바로 확정합니다…' : fix.length ? '확정 중입니다…' : '원본을 붙이는 중입니다…');
+    toast(job && !HP.pdfDone ? '원본 PDF를 보관하고 있어요. 끝나면 바로 확정해요.' : fix.length ? '확정하는 중…' : '원본을 붙이는 중…');
     var post = function (body) {
       return apiRetry('/functions/v1/toll-apply', { method: 'POST', body: JSON.stringify(body) })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
@@ -9664,7 +9684,7 @@ window.EduGuard = {
         R.att.push({ id: e.trip.id, lines: ls });
       });
       var first = items.length ? post({ items: items, batch: HP.batch }).then(function (res) {
-        if (!res.ok || !res.j || !res.j.ok) { R.err = (res.j && res.j.error) || '확정하지 못했습니다.'; return; }
+        if (!res.ok || !res.j || !res.j.ok) { R.err = (res.j && res.j.error) || '확정하지 못했어요.'; return; }
         R.sent = true; R.applied = Number(res.j.applied) || 0; R.warning = res.j.warning || null;
         R.skipped = R.skipped.concat(res.j.skipped || []); R.rows = R.rows.concat(res.j.rows || []);
       }) : Promise.resolve();
@@ -9672,18 +9692,18 @@ window.EduGuard = {
         if (R.err || !R.att.length) return;
         return post({ attach: R.att, batch: HP.batch }).then(function (res) {
           if (!res.ok || !res.j || !res.j.ok) {
-            var why = (res.j && res.j.error) || '원본을 붙이지 못했습니다';
+            var why = (res.j && res.j.error) || '원본을 첨부하지 못했어요';
             R.local = R.local.concat(R.att.map(function (a) { return { id: a.id, why: why }; })); return;
           }
           R.sent = true; R.attached = Number(res.j.attached) || 0; R.attSkip = res.j.skipped || [];
           R.skipped = R.skipped.concat(R.attSkip); R.rows = R.rows.concat(res.j.rows || []);
-        }, function () { R.local = R.local.concat(R.att.map(function (a) { return { id: a.id, why: '서버에 연결하지 못했습니다' }; })); });
+        }, function () { R.local = R.local.concat(R.att.map(function (a) { return { id: a.id, why: '서버에 연결하지 못했어요' }; })); });
       });
     }).then(function () {
       if (!R.sent) {
         // 서버가 아무것도 처리하지 않았다(확정 실패 · 붙일 원본이 없음 · 붙이기 실패) — 예전처럼 단추를 살리고 까닭만
         if (hbtn) { hbtn.disabled = false; hbtn.textContent = label; }
-        toast(R.err || (R.local.length ? endDot(R.local[0].why) : '확정하지 못했습니다.'), true); return;
+        toast(R.err || (R.local.length ? endDot(R.local[0].why) : '확정하지 못했어요.'), true); return;
       }
       // 서버가 되읽어 준 값으로 화면을 맞춘다 — 트리거가 바꿔치기했을 수 있다(원본 붙이기는 금액이 그대로 — 같은 값).
       R.rows.forEach(function (row) {
@@ -9698,15 +9718,17 @@ window.EduGuard = {
         R.att.forEach(function (a) { if (no.indexOf(String(a.id)) < 0 && HP.ej) delete HP.ej[String(a.id)]; });
       }
       var A = R.applied, K = R.attached, skipped = R.skipped.concat(R.local);
-      var part = R.part ? ' (원본을 보관하지 못한 줄은 못 붙였습니다 — 다시 올려 주세요)' : '';
-      var did = A && K ? A + '건 확정 · 원본 ' + K + '건 붙임' : K ? '원본 ' + K + '건 붙임' : A + '건 확정';
+      // 건너뛴 이유가 이미 「원본을 보관하지 못해 …」면 같은 말을 또 하지 않는다(2026-10-24 검수 #34)
+      var part = !R.part ? '' : skipped.length && endDot(skipped[0].why) === endDot(HP_ATTACH_NOPATH)
+        ? ' 다른 운행도 일부 줄은 같은 이유로 첨부하지 못했어요.' : ' 원본을 보관하지 못한 줄은 첨부하지 못했어요. 다시 올려 주세요.';
+      var did = A && K ? A + '건을 확정하고 원본 ' + K + '건을 첨부했어요.' : K ? '원본 ' + K + '건을 첨부했어요.' : A + '건을 확정했어요.';
       if (R.warning) toast(R.warning, true);
       // ★ 0건이면 '반영했다' 로 읽히면 안 된다. 왜 못 했는지를 앞세운다.
-      else if (!A && !K) toast((fix.length ? '한 건도 확정되지 않았습니다' : '원본을 한 건도 붙이지 못했습니다') + (skipped.length
-        ? ' — ' + skipped[0].why
-        : '.'), true);
-      else if (skipped.length) toast(did + ' · ' + skipped.length + '건은 건너뛰었습니다 (' +
-        skipped[0].why + ')' + part, true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
+      else if (!A && !K) toast((fix.length ? '한 건도 확정하지 못했어요.' : '원본을 한 건도 첨부하지 못했어요.') + (skipped.length
+        ? ' 이유: ' + endDot(skipped[0].why)
+        : ''), true);
+      else if (skipped.length) toast(did + ' ' + skipped.length + '건은 건너뛰었어요. 이유: ' +
+        endDot(skipped[0].why) + part, true);   // toast 는 textContent — esc 를 씌우면 &quot; 가 그대로 보인다
       else if (part) toast(hpOkMsg(A, K, false) + part, true);
       else toast(hpOkMsg(A, K, false));
       // 남은 것만 다시 계산(원본만 붙이기는 받아 둔 근거로 다시 표시 — 붙인 운행은 위에서 버려 같음으로 끝난다)
@@ -9722,7 +9744,7 @@ window.EduGuard = {
       if (card) card.scrollIntoView({ block: 'start' });
     }).catch(function () {
       if (hbtn) { hbtn.disabled = false; hbtn.textContent = label; }
-      toast('서버에 연결하지 못했습니다.', true);
+      toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true);
     });
   }
 
@@ -9758,10 +9780,10 @@ window.EduGuard = {
     // 여러 주기를 함께 볼 때는 '조회 전용'이라고 해 놓았다 — 고치려면 그 달을 열게 한다.
     var tc = cycleOfMs(Number(t.start_time));
     $('pFoot').innerHTML = locked
-      ? '<span class="dim" style="font-size:12px;flex:1">결재 중이거나 끝난 기간이라 고칠 수 없습니다</span>' +
+      ? '<span class="dim" style="font-size:12px;flex:1">결재 중이거나 끝난 기간이라 고칠 수 없어요.</span>' +
         '<button class="btn" data-close>닫기</button>'
       : isMulti()
-        ? '<span class="dim" style="font-size:12px;flex:1">여러 기간을 함께 볼 때는 조회만 됩니다</span>' +
+        ? '<span class="dim" style="font-size:12px;flex:1">여러 기간을 함께 볼 때는 조회만 돼요.</span>' +
           '<button class="btn" data-close>닫기</button>' +
           '<button class="btn pri" data-cyc="' + cycKey(tc) + '">' + CR.short(tc) + ' 열어 고치기</button>'
         : '<span style="flex:1"></span><button class="btn" data-close>닫기</button>' +
@@ -9807,22 +9829,22 @@ window.EduGuard = {
   /** 운행 고치기 창 통행료 안내 — 고른 값(pick)에 맞춘다. 「지금 값」은 처음 고름 그대로일 때만 보인다. */
   // 「없음」·「모름」이어도 그날 영수증이 있으면 영수증 금액이 운행에 들어간다(금액 규칙 v3 — 의도된 동작).
   //   창에는 「사람이 정한 값은 자동 계산이 덮어쓰지 않는다」만 있어, 영수증 금액이 들어가면 고친 값이 무시된 것처럼 보였다(2026-10-16 5차).
-  var RCP_FILL = { '통행료': '그날 업무 운행에 통행료가 하나도 없으면, 그날 올린 <b>통행료 영수증 금액</b>이 운행에 들어갑니다.',
-    '주차': '그날 업무 운행에 주차비가 하나도 없으면, 그날 올린 <b>주차 영수증 금액</b>이 운행에 들어갑니다.' };
+  var RCP_FILL = { '통행료': '그날 업무 운행에 통행료가 하나도 없으면 그날 올린 <b>통행료 영수증 금액</b>이 운행에 들어가요.',
+    '주차': '그날 업무 운행에 주차비가 하나도 없으면 그날 올린 <b>주차 영수증 금액</b>이 운행에 들어가요.' };
   /** 키보드(화살표)로 고르는 중인가 — 그때 금액 칸으로 포커스를 옮기면 고르기 묶음 밖으로 튀어 나머지 칩으로 못 간다(2026-10-16 5차).
    *  마우스·손가락으로 누르면 :focus-visible 이 아니다 → 예전처럼 금액 칸으로. */
   function kbdPick(el) { try { return el.matches(':focus-visible'); } catch (e) { return false; } }
   function tollEditHint(pick, first, srcTxt, other) {
     var now = srcTxt && pick === first ? '지금 값: ' + esc(srcTxt) + ' · ' : '';
-    if (pick === 'none') return now + '통행료가 없는 운행으로 저장합니다(0원). ' + RCP_FILL['통행료'];
+    if (pick === 'none') return now + '통행료가 없는 운행으로 저장해요(0원). ' + RCP_FILL['통행료'];
     if (pick === 'unknown') return now + unkTollHint(other);
     return now + '1 ~ 200,000원 · 자동으로 채운 금액이 틀렸으면 고치세요.';
   }
   /** 「모름」 안내(2026-10-21) — 예전 「(영수증이 있으면 영수증 금액)」은 그날 다른 운행에 통행료가 있으면 틀렸다(규칙 v3: 운행 금액이 있는 날
    *  영수증은 대조만 — 「모름」 운행은 0원으로 정산). other = 그날 다른 업무 운행에 통행료 금액이 있는가(otherTollOn). */
   function unkTollHint(other) {
-    return other ? '「모름」은 0원으로 정산됩니다 — 이 날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행을 채우지 않습니다. 영수증이 있으면 「금액 입력」에 그 금액을 넣어 주세요.'
-      : '「모름」은 0원으로 잡힙니다 — 이 날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어갑니다(이 운행에 이은 영수증이면 이 운행, 아니면 그날 첫 운행). 이 운행 영수증이면 「금액 입력」에 넣는 것이 정확합니다.';
+    return other ? '‘모름’은 0원으로 정산돼요. 이날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행에 들어가지 않아요. 영수증이 있으면 ‘금액 입력’에 그 금액을 넣어 주세요.'
+      : '‘모름’은 우선 0원이에요. 이날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어가는데, 이 운행에 연결한 영수증이면 이 운행에, 아니면 그날 첫 운행에 들어가요. 이 운행 영수증이면 ‘금액 입력’에 넣는 것이 정확해요.';
   }
   /** 같은 사람·같은 날(KST)의 다른 업무 운행에 통행료 금액이 있는가 — 있으면 그날 영수증은 「모름」 운행을 채우지 않는다(금액 규칙 v3). */
   function otherTollOn(t, who, dayKey) {
@@ -9833,19 +9855,19 @@ window.EduGuard = {
     });
   }
   function parkEditHint(pick) {
-    return pick === 'amount' ? '1 ~ 300,000원 · 그날 주차 영수증과 대조합니다(정산에는 운행 금액이 들어갑니다).'
-      : '주차비가 없는 운행으로 저장합니다. ' + RCP_FILL['주차'];
+    return pick === 'amount' ? '1 ~ 300,000원 · 그날 주차 영수증과 비교하고, 정산에는 운행 금액이 들어가요.'
+      : '주차비가 없는 운행으로 저장해요. ' + RCP_FILL['주차'];
   }
   /** 운행 추가 창 주차비 안내 — 고른 값을 따른다. 「없음」 뜻은 운행 고치기 창과 같다(그날 영수증 금액이 들어감, 2026-10-16 6차). */
   function parkAddHint(pick) {
-    return pick === 'amount' ? '1 ~ 300,000원 · 영수증도 올려 주세요. 그날 주차 영수증과 대조합니다(정산에는 운행 금액이 들어갑니다).'
-      : pick === 'none' ? '주차비가 없는 운행으로 넣습니다. ' + RCP_FILL['주차']
-      : '주차비를 냈으면 「있음」에 금액을 넣고 영수증도 올려 주세요. ' + RCP_FILL['주차'];
+    return pick === 'amount' ? '1 ~ 300,000원 · 영수증도 올려 주세요. 그날 주차 영수증과 비교하고, 정산에는 운행 금액이 들어가요.'
+      : pick === 'none' ? '주차비가 없는 운행으로 넣어요. ' + RCP_FILL['주차']
+      : '주차비를 냈으면 있음을 골라 금액을 넣고 영수증도 올려 주세요. ' + RCP_FILL['주차'];
   }
   function openEdit(id) {
     var t = TRIPS.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!t) return;
-    if (apprLocked(t)) { toast('결재 중이거나 끝난 기간이라 고칠 수 없습니다. 「이번 달 마감」에서 고치는 방법을 확인해 주세요.', true); return; }
+    if (apprLocked(t)) { toast('결재 중이거나 끝난 기간이라 고칠 수 없어요. ‘이번 달 마감’에서 고치는 방법을 확인해 주세요.', true); return; }
     // 계기판: 본인 운행·관리자(2026-10-07 — 직원도 계기판 사진과 맞춰 직접 고친다. 서버 trip-edit 와 같은 규칙)
     var canOdo = !!(ME && (ME.is_admin || t.username === myName()));
 
@@ -9857,7 +9879,7 @@ window.EduGuard = {
       return '<label class="radio"><input type="radio" name="ePurpose" value="' + esc(p) + '"' +
         ((t.purpose || '') === p ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
     }).join('') + '</div>',
-      (t.purpose || '') === '일반업무' ? '업무용만 비용으로 집계됩니다' : '업무용이 아니면 비용에서 빠집니다');
+      (t.purpose || '') === '일반업무' ? '업무용만 비용으로 집계돼요.' : '업무용이 아니면 비용에서 빠져요.');
 
     h += fld('방문처', '<input class="inp" id="eVisit" maxlength="120" value="' + esc(t.visit_place || '') + '">');
     // 주차비·통행료 — 「운행 추가」 창과 같은 고르기(2026-10-15 사용자: 수기로 넣을 수 있게 · 「0 을 넣어라 / 비워라」를 섞지 않는다).
@@ -9879,9 +9901,9 @@ window.EduGuard = {
       (E0.toll === 'amount' ? n0(E0.tollAmt) : '') + '"><span class="unit">원</span></div>',
       '<span id="eTollHint">' + tollEditHint(E0.toll, E0.toll, srcTxt, othToll) + '</span>');
     // 아래 안내는 통행료 고르기 바로 아래에 둔다 — 창 맨 아래에 있으면 1280×800 에서 창을 내려야 보였다(2026-10-16 6차)
-    h += '</div>' + '<div class="anote" id="eNote" style="margin:-4px 0 16px">고친 내용은 <b>서버가 다시 검사</b>합니다. ' +
-      '통행료를 고치면 <b>사람이 정한 값</b>으로 기록돼 <b>자동 계산</b>(길찾기·하이패스 요금)이 덮어쓰지 않습니다. ' +
-      '단, 통행료·주차비를 「없음」으로 두면 그날 올린 <b>영수증 금액</b>이 들어갑니다(그날 업무 운행에 그 금액이 하나도 없을 때).</div>' + '<div class="form">';
+    h += '</div>' + '<div class="anote" id="eNote" style="margin:-4px 0 16px">' +
+      '통행료를 고치면 <b>직접 정한 값</b>으로 남아 길찾기나 하이패스 요금 같은 <b>자동 계산</b>이 덮어쓰지 않아요. ' +
+      '단, 통행료나 주차비를 ‘없음’으로 두었는데 그날 다른 업무 운행에도 그 항목 금액이 하나도 없으면, 그날 올린 그 항목의 <b>영수증 금액</b>이 들어가요.</div>' + '<div class="form">';
 
     if (canOdo) {
       h += fld('계기판',
@@ -9889,7 +9911,7 @@ window.EduGuard = {
         '<input class="inp num" id="eOdoS" inputmode="numeric" value="' + odoVal(t.start_odometer) + '">' +
         '<span class="arrowto">→</span>' +
         '<input class="inp num" id="eOdoE" inputmode="numeric" value="' + n0(t.end_odometer) + '">',
-        '고치면 <b>주행거리도 같이 바뀝니다</b>. 한 번에 3,000km 를 넘을 수 없습니다.');
+        '고치면 <b>주행거리도 같이 바뀌어요</b>. 한 번에 3,000km를 넘을 수 없어요.');
     }
     h += '</div>';
 
@@ -9980,27 +10002,27 @@ window.EduGuard = {
       var us = Object.keys(PEOPLE).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b), 'ko'); });
       h += fld('누구 운행', '<select class="inp" id="cWho">' + us.map(function (u) {
         return '<option value="' + esc(u) + '"' + (u === mine ? ' selected' : '') + '>' + esc(nameOf(u)) + ' · ' + esc(personOf(u).dept || '') + '</option>';
-      }).join('') + '</select>', '관리자는 다른 분 운행도 넣을 수 있습니다');
+      }).join('') + '</select>', '관리자는 다른 분의 운행도 넣을 수 있어요.');
     }
     h += fld('차량번호', myCars.length
       ? '<select class="inp" id="cPlate">' + myCars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') + '</select>'
       : '<input class="inp" id="cPlateEtc" placeholder="예) 12가3456">');
     h += fld('날짜 <em class="req">*</em>', '<input class="inp" type="date" id="cDate" value="' + dstr + '" min="' + minD + '" max="' + maxD + '">', '<span id="cDateHint"></span>');
     h += '<div id="cPosRow"></div>';
-    h += fld('출발지 <em class="req">*</em>', placeBox('cFrom', '건물 이름·주소로 찾기 (예: 서울버스 본사)'), '<span id="cFromHint">목록에서 골라 주세요 — 수도권·지방 유류단가를 가릅니다</span>');
-    h += fld('도착지 <em class="req">*</em>', placeBox('cTo', '건물 이름·주소로 찾기'), '<span id="cToHint">목록에서 고르면 도로 거리로 도착 계기판을 채웁니다</span>');
+    h += fld('출발지 <em class="req">*</em>', placeBox('cFrom', '건물 이름·주소로 찾기 (예: 서울버스 본사)'), '<span id="cFromHint">목록에서 골라 주세요. 출발지로 수도권·지방 유류단가가 정해져요.</span>');
+    h += fld('도착지 <em class="req">*</em>', placeBox('cTo', '건물 이름·주소로 찾기'), '<span id="cToHint">목록에서 고르면 도로 거리로 도착 계기판이 채워져요.</span>');
     h += fld('계기판 <em class="req">*</em>',
       '<input class="inp num" id="cOdoS" inputmode="numeric" placeholder="출발">' +
       '<span class="arrowto">→</span>' +
       '<input class="inp num" id="cOdoE" inputmode="numeric" placeholder="도착">',
-      '<span id="cOdoHint">출발은 앞 운행의 도착값, 도착은 도로 거리로 자동으로 채웁니다(고칠 수 있습니다)</span>');
+      '<span id="cOdoHint">출발은 앞 운행의 도착값, 도착은 도로 거리로 채워져요. 직접 고쳐도 돼요.</span>');
     h += fld('시각', '<input class="inp num" type="time" id="cFromT" style="width:150px">' +
       '<span class="arrowto">→</span><input class="inp num" type="time" id="cToT" style="width:150px">',
-      '고른 자리에 맞춰 자동으로 정해집니다. 도착 시각이 있으면 나중에 <b>하이패스 영수증과 맞춰볼 수 있습니다</b>');
+      '고른 자리에 맞춰 정해져요. 도착 시각이 있으면 나중에 <b>하이패스 기록과 맞출 수 있어요</b>.');
     h += fld('운행목적', '<div class="radios" role="radiogroup" aria-label="운행목적">' + PURPOSES.map(function (p) {
       return '<label class="radio"><input type="radio" name="cPurpose" value="' + esc(p) + '"' + (p === '일반업무' ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
     }).join('') + '</div>');
-    h += fld('방문처 <em class="req">*</em>', '<input class="inp" id="cVisit" maxlength="120" placeholder="예) 서울버스 본사">', '도착지를 고르면 그 이름으로 채웁니다');
+    h += fld('방문처 <em class="req">*</em>', '<input class="inp" id="cVisit" maxlength="120" placeholder="예) 서울버스 본사">', '도착지를 고르면 그 이름으로 채워져요.');
     h += fld('주차비 <em class="req">*</em>',
       '<div class="radios" role="radiogroup" aria-label="주차비"><label class="radio"><input type="radio" name="cParkM" value="none"><span>없음</span></label>' +
       '<label class="radio"><input type="radio" name="cParkM" value="amount"><span>있음</span></label></div>' +
@@ -10011,8 +10033,8 @@ window.EduGuard = {
       '<label class="radio"><input type="radio" name="cToll" value="amount"><span>금액 입력</span></label>' +
       '<label class="radio"><input type="radio" name="cToll" value="unknown"><span>모름</span></label></div>' +
       '<div style="margin-top:9px" id="cTollBox" hidden><input class="inp num" id="cToll" inputmode="numeric" placeholder="0"><span class="unit">원</span></div>',
-      '<span id="cTollHint">「모름」은 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다</span>');
-    h += '</div><div class="anote">수기로 넣은 운행은 <b>수기</b> 표시가 붙습니다. 주행거리는 계기판 차이로 계산됩니다.</div>';
+      '<span id="cTollHint">모름을 고르면 나중에 자동 계산이나 하이패스 이용내역 PDF로 채워져요.</span>');
+    h += '</div><div class="anote">직접 넣은 운행에는 <b>수기</b> 표시가 붙고, 주행거리는 계기판 차이로 계산돼요.</div>';
 
     $('pBody').innerHTML = h;
     $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnCreateTrip">넣기</button>';
@@ -10065,8 +10087,8 @@ window.EduGuard = {
         show([], '찾는 중…');
         apiRetry('/functions/v1/trip-geo', { method: 'POST', body: JSON.stringify({ action: 'search', q: v }) })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (my !== seq) return; if (!j || !j.ok) { show([], (j && j.error) || '찾지 못했습니다'); return; } show(j.list, j.list.length ? '' : '찾는 곳이 없습니다 — 다른 이름이나 주소로 찾아 보세요'); })
-          .catch(function () { if (my === seq) show([], '서버에 연결하지 못했습니다'); });
+          .then(function (j) { if (my !== seq) return; if (!j || !j.ok) { show([], (j && j.error) || '찾지 못했어요.'); return; } show(j.list, j.list.length ? '' : '찾는 곳이 없어요. 다른 이름이나 주소로 찾아 보세요.'); })
+          .catch(function () { if (my === seq) show([], '서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.'); });
       }, 350);
     });
     list.addEventListener('click', function (e) {
@@ -10083,8 +10105,8 @@ window.EduGuard = {
     var ms = Date.parse((CF.date || '') + 'T12:00:00+09:00');
     var lk = isFinite(ms) && lockedAt(CF.who, ms);
     if (hint) {
-      if (!isFinite(ms)) hint.textContent = '날짜를 골라 주세요';
-      else { var c = cycleOfMs(ms); hint.innerHTML = '<b>' + esc(cycleName(c)) + '</b>(' + esc(cycleSpan(c)) + ')에 들어갑니다' + (lk ? ' — <b style="color:var(--red)">결재 중이거나 끝난 기간이라 넣을 수 없습니다</b>' : ''); }
+      if (!isFinite(ms)) hint.textContent = '날짜를 골라 주세요.';
+      else { var c = cycleOfMs(ms); hint.innerHTML = '<b>' + esc(cycleName(c)) + '</b>(' + esc(cycleSpan(c)) + ')에 들어가요.' + (lk ? ' <b style="color:var(--red)">결재 중이거나 끝난 기간이라 넣을 수 없어요.</b>' : ''); }
     }
     var btn = $('btnCreateTrip'); if (btn) btn.disabled = !!lk;
     var day = cfDayTrips();
@@ -10097,7 +10119,7 @@ window.EduGuard = {
           var lab = i === 0 ? '맨 앞 — ' + hhmmOf(day[0].start_time) + ' 운행 전'
             : hhmmOf(day[i - 1].start_time) + ' 운행(' + esc(placeShort(day[i - 1].end_address) || day[i - 1].visit_place || day[i - 1].purpose || '') + ' 도착) 다음';
           return '<option value="' + i + '"' + (i === CF.pos ? ' selected' : '') + '>' + lab + '</option>';
-        }).join('') + '</select><div class="fhint">이 날 운행이 ' + day.length + '건 있습니다. 어느 운행 앞뒤인지 고르면 시각·계기판이 그 자리에 맞춰집니다.</div></div></div>' : '';
+        }).join('') + '</select><div class="fhint">이 날 운행이 ' + day.length + '건 있어요. 어느 운행 앞뒤인지 고르면 시각과 계기판이 그 자리에 맞춰져요.</div></div></div>' : '';
       var ps = $('cPos'); if (ps) ps.addEventListener('change', function () { CF.pos = +this.value; cfRefresh(false); });
     }
     if (!isFinite(ms)) return;
@@ -10133,7 +10155,7 @@ window.EduGuard = {
     CF.route = null;
     var my = ++CF_ROUTE_SEQ;                 // 출발·도착을 비워도 순번을 올린다 — 가는 중인 예전 요청을 무르기 위해
     var hint = $('cOdoHint');
-    if (!CF.from || !CF.to) { if (hint) hint.textContent = '출발은 앞 운행의 도착값, 도착은 도로 거리로 자동으로 채웁니다(고칠 수 있습니다)'; return; }
+    if (!CF.from || !CF.to) { if (hint) hint.textContent = '출발은 앞 운행의 도착값, 도착은 도로 거리로 채워져요. 직접 고쳐도 돼요.'; return; }
     if (hint) hint.textContent = '도로 거리를 계산하는 중…';
     var cf = CF, from = CF.from, to = CF.to;
     var live = function () { return my === CF_ROUTE_SEQ && cf === CF && cf.from === from && cf.to === to; };
@@ -10141,13 +10163,13 @@ window.EduGuard = {
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!live()) return;
-        if (!j || !j.ok || j.km == null) { if (hint) hint.textContent = (j && (j.error || j.note)) || '거리를 계산하지 못했습니다 — 도착 계기판을 직접 넣어 주세요'; return; }
+        if (!j || !j.ok || j.km == null) { if (hint) hint.textContent = (j && (j.error || j.note)) || '거리를 계산하지 못했어요. 도착 계기판을 직접 넣어 주세요.'; return; }
         CF.route = j;
-        if (hint) hint.innerHTML = '도로 거리 <b>' + esc(j.km) + 'km</b> · 약 ' + esc(j.min) + '분 기준으로 채웠습니다(고칠 수 있습니다)';
+        if (hint) hint.innerHTML = '도로 거리 <b>' + esc(j.km) + 'km</b>, 약 ' + esc(j.min) + '분 기준으로 채웠어요. 직접 고쳐도 돼요.';
         cfFillEnd();
         if (!CF.timeTouched) cfRefresh(false);
         cfTollHint();
-      }).catch(function () { if (live() && hint) hint.textContent = '거리를 계산하지 못했습니다 — 도착 계기판을 직접 넣어 주세요'; });
+      }).catch(function () { if (live() && hint) hint.textContent = '거리를 계산하지 못했어요. 도착 계기판을 직접 넣어 주세요.'; });
   }
   /** 통행료 안내 — 고른 값(없음·금액 입력·모름)에 맞춘 한 줄 + 길찾기 예상 통행료(있으면).
    *  예전에는 길찾기 결과 한 줄로 덮어써서 「모름」을 골라도 「길찾기 경로에는 통행료가 없습니다」만 남았다(2026-10-16 5차 — 고치기 창과 같게). */
@@ -10155,17 +10177,17 @@ window.EduGuard = {
     var th = $('cTollHint'); if (!th || !CF) return;
     var pick = (document.querySelector('input[name="cToll"]:checked') || {}).value || '';
     var rt = CF.route, toll = rt && rt.toll > 0 ? rt.toll : 0;
-    var head = pick === 'none' ? '통행료가 없는 운행으로 넣습니다(0원). ' + RCP_FILL['통행료']
+    var head = pick === 'none' ? '통행료가 없는 운행으로 넣어요(0원). ' + RCP_FILL['통행료']
       // 「(영수증이 있으면 영수증 금액)」은 그날 다른 운행에 통행료가 있으면 틀렸다(2026-10-21) — 그날 상황대로
-      : pick === 'unknown' ? '「모름」은 0원으로 잡히고, 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다. ' +
-        (otherTollOn(null, CF.who, CF.date) ? '이 날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행을 채우지 않으니, 영수증이 있으면 「금액 입력」에 그 금액을 넣어 주세요.'
-          : '이 날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어갑니다.')
-        : pick === 'amount' ? '1 ~ 200,000원 · 통행료 영수증도 올려 주세요(검증에서 대조합니다).'
-          : '「모름」은 나중에 자동 계산이나 하이패스 이용내역 PDF로 채웁니다';
+      : pick === 'unknown' ? '모름을 고르면 우선 0원이고, 나중에 자동 계산이나 하이패스 이용내역 PDF로 채워져요. ' +
+        (otherTollOn(null, CF.who, CF.date) ? '이 날은 다른 운행에 통행료가 있어 그날 영수증이 이 운행에 들어가지 않으니, 영수증이 있으면 금액 입력을 골라 그 금액을 넣어 주세요.'
+          : '이 날 다른 운행에도 통행료가 없으면 그날 통행료 영수증 금액이 들어가요.')
+        : pick === 'amount' ? '1 ~ 200,000원 · 통행료 영수증도 올려 주세요. 검증 때 비교해요.'
+          : '모름을 고르면 나중에 자동 계산이나 하이패스 이용내역 PDF로 채워져요.';
     var route = !rt ? '' : toll
       ? ' 카카오 길찾기 예상 통행료 <b>' + n0(toll) + '원</b>' + (pick === 'amount' && numIn($('cToll').value) === Number(toll) ? ''
         : ' <button type="button" class="btn sm" id="cTollUse">이 금액 넣기</button>')
-      : ' (길찾기 경로에는 통행료가 없습니다.)';
+      : ' 길찾기 경로에는 통행료가 없어요.';
     th.innerHTML = head + route;
     var u = $('cTollUse');
     if (u) u.addEventListener('click', function () {
@@ -10194,24 +10216,24 @@ window.EduGuard = {
     if (numStop($('cOdoS'), '출발 계기판') || numStop($('cOdoE'), '도착 계기판')) return;
     var so = num($('cOdoS')), eo = num($('cOdoE'));
     if (so == null || eo == null) { toast('계기판 값을 넣어 주세요.', true); return; }
-    if (eo < so) { toast('도착 계기판이 출발보다 작습니다.', true); return; }
-    if (eo - so > 3000) { toast('한 운행에 3,000km 를 넘을 수 없습니다.', true); return; }
+    if (eo < so) { toast('도착 계기판이 출발보다 작아요.', true); return; }
+    if (eo - so > 3000) { toast('한 운행에 3,000km를 넘을 수 없어요.', true); return; }
     var visit = $('cVisit').value.trim();
     if (!visit) { toast('방문처를 넣어 주세요.', true); $('cVisit').focus(); return; }
     var parkM = (document.querySelector('input[name="cParkM"]:checked') || {}).value;
-    if (!parkM) { toast('주차비 「없음」 또는 「있음」을 골라 주세요.', true); return; }
+    if (!parkM) { toast('주차비를 없음, 있음 중에서 골라 주세요.', true); return; }
     if (parkM === 'amount' && numStop($('cPark'), '주차비')) return;
     var park = parkM === 'amount' ? num($('cPark')) : null;
     if (parkM === 'amount' && !(park > 0)) { toast('주차비 금액을 넣어 주세요.', true); $('cPark').focus(); return; }
     var tollMode = (document.querySelector('input[name="cToll"]:checked') || {}).value;
-    if (!tollMode) { toast('통행료 「없음」·「금액 입력」·「모름」 중 하나를 골라 주세요.', true); return; }
+    if (!tollMode) { toast('통행료를 없음, 금액 입력, 모름 중에서 골라 주세요.', true); return; }
     if (tollMode === 'amount' && numStop($('cToll'), '통행료')) return;
     var tollAmt = tollMode === 'amount' ? num($('cToll')) : null;
-    if (tollMode === 'amount' && !(tollAmt > 0)) { toast('통행료 금액을 넣어 주세요(없으면 「없음」).', true); $('cToll').focus(); return; }
+    if (tollMode === 'amount' && !(tollAmt > 0)) { toast('통행료 금액을 넣어 주세요. 없으면 없음을 고르세요.', true); $('cToll').focus(); return; }
     // 도착 시각이 출발보다 이르면 다음 날 도착으로 넣기 전에 한 번 묻는다(2026-10-20 AU2 #16 — 예전엔 말없이 하루를 더했다).
     //   다른 칸을 다 본 뒤에 묻는다(칸을 고치고 다시 누를 때마다 묻지 않게). 서버가 되묻고 다시 부를 때는 이미 답한 것(nextDay)을 넘긴다.
     if (endMs < startMs) {
-      if (!nextDay && !window.confirm('도착 시각(' + to + ')이 출발 시각(' + from + ')보다 이릅니다.\n\n자정을 넘겨 다음 날 ' + to + '에 도착한 운행으로 넣을까요?\n아니면 「취소」를 누르고 시각을 고쳐 주세요.')) {
+      if (!nextDay && !window.confirm('도착 시각(' + to + ')이 출발 시각(' + from + ')보다 일러요.\n\n자정을 넘겨 다음 날 ' + to + '에 도착한 운행으로 넣을까요?\n시각을 고치려면 ‘취소’를 눌러 주세요.')) {
         if ($('cToT')) $('cToT').focus();
         return;
       }
@@ -10239,11 +10261,11 @@ window.EduGuard = {
           var j = res.j || {};
           // 뒤 운행과 겹치면 이후 운행을 밀어 올릴지 되묻는다(앱과 같은 동작)
           if (j.needShift && window.confirm(j.error + '\n\n이 운행을 넣고 이후 운행의 계기판을 밀어 올릴까요?')) { createTrip(force, true, nextDay); return; }
-          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 넣으시겠습니까?')) { createTrip(true, shift, nextDay); return; }
-          if (!j.needShift) toast(j.error || '넣지 못했습니다.', true);
+          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 넣을까요?')) { createTrip(true, shift, nextDay); return; }
+          if (!j.needShift) toast(j.error || '운행을 넣지 못했어요.', true);
           return;
         }
-        var note = '운행을 넣었습니다.' + (res.j.shifted ? ' 이후 운행 ' + res.j.shifted + '건의 계기판을 +' + n0(res.j.shiftKm) + 'km 밀었습니다.' : '');
+        var note = '운행을 넣었어요.' + (res.j.shifted ? ' 이후 운행 ' + res.j.shifted + '건의 계기판을 +' + n0(res.j.shiftKm) + 'km 밀었어요.' : '');
         TRIP_CACHE = {};
         AUDIT = null;
         toastOk(note, res.j.warning);
@@ -10251,7 +10273,7 @@ window.EduGuard = {
         loadAll();                            // 밀린 운행까지 서버 값으로 다시 받는다
       }).catch(function () {
         if (btn) { btn.disabled = false; btn.textContent = '넣기'; }
-        toast('서버에 연결하지 못했습니다.', true);
+        toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true);
       });
   }
 
@@ -10277,8 +10299,8 @@ window.EduGuard = {
     if (parkM === 'amount') {
       if (numStop($('ePark'), '주차비')) return;
       var park = num($('ePark'));
-      if (!(park > 0)) { toast('주차비 금액을 넣어 주세요(없으면 「없음」).', true); $('ePark').focus(); return; }
-      if (park > 300000) { toast('주차비는 300,000원까지입니다.', true); return; }
+      if (!(park > 0)) { toast('주차비 금액을 넣어 주세요. 없으면 없음을 고르세요.', true); $('ePark').focus(); return; }
+      if (park > 300000) { toast('주차비는 300,000원까지 넣을 수 있어요.', true); return; }
       if (park !== E0.park) patch.parking_cost = park;
     } else if (E0.park) patch.parking_cost = null;      // 있음 → 없음
 
@@ -10290,10 +10312,10 @@ window.EduGuard = {
     } else if (mode === 'amount') {
       if (numStop($('eToll'), '통행료')) return;
       var amt = num($('eToll'));
-      if (!(amt > 0)) { toast('통행료 금액을 넣어 주세요(없으면 「없음」, 모르면 「모름」).', true); $('eToll').focus(); return; }
-      if (amt > 200000) { toast('통행료는 200,000원까지입니다.', true); return; }
+      if (!(amt > 0)) { toast('통행료 금액을 넣어 주세요. 없으면 없음, 모르면 모름을 고르세요.', true); $('eToll').focus(); return; }
+      if (amt > 200000) { toast('통행료는 200,000원까지 넣을 수 있어요.', true); return; }
       if (E0.toll !== 'amount' || amt !== E0.tollAmt) patch.toll = { mode: 'amount', amount: amt };
-    } else { toast('통행료 「없음」·「금액 입력」·「모름」 중 하나를 골라 주세요.', true); return; }
+    } else { toast('통행료를 없음, 금액 입력, 모름 중에서 골라 주세요.', true); return; }
 
     if ($('eOdoS')) {                                    // 칸은 고칠 수 있는 사람(본인·관리자)에게만 그려진다
       if (numStop($('eOdoS'), '출발 계기판') || numStop($('eOdoE'), '도착 계기판')) return;
@@ -10304,15 +10326,15 @@ window.EduGuard = {
       //   운행은 관리자가 목적만 고쳐도 '계기판 값을 넣어 주세요' 에서 막혔다(2026-09-23 검증로봇).
       if (so !== so0 || eo !== eo0) {
         if (so == null || eo == null) { toast('계기판 값을 넣어 주세요.', true); return; }
-        if (eo < so) { toast('도착 계기판이 출발보다 작습니다.', true); return; }
-        if (eo - so > 3000) { toast('한 운행에 3,000km 를 넘을 수 없습니다.', true); return; }
+        if (eo < so) { toast('도착 계기판이 출발보다 작아요.', true); return; }
+        if (eo - so > 3000) { toast('한 운행에 3,000km를 넘을 수 없어요.', true); return; }
         patch.start_odometer = so; patch.end_odometer = eo;
       }
     }
     // 서버가 앞뒤 운행과 크게 벌어졌다고 되물은 뒤 '그래도 저장' 을 고른 경우.
     if (force) patch.force = true;
 
-    if (!Object.keys(patch).length) { toast('바뀐 내용이 없습니다.'); closePanel(); return; }
+    if (!Object.keys(patch).length) { toast('바뀐 내용이 없어요.'); closePanel(); return; }
 
     var btn = $('btnSaveTrip'); btn.disabled = true; btn.textContent = '저장 중…';
     apiRetry('/functions/v1/trip-edit', { method: 'POST', body: JSON.stringify({ id: Number(id), patch: patch }) })
@@ -10324,21 +10346,21 @@ window.EduGuard = {
           // ★ 계기판이 앞뒤 운행과 크게 벌어지면 서버가 needConfirm 으로 되묻는다(createTrip 과 같다).
           //   예전에는 되물을 창이 없어, 한 사람의 여러 건이 줄줄이 틀린 경우(9/14 정정 때처럼)
           //   어느 건을 고쳐도 아직 틀린 이웃과 벌어져 전부 막혔다.
-          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 저장하시겠습니까?')) {
+          if (j.needConfirm && window.confirm(j.error + '\n\n그래도 이대로 저장할까요?')) {
             saveTrip(id, true); return;
           }
-          toast(j.error || '저장하지 못했습니다.', true); return;
+          toast(j.error || '저장하지 못했어요.', true); return;
         }
         // 서버가 되돌려 준 값으로 갈아끼운다 — 트리거가 값을 바꿨을 수 있다.
         var row = res.j.row || {};
         Object.keys(row).forEach(function (k) { if (k !== 'id') t[k] = row[k]; });
         AUDIT = null;
         TRIP_CACHE = {};                     // 다른 기간으로 갔다 왔을 때 고치기 전 값이 나오지 않게
-        toastOk((res.j.changed || []).join('·') + ' 고쳤습니다.', res.j.warning);
+        toastOk((res.j.changed || []).join('·') + ' 항목을 고쳤어요.', res.j.warning);
         closePanel(); paintPills(); render();
       }).catch(function () {
         btn.disabled = false; btn.textContent = '저장';
-        toast('서버에 연결하지 못했습니다.', true);
+        toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true);
       });
   }
 
@@ -10365,13 +10387,13 @@ window.EduGuard = {
   function askClose() {
     // 서버로 올리는 중에는 닫지 못한다(절반만 올라간 채 목록을 잃는다). 파일을 읽는 중(PDF → 장)이면 닫을 수 있다 —
     // 읽기가 멈췄을 때 빠져나갈 길이 있어야 한다. 아래 panelDirty 가 되묻는다.
-    if (EV_SENDING && $('evDrop')) { toast('영수증을 올리는 중입니다. 끝날 때까지 기다려 주세요.'); return; }
+    if (EV_SENDING && $('evDrop')) { toast('영수증을 올리는 중이에요. 끝날 때까지 기다려 주세요.'); return; }
     if (!panelDirty()) { closePanel(); return; }
     // 창을 다시 그린 쪽(운행 추가의 '누구 운행' 등)이 되묻는 줄을 지웠을 수 있다 — 떠 있을 때만 '묻는 중'이다.
     if (CLOSE_ASK != null && $('btnKeep')) return;
     CLOSE_ASK = $('pFoot').innerHTML;
     // 「계속 입력」 = 닫기를 그만두는 취소(data-cancel) — footOrder 가 줄 끝으로 옮겨 [버리고 닫기] [계속 입력](2026-10-20 단추 차례 통일, 초점은 계속 입력 그대로)
-    $('pFoot').innerHTML = '<span class="dim" style="flex:1;font-size:13px">입력한 내용이 사라집니다. 닫을까요?</span>' +
+    $('pFoot').innerHTML = '<span class="dim" style="flex:1;font-size:13px">입력한 내용이 사라져요. 닫을까요?</span>' +
       '<button class="btn" id="btnKeep" data-cancel>계속 입력</button><button class="btn pri" id="btnDiscard">버리고 닫기</button>';
     var k = $('btnKeep'); if (k) k.focus();
   }
@@ -10485,7 +10507,7 @@ window.EduGuard = {
     //   예전에는 「← 1 운행 기록」만 있어서 다 맞춘 뒤 어디로 가야 할지 몰랐다.
     if ((VIEW === 'hipass' || VIEW === 'tollfill') && !isAll() && !isMulti()) {
       html += '<div class="nextstep"><span class="stepbadge">2</span><span class="t">' +
-        '다 맞췄으면 <b>통행료</b> 차례로 돌아가 반영된 금액을 확인하고 「다음: 주유」로 넘어가세요.</span>' +
+        '다 맞췄으면 <b>통행료</b>로 돌아가 반영된 금액을 확인하고 ‘다음: 주유’로 넘어가세요.</span>' +
         '<button class="btn pri cta" data-tollback="1">← 통행료로 돌아가기</button></div>';
       sn = 0;
     }
@@ -10493,12 +10515,12 @@ window.EduGuard = {
       var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
       // 3단계(검증·상신)에는 맨 아래 「다음 단계」 단추가 없다 — 위 ①②③ 으로 상신하면 끝난다고 말한다(2026-10-20 V3 다듬기: 없는 단추를 가리켰다)
-      var back = sn > 1 ? ' 잘못 넘어갔으면 「← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '」로 돌아오면 됩니다.' : '';
-      var note = sn < p ? '<b>이미 지난 단계</b>입니다. 고친 뒤 「다음 단계」로 다시 넘어가세요.'
-        : sn > p ? '지금은 <b>' + p + '단계(' + esc(STEP_NAMES[p - 1]) + ')</b> 차례입니다.'
-        : sn === 3 ? (here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 상신할 수 있습니다(결재하는 분께 함께 보입니다).'
-          : '위 <b>① 검증하기 → ② PDF 미리보기 → ③ 상신</b> 차례로 하면 이 단계가 끝납니다.') + back
-        : here && here.n > 0 ? '이 단계에 남은 일: <b>' + esc(here.sub) + '</b> — 그래도 다음 단계로 갈 수 있습니다.'
+      var back = sn > 1 ? ' 잘못 넘어왔으면 앞 단계로 돌아가도 돼요.' : '';
+      var note = sn < p ? '<b>이미 지난 단계</b>예요. 고친 뒤 다음 단계로 다시 넘어가세요.'
+        : sn > p ? '지금은 <b>' + p + '단계(' + esc(STEP_NAMES[p - 1]) + ')</b> 차례예요.'
+        : sn === 3 ? (here && here.n > 0 ? '이 단계에 남은 일이 있어요(<b>' + esc(here.sub) + '</b>). 그래도 상신할 수 있고, 결재자에게도 함께 보여요.'
+          : '<b>검증하기, PDF 미리보기, 상신</b> 순서로 하면 이 단계가 끝나요.') + back
+        : here && here.n > 0 ? '이 단계에 남은 일이 있어요(<b>' + esc(here.sub) + '</b>). 그래도 다음 단계로 넘어갈 수 있어요.'
         : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.' + back;
       html += '<div class="nextstep"><span class="stepbadge">' + sn + '</span><span class="t">' + note + '</span>' +
         // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만. 이 화면에서 깜빡이는 하나(마감 뒤 5일에 1·2단계인 사람 등, 2026-10-20 V3 U1)
@@ -10507,7 +10529,7 @@ window.EduGuard = {
         // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
         //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
         (sn === 2 && sn === p && evSubMax() < 3
-          ? '<span class="dim" style="font-size:13px">주차 → 통행료 → 주유 → 계기판을 차례로 마치면 3 검증·상신으로 넘어갈 수 있습니다.</span>'
+          ? '<span class="dim" style="font-size:13px">주차, 통행료, 주유, 계기판을 차례로 마치면 3단계 검증·상신으로 넘어갈 수 있어요.</span>'
           // 계기판 차례에서는 카드의 「다음: 3 검증·상신 →」 하나만(같은 단추가 카드와 띠에 둘이었다 — 2026-10-15 2차)
           : sn === 2 && sn === p && VIEW === 'evid' && evSub() === 3 ? ''
           // 영수증 화면은 카드 안의 단추(올리기·「다음」)가 깜빡이는 하나 — 띠 단추는 빨강만(깜빡임 둘이 되지 않게, V3 U1)
@@ -10684,7 +10706,7 @@ window.EduGuard = {
     $('inner').innerHTML = LOAD_ERR
       ? '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
         '<div style="font-weight:700;margin-bottom:6px">' + esc(LOAD_ERR) + '</div>' +
-        '<div class="dim" style="margin-bottom:16px">잠시 뒤 다시 시도해 주세요.</div>' +
+        '<div class="dim" style="margin-bottom:16px">' + retryHint(LOAD_ERR) + '</div>' +
         '<button class="btn pri" id="btnRetryLoad">다시 불러오기</button></div></section>'
       : (LOADED ? stepChrome((VIEWS[VIEW] || viewClose)()) : (VIEWS[VIEW] || viewClose)());
     paintNavMode();
@@ -10816,7 +10838,7 @@ window.EduGuard = {
     var target = h.a ? (h.b ? cycKey(h.a) + '~' + cycKey(h.b) : cycKey(h.a)) : '';
     if (target && target !== hashOf().split('/')[2] && unsavedFills()) {
       writeHash();
-      toast('저장하지 않은 통행료 ' + n0(unsavedFills()) + '구간이 있습니다. 먼저 저장해 주세요.', true);
+      toast('저장하지 않은 통행료가 ' + n0(unsavedFills()) + '구간 있어요. 먼저 저장해 주세요.', true);
       return;
     }
     closePanel();
@@ -11044,13 +11066,13 @@ window.EduGuard = {
       setEvSub(ni, ni > ci ? 'fwd' : ni < ci ? 'back' : ''); render(); return;
     }
     if (e.target.closest('[data-tollback]')) {
-      if (VIEW === 'tollfill' && unsavedFills()) { toast('저장하지 않은 통행료 ' + n0(unsavedFills()) + '구간이 있습니다. 먼저 저장해 주세요.', true); return; }
+      if (VIEW === 'tollfill' && unsavedFills()) { toast('저장하지 않은 통행료가 ' + n0(unsavedFills()) + '구간 있어요. 먼저 저장해 주세요.', true); return; }
       tollBack(); return;
     }
     if ((el = e.target.closest('[data-evsubmove]'))) {
       var d = +el.dataset.evsubmove, ti = evSub() + d;
       setEvSub(ti, d > 0 ? 'fwd' : 'back');
-      toast(d > 0 ? (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례입니다.' : (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례로 돌아왔습니다.');
+      toast(d > 0 ? (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례예요.' : (ti + 1) + '/4 ' + EV_SUBS[ti] + ' 차례로 돌아왔어요.');
       render(); evSubTop(); return;
     }
     if (e.target.closest('#btnEvGo')) { runEvUpload(); return; }
@@ -11100,7 +11122,7 @@ window.EduGuard = {
           if (!x.date && f0.date && !x.ai) { x.date = f0.date; filled++; }
         });
         paintEvList();
-        toast(filled ? '비어 있던 구분·날짜를 첫 줄 값으로 채웠습니다.' : '채울 빈 칸이 없습니다.');
+        toast(filled ? '비어 있던 구분과 날짜를 첫 줄 값으로 채웠어요.' : '채울 빈칸이 없어요.');
       }
       return;
     }
@@ -11159,7 +11181,7 @@ window.EduGuard = {
       });
       closePanel(); render();              // 전부 바뀌므로 이때는 다시 그린다
       // 패널 버튼이 완료형이라 '끝났다' 로 읽힌다 — 아직 저장 전임을 말한다.
-      toast(n0(marked) + '건을 없음으로 표시했습니다. 아래 「' + n0(doneNow) + '건 저장」을 눌러야 저장됩니다.');
+      toast(n0(marked) + '건을 없음으로 표시했어요. ‘' + n0(doneNow) + '건 저장’을 눌러야 저장돼요.');
       return;
     }
     if (e.target.closest('#tfSave')) { tfSave(); return; }
@@ -11228,8 +11250,8 @@ window.EduGuard = {
     }
     if (e.target.closest('#btnSubmitAppr')) {
       var bad = DRAFT.filter(function (s) { return !s.approver; });
-      if (!DRAFT.length) { toast('결재받을 분을 한 칸 이상 넣어 주세요.', true); return; }
-      if (bad.length) { toast('아직 고르지 않은 결재자가 있습니다.', true); return; }
+      if (!DRAFT.length) { toast('결재자를 한 명 이상 넣어 주세요.', true); return; }
+      if (bad.length) { toast('아직 고르지 않은 결재자가 있어요.', true); return; }
       var sb = $('btnSubmitAppr');
       if (sb.disabled) return;
       // ★ 주기(21일~20일)가 끝나기 전이면 한 번 묻는다 — 상신하면 그 뒤 운행·영수증은 결재 문서에 들어가지 않는다
@@ -11243,8 +11265,8 @@ window.EduGuard = {
         var endD = md(rEnd - 1);
         // 개인경비는 「뒤의 경비가 빠진다」가 아니다 — 상신하면 그 기간이 잠겨 회수 전에는 영수증을 더 올리거나 고칠 수 없다(2026-10-08).
         earlyMsg = subKD
-          ? '아직 기간 중입니다. 상신하면 회수하기 전에는 이 기간(~' + esc(endD) + ')의 ' + (subKD.earlyNoun || '영수증을 더 올리거나') + ' 고칠 수 없습니다.'
-          : '아직 기간 중입니다(' + esc(endD) + '까지). 지금 상신하면 이후 운행·영수증은 결재 문서에 들어가지 않습니다.';
+          ? '아직 기간이 끝나지 않았어요. 이 기간은 ' + esc(endD) + '까지예요. 상신하면 회수하기 전에는 이 기간의 ' + (subKD.earlyNoun || '영수증을 더 올리거나') + ' 고칠 수 없어요.'
+          : '아직 기간이 끝나지 않았어요. 이 기간은 ' + esc(endD) + '까지예요. 지금 상신하면 이후 운행과 영수증은 결재 문서에 들어가지 않아요.';
       }
       sb.disabled = true; sb.textContent = '검증하는 중…';
       var cyc0 = CYCKEY();
@@ -11253,7 +11275,7 @@ window.EduGuard = {
       var token = SUBMIT.token = {};
       var alive = function () { return SUBMIT.token === token && $('panel').classList.contains('open'); };
       // 창이 닫혔을 때만 '취소했다'고 말한다. 결재선을 고쳐 다시 그린 것이면 화면에 「상신」 버튼이 돌아와 있다.
-      var gone = function () { if (!$('panel').classList.contains('open')) toast('상신하지 않고 닫았습니다.'); };
+      var gone = function () { if (!$('panel').classList.contains('open')) toast('상신하지 않고 닫았어요.'); };
       var send = function () {
         if (!alive()) { gone(); return; }
         // ★ 결재선은 보내는 순간의 화면에서 읽는다. 누른 순간에 만들어 두면, '그대로 상신할까요?' 가 떠 있는 동안
@@ -11273,7 +11295,7 @@ window.EduGuard = {
         if (noteTxt) payload.note = noteTxt;
         var b = $('btnSubmitAnyway') || sb;
         if (document.contains(b)) { b.disabled = true; b.textContent = '상신하는 중…'; }
-        callAppr(payload, '상신했습니다.').then(function (ok) {
+        callAppr(payload, '상신했어요.').then(function (ok) {
           if (ok) { delete SUB_NOTE[nkey]; delete SUB_NOTE_PREV[nkey]; }     // 올라간 의견은 결재 건에 있다 — 적던 글은 지운다
           // 상신되면 그 주기는 잠긴다 — 통행료 채우기에 쳐 둔 값은 더 저장할 수 없다.
           if (ok && subKD) delete DRAFT_KEEP[subKind + ':' + cyc0];
@@ -11291,7 +11313,7 @@ window.EduGuard = {
         // 확장 모듈이 상신을 멈췄다(개인경비: PDF 미리보기 뒤에 경비가 바뀜, 2026-10-08) — 창 닫기·안내는 모듈이 했다.
         if (sum && sum.blocked) return;
         if (!alive()) { gone(); return; }
-        var badMsg = sum && sum.bad > 0 ? '검증에서 맞지 않는 곳이 ' + n0(sum.bad) + '건 있습니다.' : '';
+        var badMsg = sum && sum.bad > 0 ? '검증에서 맞지 않는 곳이 ' + n0(sum.bad) + '건 있어요.' : '';
         if (earlyMsg || badMsg) {
           // 두 가지를 한 번에 — 단추는 하나(그래도 상신)
           $('pFoot').innerHTML = '<span class="st subwarn ' + (badMsg ? 'bad' : 'warn') + '" data-subwarn>' +
@@ -11337,8 +11359,8 @@ window.EduGuard = {
       if (el.dataset.sub) p2.expect_submitted_at = el.dataset.sub;
       if (why && act !== 'withdraw') p2.comment = why;
       // 서버가 문구를 안 보내는 동작(회수)도 무엇을 했는지 말한다 — 예전엔 「처리했습니다.」(2026-10-15 매뉴얼 로봇)
-      var okWord = { withdraw: '회수했습니다. 고친 뒤 다시 상신하세요.', approve: '승인했습니다.', reject: '반려했습니다.',
-        recall_reject: '승인을 취소하고 반려했습니다. 상신한 분에게 돌아갑니다.' }[act];
+      var okWord = { withdraw: '회수했어요. 고친 뒤 다시 상신하세요.', approve: '승인했어요.', reject: '반려했어요.',
+        recall_reject: '승인을 취소하고 상신자에게 반려했어요.' }[act];
       callAppr(p2, okWord).then(function (ok) { if (!ok && document.contains(el)) el.disabled = false; });
       return;
     }
@@ -11373,10 +11395,10 @@ window.EduGuard = {
       var f = e.target.files && e.target.files[0];
       e.target.value = '';
       if (!f) return;
-      if (f.size > 20e6) { toast('파일이 너무 큽니다(20MB 이하).', true); return; }
+      if (f.size > 20e6) { toast('파일이 너무 커요. 20MB 이하로 올려 주세요.', true); return; }
       toast('서명을 읽는 중…');
       fileToSign(f).then(function (png) { SIGN_DRAFT = png; render(); },
-        function (err) { toast((err && err.message) || '서명을 읽지 못했습니다.', true); });
+        function (err) { toast((err && err.message) || '서명을 읽지 못했어요.', true); });
       return;
     }
     if (e.target.id === 'ofDiv' || e.target.id === 'ofTeam' || e.target.id === 'ofUnit') {
@@ -11400,8 +11422,8 @@ window.EduGuard = {
       var hq = Array.prototype.slice.call(e.target.files || []), isPdf = function (f) { return /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name); };
       var hpdf = hq.filter(isPdf), hpic = hq.filter(function (f) { return !isPdf(f); });
       // 사진을 여기로 골랐으면 영수증 올리기 창으로 넘긴다(2026-10-17 모르는 로봇 — 사진이 하이패스 칸으로 들어가 「읽지 못한 파일」)
-      if (!hpdf.length && hpic.length) { openEvUpload('통행료'); evAddFiles(hpic); toast('사진이라 영수증 올리기 창으로 옮겼습니다 — 하이패스 단추는 이용내역 PDF만 받습니다.'); return; }
-      if (hpdf.length) { go('hipass'); hpFiles(hpdf); if (hpic.length) toast('사진 ' + hpic.length + '장은 빼고 PDF만 읽습니다 — 영수증 사진은 「영수증 사진 올리기」로 올려 주세요.', true); }
+      if (!hpdf.length && hpic.length) { openEvUpload('통행료'); evAddFiles(hpic); toast('사진이라 영수증 올리기 창으로 옮겼어요. 하이패스 버튼은 이용내역 PDF만 받아요.'); return; }
+      if (hpdf.length) { go('hipass'); hpFiles(hpdf); if (hpic.length) toast('사진 ' + hpic.length + '장은 빼고 PDF만 읽어요. 영수증 사진은 ‘영수증 사진 올리기’로 올려 주세요.', true); }
       return;
     }
     if (e.target.id === 'evFile') { evAddFiles(e.target.files); e.target.value = ''; return; }
@@ -11766,16 +11788,16 @@ window.EduGuard = {
   /** 이은 운행이 다른 기간인 영수증(그 영수증 기간에서 「운행 없는 영수증」이 된 것) — 영수증 기간 쪽 문구. */
   function xlinkHereText(e, t) {
     var tm = CR.short(cycleOfMs(Number(t.start_time))), em = CR.short(cycleOfMs(Number(e.date_millis)));
-    return '이 영수증(' + md(e.date_millis) + ' ' + (e.category || '') + ' ' + n0(e.amount) + '원)은 ' + md(t.start_time) + ' 운행(' + tm + ')에 이어져 있지만 ' +
-      '영수증 날짜는 ' + em + '이라 어느 기간에도 정산되지 않습니다. 넣으려면 「다른 운행에 붙이기」로 이번 기간 운행에 다시 잇거나, ' +
-      tm + '이 아직 상신 전이면 그쪽에서 확인하세요.';
+    return md(e.date_millis) + ' ' + (e.category || '') + ' 영수증 ' + n0(e.amount) + '원은 ' + md(t.start_time) + ' 운행(' + tm + ')에 이어져 있지만, ' +
+      '영수증 날짜가 ' + em + '에 속해 어느 기간에도 정산되지 않아요. ‘다른 운행에 붙이기’로 이번 기간 운행에 다시 잇거나, ' +
+      tm + ' 기간이 아직 상신 전이면 그쪽에서 확인하세요.';
   }
   /** 이 기간 운행에 이었는데 영수증 날짜가 다른 기간인 영수증 — 운행 기간 쪽 문구(영수증 기간에 그날 운행이 있는지는 여기서 모른다). */
   function xlinkThereText(e, t) {
     var em = CR.short(cycleOfMs(Number(e.date_millis)));
     return md(t.start_time) + ' 운행에 이은 ' + (e.category || '') + ' 영수증 ' + n0(e.amount) + '원은 영수증 날짜(' + md(e.date_millis) + ')가 ' + em +
-      '이라 이 기간 정산에 들어가지 않습니다. ' + em + '에 그날 업무 운행이 없으면 어느 기간에도 정산되지 않으니, ' + em +
-      '에서 「다른 운행에 붙이기」로 그 기간 운행에 다시 잇거나 확인하세요.';
+      '에 속해 이 기간 정산에 들어가지 않아요. ' + em + '에 그날 업무 운행이 없으면 어느 기간에도 정산되지 않으니, ' + em +
+      ' 화면에서 ‘다른 운행에 붙이기’로 그 기간 운행에 다시 잇거나 확인하세요.';
   }
   /**
    * 한 사람 · 한 기간(r)의 경계 영수증. here = 이 기간 영수증인데 이은 운행이 다른 기간이라 「운행 없는 영수증」이 된 것(표시하는 날만 —
@@ -11909,7 +11931,7 @@ window.EduGuard = {
       }, function () {
         AUTOFILL_BUSY = false;
         (tried || []).forEach(function (k) { delete AUTOFILL_TRIED[k]; });
-        if (opt && opt.miss) toast('서버에서 운행을 다시 읽지 못했습니다 — 잠시 뒤 그 줄의 「확인」을 다시 눌러 주세요(아무것도 적지 않았습니다).', true);
+        if (opt && opt.miss) toast('운행 정보를 불러오지 못해 저장하지 않았어요. 잠시 후 ‘확인’을 다시 눌러 주세요.', true);
       });
   }
   function writeFill(tolls, parks, opt) {
@@ -11928,9 +11950,9 @@ window.EduGuard = {
     };
     tollStep.then(function () { return parkStep(0); }).then(function () {
       AUTOFILL_BUSY = false;
-      if (!ok) { if (fail) toast('영수증 금액을 운행에 적지 못했습니다(정산 금액은 그대로 영수증 금액이 들어갑니다).', true); return; }
-      toastOk(opt && opt.ok ? opt.ok(notes) : '영수증 금액을 운행에 넣었습니다: ' + notes.slice(0, 4).join(' · ') + (notes.length > 4 ? ' 외 ' + (notes.length - 4) + '건' : ''),
-        fail ? fail + '건은 적지 못했습니다(정산 금액은 그대로 영수증 금액이 들어갑니다)' : (opt && opt.sub) || null);
+      if (!ok) { if (fail) toast('영수증 금액을 운행에 적지 못했어요. 정산에는 그대로 영수증 금액이 들어가요.', true); return; }
+      toastOk(opt && opt.ok ? opt.ok(notes) : '영수증 금액을 운행에 넣었어요. ' + notes.slice(0, 4).join(' · ') + (notes.length > 4 ? ' 외 ' + (notes.length - 4) + '건' : ''),
+        fail ? fail + '건은 적지 못했어요. 정산에는 그대로 영수증 금액이 들어가요.' : (opt && opt.sub) || null);
       TRIP_CACHE = {}; AUDIT = null;
       loadAll();
     });
@@ -11947,11 +11969,11 @@ window.EduGuard = {
     if (!me || isMulti() || cycleLocked(me)) return;
     var M = moneyOf(me, cycleRange(CYC), ALL_TRIPS, ALL_EVID);
     var x = dupFillDays(M).filter(function (y) { return y.cat === cat && y.d.day === day; })[0];
-    if (!x || !x.ask.length) { toast('이 날은 확인할 같은 금액 영수증이 없습니다 — 화면을 새로 고쳤습니다.'); render(); return; }
+    if (!x || !x.ask.length) { toast('이 날은 확인할 같은 금액 영수증이 없어요. 화면을 새로 고쳤어요.'); render(); return; }
     var d = x.d, word = cat === '주차' ? '주차비' : '통행료', w = function (v) { return n0(v) + '원'; };
     var sum = fillItemsOf(cat, d, 'sum', x.G, 'paid'), once = fillItemsOf(cat, d, 'once', x.G, 'once');
     var tot = function (l) { return l.reduce(function (s, p) { return s + p.amount; }, 0); };
-    if (!sum.length) { toast('이 날 운행에 영수증 금액을 적을 수 없습니다(본인 운행이 아니거나 결재 중입니다).', true); return; }
+    if (!sum.length) { toast('본인 운행이 아니거나 결재 중이라 이 날 운행에 영수증 금액을 적을 수 없어요.', true); return; }
     DUPF = { cat: cat, day: day, key: dupKey(cat, d), sum: sum, once: once };
     var nDup = x.ask.reduce(function (s, g) { return s + g.ev.length; }, 0);
     var DOW = ['일', '월', '화', '수', '목', '금', '토'], p = day.split('-'), dw = DOW[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay()];
@@ -11968,13 +11990,13 @@ window.EduGuard = {
     var opt = function (v, title, sub) {
       return '<label class="dupopt"><input type="radio" name="dupfill" value="' + v + '"><span><b>' + esc(title) + '</b><span class="dim">' + esc(sub) + '</span></span></label>';
     };
-    var body = '<div class="anote warn" style="margin-top:0">이 날은 운행 ' + word + '가 비어 있어 영수증 금액을 운행에 넣습니다. 그런데 <b>같은 금액 영수증이 ' + n0(nDup) + '장</b> 있습니다 — ' +
+    var body = '<div class="anote warn" style="margin-top:0">이 날은 운행 ' + word + '가 비어 있어 영수증 금액을 넣어야 하는데, <b>같은 금액 영수증이 ' + n0(nDup) + '장</b> 있어요. ' +
         '같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) 골라 주세요.</div>' +
       '<ul class="dupev">' + evLi + '</ul>' +
-      '<div class="dim" style="font-size:13px;margin:6px 0 10px">넣을 운행: ' + esc(tripTxt || '그날 첫 업무 운행') + ' · 사진이 같은 영수증이면 겹친 것입니다(같은 원본에서 오린 두 장도 겹칠 수 있습니다).</div>' +
+      '<div class="dim" style="font-size:13px;margin:6px 0 10px">넣을 운행: ' + esc(tripTxt || '그날 첫 업무 운행') + ' · 사진이 같은 영수증이면 겹친 거예요. 같은 원본에서 오린 두 장도 겹칠 수 있어요.</div>' +
       '<div class="dupopts" role="radiogroup" aria-label="같은 금액 영수증">' +
-        opt('sum', (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음(왕복 등) → 합계 ' + w(tot(sum)) + ' 적기', '영수증 ' + n0(d.ev.length) + '장 모두 정산합니다') +
-        opt('once', '같은 영수증이 겹침 → 한 번만 ' + w(tot(once)) + ' 적기', '겹친 영수증은 적은 뒤 아래 내역에서 지워 주세요(그대로 두면 「금액 다름」으로 남습니다)') +
+        opt('sum', (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음(왕복 등) → 합계 ' + w(tot(sum)) + ' 적기', '영수증 ' + n0(d.ev.length) + '장을 모두 정산해요.') +
+        opt('once', '같은 영수증이 겹침 → 한 번만 ' + w(tot(once)) + ' 적기', '적은 뒤 겹친 영수증을 내역에서 지워 주세요. 그대로 두면 ‘금액 다름’으로 남아요.') +
       '</div>';
     openPanel('같은 금액 영수증 확인', md(Date.parse(day + 'T00:00:00+09:00')) + '(' + dw + ') · ' + cat, body,
       '<span style="flex:1"></span><button class="btn pri" id="btnDupGo" disabled>적기</button><button class="btn" data-close>취소</button>');
@@ -11985,23 +12007,23 @@ window.EduGuard = {
     if (!S0 || !me) return;
     var c = document.querySelector('input[name="dupfill"]:checked');
     if (!c) { toast('둘 중 하나를 골라 주세요.', true); return; }
-    if (AUTOFILL_BUSY) { toast('영수증 금액을 적는 중입니다 — 잠시 뒤 다시 눌러 주세요.', true); return; }
+    if (AUTOFILL_BUSY) { toast('영수증 금액을 적는 중이에요. 잠시 후 다시 눌러 주세요.', true); return; }
     // 창을 연 뒤 영수증·운행이 바뀌었으면 적지 않는다(다시 묻는다)
     var M = moneyOf(me, cycleRange(CYC), ALL_TRIPS, ALL_EVID);
     var x = dupFillDays(M).filter(function (y) { return y.cat === S0.cat && y.d.day === S0.day; })[0];
-    if (!x || dupKey(x.cat, x.d) !== S0.key) { DUPF = null; closePanel(); toast('그 사이 이 날 영수증이 바뀌었습니다 — 다시 확인해 주세요.', true); render(); return; }
+    if (!x || dupKey(x.cat, x.d) !== S0.key) { DUPF = null; closePanel(); toast('그 사이 이 날 영수증이 바뀌었어요. 다시 확인해 주세요.', true); render(); return; }
     var once = c.value === 'once', items = once ? S0.once : S0.sum;
     DUPF = null; closePanel();
     var tolls = items.filter(function (p) { return p.cat === '통행료'; }), parks = items.filter(function (p) { return p.cat === '주차'; });
     var amt = items.reduce(function (s, p) { return s + p.amount; }, 0), dd = S0.day.slice(5).replace('-', '.');
     var nGone = x.ask.reduce(function (s, g) { return s + g.ev.length - 1; }, 0), nDup = x.ask.reduce(function (s, g) { return s + g.ev.length; }, 0);
     fillSafe(tolls, parks, [], {
-      miss: '이 날 운행 금액이 그 사이 정해져 적지 않았습니다 — 표를 새로 고쳤습니다.',
+      miss: '그 사이 이 날 운행 금액이 정해져서 적지 않았어요. 표를 새로 고쳤어요.',
       ok: function () {
-        return once ? '운행에 한 번만 넣었습니다: ' + dd + ' ' + S0.cat + ' ' + n0(amt) + '원'
-          : '영수증 금액을 운행에 넣었습니다: ' + dd + ' ' + S0.cat + ' ' + n0(amt) + '원(' + (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음)';
+        return once ? dd + ' ' + S0.cat + ' ' + n0(amt) + '원을 운행에 한 번만 넣었어요.'
+          : dd + ' ' + S0.cat + ' ' + n0(amt) + '원을 운행에 넣었어요(' + (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음).';
       },
-      sub: once ? '겹친 영수증 ' + n0(nGone) + '장은 아래 내역에서 지워 주세요 — 그대로 두면 「금액 다름」으로 남습니다' : null
+      sub: once ? '겹친 영수증 ' + n0(nGone) + '장은 내역에서 지워 주세요. 그대로 두면 ‘금액 다름’으로 남아요.' : null
     });
   }
 
@@ -12069,14 +12091,14 @@ window.EduGuard = {
   function undoBlock(plan, del) {
     if (!plan || !plan.length) return '';
     return '<div class="undoblk" role="group" aria-label="영수증 금액이 들어간 운행 되돌리기">' +
-      '<div class="anote warn" style="margin-top:0">이 영수증 금액이 아래 운행에 들어가 있습니다. 함께 되돌리지 않으면 ' +
-      (del ? '운행에 영수증 없는 금액으로 남습니다' : '두 번 정산될 수 있습니다') + ' — 되돌리지 않을 줄만 끄세요.</div><ul class="undolist">' +
+      '<div class="anote warn" style="margin-top:0">이 영수증 금액이 아래 운행에 들어가 있어요. 함께 되돌리지 않으면 ' +
+      (del ? '운행에 영수증 없는 금액으로 남아요' : '두 번 정산될 수 있어요') + '. 되돌리지 않을 줄만 끄세요.</div><ul class="undolist">' +
       plan.map(function (p, i) {
         var t = p.trip, w = p.cat === '주차' ? '주차비' : '통행료';
         return '<li><label><input type="checkbox" data-undo="' + i + '" checked> <span>' +
           esc(md(t.start_time) + ' ' + hm(t.start_time) + ' ' + (t.visit_place || placeShort(t.end_address) || '운행') + ' · ' + w + ' ' + n0(p.amount) + '원 → ' +
             (p.cat === '주차' ? (p.prev ? n0(p.prev) + '원' : '비움') : p.prev == null ? '모름(미확정)' : p.prev === 0 ? '없음(0원)' : n0(p.prev) + '원')) +
-          (p.exact ? '' : ' <span class="dim">(이 영수증 금액으로 넣은 것 같습니다)</span>') + '</span></label></li>';
+          (p.exact ? '' : ' <span class="dim">(이 영수증 금액으로 넣은 것 같아요)</span>') + '</span></label></li>';
       }).join('') + '</ul></div>';
   }
   /** 켜 둔 줄만. */
@@ -12102,8 +12124,8 @@ window.EduGuard = {
   /** 결과 한 마디(지우기·붙이기 알림 뒤에 붙인다). */
   function undoSay(u) {
     if (!u) return '';
-    return (u.ok ? ' 운행에 넣었던 금액 ' + n0(u.ok) + '건도 되돌렸습니다.' : '') +
-      (u.fail ? ' ' + n0(u.fail) + '건은 되돌리지 못했습니다 — 그 운행을 눌러 금액을 직접 고쳐 주세요.' : '');
+    return (u.ok ? ' 운행에 넣었던 금액 ' + n0(u.ok) + '건도 되돌렸어요.' : '') +
+      (u.fail ? ' ' + n0(u.fail) + '건은 되돌리지 못했어요. 그 운행을 눌러 금액을 직접 고쳐 주세요.' : '');
   }
 
   /* ══════════════════ 통행료 맞추기 제안(2026-10-21 사용자 결정 「제안 + 한 번 눌러 확정」) ══════════════════
@@ -12131,10 +12153,10 @@ window.EduGuard = {
   function openTollSug() {
     var me = myName();
     if (!me || isMulti()) return;
-    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없습니다.', true); return; }
+    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없어요.', true); return; }
     var P = tollSugPlan();
-    if (!P) { toast('통행료 제안을 만들지 못했습니다 — 화면을 새로 고친 뒤 다시 눌러 주세요.', true); return; }
-    if (!P.items.length) { toast('통행료 미확정 운행이 없습니다.'); return; }
+    if (!P) { toast('통행료 제안을 만들지 못했어요. 새로고침한 뒤 다시 눌러 주세요.', true); return; }
+    if (!P.items.length) { toast('통행료 미확정 운행이 없어요.'); return; }
     TSUG = { items: P.items, busy: false };
     var DOW = ['일', '월', '화', '수', '목', '금', '토'];
     var dn = function (k) { var p = k.split('-'), x = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return p[1] + '.' + p[2] + '(' + DOW[x.getUTCDay()] + ')'; };
@@ -12164,10 +12186,10 @@ window.EduGuard = {
         (it.kind === 'pick' ? '<button type="button" class="btn sm tsedit" data-edit="' + esc(String(t.id)) + '">' + ic('edit', 13) + '직접 고치기</button>' : '') +
         '</li>';
     };
-    var body = '<div class="anote" style="margin-top:0">영수증·하이패스 기록으로 통행료 「모름」(미확정) 운행을 맞춘 제안입니다. <b>정산 규칙은 그대로</b>이고, ' +
-      '고른 줄만 그 운행의 통행료로 적습니다(운행 고치기와 같은 「직접 입력」 · 근거 「영수증 맞춤 제안」). 「직접 고르기」 줄은 그 운행을 고쳐 금액을 정해 주세요.</div>' +
+    var body = '<div class="anote" style="margin-top:0">영수증과 하이패스 기록으로 통행료 미확정 운행을 맞춘 제안이에요. <b>정산 규칙은 그대로</b>이고, ' +
+      '고른 줄만 그 운행의 통행료로 적어요. 운행 고치기에서 직접 넣은 값과 똑같이 저장되고, 근거에는 ‘영수증 맞춤 제안’이 남아요. ‘직접 고르기’ 줄은 그 운행을 고쳐 금액을 정해 주세요.</div>' +
       (can ? '<label class="tsall"><input type="checkbox" id="tsAll" checked> 제안 ' + n0(can) + '건 모두 고르기</label>'
-        : '<div class="anote">바로 맞출 제안이 없습니다 — 아래 운행을 직접 고쳐 주세요.</div>') +
+        : '<div class="anote">바로 맞출 제안이 없어요. 아래 운행을 직접 고쳐 주세요.</div>') +
       '<div class="tsgrps">' + groups.map(function (g) {
         return '<div class="tsgrp"><div class="tsday">' + esc(dn(g.day)) + '</div><ul class="tslist">' + g.list.map(row).join('') + '</ul></div>';
       }).join('') + '</div>';
@@ -12189,7 +12211,7 @@ window.EduGuard = {
   function tsApply() {
     var S0 = TSUG, me = myName();
     if (!S0 || S0.busy || !me) return;
-    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없습니다.', true); return; }
+    if (cycleLocked(me)) { toast(lockWhy(me) + ' 이 기간에는 통행료를 고칠 수 없어요.', true); return; }
     var picked = S0.items.filter(function (it, i) {
       var c = document.querySelector('[data-tspick="' + i + '"]');
       return c && c.checked && (it.kind === 'none' || it.kind === 'amount');
@@ -12234,16 +12256,16 @@ window.EduGuard = {
       if (TSUG === S0) TSUG = null;
       closePanel();
       var warn = [];
-      if (R.stale) warn.push(n0(R.stale) + '건은 그 사이 통행료가 정해져 건너뛰었습니다');
-      if (R.fail) warn.push(n0(R.fail) + '건은 저장하지 못했습니다 — 그 운행을 눌러 직접 고쳐 주세요');
-      if (R.ok) toastOk(n0(R.ok) + '건을 맞췄습니다.', warn.join(' · ') || null);
-      else toast((warn.join(' · ') || '맞춘 운행이 없습니다') + '.', true);
+      if (R.stale) warn.push(n0(R.stale) + '건은 그 사이 통행료가 정해져 건너뛰었어요.');
+      if (R.fail) warn.push(n0(R.fail) + '건은 저장하지 못했어요. 그 운행을 눌러 직접 고쳐 주세요.');
+      if (R.ok) toastOk(n0(R.ok) + '건을 맞췄어요.', warn.join(' ') || null);
+      else toast(warn.join(' ') || '맞춘 운행이 없어요.', true);
       AUDIT = null; TRIP_CACHE = {};
       paintPills(); render();
       loadAll();                                   // 서버 값으로 다시 받아 표·합계를 다시 센다
     }, function () {
       S0.busy = false; lockUi(false); tsPick(null);
-      toast('서버에서 운행을 다시 읽지 못했습니다 — 잠시 뒤 다시 눌러 주세요(아무것도 바꾸지 않았습니다).', true);
+      toast('운행 정보를 불러오지 못해 아무것도 바꾸지 않았어요. 잠시 후 다시 눌러 주세요.', true);
     });
   }
 
@@ -12260,7 +12282,7 @@ window.EduGuard = {
     }).sort(function (a, b) { return a.date_millis - b.date_millis; });
     var trips = TRIPS.filter(function (t) { return t.username === me && !t.deleted_at && t.start_time >= r.lo && t.start_time < r.hi; })
       .sort(function (a, b) { return a.start_time - b.start_time; });
-    if (!evs.length) { toast('이번 기간에 올린 ' + catName + ' 영수증이 없습니다.'); return; }
+    if (!evs.length) { toast('이번 기간에 올린 ' + catName + ' 영수증이 없어요.'); return; }
     var bad = {}; cats.forEach(function (c) { evUnmatched(c).forEach(function (e) { bad[e.id] = 1; }); });
     // 두 번 정산 의심(2026-10-20 R14) — 다음 날 날짜로 올라온 전날 영수증일 수 있는 것: 줄에 까닭을 적고 운행 칸에서 전날 묶음을 짚는다
     var twice = {}, MM = moneyOf(me, r);
@@ -12310,9 +12332,9 @@ window.EduGuard = {
         '<td style="width:100%"><select class="inp" data-evlinksel="' + e.id + '" data-was="' + esc(String(e.trip_id || '')) + '" style="min-width:260px">' + opts + '</select></td></tr>';
     }).join('');
     openPanel(catName + ' 영수증을 다른 운행에 붙이기', cycleName(CYC) + ' · ' + n0(evs.length) + '건',
-      '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 저절로 붙습니다. 자정을 넘겨 결제했거나 수기 운행의 날짜가 달라 ' +
-      '「그날 업무 운행 없음」이면, 운행 칸에서 <b>어느 운행의 영수증인지</b> 골라 저장하세요(영수증 날짜는 바뀌지 않습니다). ' +
-      '맞는 운행이 아예 없으면 1단계에서 운행을 넣거나, 잘못 올린 영수증이면 영수증 내역에서 지우세요.</div>' +
+      '<div class="anote" style="margin-top:0">영수증은 보통 <b>같은 날 운행</b>에 연결돼요. 자정을 넘겨 결제했거나 수기 운행 날짜가 달라 ' +
+      '그날 업무 운행이 없으면, 영수증 날짜는 그대로 두고 <b>어느 운행의 영수증인지</b>만 골라 저장하세요. ' +
+      '맞는 운행이 없으면 1단계에서 운행을 넣거나, 잘못 올린 영수증이면 내역에서 지우세요.</div>' +
       '<div id="evLinkUndo"></div>' +
       // evlinkt — 폰에서는 줄마다 두 줄(날짜·금액 / 운행 고르기 칸 전체 폭). 창(348px) 안에 660px 표라 운행 칸이 가로 스크롤 뒤에 있었다(2026-10-20 V3 U3)
       '<div class="panel" style="margin-top:12px"><div class="scroll"><table class="evlinkt"><thead><tr><th>영수증 날짜</th><th class="n">금액</th><th>운행</th></tr></thead>' +
@@ -12324,7 +12346,7 @@ window.EduGuard = {
   }
   function saveEvLink() {
     var sels = [].slice.call(document.querySelectorAll('[data-evlinksel]')).filter(function (s) { return s.value !== s.dataset.was; });
-    if (!sels.length) { toast('바뀐 내용이 없습니다.'); closePanel(); return; }
+    if (!sels.length) { toast('바뀐 내용이 없어요.'); closePanel(); return; }
     var btn = $('btnEvLinkSave');
     // 옮기는 영수증의 금액이 지금 다른 운행에 들어가 있으면(웹 영수증 적기) 함께 되돌릴지 먼저 묻는다(2026-10-20 AU2 ① —
     //   안 되돌리면 그 운행 금액이 남아 두 번 정산된다). 처음 누르면 확인 → 있으면 목록을 보이고 한 번 더 「저장」, 없으면 바로 저장.
@@ -12343,7 +12365,7 @@ window.EduGuard = {
         var host = $('evLinkUndo');
         if (host) { host.innerHTML = undoBlock(plan); try { host.scrollIntoView({ block: 'nearest' }); } catch (e) { } }
         if (btn) { btn.disabled = false; btn.textContent = '저장'; }
-        toast('이 영수증 금액이 들어간 운행이 있습니다 — 위 목록을 확인하고 「저장」을 한 번 더 눌러 주세요.');
+        toast('이 영수증 금액이 들어간 운행이 있어요. 목록을 확인하고 ‘저장’을 한 번 더 눌러 주세요.');
       });
       return;
     }
@@ -12369,8 +12391,8 @@ window.EduGuard = {
     }).then(function (u) {
       EVLINK_UNDO = null;
       closePanel();
-      toast((fail ? (sels.length - fail) + '건 저장, ' + fail + '건은 저장하지 못했습니다(결재 중이거나 다른 기간 운행일 수 있습니다).'
-        : sels.length + '건을 맞췄습니다.') + undoSay(u), !!fail || !!(u && u.fail));
+      toast((fail ? (sels.length - fail) + '건을 저장했고 ' + fail + '건은 저장하지 못했어요. 결재 중이거나 다른 기간 운행일 수 있어요.'
+        : sels.length + '건을 맞췄어요.') + undoSay(u), !!fail || !!(u && u.fail));
       if (u && u.ok) TRIP_CACHE = {};
       loadAll();
     });
@@ -12750,7 +12772,7 @@ window.EduGuard = {
       isAll: isAll, isMulti: isMulti, singleOnly: singleOnly, BOXES: BOXES,
       // 결재란·결재선 — 세 문서(운행일지·개인경비·법인카드)와 조직도 화면이 같은 것을 쓴다(2026-10-14)
       BOXES_V1: BOXES_V1, boxSetOf: boxSetOf, boxLabels: boxLabels, docBoxes: docBoxes, liveSign: liveSign,
-      autoLine: autoLine, lineAt: lineAt, apprHint: APPR_HINT, canApprove: canApprove,
+      autoLine: autoLine, lineAt: lineAt, apprHint: APPR_HINT, canApprove: canApprove, retryHint: retryHint, endDot: endDot, lockSay: lockSay,
       // 관리자가 지정한 결재선(2026-10-14) — 조직도 화면(drv-org.js)이 같은 계산으로 보이고 고친다
       APPR_BOXES: APPR_BOXES, effLine: effLine, applyOverride: applyOverride, lineOverride: lineOverride,
       lineOvOk: function () { return LINE_OV_OK; }, fetchLineOv: fetchLineOv, setLineOv: setLineOv, orgLabel: orgLabel,
