@@ -1268,7 +1268,7 @@
         : cur < 3 ? '<button class="' + nextCls + '" data-evsubmove="1">다음: ' + esc(EV_SUBS[cur + 1]) + ' →</button>'
         : (stepNow() === 2 && !cycleLocked(myName()) && !isMulti()
           ? '<button class="' + nextCls + '" data-stepmove="1" data-from="2">다음: 3 검증·상신 →</button>'
-          : '<span class="dim" style="font-size:12.5px">마지막 차례입니다.</span>')) +
+          : '<span class="dim" style="font-size:13px">마지막 차례입니다.</span>')) +
       '</div></div>';
     EVSUB_FX = '';
     return '<section class="sect">' + steps + body + '</section>';
@@ -1529,9 +1529,11 @@
             var dupAmt = MC.days.reduce(function (a, d) { return a + (d.D || 0); }, 0);
             if (dupAmt) why.push('하이패스와 같은 통행료 ' + won(dupAmt) + '은 한 번만 셈');
             return why.length ? ' (' + why.join(' · ') + ')' : '';
-          })() + ' ' + foldBtn + lineHtml +
+          })() + lineHtml +
           (how.length ? '<div class="mhow"' + (hideHow ? ' hidden' : '') + '>' + how.join('. ') + '.</div>' : '') +
-          (fold ? '' : '<div class="mrule">' + rule + '</div>'),
+          (fold ? '' : '<div class="mrule">' + rule + '</div>') +
+          // 「자세히 보기」는 안내 글 아래 한 줄 — 문장 사이에 끼면 그 줄만 단추 높이로 벌어졌다(2026-10-24 다듬기 2단계)
+          '<div class="mfoldrow">' + foldBtn + '</div>',
         table) + xlHtml;
     }
     if (cat === '주유') {
@@ -1968,8 +1970,8 @@
   }
 
   function safeRuleNote() {
-    return '<section class="sect"><div class="panel" style="padding:18px 20px;font-size:12.5px;' +
-      'line-height:1.95;color:var(--ink-3)">' +
+    return '<section class="sect"><div class="panel" style="padding:18px 20px;font-size:13px;' +
+      'line-height:1.7;color:var(--ink-3)">' +
       '<b style="color:var(--ink-2)">100점에서 깎습니다.</b> ' +
       '과속 −3 · 어린이보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3 · ' +
       '지속과속 −2(운행당 −10까지)<br>' +
@@ -2046,8 +2048,8 @@
       done += g[k].rows.length; sum += FILLS[k] * g[k].rows.length;
     });
 
-    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;' +
-      'line-height:1.9;color:var(--ink-3)">' +
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;' +
+      'line-height:1.7;color:var(--ink-3)">' +
       '같은 구간끼리 묶었습니다. <b style="color:var(--ink-2)">시내 운행처럼 요금소를 안 지난 구간은 ' +
       '「없음」</b>을 누르시면 그 구간 전체가 한 번에 정리됩니다.<br>' +
       '전에 정하신 금액이 있으면 「지난번 N원」 버튼이 붙어 있습니다 — 누르면 그대로 들어갑니다.<br>' +
@@ -2547,8 +2549,8 @@
     var admins = list.filter(function (u) { return USERS[u].is_admin; }).length;
     var MGRS = ACCT.managers || [], master = !!ACCT.is_master;
     var h = head('권한 관리', list.length + '명 · 관리자 ' + admins + '명 · 권한 주는 관리자 ' + MGRS.length + '명');
-    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;' +
-      'line-height:1.9;color:var(--ink-3)">' +
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;' +
+      'line-height:1.7;color:var(--ink-3)">' +
       '<b style="color:var(--ink-2)">운행일지 관리자</b>는 전 직원의 운행·정산·증빙을 보고, ' +
       '계기판을 고칠 수 있습니다.<br>' +
       '바꿀 때마다 <b>본인 비밀번호</b>를 한 번 더 확인합니다 — 자리를 비운 사이 남이 ' +
@@ -3404,7 +3406,7 @@
     if (!all.length) {
       list = '<div class="acnone">' +
         (APPR_Q.trim() ? '「' + esc(APPR_Q.trim()) + '」 로 찾히는 사람이 없습니다.' : '이 자리에는 결재자로 넣을 분이 없습니다.') +
-        '<br><span style="font-size:11.5px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 나옵니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
+        '<br><span style="font-size:12px">결재자는 조직도에 올라 있고 앱 계정이 연결된 분만 나옵니다. 없으면 관리자에게 조직도 등록을 요청하세요.</span></div>';
     } else {
       var lastG = null;
       list = all.map(function (u, i) {
@@ -4790,7 +4792,7 @@
     return '<div class="panel" style="padding:30px 26px;text-align:center">' +
       '<div style="color:var(--ok);margin-bottom:10px">' + ic('check', 22) + '</div>' +
       '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(title) + '</div>' +
-      '<div class="dim" style="font-size:13px;line-height:1.8;max-width:430px;margin:0 auto">' +
+      '<div class="dim" style="font-size:13px;line-height:1.7;max-width:430px;margin:0 auto">' +
       body + '</div>' +
       '<div style="margin-top:16px"><button class="btn sm" data-v="close">「이번 달 마감」에서 결재 문서 받기 ' +
       ic('chev', 13) + '</button></div></div>';
@@ -5851,7 +5853,7 @@
     h += '<div class="anote">상신 상태는 이 기간의 운행일지 결재 건, 검증은 상신한 사람은 상신 때 결과, 아직 상신하지 않은 사람은 마지막 검증 결과입니다. ' +
       '결재 완료본 받기·관리자 반려·정정 열기는 「결재 완료 출력」에서 합니다. 이름을 누르면 그 사람의 운행 기록으로 갑니다.</div>';
     h += sect('산정 기준', null, '',
-      '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
+      '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
       '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
       '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
       '주차비·통행료 = 금액 규칙 v3 — 운행 금액(영수증과 대조) · 운행 금액이 없는 날은 영수증 금액 · 운행 없는 날의 영수증은 뺌<br>' +
@@ -5977,7 +5979,7 @@
     return head(title, esc(viewName())) +
       '<div class="panel" style="padding:30px 26px;text-align:center">' +
       '<div style="font-weight:700;font-size:15px;margin-bottom:8px">' + esc(what) + '은 한 기간씩 합니다</div>' +
-      '<div class="dim" style="font-size:13px;line-height:1.8;max-width:460px;margin:0 auto 16px">' +
+      '<div class="dim" style="font-size:13px;line-height:1.7;max-width:460px;margin:0 auto 16px">' +
       '지금은 여러 기간을 함께 보고 있습니다(조회 전용). 어느 기간을 다룰지 골라 주세요.</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
       cs.map(function (c) {
@@ -6314,7 +6316,7 @@
     }
 
     h += sect('점검 기준', null, '',
-      '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
+      '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
       '<b style="color:var(--ink-2)">계기판이 크게 튄 곳</b> — 같은 사람·같은 차에서 1,000km 이상 벌어진 지점. 계기판 숫자를 잘못 적었을 수 있습니다.<br>' +
       '<b style="color:var(--ink-2)">한 차를 두 사람이</b> — 번호판을 잘못 고르면 남의 차 기록이 됩니다.<br>' +
       '<b style="color:var(--ink-2)">운행목적 미선택</b> — 업무용으로 안 잡혀 금액이 조용히 0원이 됩니다.<br>' +
@@ -6462,7 +6464,7 @@
           // 원본 장을 이 줄 사진으로 쓴 줄(photo_path = scan_path — 영수증 자리를 못 받아 오리지 않음, 2026-10-21)은 「원본」 하나만
           '<td class="n mact" style="white-space:nowrap">' + (e.photo_path && e.photo_path === e.scan_path ? ''
             : e.photo_path ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(photoUrl(e.photo_path)) + '">사진</a>'
-            : '<span class="dim" style="font-size:11.5px">사진 없음</span>') +
+            : '<span class="dim" style="font-size:12px">사진 없음</span>') +
           (e.scan_path ? ' <a class="btn sm" target="_blank" rel="noopener" title="' +
             (e.photo_path === e.scan_path ? '영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진입니다' : '스캔한 A4 원본') + '" href="' +
             esc(photoUrl(e.scan_path)) + '">원본</a>' : '') +
@@ -7167,8 +7169,8 @@
   function evOdoCells(it, hintHtml) {
     return '<td class="n eva" data-l="계기판 km" data-evodo style="flex-wrap:wrap;row-gap:2px">' +
       (it.km != null ? '<b class="evkm" style="white-space:nowrap">' + n0(it.km) + ' km</b>'
-        : '<span class="evkm dim" style="font-size:12px;line-height:1.45">읽지 못함 — 검증 때 다시 읽습니다</span>') + '</td>' +
-      '<td class="evm"><div class="evguide" style="font-size:12.5px;line-height:1.5;color:var(--ink-600)">검증 때 운행일지 마지막 km 와 맞춰 봅니다</div>' +
+        : '<span class="evkm dim" style="font-size:12px;line-height:1.5">읽지 못함 — 검증 때 다시 읽습니다</span>') + '</td>' +
+      '<td class="evm"><div class="evguide" style="font-size:13px;line-height:1.5;color:var(--ink-600)">검증 때 운행일지 마지막 km 와 맞춰 봅니다</div>' +
       hintHtml + '</td>';
   }
 
@@ -8016,7 +8018,7 @@ window.EduGuard = {
             '</div>';
         }).join('') + '</div>');
     });
-    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:12.5px;color:var(--ink-600);line-height:1.75">' +
+    h += '<section class="sect"><div class="panel" style="padding:16px 20px;font-size:13px;color:var(--ink-600);line-height:1.7">' +
       '· 앞으로 건너뛰기와 배속 변경은 불가합니다<br>· 되감기는 자유이며, 나갔다 와도 이어서 볼 수 있습니다<br>' +
       '· 앱과 웹의 진도는 함께 쌓입니다(어느 쪽에서 봐도 같은 기록)</div></section>';
     return h;
@@ -8234,7 +8236,7 @@ window.EduGuard = {
       '<button class="btn sm" id="btnCsv" title="운행 목록을 CSV 로 받습니다">' + ic('dl', 13) + '목록 CSV</button></span>', personTable(rows));
 
     h += sect('산정 기준', null, '',
-      '<div class="panel" style="padding:18px 20px;font-size:12.5px;line-height:1.95;color:var(--ink-3)">' +
+      '<div class="panel" style="padding:18px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
       '업무용(<b style="color:var(--ink-2)">' + BUSINESS + '</b>) 운행만 집계합니다.<br>' +
       '유류비 = 분기 기준단가 × 주행거리(도착 계기판 km − 출발 계기판 km, 각각 반올림)<br>' +
       '분기 경계 ' + esc(QBOUNDS.map(function (b) { return pad(b[0]) + '-' + pad(b[1]); }).join(' · ')) + '<br>' +
@@ -8917,7 +8919,7 @@ window.EduGuard = {
         return '<tr class="clk" tabindex="0" data-person="' + esc(u.username) + '">' + orgCell(u.username, true) +
           // 「관리자」는 맨 끝 빈 칸이 아니라 이름 옆 딱지(2026-10-19 웹 사용성 1차)
           '<td><span class="lead">' + esc(u.name || u.username) + '</span>' + (u.is_admin ? ' <span class="admtag">관리자</span>' : '') +
-          '<div class="dim" style="font-size:11px">' + esc(u.username) + '</div></td>' +
+          '<div class="dim" style="font-size:12px">' + esc(u.username) + '</div></td>' +
           '<td class="dim">' + esc(u.position || '—') + '</td>' +
           '<td class="dim">' + esc(u.plate_no || '—') + '</td>' +
           '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td>' +
@@ -9740,10 +9742,10 @@ window.EduGuard = {
       ['방문처', esc(t.visit_place || '—')],
       ['계기판', '<b style="white-space:nowrap">' + n0(t.start_odometer) + ' → ' + n0(t.end_odometer) + '</b> <span class="dim">(' + n0(odoKm(t)) + ' km)</span>'],
       ['주행거리', '<b>' + km(t.distance_km) + ' km</b>'],
-      ['유류비', '<b>' + won(tripFuel(t)) + '</b><div class="dim" style="font-size:11.5px">' +
+      ['유류비', '<b>' + won(tripFuel(t)) + '</b><div class="dim" style="font-size:12px">' +
         esc(region(t.start_address, t.start_lat, t.start_lng)) + ' · ' + qq.y + '년 ' + qq.q + '분기 단가</div>'],
       // 통행료·주차비 금액 모양을 같게(₩ · 굵게, 2026-10-16 3차) — 미확정·없음·면제는 표와 같은 딱지
-      ['통행료', (isUnknownToll(t) || Number(t.toll_cost) === 0 ? tollCell(t) : '<b>' + won(t.toll_cost) + '</b>') + (t.toll_source ?'<div class="dim" style="font-size:11.5px">' + esc(t.toll_source) + '</div>' : '')],
+      ['통행료', (isUnknownToll(t) || Number(t.toll_cost) === 0 ? tollCell(t) : '<b>' + won(t.toll_cost) + '</b>') + (t.toll_source ?'<div class="dim" style="font-size:12px">' + esc(t.toll_source) + '</div>' : '')],
       ['주차비', t.parking_cost ? '<b>' + won(t.parking_cost) + '</b>' : '—'],
       ['입력', t.is_manual ? '수기 입력' : '자동 기록'],
       ['안전', '과속 ' + n0(t.overspeed_count) + ' · 급가속 ' + n0(t.rapid_accel_count) +
@@ -10369,7 +10371,7 @@ window.EduGuard = {
     if (CLOSE_ASK != null && $('btnKeep')) return;
     CLOSE_ASK = $('pFoot').innerHTML;
     // 「계속 입력」 = 닫기를 그만두는 취소(data-cancel) — footOrder 가 줄 끝으로 옮겨 [버리고 닫기] [계속 입력](2026-10-20 단추 차례 통일, 초점은 계속 입력 그대로)
-    $('pFoot').innerHTML = '<span class="dim" style="flex:1;font-size:12.5px">입력한 내용이 사라집니다. 닫을까요?</span>' +
+    $('pFoot').innerHTML = '<span class="dim" style="flex:1;font-size:13px">입력한 내용이 사라집니다. 닫을까요?</span>' +
       '<button class="btn" id="btnKeep" data-cancel>계속 입력</button><button class="btn pri" id="btnDiscard">버리고 닫기</button>';
     var k = $('btnKeep'); if (k) k.focus();
   }
@@ -10505,7 +10507,7 @@ window.EduGuard = {
         // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
         //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
         (sn === 2 && sn === p && evSubMax() < 3
-          ? '<span class="dim" style="font-size:12.5px">주차 → 통행료 → 주유 → 계기판을 차례로 마치면 3 검증·상신으로 넘어갈 수 있습니다.</span>'
+          ? '<span class="dim" style="font-size:13px">주차 → 통행료 → 주유 → 계기판을 차례로 마치면 3 검증·상신으로 넘어갈 수 있습니다.</span>'
           // 계기판 차례에서는 카드의 「다음: 3 검증·상신 →」 하나만(같은 단추가 카드와 띠에 둘이었다 — 2026-10-15 2차)
           : sn === 2 && sn === p && VIEW === 'evid' && evSub() === 3 ? ''
           // 영수증 화면은 카드 안의 단추(올리기·「다음」)가 깜빡이는 하나 — 띠 단추는 빨강만(깜빡임 둘이 되지 않게, V3 U1)
@@ -11969,7 +11971,7 @@ window.EduGuard = {
     var body = '<div class="anote warn" style="margin-top:0">이 날은 운행 ' + word + '가 비어 있어 영수증 금액을 운행에 넣습니다. 그런데 <b>같은 금액 영수증이 ' + n0(nDup) + '장</b> 있습니다 — ' +
         '같은 영수증을 두 번 올렸는지, 실제로 여러 번 냈는지(왕복 등) 골라 주세요.</div>' +
       '<ul class="dupev">' + evLi + '</ul>' +
-      '<div class="dim" style="font-size:12.5px;margin:6px 0 10px">넣을 운행: ' + esc(tripTxt || '그날 첫 업무 운행') + ' · 사진이 같은 영수증이면 겹친 것입니다(같은 원본에서 오린 두 장도 겹칠 수 있습니다).</div>' +
+      '<div class="dim" style="font-size:13px;margin:6px 0 10px">넣을 운행: ' + esc(tripTxt || '그날 첫 업무 운행') + ' · 사진이 같은 영수증이면 겹친 것입니다(같은 원본에서 오린 두 장도 겹칠 수 있습니다).</div>' +
       '<div class="dupopts" role="radiogroup" aria-label="같은 금액 영수증">' +
         opt('sum', (nDup > 2 ? '여러 번' : '두 번') + ' 낸 것 맞음(왕복 등) → 합계 ' + w(tot(sum)) + ' 적기', '영수증 ' + n0(d.ev.length) + '장 모두 정산합니다') +
         opt('once', '같은 영수증이 겹침 → 한 번만 ' + w(tot(once)) + ' 적기', '겹친 영수증은 적은 뒤 아래 내역에서 지워 주세요(그대로 두면 「금액 다름」으로 남습니다)') +

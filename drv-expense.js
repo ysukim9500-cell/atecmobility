@@ -196,7 +196,7 @@
     return { by: by, all: all, n: rows.length, meal: meal };
   }
   function photoLink(it, label) {
-    if (!it.photo_path) return '<span class="dim" style="font-size:11.5px">사진 없음</span>';
+    if (!it.photo_path) return '<span class="dim" style="font-size:12px">사진 없음</span>';
     // 원본 장을 이 줄 사진으로 쓴 줄(photo_path = scan_path — 영수증 자리를 못 받아 오리지 않음, 2026-10-21)은 「원본」 하나만
     if (it.scan_path && it.photo_path === it.scan_path) {
       return '<a class="btn sm" target="_blank" rel="noopener" title="영수증 자리를 찾지 못해 원본 장 전체가 이 줄의 사진입니다" href="' + esc(C.photoUrl(it.scan_path)) + '">원본</a>';

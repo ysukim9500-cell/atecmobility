@@ -564,7 +564,7 @@
       var opts = '<option value="">— 조직도에서 고르기 —</option>' +
         (same.length ? '<optgroup label="같은 이름">' + same.map(function (o) { return '<option value="' + o.id + '"' + (same.length === 1 ? ' selected' : '') + '>' + esc(lab(o)) + '</option>'; }).join('') + '</optgroup>' : '') +
         '<optgroup label="계정 없는 사람 전체">' + rest.map(function (o) { return '<option value="' + o.id + '">' + esc(lab(o)) + '</option>'; }).join('') + '</optgroup>';
-      return '<tr><td><span class="lead">' + esc(nm) + '</span><div class="dim" style="font-size:11px">' + esc(u) + '</div></td>' +
+      return '<tr><td><span class="lead">' + esc(nm) + '</span><div class="dim" style="font-size:12px">' + esc(u) + '</div></td>' +
         '<td class="dim">' + esc([pp.dept, pp.position].filter(Boolean).join(' · ') || '—') + '</td>' +
         '<td style="min-width:240px"><select class="inp" data-olinksel="' + esc(u) + '" style="height:auto">' + opts + '</select></td>' +
         '<td class="n"><button class="btn sm pri" data-olink="' + esc(u) + '">잇기</button></td></tr>';

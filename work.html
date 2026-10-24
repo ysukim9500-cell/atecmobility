@@ -24,8 +24,8 @@ try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) 
 </script>
 <!-- 마감 기간 규칙 엔진(2026-10-20 연말 마감 설정) — 아래 마감 일정·카드가 쓴다. 운행일지(driving.html)와 같은 파일 -->
 <script src="cycle-rules.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<!-- 글꼴은 Pretendard 하나(2026-10-24 다듬기 2단계) — 예전 Noto Sans KR(구글 글꼴)은 그리기 전에 91KB 를 기다리게 했는데 실제로 그리는 글자는 Pretendard 였다 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <!--
   업무 결재 포털 (2026-10-02)
@@ -43,7 +43,7 @@ try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) 
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{font-family:"Noto Sans KR","Malgun Gothic",-apple-system,sans-serif;color:var(--ink);background:var(--bg);
+body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);
   word-break:keep-all;-webkit-text-size-adjust:100%;font-variant-numeric:tabular-nums}
 a{color:inherit}
 button,input{font-family:inherit}
@@ -65,16 +65,16 @@ button,input{font-family:inherit}
 .brand{display:flex;align-items:center;gap:14px;text-decoration:none}
 .brand img{height:22px;width:auto;display:block}
 .brand .bar{width:1px;height:18px;background:var(--line)}
-.brand .nm{font-size:12px;font-weight:700;color:var(--grey);letter-spacing:.02em;white-space:nowrap}
+.brand .nm{font-size:12px;font-weight:700;color:var(--grey);letter-spacing:0;white-space:nowrap}
 .top .sp{flex:1}
-.top .lnk{background:none;border:0;font-size:13.5px;font-weight:700;color:var(--ink-2);cursor:pointer;padding:10px 8px}
+.top .lnk{background:none;border:0;font-size:14px;font-weight:700;color:var(--ink-2);cursor:pointer;padding:10px 8px}
 .top .btn{height:38px;padding:0 16px;font-size:13px}
 .ub{display:flex;align-items:center;gap:10px;font-size:13px}
 .ub .who{line-height:1.3;text-align:right}
-.ub .who b{display:block;font-size:13.5px}
-.ub .who span{font-size:11.5px;color:var(--grey-2)}
+.ub .who b{display:block;font-size:14px}
+.ub .who span{font-size:12px;color:var(--grey-2)}
 /* 「관리자」 표시 — 테두리 상자는 단추처럼 보여서(2026-10-15 화면 정리) 연한 바탕 글자로. 누르는 것이 아니다. */
-.ub .who .tag{display:inline-block;margin-left:6px;padding:1px 6px;font-size:11px;font-weight:700;line-height:1.5;color:var(--red-700);background:var(--red-50);border:0;vertical-align:1px}
+.ub .who .tag{display:inline-block;margin-left:6px;padding:1px 6px;font-size:12px;font-weight:700;line-height:1.5;color:var(--red-700);background:var(--red-50);border:0;vertical-align:1px}
 
 /* ── 첫 화면(로그인 전) — A안 「결재는 한 번에, 마감은 한눈에」(2026-10-12) ──
    왼쪽: 소개 + 바로 쓰는 로그인 칸 · 오른쪽: 이번 달 마감 일정(D-day). 색은 CI 에서 뽑은 것 — 로그인 전 화면에만 쓴다. */
@@ -86,16 +86,16 @@ button,input{font-family:inherit}
 #landing .lt .brand{gap:20px}
 #landing .lt .brand img{height:26px}
 #landing .lt .brand .bar{height:20px;background:#D5D2CE}
-#landing .lt .brand .nm{font-size:15px;font-weight:600;color:var(--c-slate);letter-spacing:.03em}
+#landing .lt .brand .nm{font-size:15px;font-weight:600;color:var(--c-slate);letter-spacing:0}
 #landing .lt .lnk{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:14px;font-weight:500;color:var(--c-slate);text-decoration:none}
 #landing .lt .lnk:hover{color:var(--c-red-d)}
 .lp{padding-block:64px 56px}
 .lp-grid{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:clamp(40px,5vw,72px);align-items:start}
 .lp-left{display:flex;flex-direction:column;gap:32px;min-width:0}
 .lp-intro{display:flex;flex-direction:column;gap:14px}
-.lp-eye{font-size:13px;font-weight:700;letter-spacing:.23em;color:var(--c-red)}
-.lp h1{margin:0;font-size:44px;line-height:1.22;font-weight:700;letter-spacing:-.025em}
-.lp .lead{margin:0;font-size:16px;line-height:1.7;color:var(--c-slate)}
+.lp-eye{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--c-red)}
+.lp h1{margin:0;font-size:44px;line-height:1.25;font-weight:700;letter-spacing:-.025em}
+.lp .lead{margin:0;font-size:17px;line-height:1.7;color:var(--c-slate)}
 /* 로그인 칸 */
 .lcard{background:#fff;border:1px solid var(--c-line);padding:32px;box-shadow:0 18px 40px -24px rgba(28,33,38,.35)}
 #fLogin{display:flex;flex-direction:column;gap:12px}
@@ -109,7 +109,7 @@ button,input{font-family:inherit}
 .keep input{width:18px;height:18px;margin:0;accent-color:var(--c-red)}
 .tlink{background:none;border:0;padding:0 2px;min-height:44px;font-size:14px;color:var(--c-red-d);cursor:pointer;font-weight:500}
 .tlink:hover{color:#80002E;text-decoration:underline}
-.lgo{height:54px;margin-top:8px;border:0;background:var(--c-red);color:#fff;font-size:17px;font-weight:700;letter-spacing:.06em;cursor:pointer;width:100%}
+.lgo{height:54px;margin-top:8px;border:0;background:var(--c-red);color:#fff;font-size:17px;font-weight:700;letter-spacing:0;cursor:pointer;width:100%}
 .lgo:hover{background:var(--c-red-d)}
 .lgo[disabled]{opacity:.6;cursor:default}
 #fLogin .msg{margin:0}
@@ -120,7 +120,7 @@ button,input{font-family:inherit}
 /* 마감 일정 판 */
 .dl{background:var(--c-panel);color:#fff;padding:40px 44px;display:flex;flex-direction:column;gap:28px;min-width:0}
 .dl-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.dl-head h2{margin:0;font-size:22px;font-weight:700}
+.dl-head h2{margin:0;font-size:20px;font-weight:700}
 .dl-head > span{font-size:14px;color:var(--c-mute)}
 .tl{position:relative;height:64px}
 .tl > i{position:absolute;display:block}
@@ -137,10 +137,10 @@ button,input{font-family:inherit}
 .dr{display:grid;grid-template-columns:120px minmax(0,1fr) auto;align-items:center;gap:20px;padding:20px 0;border-top:1px solid var(--c-rule)}
 .dr:last-child{border-bottom:1px solid var(--c-rule)}
 .dd{font-size:44px;font-weight:700;line-height:1;letter-spacing:-.02em;white-space:nowrap}
-.dd.now{font-size:24px;line-height:1.2}
+.dd.now{font-size:24px;line-height:1.25}
 .dr.first .dd{color:#FF5C93}
 .dtx{display:flex;flex-direction:column;gap:4px;min-width:0}
-.dtx b{font-size:18px;font-weight:700}
+.dtx b{font-size:17px;font-weight:700}
 .dtx .per{font-size:14px;color:var(--c-mute);line-height:1.5}
 .dtx .sh,.dtx .chm,.dtx .due-m{display:none}
 /* 「가장 먼저」는 누르는 것이 아니다 — 테두리 상자(단추처럼 보이던 것)를 빼고 글자만(2026-10-15 화면 정리) */
@@ -148,7 +148,7 @@ button,input{font-family:inherit}
 .due{font-size:13px;color:var(--c-mute);white-space:nowrap}
 .news{display:flex;align-items:center;gap:12px;font-size:14px;color:#E5E9EC;line-height:1.5}
 .news[hidden]{display:none}
-.news .new{flex:none;padding:3px 10px;background:var(--c-red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em}
+.news .new{flex:none;padding:3px 10px;background:var(--c-red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:1040px){
   .lp-grid{grid-template-columns:minmax(0,1fr)}
@@ -164,7 +164,7 @@ button,input{font-family:inherit}
   .lp-grid,.lp-left{gap:16px}
   .lp-intro{gap:6px}
   .lp-eye{font-size:12px}
-  .lp h1{font-size:28px;line-height:1.25;letter-spacing:-.02em}
+  .lp h1{font-size:30px;line-height:1.25;letter-spacing:-.02em}
   .lp .lead{display:none}
   .lcard{padding:18px;box-shadow:0 14px 30px -22px rgba(28,33,38,.4)}
   #fLogin{gap:8px}
@@ -174,13 +174,13 @@ button,input{font-family:inherit}
   .lgo{height:50px;margin-top:4px}
   .dl{padding:16px 18px;gap:0}
   .dl-head{padding-bottom:8px}
-  .dl-head h2{font-size:16px}
+  .dl-head h2{font-size:17px}
   .dl-head > span{font-size:12px}
   .dl-head .pc{display:none}
   .tl{display:none}
   .dr{grid-template-columns:64px minmax(0,1fr);gap:12px;padding:10px 0}
   .dr:last-child{border-bottom:0}
-  .dd{font-size:26px}
+  .dd{font-size:24px}
   .dd.now{font-size:15px}
   .dtx{display:block;font-size:14px;gap:0}
   .dtx b{font-size:14px}
@@ -192,8 +192,11 @@ button,input{font-family:inherit}
 }
 
 footer{border-top:1px solid var(--line-2);background:var(--soft)}
-footer .wrap{display:flex;gap:16px;align-items:center;padding-block:22px;font-size:12px;color:var(--grey)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding-block:22px;font-size:12px;color:var(--grey)}
 footer .sp{flex:1}
+/* 「정도 · 혁신 · 협업」은 한 덩어리 — 폰에서 「협업」만 다음 줄로 넘어갔다(2026-10-24). 자리가 모자라면 덩어리째 다음 줄로 */
+footer .wrap > span:last-child{white-space:nowrap}
+footer .wrap > span:first-child{text-wrap:pretty}
 
 /* ── 로그인 뒤: 시스템 선택 ── */
 #appRoot{display:none}
@@ -201,8 +204,8 @@ html.booting #landing,html.booting #appRoot{visibility:hidden}
 body.in #landing{display:none}
 body.in #appRoot{display:block}
 .pick{padding-block:44px 64px}
-.pick h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
-.pick .sub{margin:6px 0 0;font-size:13.5px;color:var(--grey)}
+.pick h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.pick .sub{margin:6px 0 0;font-size:14px;color:var(--grey)}
 .rule{height:2px;background:var(--red);margin-top:16px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 .launch{position:relative;display:flex;flex-direction:column;gap:8px;padding:28px 32px 30px;border-right:1px solid var(--line);
@@ -212,9 +215,9 @@ a.launch:hover{background:var(--soft)}
 a.launch:hover::before{content:"";position:absolute;left:0;top:0;width:10px;height:10px;background:var(--red)}
 .launch .ico{width:40px;height:40px;display:grid;place-items:center;background:var(--ink);color:#fff;margin-bottom:8px}
 .launch.off .ico{background:#C7CDD1}
-.launch h2{margin:0;font-size:16.5px;font-weight:800}
+.launch h2{margin:0;font-size:17px;font-weight:800}
 .launch p{margin:0;font-size:13px;line-height:1.7;color:var(--grey)}
-.launch .go{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;color:var(--red)}
+.launch .go{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--red)}
 a.launch:hover .go svg{transform:translateX(4px)}
 .launch .go svg{transition:transform .15s}
 .launch.off .go{color:var(--grey-2)}
@@ -222,13 +225,13 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .launch p.mine{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:2px;font-size:13px;font-weight:700;color:var(--ink)}
 .launch p.mine .hot{color:var(--red)}
 .launch p.mine .ap{display:inline-flex;align-items:center;padding:0 8px;border-radius:999px;background:var(--red);color:#fff;font-size:12px;line-height:22px}
-.notice{margin-top:22px;display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--warn-50);border:1px solid #EAD9B5;font-size:13.5px;color:#6A4708}
+.notice{margin-top:22px;display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--warn-50);border:1px solid #EAD9B5;font-size:14px;color:#6A4708}
 .notice .sp{flex:1}
 .notice[hidden]{display:none}
 /* ── 오늘 할 일 · 마감 일정(2026-10-20 디자인 v2 — P_Portal · M_Portal) ──
    시스템 고르기 위에: 세 시스템의 할 일(마감이 가까운 순, 줄마다 시스템 · 할 일 · 마감 딱지 · 단추) + 마감 일정. 세 시스템 칸(빨간 2px 선 · 검은 아이콘 칸)은 그대로 두고 단계 막대만 더한다.
    자료는 포털이 가진 것뿐 — 마감 일정(deadlines) · 운행일지 화면이 이 탭에 적어 둔 것(drv_portal_hint: 결재 상태 · 결재할 것 · 남은 일과 그때 시각). */
-.hello h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.3}
+.hello h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.3}
 .hello .sub{margin:6px 0 0;font-size:14px;color:var(--grey);font-variant-numeric:tabular-nums}
 .pgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:24px;row-gap:24px;align-items:start;margin:28px 0 32px}
 .ptodo{grid-column:span 8}
@@ -238,7 +241,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .pcard .phd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
 .pcard .phd h2{margin:0;font-size:17px;font-weight:800}
 .pcard .phd h2 em{font-style:normal;color:var(--red);font-variant-numeric:tabular-nums}
-.pcard .phd > span{font-size:12.5px;color:var(--grey)}
+.pcard .phd > span{font-size:13px;color:var(--grey)}
 .plist{list-style:none;margin:0;padding:0}
 .trw{display:grid;grid-template-columns:96px minmax(0,1fr) 144px 128px;column-gap:16px;align-items:center;padding:16px 0;border-bottom:1px solid var(--line-2)}
 .trw:last-child{border-bottom:0}
@@ -246,10 +249,10 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .trw .tt b{font-size:15px;font-weight:700;color:var(--ink)}
 .trw .tt span{font-size:13px;line-height:1.5;color:var(--grey);font-variant-numeric:tabular-nums}
 .trw .tdue{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
-.trw .tdue small{font-size:12.5px;color:var(--grey);font-variant-numeric:tabular-nums}
+.trw .tdue small{font-size:13px;color:var(--grey);font-variant-numeric:tabular-nums}
 .trw .btn{width:128px;height:40px;padding:0 10px;font-size:14px}
 .tnone{padding:18px 0;font-size:14px;color:var(--grey)}
-.cp{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;font-size:12.5px;font-weight:700;line-height:1;white-space:nowrap;background:#F0F3F4;color:#434E56}
+.cp{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:700;line-height:1;white-space:nowrap;background:#F0F3F4;color:#434E56}
 .cp.line{background:#fff;border:1px solid #C7CDD1}
 .cp.bad{background:var(--red-50);color:var(--red-700)}
 .cp.warn{background:var(--warn-50);color:var(--warn)}
@@ -258,7 +261,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .srw:last-child{border-bottom:0}
 .srw b{display:block;font-size:14px;font-weight:700}
 .srw span{display:block;font-size:13px;color:var(--grey);font-variant-numeric:tabular-nums}
-.psched .pnote{margin:8px 0 0;font-size:12.5px;line-height:1.6;color:var(--grey)}
+.psched .pnote{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--grey)}
 /* 시스템 칸의 단계 막대 — 끝(초록) · 지금(빨강) · 남음(회색). 무엇인지는 바로 아래 내 상태 한 줄(p.mine)이 말한다 */
 .lbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:4px;margin-top:8px}
 .lbar i{display:block;height:4px;border-radius:2px;background:var(--line)}
@@ -271,18 +274,18 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .veil.open{display:flex}
 .modal{position:relative;width:100%;max-width:440px;max-height:calc(100dvh - 40px);overflow:auto;background:#fff;padding:36px 34px 28px}
 .modal.wide{max-width:560px}
-.modal .x{position:absolute;right:12px;top:12px;width:40px;height:40px;border:0;background:none;cursor:pointer;color:var(--grey);font-size:22px;line-height:1}
+.modal .x{position:absolute;right:12px;top:12px;width:40px;height:40px;border:0;background:none;cursor:pointer;color:var(--grey);font-size:24px;line-height:1}
 .modal .mhead{text-align:center}
 .modal .mhead img{height:24px}
 .modal .mhead div{margin-top:8px;font-size:12px;font-weight:700;color:var(--grey)}
-.modal h2{margin:26px 0 14px;font-size:16px;font-weight:800}
+.modal h2{margin:26px 0 14px;font-size:17px;font-weight:800}
 .fld{display:block;margin-bottom:10px}
-.fld > span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.fld > span{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
 .fld > span em{font-style:normal;color:var(--red)}
-.fld > span small{font-weight:400;color:var(--grey-2)}
-.fld legend > span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+.fld > span small{font-size:12px;font-weight:400;color:var(--grey-2)}   /* 크기를 안 주면 small 기본(작게)이라 11px 대였다(2026-10-24) */
+.fld legend > span{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
 .fld legend > span em{font-style:normal;color:var(--red)}
-.fld legend > span small{font-weight:400;color:var(--grey-2)}
+.fld legend > span small{font-size:12px;font-weight:400;color:var(--grey-2)}
 .inp{width:100%;height:46px;padding:0 14px;border:1px solid var(--line);background:#F7F9FC;font-size:16px;color:var(--ink)}
 .inp:focus{border-color:var(--ink);background:#fff;outline:none}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -290,8 +293,8 @@ a.launch:hover .go svg{transform:translateX(4px)}
 .msg.ok{background:#EAF6F1;color:var(--ok)}
 .msg[hidden]{display:none}
 .modal .btn.pri{width:100%;height:48px;margin-top:6px;font-size:15px}
-.links{display:flex;justify-content:space-between;gap:10px;margin-top:18px;font-size:12.5px;color:var(--grey)}
-.links button{background:none;border:0;padding:6px 0;font-size:12.5px;cursor:pointer;color:var(--grey)}
+.links{display:flex;justify-content:space-between;gap:10px;margin-top:18px;font-size:13px;color:var(--grey)}
+.links button{background:none;border:0;padding:6px 0;font-size:13px;cursor:pointer;color:var(--grey)}
 .links button.em{color:var(--red);font-weight:800}
 .hint{margin:4px 0 12px;font-size:12px;line-height:1.6;color:var(--grey-2)}
 .pwhelp{margin-top:14px;padding:14px;border:1px solid var(--line);background:#F7F9FC}
@@ -314,7 +317,7 @@ a.launch:hover .go svg{transform:translateX(4px)}
   .wrap{padding-inline:16px}
   .brand img{height:14px}
   .brand{gap:9px}
-  .brand .nm{font-size:11px}
+  .brand .nm{font-size:12px}
   /* 로그인 뒤 머리띠: 폰에서 「내 계정·로그아웃」이 화면 밖으로 밀리던 것(2026-10-07) — 포털 이름·내 이름은 감춘다 */
   .brand .bar,.brand .nm,.ub .who{display:none}
   .ub{gap:6px}
@@ -326,17 +329,17 @@ a.launch:hover .go svg{transform:translateX(4px)}
    Pretendard, 회색 글자 한 단계 진하게, 11~12px 글씨를 13px 이상으로. 화면 전용. */
 @media screen{
 :root{--grey:#48545D;--grey-2:#5A6670}
-body{font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Malgun Gothic",-apple-system,sans-serif;letter-spacing:-.01em}
+body{letter-spacing:-.01em}
 .brand .nm{font-size:13px}
-.ub .who span{font-size:12.5px}
+.ub .who span{font-size:13px}
 footer .wrap{font-size:13px}
 .modal .mhead div{font-size:13px}
-.fld > span,.fld legend > span{font-size:13.5px}
+.fld > span,.fld legend > span{font-size:14px}
 .msg{font-size:14px}
-.links,.links button{font-size:13.5px}
+.links,.links button{font-size:14px}
 .hint{font-size:13px}
-.notice{font-size:14.5px}
-.launch .go{font-size:14.5px}
+.notice{font-size:15px}
+.launch .go{font-size:15px}
 }
 /* 폰 정리(2026-10-08 모바일 점검 로봇) — 입력칸 16px(iOS 확대 막기), 창 로고가 × 를 덮지 않게, 버튼 글자 한 줄 */
 @media (max-width:900px){
@@ -351,7 +354,7 @@ footer .wrap{font-size:13px}
 /* 폰(M_Portal, 2026-10-20) — 할 일은 카드(시스템·마감 딱지 / 할 일 / 단추 48), 마감 일정은 아래 시스템 줄의 딱지가 대신, 시스템 칸은 한 줄 */
 @media (max-width:600px){
   .pick{padding-block:24px 40px}
-  .hello h1{font-size:22px}
+  .hello h1{font-size:24px}
   .hello .sub{font-size:13px}
   .pgrid{margin:16px 0 24px;row-gap:16px}
   .psched{display:none}
@@ -362,7 +365,7 @@ footer .wrap{font-size:13px}
   .trw:last-child{border-bottom:1px solid var(--line)}
   .trw .tsys{grid-area:s} .trw .tt{grid-area:t} .trw .btn{grid-area:b;width:100%;height:48px;font-size:15px}
   .trw .tdue{grid-area:d;flex-direction:row;align-items:center;gap:6px;min-width:0}
-  .trw .tt b{font-size:16px}
+  .trw .tt b{font-size:17px}
   .launch{display:grid;grid-template-columns:40px minmax(0,1fr) 18px;column-gap:12px;row-gap:2px;align-items:center;min-height:68px;padding:12px 0;
     border-right:0;border-bottom:1px solid var(--line-2)}
   .launch .ico{grid-column:1;grid-row:1 / span 3;margin:0}
@@ -373,6 +376,9 @@ footer .wrap{font-size:13px}
   .launch .go{grid-column:3;grid-row:1 / span 3;margin:0;font-size:0;color:var(--grey-2)}
   .launch .go svg{width:18px;height:18px}
 }
+/* 큰 글자 줄 간격(2026-10-24 다듬기 2단계) — 본문 줄 간격을 물려받아 제목 위아래가 벌어지던 것. 글자 크기는 운행일지와 같은 여덟 단계 */
+.pick h1,.dl-head h2{line-height:1.3}
+.launch h2,.pcard .phd h2,.modal h2{line-height:1.4}
 </style>
 </head>
 <body>
@@ -443,8 +449,8 @@ footer .wrap{font-size:13px}
       <span class="sp"></span>
       <div class="ub">
         <div class="who"><b id="uName">—</b><span id="uMeta"></span></div>
-        <a class="btn" href="driving.html#/account" style="height:36px;padding:0 12px;font-size:12.5px">내 계정</a>
-        <button class="btn" type="button" id="btnOut" style="height:36px;padding:0 12px;font-size:12.5px">로그아웃</button>
+        <a class="btn" href="driving.html#/account" style="height:36px;padding:0 12px;font-size:13px">내 계정</a>
+        <button class="btn" type="button" id="btnOut" style="height:36px;padding:0 12px;font-size:13px">로그아웃</button>
       </div>
     </div>
   </header>
@@ -453,7 +459,7 @@ footer .wrap{font-size:13px}
     <div class="hello"><h1 id="helloT">오늘 할 일</h1><p class="sub" id="helloS"></p></div>
     <div class="notice" id="signupNote" hidden>
       <span id="signupNoteT"></span><span class="sp"></span>
-      <a class="btn" href="driving.html#/perm" style="height:34px;font-size:12.5px">가입 승인하기</a>
+      <a class="btn" href="driving.html#/perm" style="height:34px;font-size:13px">가입 승인하기</a>
     </div>
     <div class="pgrid">
       <section class="pcard ptodo" aria-labelledby="todoT"><div class="phd"><h2 id="todoT">오늘 할 일 <em id="todoN"></em></h2><span>마감이 가까운 순</span></div>
