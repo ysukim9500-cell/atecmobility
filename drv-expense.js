@@ -31,7 +31,7 @@
   function xRangeKey(k) { return xRange(parseKey(k)); }
   function xSpan(y, m) {
     var r = xRange(y, m), s = C.kd(r.lo), e = C.kd(r.hi - 1);
-    return pad(s.getUTCMonth() + 1) + '.' + pad(s.getUTCDate()) + ' – ' + pad(e.getUTCMonth() + 1) + '.' + pad(e.getUTCDate());
+    return pad(s.getUTCMonth() + 1) + '.' + pad(s.getUTCDate()) + '~' + pad(e.getUTCMonth() + 1) + '.' + pad(e.getUTCDate());
   }
   function xSpanKey(k) { return xSpan(parseKey(k)); }
   /** 오늘이 속한 개인경비 기간. 20일부터는 다음 달분(연말 설정이 있으면 그 범위). */
@@ -261,14 +261,15 @@
         (canWithdraw ? '고치려면 회수한 뒤 다시 상신하세요.' : '이미 승인한 결재자가 있어 회수할 수 없어요. 고치려면 지금 차례인 결재자에게 반려를 요청하세요.') + '</div>' : '') +
       // 반려·회수 뒤 — 어디서 다시 상신하는지(운행일지 띠와 같게, 2026-10-16 3차). 검증·상신 화면이 아니면 그리 가는 길도.
       (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote afix">고친 뒤 ‘검증·상신’에서 다시 상신하세요.' +
-        (C.state().VIEW !== 'x_verify' ? ' <button class="btn pri sm" data-v="x_verify">고쳐서 다시 상신 →</button>' : '') + '</div>' : '') +
+        (C.state().VIEW !== 'x_verify' ? ' <button class="btn pri sm" data-v="x_verify">수정 후 다시 상신 →</button>' : '') + '</div>' : '') +
       '</div></section>';
   }
 
   /* ══════════════════ 이번 달 경비 ══════════════════ */
   var XDAY = '';            // 달력에서 고른 날('YYYY-MM-DD'), '' = 기간 전체
   /** 화면 제목 — 지금 기간이면 「이번 달 경비」, 지난(또는 다음) 기간을 볼 때는 「경비 내역」(기간은 제목 아래 줄에, 2026-10-15). */
-  function monthTitle() { return C.cmpCycle(C.state().CYC, xCurrent()) === 0 ? '이번 달 경비' : '경비 내역'; }
+  //   2026-10-24 4단계 이름표 통일 — 지금 기간도 「경비 내역」(메뉴 이름과 같게). 기간은 제목 아래 줄이 말한다.
+  function monthTitle() { return '경비 내역'; }
   function viewMonth() {
     var S = C.state(), title = monthTitle();
     if (!S.LOADED) return C.head(title) + C.skeleton();
@@ -320,15 +321,15 @@
       chips = (cnt.ok ? '<span class="d2chip ok">맞음 ' + n0(cnt.ok) + '</span>' : '') + (cnt.diff ? '<span class="d2chip warn">다름 ' + n0(cnt.diff) + '</span>' : '') +
         (cnt.wait ? '<span class="d2chip neu">확인 전 ' + n0(cnt.wait) + '</span>' : '');
     }
-    var ai = rows.length ? '<div class="xaisum">' + (locked ? '' : '<b class="xait">AI 확인 ' + C.gemTag('Gemini') + '</b>') +
+    var ai = rows.length ? '<div class="xaisum">' + (locked ? '' : '<b class="xait">AI 확인 ' + C.gemTag('AI') + '</b>') +
       (chips ? '<div class="xaichips">' + chips + '</div>' : '<div class="xaichips"><span class="d2chip neu">불러오는 중</span></div>') +
       '<span class="xaid">' + (locked ? '상신할 때의 검증 결과예요. AI가 읽은 값과 입력한 값이 다른 줄은 표에 표시돼요.'
         : 'AI가 읽은 값과 입력한 값이 다르면 표시만 해요. 맞게 고친 뒤 ‘검증·상신’에서 다시 검증하면 표시가 바뀌어요.') + '</span></div>' : '';
     return '<section class="sect xupw" aria-labelledby="xuph"><div class="panel d2pad xupcard"><div class="d2hd"><div class="d2t"><h2 id="xuph">' +
-      (locked ? 'AI 확인</h2>' + C.gemTag('Gemini') : '영수증 올리기</h2>') + '</div></div>' +
+      (locked ? 'AI 확인</h2>' + C.gemTag('AI') : '영수증 올리기</h2>') + '</div></div>' +
       (locked ? '' : '<div class="xdropc" id="xDropCard">' +
         '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-        '<b class="xdrag">사진을 끌어 놓거나 고르세요</b><b class="xtap">영수증 사진을 고르세요</b><span>' + C.gemTag('Gemini') + '가 날짜, 금액, 사용처를 읽어 채워요.</span>' +
+        '<b class="xdrag">사진을 끌어 놓거나 고르세요</b><b class="xtap">영수증 사진을 고르세요</b><span>' + C.gemTag('AI') + '가 날짜, 금액, 사용처를 읽어 채워요.</span>' +
         '<button class="btn' + (rows.length ? '' : ' pri') + '" data-xup="' + esc(XDAY) + '">' + ic('receipt', 14) + esc(upLabel) + '</button></div>') +
       (locked && !rows.length ? '<div class="d2empty">이 기간에 올린 경비가 없어요.</div>' : ai) + '</div></section>';
   }
@@ -420,7 +421,7 @@
     };
     var h = (sel ? C.mselAllLine('x', 'xtab') : '') + '<div class="panel"><div class="scroll" data-rows><table class="xtab xmon"><thead><tr>' +
       '<th' + (sel ? ' class="mselth">' + C.mselAll('x') : '>') + '날짜</th>' + (opt.who ? '<th>소속 · 이름</th>' : '') +
-      '<th>사용처</th><th>사용내역</th><th class="n">금액(원)</th><th>AI 확인</th><th class="n"><span class="sr">사진 · 고치기</span></th></tr></thead><tbody>';
+      '<th>사용처</th><th>사용내역</th><th class="n">금액(원)</th><th>AI 확인</th><th class="n"><span class="sr">사진 · 수정</span></th></tr></thead><tbody>';
     var total = 0;
     CATS.forEach(function (cat) {
       var list = rows.filter(function (it) { return (CATS.indexOf(it.category) < 0 ? '기타비용' : it.category) === cat; });
@@ -445,7 +446,7 @@
           '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span></td>' +
           '<td class="xai" data-l="AI 확인">' + aiCell(it) + '</td>' +
           // 줄 단추는 예전 그대로 사진(원본) · 고치기 · 지우기(2026-10-20 D2 — 시안은 사진만이지만 있던 단추는 없애지 않는다)
-          '<td class="n xact">' + photoLink(it) + (can ? ' <button class="btn sm" data-xedit="' + it.id + '">고치기</button> <button class="btn sm" data-xdel="' + it.id + '">지우기</button>' : '') + '</td></tr>';
+          '<td class="n xact">' + photoLink(it) + (can ? ' <button class="btn sm" data-xedit="' + it.id + '">수정</button> <button class="btn sm" data-xdel="' + it.id + '">삭제</button>' : '') + '</td></tr>';
       });
     });
     h += '</tbody><tfoot><tr><td colspan="' + lead + '">합계 <span class="xgn">' + n0(rows.length) + '건</span></td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>' + (sel ? C.mselBar('x') : '');
@@ -480,7 +481,7 @@
       '<b>A4에 여러 장 붙여 스캔한 파일</b>도 올리면 영수증마다 한 줄씩 나눠 적어요.</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기<input type="file" id="xFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div><div id="xList"></div><div id="xNote" class="fhint" style="margin-top:10px"></div>' +
-      '<div class="fhint">' + C.gemTag('Gemini') + '가 채운 값은 틀릴 수 있어요. <b>올리기 전에 사진과 꼭 비교해 보세요.</b> 처음부터 직접 입력해도 돼요. ' +
+      '<div class="fhint">' + C.gemTag('AI') + '가 채운 값은 틀릴 수 있어요. <b>올리기 전에 사진과 꼭 비교해 보세요.</b> 처음부터 직접 입력해도 돼요. ' +
       '날짜는 ' + esc(xSpanKey(S.CYCKEY)) + ' 안이어야 해요.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXUpGo" disabled>올리기</button>', true);
     C.bindDrop($('xDrop'), addFiles);
@@ -652,7 +653,7 @@
             : it.ai ? '<div class="evhint ok">' + C.gemTag() + ' 자동으로 채웠어요. 사진과 맞는지 확인해 주세요.</div>' : '') +
           '<div class="evhint xmh"' + (mealOver({ category: it.cat, amount: it.amt, usage: it.usage }) ? '>' + mealTag({ category: it.cat, amount: it.amt, usage: it.usage }) : ' hidden>') + '</div></td>' +
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-xaddrow="' + i + '" title="이 장에 영수증이 더 있으면 줄을 추가하세요." aria-label="같은 장에 줄 추가">＋</button> ' +
-          '<button class="btn sm" data-xrm="' + i + '">빼기</button></td></tr>';
+          '<button class="btn sm" data-xrm="' + i + '">제외</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' + n0(Object.keys(perPage).length) + '장 · 영수증 ' + n0(n) + '건' +
       (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
@@ -791,7 +792,7 @@
     if (lockedFor(it.username, C.state().CYCKEY)) { C.toast('결재 중이거나 끝난 기간이라 고칠 수 없어요.', true); return; }
     var r = xRangeKey(C.state().CYCKEY);
     var frow = function (lab, id2, body, hint) { return '<div class="frow"><label class="flab" for="' + id2 + '">' + lab + '</label><div class="fbody">' + body + (hint ? '<div class="fhint">' + hint + '</div>' : '') + '</div></div>'; };
-    C.openPanel('경비 고치기', C.md(it.date_millis) + ' · ' + (it.category || '') + ' · ' + won(it.amount),
+    C.openPanel('경비 수정', C.md(it.date_millis) + ' · ' + (it.category || '') + ' · ' + won(it.amount),
       '<div class="xephoto">' + (it.photo_path ? '<a target="_blank" rel="noopener" aria-label="영수증 사진 크게(새 탭)" title="영수증 사진 크게(새 탭)" href="' + esc(C.photoUrl(it.photo_path)) + '"><img id="xePh" alt="영수증 사진" src="' + esc(C.photoUrl(it.photo_path)) + '"></a>' : '') +
       // 「사진 바꾸기」는 진짜 단추(화면 읽기·키보드에 단추로 잡힘) — 숨은 파일 칸을 대신 연다(2026-10-16 6차: label 안 1px 파일 칸이라 단추로 안 잡혔다)
       '<button type="button" class="btn sm" id="xePhBtn" style="margin-top:8px">사진 바꾸기</button>' +
@@ -804,7 +805,7 @@
       frow('사용내역', 'xeUse', '<input class="inp" id="xeUse" maxlength="200" value="' + esc(it.usage || '') + '">', '식비는 ‘3명’이나 ‘외 2명’처럼 인원을 적으면 1인당 금액으로 봐요.') +
       frow('비고', 'xeNote', '<input class="inp" id="xeNote" maxlength="200" value="' + esc(it.note || '') + '">') +
       '</div>',
-      '<button class="btn" data-xdel="' + it.id + '">지우기</button><span style="flex:1"></span><button class="btn" data-close>취소</button>' +
+      '<button class="btn" data-xdel="' + it.id + '">삭제</button><span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnXEditGo" data-id="' + it.id + '">저장</button>');
     XEDIT = { id: it.id, before: JSON.stringify(editVals()), photo: null };
   }
@@ -854,11 +855,11 @@
   }
   function openDel(id) {
     var it = findItem(id); if (!it) return;
-    C.openPanel('경비 지우기', C.md(it.date_millis) + ' · ' + (it.category || '') + ' · ' + won(it.amount),
-      '<div class="anote" style="margin-top:0">이 줄을 지울까요? 지우면 되돌릴 수 없어요.</div>' +
+    C.openPanel('경비 삭제', C.md(it.date_millis) + ' · ' + (it.category || '') + ' · ' + won(it.amount),
+      '<div class="anote" style="margin-top:0">이 줄을 삭제할까요? 삭제하면 되돌릴 수 없어요.</div>' +
       (it.photo_path ? '<div class="xephoto"><img alt="" src="' + esc(C.photoUrl(it.photo_path)) + '"></div>' : '') +
       '<div class="dim" style="font-size:13px;margin-top:8px">' + esc([it.merchant, it.usage].filter(Boolean).join(' · ')) + '</div>',
-      '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXDelGo" data-id="' + it.id + '">지우기</button>');
+      '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXDelGo" data-id="' + it.id + '">삭제</button>');
   }
   /** 한 줄 지우기 — 한 건 지우기·여러 줄 지우기(C.msel)가 같은 길. */
   function delOne(it) {
@@ -882,7 +883,7 @@
         dropItems(S.CYCKEY); C.closePanel(); C.toast('지웠어요.');
         loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
       }).catch(function (e) {
-        if (btn) { btn.disabled = false; btn.textContent = '지우기'; }
+        if (btn) { btn.disabled = false; btn.textContent = '삭제'; }
         C.toast('지우지 못했어요. ' + why(e), true);
       });
   }
@@ -959,7 +960,7 @@
   function xMotion(cyc) {
     var rows = ((ITEMS[itemKey(false, cyc)] || {}).rows || []).slice().sort(function (a, b) { return a.date_millis - b.date_millis; });
     var ph = rows.filter(function (it) { return it.photo_path; });
-    return { title: 'AI가 영수증을 읽고 있어요', cols: ['날짜', '사용처', '금액(원)', '맞춰 보기'], N: ph.length, more: Math.max(0, rows.length - 6),
+    return { title: 'AI가 영수증을 읽고 있어요', cols: ['날짜', '사용처', '금액(원)', '비교'], N: ph.length, more: Math.max(0, rows.length - 6),
       rows: rows.slice(0, 6).map(function (it) { return { id: it.id, date: C.md(it.date_millis), place: it.merchant || it.usage || it.category || '—', amt: n0(it.amount) }; }),
       photos: ph.map(function (it) { return { id: it.id, src: C.photoUrl(it.photo_path), kind: (it.category || '') + ' 영수증' }; }) };
   }
@@ -998,7 +999,7 @@
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, ref = (it.ref && it.ref.items) || (it.refs && it.refs.items) || [];
       var go = '';
-      if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-xvfix="' + (VITEMS.length - 1) + '">바로 고치기' + ic('chev', 12) + '</button>'; }
+      if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-xvfix="' + (VITEMS.length - 1) + '">바로 수정' + ic('chev', 12) + '</button>'; }
       return '<div class="vitem v-' + esc(it.level) + (isAiItem(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
         '<div class="vb"><div class="vt">' + esc(it.title) + (isAiItem(it) ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
@@ -1008,11 +1009,11 @@
     var S = C.state(), x = ITEMS[itemKey(false, S.CYCKEY)], rows = ((x && x.rows) || []).filter(function (r) { return ref.indexOf(String(r.id)) >= 0; });
     if (rows.length === 1) { openEdit(rows[0].id); return; }
     if (!rows.length) { C.toast('고칠 줄을 찾지 못했어요. 다시 검증해 주세요.', true); return; }
-    C.openPanel('바로 고치기 — ' + it.title, '고친 뒤 다시 검증해 주세요.',
+    C.openPanel('바로 수정 — ' + it.title, '고친 뒤 다시 검증해 주세요.',
       '<div class="anote">' + esc(it.detail || '') + '</div><div class="fixl">' + rows.map(function (r) {
         return '<div class="fixi">' + (r.photo_path ? '<a class="fixph" target="_blank" rel="noopener" aria-label="' + esc(C.md(r.date_millis) + ' ' + (r.category || '') + ' ' + n0(r.amount) + '원 영수증 사진 크게') + '" href="' + esc(C.photoUrl(r.photo_path)) + '"><img alt="" loading="lazy" src="' + esc(C.photoUrl(r.photo_path)) + '"></a>' : '<span class="fixph none">사진 없음</span>') +
           '<div class="fixt"><b>' + C.md(r.date_millis) + ' ' + esc(r.category) + ' ' + n0(r.amount) + '원</b><div class="dim">' + esc([r.merchant, r.usage].filter(Boolean).join(' · ')) + '</div></div>' +
-          '<button class="btn sm" data-xedit="' + r.id + '">고치기</button></div>';
+          '<button class="btn sm" data-xedit="' + r.id + '">수정</button></div>';
       }).join('') + '</div>', '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
   }
   function viewVerify() {
@@ -1030,7 +1031,7 @@
     var s = (row && row.summary) || {}, items = (row && row.result && row.result.items) || [];
     VITEMS = [];
     var verdict, clean = '';
-    if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('Gemini') + '</span><span class="xvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
+    if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('AI') + '</span><span class="xvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
     else if (!row) verdict = '아직 검증하지 않았어요';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있어요';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있어요'; clean = ' wait'; }
@@ -1043,8 +1044,8 @@
     var mk = 'x:' + k, AM = C.vx.aiMotion;
     var none = !rows.length;
     var steps = locked ? '' : '<ol class="vsteps" aria-label="상신 순서">' +
-      card(1, '검증하기 ' + C.vx.gemBadge('Gemini'),
-        none ? '먼저 ‘이번 달 경비’에서 영수증을 올려 주세요.'
+      card(1, '검증하기 ' + C.vx.gemBadge('AI'),
+        none ? '먼저 ‘경비 내역’에서 영수증을 올려 주세요.'
           : busy ? 'AI가 영수증 사진을 읽고 입력값과 비교하는 중…'
           : row && fresh ? (C.vx.readDone ? C.vx.readDone(row, XWARN[u + '|' + cyc]) : 'AI가 사진을 읽어 비교했어요. 고친 게 있으면 다시 눌러 주세요.')
           : row ? '먼저 지금 자료로 검증해 주세요. 아래는 지난 검증(' + esc(C.vx.whenText(row.created_at)) + ') 결과예요.'
@@ -1067,7 +1068,7 @@
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' + fact('불일치', n0(s.bad), '금액·영수증이 서로 다름', s.bad > 0) + fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '식비 기준 초과 등(알림만)') +
-        '<div class="fact"><div class="k">사진 판독 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'AI가 읽은 영수증' : '규칙으로만 검증(AI 미설정)') + '</div></div></div>' : '') +
+        '<div class="fact"><div class="k">사진 인식 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'AI가 읽은 영수증' : '규칙으로만 검증(AI 미설정)') + '</div></div></div>' : '') +
       '</div>';
     if (moving) { /* 결과는 응답 뒤에 — 지난 결과를 먼저 보이지 않는다 */ }
     else if (row) {
@@ -1226,7 +1227,7 @@
     var d = frozenDoc(a, fz), done = a.status === 'approved';
     // 결재 완료본에는 검증 결과 쪽을 붙이지 않는다(2026-10-14 사용자 — 출력물엔 필요 없다). 결재 중 문서에는 그대로 — 결재자가 본다.
     if (done) d = Object.assign({}, d, { verify: null });
-    return pdfOpts(d, { title: done ? '결재 완료본 — 개인경비' : a.status === 'submitted' ? '결재 문서 — 개인경비' : '상신했던 문서 — 개인경비',
+    return pdfOpts(d, { title: done ? '결재 완료 문서 — 개인경비' : a.status === 'submitted' ? '결재 문서 — 개인경비' : '상신했던 문서 — 개인경비',
       sub: d.person.name + ' · ' + cycName(a.cycle) + ' (' + xSpanKey(a.cycle) + ')',
       file: '개인경비_지출명세_' + C.vx.safeName(d.person.name) + '_' + a.cycle + ({ '': '_결재완료', pending: '_결재중', rejected: '_반려', withdrawn: '_회수' }[d.meta.mark]) + '.pdf',
       expect: (a.snapshot || {}).cost, expectName: '상신 때 집계한 금액' });
@@ -1521,8 +1522,8 @@
     var chip = f && f.verify ? '<button class="vchip" data-xfzverify="' + a.id + '" title="상신할 때의 검증 결과 보기">' + C.vx.sumChip(f.verify.summary) + '</button>' : '';
     if (done && C.prints) chip += C.prints.badge('expense', a);         // 출력 딱지(2026-10-14)
     return (own ? '' : brief(a, f)) + '<div class="aext">' + chip + '<span style="flex:1"></span>' +
-      '<button class="btn sm" data-xfzpdf="' + a.id + '">' + ic('dl', 13) + 'PDF 받기</button>' +
-      (done ? '<button class="btn sm" data-xfzxlsx="' + a.id + '">' + ic('dl', 13) + '엑셀 받기</button>' : '') + '</div>';
+      '<button class="btn sm" data-xfzpdf="' + a.id + '">' + ic('dl', 13) + 'PDF 다운로드</button>' +
+      (done ? '<button class="btn sm" data-xfzxlsx="' + a.id + '">' + ic('dl', 13) + '엑셀 다운로드</button>' : '') + '</div>';
   }
   function brief(a, f) {
     if (!a || a.status !== 'submitted') return '';
@@ -1543,7 +1544,7 @@
     var checks = [];
     if (vs) {
       // 2026-10-15 2차: 칩 「검증 불일치 N건」은 뺀다 — 띠(판정)와 검증 딱지(알약)에 이미 있다
-      if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 사진 판독 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
+      if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 인식 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 인식 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
     } else if (f === undefined) { if (!FZFAIL[fzKey(a)]) checks.push(['warn', '검증 결과를 불러오는 중…']); }   // 못 받았으면 그 줄은 없앤다(판정 띠가 말한다)
     else checks.push(['warn', '상신 때 검증 결과가 없어요']);
     checks.push(s.meal_over ? ['warn', '식비 1인 13,000원 초과 ' + n0(s.meal_over) + '건(알림)'] : ['ok', '식비 기준 안']);
@@ -1551,7 +1552,7 @@
     var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
       nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length;
     var asApprover = a.username !== (C.state().ME || {}).username;   // 결재하는 분 — 상신자 할 일(고치세요)은 보이지 않는다
-    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 받기’로 문서를 열어 확인해 주세요.']
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 다운로드’로 문서를 열어 확인해 주세요.']
       : nBad ? ['bad', asApprover ? '확인이 필요해요. 문서의 불일치 항목을 보고 결재해 주세요.' : '검증에서 맞지 않는 곳이 있어요. 결재자도 문서에서 같이 봐요.']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
       : nWarn ? ['warn', '대체로 정상이에요. ' + C.vx.warnTail(items, vs, asApprover) + '.']
       : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
@@ -1621,7 +1622,7 @@
         var a = x.a, st = !a ? 'none' : a.status, rs = st === 'rejected' ? (a.steps || []).filter(function (s) { return s && s.result === 'rejected'; })[0] : null;
         return { u: x.u, st: st, last: Math.max(lastX[x.u] || 0, a ? (Date.parse(a.closed_at || a.updated_at || '') || 0) : 0),
           left: st === 'rejected' ? '반려 사유: ' + (rs && rs.comment ? String(rs.comment).replace(/\s+/g, ' ') : '(사유 없음)')
-            : (st === 'withdrawn' ? '회수함 · ' : '') + '경비 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.meal ? ' · 식비 기준 초과 ' + n0(x.meal) + '건' : '') };
+            : (st === 'withdrawn' ? '회수됨 · ' : '') + '경비 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.meal ? ' · 식비 기준 초과 ' + n0(x.meal) + '건' : '') };
       }), { wide: true, none: '이 기간 경비가 있는 사람은 모두 상신했어요' }) + '</div>';
     }
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>경비가 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
@@ -1658,7 +1659,7 @@
             (x.n ? '<button class="btn sm" data-xperson="' + esc(x.u) + '">내역</button>' : '') + '</td></tr>';
         }).join('');
       }).join('') + '</tbody></table></div></div>' : C.blank('이 기간에 경비가 있는 사람이 없어요.', null, 'users'));
-    h += '<div class="anote">결재 상태, 결재 완료 문서 다운로드, 관리자 반려, 정정 열기는 ‘결재 완료 출력’에 있어요.</div>';
+    h += '<div class="anote">결재 상태, 결재 완료 문서 다운로드, 관리자 반려, 정정 열기는 ‘결재 완료 문서’에 있어요.</div>';
     return h;
   }
   /** 직원 현황(개인경비) — 등록된 모든 직원의 이번 기간 경비. 운행일지 직원 현황(운행·거리·유지비)과 따로 둔다(2026-10-08).
@@ -1741,7 +1742,7 @@
             '<td class="el xuse" title="' + esc(it.usage || '') + '">' + esc(it.usage || '') + '</td><td class="el dim xnote">' + esc(it.note || '') + '</td><td class="xph" style="white-space:nowrap">' + photoLink(it) + '</td></tr>';
         }).join('');
       }).join('') + '</tbody><tfoot><tr><td colspan="5">보이는 ' + n0(rows.length) + '건 합계</td><td class="n total">' + n0(total) + '</td><td colspan="3"></td></tr></tfoot></table></div></div>'
-      : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 경비가 없어요.</div><div style="margin-top:12px"><button class="btn sm" data-xclear>조건 지우기</button></div></div></div>');
+      : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 경비가 없어요.</div><div style="margin-top:12px"><button class="btn sm" data-xclear>조건 초기화</button></div></div></div>');
     return h;
   }
   /** CSV — 엑셀에서 바로 열리게 BOM. 글자 칸이 = + - @ 탭·CR 로 시작하면 ' 를 붙여 수식으로 실행되지 않게 한다. */
@@ -1783,10 +1784,10 @@
   function finWhen(iso) { var ms = Date.parse(iso); return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : ''; }
   function viewAdminFinal() {
     var S = C.state();
-    if (!S.LOADED) return C.head('개인경비 결재 완료 출력') + C.skeleton();
-    if (C.isMulti()) return C.singleOnly('개인경비 결재 완료 출력', '출력');
+    if (!S.LOADED) return C.head('개인경비 결재 완료 문서') + C.skeleton();
+    if (C.isMulti()) return C.singleOnly('개인경비 결재 완료 문서', '결재 완료 문서');
     var all = adminRows();
-    if (!all || all.err) return notReady('개인경비 결재 완료 출력', all);
+    if (!all || all.err) return notReady('개인경비 결재 완료 문서', all);
     var list = cycAppr().filter(function (a) { return C.orgMatch(a.username); });
     var done = list.filter(function (a) { return a.status === 'approved'; }).sort(function (x, y) { return C.nameOf(x.username).localeCompare(C.nameOf(y.username), 'ko'); });
     var going = list.filter(function (a) { return a.status === 'submitted'; });
@@ -1802,13 +1803,13 @@
     // 이름으로 찾기(2026-10-23) — 표에는 shown 을 다 그리고 안 맞는 줄은 C.fin 이 그 자리에서 숨긴다. 고른 수는 보이는 줄만.
     var vis = shown.filter(finVisible), nSel = vis.filter(function (a) { return FINSEL[a.id]; }).length;
     var nRej = back.filter(function (a) { return a.status === 'rejected'; }).length, nWd = back.length - nRej;
-    var h = head('개인경비 결재 완료 출력', '결재가 끝난 지출결의를 모아 출력해요');
+    var h = head('개인경비 결재 완료 문서', '결재가 끝난 지출결의를 모아 출력해요');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (done.length && !going.length && !notYet.length ? ' ok' : '') + '"></span>' + esc(cycName(S.CYCKEY)) + ' · ' + esc(xSpanKey(S.CYCKEY)) + '</div>' +
       '<p class="verdict">결재 완료 <em>' + n0(done.length) + '명</em> · ' + won(total) + '</p><div class="facts">' +
       // 분류는 운행일지 결재 완료 출력과 같은 셋(결재 중·반려·미상신, 결재 완료는 위 큰 제목) — 회수는 다시 올리기 전까지 미상신(2026-10-19)
       fact('결재 중', n0(going.length) + '<small>명</small>', '결재자 차례를 기다리는 중', going.length > 0) +
       fact('반려', n0(nRej) + '<small>명</small>', '고쳐서 다시 상신해야 함', nRej > 0) +
-      fact('미상신', n0(notYet.length + nWd) + '<small>명</small>', nWd ? '이번 기간 경비가 있는데 상신 전(회수 ' + n0(nWd) + '명 포함)' : '이번 기간 경비가 있는데 상신 전', notYet.length + nWd > 0) + '</div></div>';
+      fact('상신 전', n0(notYet.length + nWd) + '<small>명</small>', nWd ? '이번 기간 경비가 있는데 상신 전(회수 ' + n0(nWd) + '명 포함)' : '이번 기간 경비가 있는데 상신 전', notYet.length + nWd > 0) + '</div></div>';
     var tools = done.length ? '<button class="btn sm' + (nSel ? ' pri' : '') + '" data-xfinpdf data-finbtn="expense"' + (nSel && !FINJOB ? '' : ' disabled') + '>' + ic('dl', 13) + (nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기') + '</button>' +
       '<button class="btn sm" data-xfincsv>' + ic('dl', 13) + '금액 요약표(CSV)</button>' + (C.prints ? C.prints.onlyBtn('expense') : '') : '';
     h += C.sect('결재 완료', n0(done.length) + '명', tools, done.length && !shown.length
@@ -1831,23 +1832,23 @@
             '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
             '<td class="el dim" data-l="결재선" title="' + esc(line) + '"><span style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">' + esc(line) + '</span></td>' +
             '<td class="n ract" style="white-space:nowrap">' + C.kmenu(C.nameOf(a.username) + ' 님 결재 완료 문서', [
-              ['data-xfzpdf="' + a.id + '"', 'PDF 받기'], ['data-xfzxlsx="' + a.id + '"', '엑셀 받기'],
+              ['data-xfzpdf="' + a.id + '"', 'PDF 다운로드'], ['data-xfzxlsx="' + a.id + '"', '엑셀 다운로드'],
               ['data-appr="reopen" data-kind="expense" data-id="' + a.id + '"', '정정 열기', true]]) + '</td></tr>';
         }).join('');
       }).join('') + FIN.none(9) + '</tbody><tfoot><tr><td></td><td colspan="5">결재 완료 ' + n0(done.length) + '명 합계</td><td class="n total">' + n0(total) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>'
       : C.blank('아직 결재가 끝난 건이 없어요.', '결재가 끝나면 여기에 모여요.', 'stamp'));
     if (going.length) {
-      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>지금 차례</th><th></th></tr></thead><tbody>' +
+      h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>현재 결재자</th><th></th></tr></thead><tbody>' +
         C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 8, '') + g.list.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
           return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td><span class="st warn">결재 중</span></td>' +
             '<td class="dim">' + (a.submitted_at ? '상신 ' + esc(C.vx.whenText(a.submitted_at)) : '') + '</td>' +
-            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td data-l="지금 차례">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td data-l="현재 결재자">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
             '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '">관리자 반려</button></td></tr>';
         }).join(''); }).join('') + '</tbody></table></div></div>');
     }
     if (back.length || notYet.length) {
-      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '미상신(회수함)' }; }).concat(notYet.map(function (u) { return { u: u, st: '미상신' }; }));
+      var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '상신 전(회수됨)' }; }).concat(notYet.map(function (u) { return { u: u, st: '상신 전' }; }));
       h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-todo"><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">이번 기간 경비</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
@@ -1882,7 +1883,7 @@
     if (!list.length || FINJOB) return;
     if (list.length > 20) { C.toast('한 번에 20명까지 묶을 수 있어요. 지금 ' + list.length + '명을 골랐으니 나눠서 다운로드해 주세요.', true); return; }
     var job = FINJOB = {};
-    C.openPanel('개인경비 결재 완료본 묶어 받기', cycName(S.CYCKEY) + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
+    C.openPanel('개인경비 결재 완료 문서 묶음 다운로드', cycName(S.CYCKEY) + ' · ' + (ord.team ? ord.team + ' · ' : '') + n0(list.length) + '명',
       '<div class="pdfwait"><div class="spin"></div><div id="xFinNote" role="status">준비하는 중…</div><div class="dim" style="margin-top:6px">사람마다 영수증 사진을 넣어 만들어요. 사람이 많으면 몇 분 걸릴 수 있어요.</div></div>',
       '<span style="flex:1"></span><button class="btn" data-close>닫기</button>');
     var note = function (t) { var el = $('xFinNote'); if (el) el.textContent = t; };
@@ -1924,7 +1925,7 @@
           chain = chain.then(function () { return P.PDFDocument.load(b); }).then(function (src) { return out.copyPages(src, src.getPageIndices()); })
             .then(function (pages) { pages.forEach(function (pg) { out.addPage(pg); }); });
         });
-        return chain.then(function () { out.setTitle('개인경비 지출결의 결재 완료본 ' + cycName(S.CYCKEY) + (ord.team ? ' ' + ord.team : '')); return out.save(); })
+        return chain.then(function () { out.setTitle('개인경비 지출결의 결재 완료 문서 ' + cycName(S.CYCKEY) + (ord.team ? ' ' + ord.team : '')); return out.save(); })
           .then(function (bytes) { return { bytes: bytes, pages: out.getPageCount() }; });
       });
     }).then(function (res) {
@@ -1934,11 +1935,11 @@
       var blob = new Blob([res.bytes], { type: 'application/pdf' }), url = URL.createObjectURL(blob);
       C.vx.setPdfUrls([url]);
       var file = '개인경비_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';   // 한 팀만이면 팀 이름(2026-10-23)
-      $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div><div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료본</div>' +
-        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) + ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF 받기’로 다시 다운로드해 주세요.</span></div>' : '') +
-        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF 받기’로 다시 다운로드해 확인해 주세요.<br>' + checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
+      $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div><div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료 문서</div>' +
+        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) + ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF 다운로드’를 다시 눌러 주세요.</span></div>' : '') +
+        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF 다운로드’를 다시 눌러 확인해 주세요.<br>' + checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
         (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었어요. 합계와 사진 점검도 이상 없어요.</span></div>' : '') + '</div>';
-      $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button><a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '내려받기</a>' +
+      $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button><a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '다운로드</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';
       if (C.prints) C.prints.bindOut($('pFoot'), 'expense', partIds, url);    // 묶은 사람마다 한 번씩 출력 기록
       C.render();

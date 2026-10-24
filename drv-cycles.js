@@ -38,7 +38,7 @@
   function isYmd(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && ds(dn(s)) === s; }
   function addD(s, k) { return ds(dn(s) + k); }
   function md(s) { return isYmd(s) ? s.slice(5, 7) + '.' + s.slice(8, 10) : ''; }
-  function span(lo, hi) { return md(lo) + ' – ' + md(hi); }
+  function span(lo, hi) { return md(lo) + '~' + md(hi); }
   function kstNow() { return new Date(Date.now() + 9 * 3600e3); }
   function thisYear() { return kstNow().getUTCFullYear(); }
   /** 오늘(한국시간) 'YYYY-MM-DD'. */
@@ -504,7 +504,7 @@
     var S = C.state();
     // 메뉴·주소는 driving-app.js 가 막는다 — 그래도 그려지면(권한이 그 사이 바뀜) 글만 보인다
     if (!(S.ACCT && S.ACCT.can_manage_admin)) {
-      return '<div class="cys">' + headHtml(false) + C.blank('마감 기간 설정은 권한 관리를 맡은 관리자만 볼 수 있어요.', '마스터 계정이나 권한 주는 관리자에게 부탁해 주세요.', 'cal') + '</div>';
+      return '<div class="cys">' + headHtml(false) + C.blank('마감 기간 설정은 권한 관리를 맡은 관리자만 볼 수 있어요.', '최고 관리자나 권한 관리자에게 부탁해 주세요.', 'cal') + '</div>';
     }
     if (ST.rules === undefined) { boot(); return '<div class="cys">' + headHtml(false) + C.skeleton() + '</div>'; }
     if (ST.rules === null) {

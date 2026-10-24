@@ -52,8 +52,8 @@
   /** '2026-07' → '07.01 – 07.31'(화면 머리띠·문서). */
   function span(cycle) {
     var P = per(cycle);
-    if (P) return mdOf(P.lo) + ' – ' + mdOf(P.hi);
-    var c = ym(cycle); return pad(c.m) + '.01 – ' + pad(c.m) + '.' + pad(lastDay(cycle));
+    if (P) return mdOf(P.lo) + '~' + mdOf(P.hi);
+    var c = ym(cycle); return pad(c.m) + '.01~' + pad(c.m) + '.' + pad(lastDay(cycle));
   }
   /** '2026-07' → '2026년 7월분(07.01 ~ 07.31)'(팀즈·검증 문구 — SPEC §3 꼴 그대로). '2026-12b' → '2026년 12월분 2차(12.21 ~ 12.31)',
    *  설정에 없는 '2026-12b' 는 이름만(「2026년 12월분 2차」 — 서버와 같다). */
@@ -133,10 +133,11 @@
     var list = (items || []).slice().sort(function (a, b) {
       return cmpS(a.appr_date, b.appr_date) || cmpS(a.appr_time, b.appr_time) || (Number(a.id) || 0) - (Number(b.id) || 0);
     });
+    // 문구는 해요체(2026-10-24 4단계 — 서버 card-verify.ts 와 글자 하나 같게, card-parity 시험)
     var c1 = list.filter(function (e) { return blank(e.category); });
-    if (c1.length) add('C01', 'block', '구분이 빈 줄 ' + c1.length + '건', '구분을 적어야 상신할 수 있습니다: ' + some(c1.map(tagOf), 8), idsOf(c1));
+    if (c1.length) add('C01', 'block', '구분이 빈 줄 ' + c1.length + '건', '구분을 적어야 상신할 수 있어요: ' + some(c1.map(tagOf), 8), idsOf(c1));
     var c2 = list.filter(function (e) { return blank(e.purpose); });
-    if (c2.length) add('C02', 'block', '사용목적이 빈 줄 ' + c2.length + '건', '사용목적을 적어야 상신할 수 있습니다: ' + some(c2.map(tagOf), 8), idsOf(c2));
+    if (c2.length) add('C02', 'block', '사용목적이 빈 줄 ' + c2.length + '건', '사용목적을 적어야 상신할 수 있어요: ' + some(c2.map(tagOf), 8), idsOf(c2));
     var byNo = {}, order = [];
     list.forEach(function (e) {
       var k = str(e.appr_no).trim();
@@ -147,23 +148,23 @@
     order.forEach(function (k) {
       var g = byNo[k];
       if (g.length > 1) add('C03', 'bad', '같은 승인번호 ' + k + ' — ' + g.length + '줄',
-        some(g.map(tagOf), 6) + ' — 같은 승인번호가 여러 줄입니다. ERP 에서 두 번 받은 것이 아닌지 확인해 주세요.', idsOf(g));
+        some(g.map(tagOf), 6) + '. 같은 승인번호가 여러 줄이에요. ERP에서 두 번 가져온 것이 아닌지 확인해 주세요.', idsOf(g));
     });
     if (isCycle(opts.cycle)) {
       var rg = cycleRange(opts.cycle);
       var off = list.filter(function (e) { var d = str(e.appr_date); return !(d >= rg.lo && d < rg.hi); });
       if (off.length) add('C04', 'warn', '이 기간 밖 승인일 ' + off.length + '건',
-        cycleLabel(opts.cycle) + ' 밖의 승인일입니다: ' + some(off.map(function (e) { return str(e.appr_date) + ' ' + merchantOf(e) + ' ' + n0(e.amount) + '원'; }), 8), idsOf(off));
+        cycleLabel(opts.cycle) + ' 밖의 승인일이에요: ' + some(off.map(function (e) { return str(e.appr_date) + ' ' + merchantOf(e) + ' ' + n0(e.amount) + '원'; }), 8), idsOf(off));
     }
     var me = normName(opts.submitterName);
     if (me) {
       var who = list.filter(function (e) { var o = normName(e.owner_name); return o !== '' && o !== me; });
       if (who.length) add('C05', 'warn', '소유자가 상신자와 다른 줄 ' + who.length + '건',
-        'ERP 소유자가 ' + str(opts.submitterName).trim() + ' 님이 아닙니다: ' + some(who.map(function (e) { return tagOf(e) + '(' + str(e.owner_name).trim() + ')'; }), 8), idsOf(who));
+        'ERP 소유자가 ' + str(opts.submitterName).trim() + ' 님이 아니에요: ' + some(who.map(function (e) { return tagOf(e) + '(' + str(e.owner_name).trim() + ')'; }), 8), idsOf(who));
     }
     var zero = list.filter(function (e) { return Math.round(Number(e.amount) || 0) === 0; });
     if (zero.length) add('C06', 'info', '0원 줄 ' + zero.length + '건',
-      '금액이 0원인 줄입니다(올릴 때 빼는 줄 — 남겨 둔 까닭을 비고에 적어 주세요): ' + some(zero.map(tagOf), 8), idsOf(zero));
+      '금액이 0원인 줄이에요: ' + some(zero.map(tagOf), 8) + '. 올릴 때 빼는 줄이라 남겨 둔 이유를 비고에 적어 주세요.', idsOf(zero));
     // ── C07 구분·내역 불일치(Gemini) — 구분이 적힌 줄만, 줄마다 하나(30건 넘으면 나머지는 한 항목) ──
     var aiBy = {};
     (opts.ai && Array.isArray(opts.ai.rows) ? opts.ai.rows : []).forEach(function (r) {
@@ -177,8 +178,8 @@
     c7.slice(0, PER_ROW_MAX).forEach(function (e) {
       var r = aiOf(e), cat = str(e.category).trim(), sug = str(r.suggest_category).trim(), biz = str(e.biz_type).trim();
       add('C07', 'warn', '구분·내역이 맞지 않아 보임 — ' + tagOf(e),
-        '구분 「' + cat + '」' + (biz ? ' · 업종 ' + biz : '') + (hm(e) ? ' · 승인 ' + hm(e) : '') + ' — ' +
-        (clip(r.reason, 60) || '구분과 가맹점·시간이 맞지 않아 보입니다') + (sug && sug !== cat ? ' (추천 구분: ' + clip(sug, 20) + ')' : ''), [e.id], true);
+        '구분 ‘' + cat + '’' + (biz ? ' · 업종 ' + biz : '') + (hm(e) ? ' · 승인 ' + hm(e) : '') + '. ' +
+        (clip(r.reason, 60) || '구분과 가맹점·시간이 맞지 않아 보여요') + (sug && sug !== cat ? ' (추천 구분: ' + clip(sug, 20) + ')' : ''), [e.id], true);
     });
     if (c7.length > PER_ROW_MAX) {
       var rest7 = c7.slice(PER_ROW_MAX);
@@ -190,8 +191,8 @@
       add('C08', 'warn', '사용목적이 짧거나 모호한 줄 ' + c8.length + '건',
         some(c8.map(function (e) {
           var r = aiOf(e), why = r && r.purpose_vague === true ? clip(r.purpose_reason, 40) : '';
-          return tagOf(e) + ' 「' + clip(e.purpose, 20) + '」' + (why ? '(' + why + ')' : '');
-        }), 8) + ' — 무엇에 썼는지(어떤 일로·누구와) 알 수 있게 적어 주세요.', idsOf(c8), c8.some(function (e) { return !purposeVague(e.purpose, e.category); }));
+          return tagOf(e) + ' ‘' + clip(e.purpose, 20) + '’' + (why ? '(' + why + ')' : '');
+        }), 8) + '. 무엇에 썼는지(어떤 일로·누구와) 알 수 있게 적어 주세요.', idsOf(c8), c8.some(function (e) { return !purposeVague(e.purpose, e.category); }));
     }
     // ── C09 개인경비 이중 청구 의심 — 같은 날(KST)·같은 금액의 개인경비 줄 ──
     if (Array.isArray(opts.expenses)) {
@@ -210,8 +211,8 @@
       var c9 = list.filter(function (e) { return Math.round(Number(e.amount) || 0) > 0 && exOf(e).length > 0; });
       c9.slice(0, PER_ROW_MAX).forEach(function (e) {
         add('C09', 'warn', '개인경비와 겹칠 수 있음 — ' + tagOf(e),
-          '같은 날 같은 금액의 개인경비가 있습니다: ' + some(exOf(e).map(exTag), 3) +
-          ' — 같은 결제를 법인카드와 개인경비로 두 번 청구하지 않았는지 확인해 주세요.', [e.id]);
+          '같은 날 같은 금액의 개인경비가 있어요: ' + some(exOf(e).map(exTag), 3) +
+          '. 같은 결제를 법인카드와 개인경비로 두 번 청구하지 않았는지 확인해 주세요.', [e.id]);
       });
       if (c9.length > PER_ROW_MAX) {
         var rest9 = c9.slice(PER_ROW_MAX);

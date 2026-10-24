@@ -994,7 +994,7 @@ footer .wrap{font-size:13px}
       if (k === 'd' && !drv) return;
       // 마감 일정 — 결재 중·완료면 그 상태(빨강 없이, 2026-10-20 AU6-M1 과 같은 규칙). 상태를 모르면 D-day 만 색 없이
       var chip = st === 'submitted' ? ['', '결재 중'] : st === 'approved' ? ['ok', '결재 완료'] : [st === null ? '' : ddCls(x.dday), ddWord(x.dday)];
-      sch.push('<li class="srw" data-k="' + k + '"><span><b>' + KN[k] + ' · ' + mon + '</b><span>' + mdOf(x.from) + ' – ' + mdOf(x.due) + '</span></span>' +
+      sch.push('<li class="srw" data-k="' + k + '"><span><b>' + KN[k] + ' · ' + mon + '</b><span>' + mdOf(x.from) + '~' + mdOf(x.due) + '</span></span>' +
         '<span class="cp ' + chip[0] + '">' + chip[1] + '</span></li>');
       if (st === 'submitted' || st === 'approved') return;            // 이미 상신했다 — 할 일이 아니다
       var quiet = st === null, due = [quiet ? '' : ddCls(x.dday), ddWord(x.dday)], until = x.dday < 0 ? mdOf(x.due + CR.graceDays() * DAY) + '까지 상신' : '';
@@ -1007,7 +1007,7 @@ footer .wrap{font-size:13px}
         var td = hint && hint.todo && hint.todo.cyc === cycOfDue(x) ? hint.todo : null, at = td ? whenOf(td.at) + ' 기준' : '';
         if (td && td.list && td.list.length) {
           td.list.slice(0, 3).forEach(function (it) { rows.push({ k: 'd', t: it.t, s: it.d, due: due, note: at, b: '처리하기', href: 'driving.html#/close', quiet: quiet }); });
-          if (td.n > 3) rows.push({ k: 'd', t: '그 밖의 남은 일 ' + (td.n - 3) + '건', s: '운행일지 ‘이번 달 마감’에 모두 있어요.', due: due, note: at, b: '들어가기', href: 'driving.html#/close', quiet: quiet });
+          if (td.n > 3) rows.push({ k: 'd', t: '그 밖의 남은 일 ' + (td.n - 3) + '건', s: '운행일지 ‘월 마감’에 모두 있어요.', due: due, note: at, b: '들어가기', href: 'driving.html#/close', quiet: quiet });
         } else if (td && (td.empty || !(td.step >= 1))) {
           // 새 기간에 아직 운행이 없다 — 「남은 일 없음 — 0단계 차례」가 아니라(2026-10-20 V3 B10)
           rows.push({ k: 'd', t: '운행일지 ' + mon + ' 운행 기록 없음', s: '앱에서 운행을 기록하면 여기에 모여요.', due: due, note: at, b: '들어가기', href: 'driving.html#/close', quiet: quiet });
@@ -1032,7 +1032,7 @@ footer .wrap{font-size:13px}
       var hi = Date.UTC(+p.hi.slice(0, 4), +p.hi.slice(5, 7) - 1, +p.hi.slice(8, 10)), past = Math.round((R.today - hi) / DAY);
       // 관리자가 정정으로 다시 연 지난 기간은 늦은 것이 아니라 고칠 차례 — 「늦었지만」·빨간 「N일 지남」 대신 이번 기간 정정 줄과 같은 말(2026-10-21 매뉴얼 로봇)
       var reo = p.st === 'rejected' && !!p.ro;
-      late.push({ k: k, key: p.key, dday: -past, ro: reo, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' ' + rejWord(p.ro) : p.st === 'withdrawn' ? ' 회수함' : ' 아직 상신 전'),
+      late.push({ k: k, key: p.key, dday: -past, ro: reo, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' ' + rejWord(p.ro) : p.st === 'withdrawn' ? ' 회수됨' : ' 아직 상신 전'),
         // 지난 기간도 반려면 고쳐서, 회수면 다시 — 그냥 「상신해 주세요」면 그대로 다시 올리라는 말로 읽혔다(2026-10-24 검수)
         s: reo ? '정정 사유를 확인하고 고쳐서 다시 상신하세요.' : p.st === 'rejected' ? '마감이 지났어요. 반려 사유를 확인하고 고쳐서 다시 상신해 주세요.'
           : p.st === 'withdrawn' ? '마감이 지났어요. 다시 상신해 주세요.' : '마감이 지났어요. 지금 상신해 주세요.', due: reo ? ['', '정정'] : ['warn', ddWord(-past)],
@@ -1213,7 +1213,7 @@ footer .wrap{font-size:13px}
     var d0 = new Date(Math.min.apply(null, L.map(function (x) { return x.due; })));
     var start = Math.min(Date.UTC(R.y, R.m, 1), Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1)), end = Math.max.apply(null, L.map(function (x) { return x.due; }));
     var startM = new Date(start).getUTCMonth(), endM = new Date(end).getUTCMonth(), cross = endM !== startM;
-    $('dlTitle').innerHTML = (startM + 1) + (cross ? '–' + (endM + 1) : '') + '월 마감<span class="pc"> 일정</span>';
+    $('dlTitle').innerHTML = (startM + 1) + (cross ? '~' + (endM + 1) : '') + '월 마감<span class="pc"> 일정</span>';
     $('dlToday').innerHTML = '오늘 ' + mdOf(R.today) + '<span class="pc"> (' + '일월화수목금토'.charAt(T.getUTCDay()) + ')</span>';
     // 줄 그림
     var pct = function (u) { return Math.max(0, Math.min(100, (u - start) / (end - start) * 100)); };
@@ -1244,7 +1244,7 @@ footer .wrap{font-size:13px}
         '<span class="dd' + (x.dday <= 0 ? ' now' : '') + '">' + dd + '</span>' +
         '<span class="dtx"><b><span class="lg">' + x.K.name + '</span><span class="sh">' + x.K.short + '</span></b>' +
         (first ? '<em class="chm">가장 먼저</em>' : '') +
-        '<span class="per">' + mdOf(x.from) + ' – ' + mdOf(x.due) + ' · ' + x.K.note + '</span>' +
+        '<span class="per">' + mdOf(x.from) + '~' + mdOf(x.due) + ' · ' + x.K.note + '</span>' +
         '<span class="due-m">' + due + '</span></span>' +
         '<span class="dside">' + (first ? '<span class="due"><span class="chip1">가장 먼저</span> · ' + due + '</span>' : '<span class="due">' + due + '</span>') + '</span></li>';
     }).join('');

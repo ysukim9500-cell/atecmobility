@@ -299,7 +299,7 @@
     return p && past >= 1 && past <= CUR.grace ? p : cur;
   }
   /** '09.21 – 10.20'(KST, 끝날 포함). */
-  function span(P) { return P ? P.lo.slice(5).replace('-', '.') + ' – ' + P.hi.slice(5).replace('-', '.') : ''; }
+  function span(P) { return P ? P.lo.slice(5).replace('-', '.') + '~' + P.hi.slice(5).replace('-', '.') : ''; }
   /** 그해 마지막 기간 P — 추가 기간이 있으면 그것(「작년 전체」의 끝). */
   function lastOfYear(kind, y) { return byKey(kind, y + '-12b') || byKey(kind, y + '-12'); }
   /** from ~ to('YYYY-MM-DD') 날을 품은 기간들(오래된 것부터) — 관리 화면·가짜 서버 미리보기용. */

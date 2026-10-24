@@ -14,7 +14,7 @@
   'use strict';
   var esc = C.esc, n0 = C.n0;
   var KINDS = { driving: 1, expense: 1, card: 1 };
-  var FMT = { pdf: 'PDF 내려받기', xlsx: '엑셀', print: 'PDF 열기·인쇄' };
+  var FMT = { pdf: 'PDF 다운로드', xlsx: '엑셀', print: 'PDF 열기·인쇄' };
   // ST[kind][id] = undefined(아직 모름) · null(볼 수 없음·결재 완료 아님) · {n, last_at, last_by, last_name, last_format, n_pdf, n_xlsx, n_print}
   var ST = { driving: {}, expense: {}, card: {} };
   var PEND = { driving: {}, expense: {}, card: {} }, ASKING = { driving: {}, expense: {}, card: {} };

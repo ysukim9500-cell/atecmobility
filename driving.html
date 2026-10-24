@@ -3037,7 +3037,7 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   <header class="top">
     <button class="iconbtn" id="burger" aria-label="메뉴 열기">
       <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button>
-    <button class="appname" id="appLogo" data-v="close" aria-label="이번 달 마감으로">
+    <button class="appname" id="appLogo" data-v="close" aria-label="월 마감으로">
       <img class="logo-mark" src="brand/atec-driving.png" alt="ATEC Driving">
       <img class="logo-mark tiny" src="brand/atec-mark.png" alt="ATEC">
     </button>
@@ -3089,7 +3089,7 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
         <a class="navback" href="work.html"><svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-left"/></svg>시스템 선택</a>
         <div class="navname"><svg width="17" height="17" viewBox="0 0 24 24"><use id="navSysIco" href="#i-car"/></svg><b id="navSysName">운행일지</b></div>
       </div>
-      <a tabindex="0" role="button" data-v="close" class="on dnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>이번 달 마감</a>
+      <a tabindex="0" role="button" data-v="close" class="on dnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>월 마감</a>
       <a tabindex="0" role="button" data-v="inbox"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재함<span class="pill" id="pInbox" hidden></span></a>
       <div class="navsec dnav">마감 단계</div>
       <a tabindex="0" role="button" data-v="trips" data-alt="check" class="step dnav"><span class="stepn" id="sn1">1</span>운행 기록<span class="pill" id="pCheck" hidden></span></a>
@@ -3101,30 +3101,30 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
       <a tabindex="0" role="button" data-v="edu" class="dnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-play"/></svg>안전교육<span class="pill" id="pEdu" hidden></span></a>
       <!-- 개인경비 지출결의(2026-10-07) — 운전 안 하는 직원도 보인다(xnav). 기간은 20일~19일. -->
       <div class="navsec xnav xhead">개인경비</div>
-      <a tabindex="0" role="button" data-v="x_month" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>이번 달 경비</a>
+      <a tabindex="0" role="button" data-v="x_month" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>경비 내역</a>
       <a tabindex="0" role="button" data-v="x_verify" class="xnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증·상신</a>
       <!-- 법인카드 지출결의(2026-10-09) — 모든 직원(cnav). 기간은 1일~말일. -->
       <div class="navsec cnav chead">법인카드</div>
-      <a tabindex="0" role="button" data-v="c_month" class="cnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-card"/></svg>이번 달 카드 내역</a>
+      <a tabindex="0" role="button" data-v="c_month" class="cnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-card"/></svg>카드 내역</a>
       <a tabindex="0" role="button" data-v="c_verify" class="cnav"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-check"/></svg>검증·상신</a>
       <button type="button" class="navsec adm admtog" id="admTog" aria-expanded="false" aria-controls="admList">관리<svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
       <div id="admList" class="fold">
       <div class="admsec adm dadm">결재·마감</div>
       <!-- 2026-10-15 2차: 「마감 현황」·「검증 현황」·「정산」 → 「현황」 한 화면(예전 주소 #/a_close·#/a_verify·#/a_settle 은 현황으로 돌아간다) -->
       <a tabindex="0" role="button" data-v="a_status" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>현황</a>
-      <a tabindex="0" role="button" data-v="a_final" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
+      <a tabindex="0" role="button" data-v="a_final" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 문서</a>
       <div class="admsec adm dadm">기록</div>
       <a tabindex="0" role="button" data-v="a_trips" data-alt="a_check,a_evid,a_hipass" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>운행·영수증 기록</a>
       <a tabindex="0" role="button" data-v="a_safety" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>안전운전</a>
       <div class="admsec adm xadm">개인경비</div>
       <a tabindex="0" role="button" data-v="xa_close" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-won"/></svg>개인경비 현황</a>
       <a tabindex="0" role="button" data-v="xa_list" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 내역</a>
-      <a tabindex="0" role="button" data-v="xa_final" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
+      <a tabindex="0" role="button" data-v="xa_final" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 문서</a>
       <a tabindex="0" role="button" data-v="xa_people" class="adm xadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <div class="admsec adm cadm">법인카드</div>
       <a tabindex="0" role="button" data-v="ca_close" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-card"/></svg>법인카드 현황</a>
       <a tabindex="0" role="button" data-v="ca_list" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-list"/></svg>전체 내역</a>
-      <a tabindex="0" role="button" data-v="ca_final" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 출력</a>
+      <a tabindex="0" role="button" data-v="ca_final" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-stamp"/></svg>결재 완료 문서</a>
       <a tabindex="0" role="button" data-v="ca_people" class="adm cadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
       <div class="admsec adm">사람·설정</div>
       <a tabindex="0" role="button" data-v="people" class="adm dadm"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-users"/></svg>직원 현황</a>
