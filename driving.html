@@ -2248,6 +2248,32 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:13px;color:var(--in
   table.mday td.n{text-align:left;white-space:normal}
   table.mday td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--ink-500);font-weight:400}
 }
+/* 결재 완료 문서(세 시스템)·결재 중 표 — 폰·태블릿에서 사람마다 카드로 띄운다. 결재함 카드와 같은 모양(바탕·테두리·둥근 모서리 · 카드 사이 12px ·
+   팀 머리는 카드 밖 맨바탕 · 머리 아래 8px · 팀과 팀 사이 20px). 한 판 안에 줄만 그어져 어디까지가 한 사람인지 헷갈렸다(2026-10-25 사용자) */
+@media (max-width:820px){
+  .panel:has(> .scroll > table.rcard.ftab){background:transparent;border:0;border-radius:0}   /* 안쪽 .scroll 은 그대로 — 태블릿에서 목록이 상자 안에서 스크롤되고 고른 자리를 되살린다(finsel) */
+  table.rcard.ftab thead tr{padding:0 2px 8px;border-bottom:0}
+  table.rcard.ftab tbody tr:not(.ogrp){background:var(--surface);border:1px solid var(--ink-200);border-radius:var(--r);margin-top:12px;padding:14px 16px}
+  table.rcard.ftab tbody tr:first-child:not(.ogrp){margin-top:0}
+  table.rcard.ftab tr.ogrp{background:transparent;border:0;padding:20px 2px 0}
+  table.rcard.ftab tbody tr.ogrp:first-child{padding-top:4px}
+  table.rcard.ftab tr.ogrp + tr:not(.ogrp){margin-top:8px}
+  /* 출력 딱지는 상태 칸 안에서 가운데쯤 떠 있었다 — 카드 왼쪽 끝에 맞춰 한 줄로(상태 글은 이름 옆 그대로) */
+  table.rcard.ftab td:has(> .prline){display:contents}
+  table.rcard.ftab .prline{flex:1 1 100%;margin-top:0}
+}
+/* 같은 표의 PC(821px~) — 칸 줄(열)은 표 그대로 두고, 사람마다 줄 사이를 12px 띄워 카드처럼(테두리·둥근 모서리는 줄 양 끝 칸에).
+   팀 머리 줄은 카드 밖 맨바탕(팀과 팀 사이 20px). 판 테두리는 없앤다 — 결재함 카드와 같은 모양(2026-10-25 사용자 「웹페이지는?」) */
+@media (min-width:821px){
+  .panel:has(> .scroll > table.rcard.ftab){background:transparent;border:0;border-radius:0}
+  table.rcard.ftab{border-spacing:0 12px;margin:-12px 0}
+  table.rcard.ftab thead th{background:transparent;border-bottom:0;padding-top:0;padding-bottom:0}
+  table.rcard.ftab tbody tr:not(.ogrp) td{background:var(--surface);border-top:1px solid var(--ink-200);border-bottom:1px solid var(--ink-200)}
+  table.rcard.ftab tbody tr:not(.ogrp) td:first-child{border-left:1px solid var(--ink-200);border-radius:var(--r) 0 0 var(--r)}
+  table.rcard.ftab tbody tr:not(.ogrp) td:last-child{border-right:1px solid var(--ink-200);border-radius:0 var(--r) var(--r) 0}
+  table.rcard.ftab tr.ogrp td{background:transparent;border:0;padding:8px 4px 0 !important}
+  table.rcard.ftab tfoot td{background:transparent;border:0}
+}
 /* ═══ 웹 사용성 1차(2026-10-19) — 누름 영역 40px 이상 ═══
    머리 단추(메뉴·로그아웃·종) 34 → 40, 날짜·찾기 칸은 안쪽 입력칸이 칸 높이를 다 쓰게(28~30px 이던 것). */
 @media screen{

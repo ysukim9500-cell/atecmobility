@@ -1541,7 +1541,7 @@
     }
     if (back.length || notYet.length) {
       var todo = back.map(function (a) { return { u: a.username, st: a.status === 'rejected' ? '반려' : '상신 전(회수됨)' }; }).concat(notYet.map(function (u) { return { u: u, st: '상신 전' }; }));
-      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-todo"><table class="ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">카드 내역</th></tr></thead><tbody>' +
+      h += C.sect('챙겨야 할 사람', n0(todo.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-todo"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th class="n">카드 내역</th></tr></thead><tbody>' +
         C.orgGroups(todo, function (x) { return x.u; }, true).map(function (g) {
           return C.orgGroupRow(g, 4, '') + g.list.map(function (x) {
             var p = by[x.u] || { n: 0, sum: 0 };
