@@ -1343,7 +1343,7 @@ table.mday .mtrip .mtunk{color:var(--warn)}
 @media screen and (max-width:900px){
   .acard.cmp{padding:12px 16px 14px}
   .acard.cmp .acrow .btn,.acard.cmp .ahd .btn{min-height:44px;height:44px}
-  .acard.cmp .vchip{min-height:44px}
+  .acard.cmp .vchip,.acard.cmp .prb{min-height:44px}   /* 출력 기록 딱지도 같은 줄 단추와 같은 높이(2026-10-25) */
   .acard.cmp .acrow .aprog{flex:1 1 100%}
   .acard.cmp .acrow .asp{display:none}
   .acard.cmp .ahd>.st.along{max-width:100%}
@@ -1833,6 +1833,9 @@ body{font-size:15px;line-height:1.6;letter-spacing:-.01em;color:var(--ink-700);
 .kind{font-size:13px;font-weight:600;line-height:21px}
 .btn{height:40px;font-size:14px;font-weight:600}   /* 한 줄 단추는 같은 높이 PC 40(2026-10-20 디자인 v2) */
 .btn.sm{height:32px;font-size:13px}
+/* 작은 단추와 한 줄에 서는 딱지 단추(검증 결과 · 출력 기록)도 같은 높이(2026-10-25 다듬기 5단계 — 결재함 카드 줄에서 「미출력」만 26px 이었다) */
+.prb,.vchip{min-height:32px}
+.stable .vchip{min-height:0}   /* 현황 표 검증 칸 딱지는 단추와 한 줄에 서지 않는다 — 예전 크기(폰 카드 높이 170px 안, r14ui) */
 .field{height:38px} .field select,.field input{font-size:14px}
 .seg button{font-size:14px;padding:7px 13px}
 .seg button .c{font-size:12px;color:var(--ink-500)}
@@ -1926,6 +1929,7 @@ td.orgc b{font-size:14px} td.orgc span,td.whoc .wo{font-size:13px;color:var(--in
   /* ⑧ 누르는 자리 40px 안팎 */
   .btn,.btn.sm{min-height:38px}
   .btn.sm{height:38px}
+  .prb,.vchip{min-height:38px}   /* 옆 작은 단추와 같은 높이(2026-10-25 — 태블릿 개인경비 띠에서 검증 딱지 32 · 단추 38) */
   .aact .btn{height:40px}
   .ag-x{width:28px;height:28px}
   .ag-b{padding-top:32px}   /* × 를 28px 로 키운 폭 — 이름이 × 아래에서 시작하게(2026-10-16 3차) */
@@ -2510,7 +2514,7 @@ table.mday td.mact .mlinkb{margin-top:0}
   .hpnote.notice .nmore{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;margin:-12px 0 -12px 2px}   /* 「자세히」 39×22 → 44 */
   .cardx .lk{display:inline-flex;align-items:center;min-height:44px}                  /* 「결재함 열기 →」 70×20 → 44 */
   .dfil .qd{height:44px;padding:0 12px}                                                 /* 「이번주·지난주」 47×30 → 44 */
-  .prb{min-height:44px}                                                                 /* 「미출력」 53×26 → 44 */
+  .prb,.vchip{min-height:44px}                                                          /* 「미출력」 53×26 → 44 · 검증 딱지도 옆 단추와 같게(2026-10-25) */
   .cyc .cycnav{width:32px}
   header.top .cycnav::after{inset:-4px -6px}                                            /* ◀▶ 실제 약 30 → 44(옆 기간 단추와 겹치지 않게 6px 만) */
   /* 마감 화면 — 할 일 줄은 카드, 단추 둘은 반반(높이 44), 빨간 단추는 아래 고정 「다음 할 일」 하나 */
