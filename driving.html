@@ -3245,6 +3245,56 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   /* R4-17 월 마감 오른쪽 칸 — 「정산 예정 금액」(안쪽 24) 아래 「내가 결재할 것」만 안쪽 18 이라 이름·금액 시작·끝이 6px 어긋났다 → 24 */
   .cards3.one .cardx{padding:20px 24px}
 }
+/* ═══ 3묶음 남은 작은 것(2026-10-28 밤, 로봇 r2·r4·r5) ═══ */
+@media screen and (max-width:600px){
+  /* R2-19 팀 막대(폰) — 막대 끝이 금액 글자 폭을 따라 줄마다 달랐다 → 오른쪽 칸 최소 112px · 「미확정」 칸이 빈 화면은 막대가 줄 끝까지 */
+  .trow{grid-template-columns:minmax(0,1fr) minmax(112px,auto)}
+  .trow:has(> .tu:empty) > .tb{grid-column:1 / -1}
+  .trow > .tu:empty{display:none}
+}
+@media screen and (max-width:380px){
+  /* R5-19 360 머리띠 — 「10월분」이면 칸 사이 6px 가 쌓여 로그아웃 단추가 오른쪽 여백 16px 중 6px 를 먹었다 → 사이 4px */
+  header.top{gap:4px}
+}
+@media screen and (min-width:821px){
+  /* R4-16 직원별 표 — 「내역」 단추가 없는 줄만 51px(다른 줄 60) → 단추 칸이 있는 표는 줄 높이 60 */
+  table.rcard:has(td.rbtn .btn) tbody tr:not(.ogrp) > td{height:60px}
+}
+/* R4-24 조직도 나무 — 들여쓰기 걸음이 +11·+14 로 달랐다 → +12 씩 */
+.onode.d2{padding-left:21px}
+.onode.d3{padding-left:33px}
+/* R6-20 결재 띠(본인 화면) — 「PDF 다운로드」는 검증 딱지 줄, 「문서 보기」는 점선 아래 혼자 셋째 줄이었다
+   → 결재함 카드(.acrow)처럼 검증 딱지 줄 하나에 단추를 모으고(검증 왼쪽 · 단추 오른쪽), 펼친 문서는 그 아래. 「회수」는 상태 옆 그대로.
+   문서 보기가 없는 띠(상신 전 등)는 예전 그대로 — :has 를 모르는 브라우저도 예전 그대로 */
+.astrip:has(> .apv){display:flex;flex-wrap:wrap;align-items:center;column-gap:8px}
+.astrip:has(> .apv) > *{flex:1 1 100%;min-width:0}
+.astrip:has(> .apv) > .ahd{margin-bottom:0}
+.astrip:has(> .apv) > .aext{display:contents}
+.astrip:has(> .apv) > .apv{display:contents}
+.astrip:has(> .apv) > .apv > .apvbar{display:contents}
+.astrip:has(> .apv) > .aext > *{flex:0 0 auto;margin-top:12px}
+.astrip:has(> .apv) > .aext > span[style*="flex:1"]{flex:1 1 0}
+.astrip:has(> .apv) > .apv > .apvbar > *{flex:0 0 auto;margin-top:12px}
+.astrip:has(> .apv) > .apv > .apvbar > [data-apvtog]{margin-left:auto}   /* 줄이 넘쳐 혼자 내려가도 오른쪽 */
+.astrip:has(> .apv) > .apv > .apvbar > .apvhint{display:none}
+.astrip:has(> .apv) > .apv > .apvpages{flex:1 1 100%;margin-top:10px}
+/* R6-09 운행 목록·최근 운행(태블릿 700~820) — 폰 두 줄 카드를 늘린 모양(가운데 400px 빈칸) → 한 줄 표: 날짜·시간 | 이름 | 목적 | 방문처 | km | 통행료 | 주차.
+   700px 아래는 방문처 칸이 너무 좁아져 두 줄 카드 그대로 */
+@media screen and (min-width:700px) and (max-width:820px){
+  table.mc.trtab tbody tr,table.mc.ctrip tbody tr{flex-wrap:nowrap;align-items:baseline;column-gap:12px}
+  table.mc.trtab tbody tr::after,table.mc.ctrip tbody tr::after{display:none}
+  .scroll table.mc.trtab td.m2,.scroll table.mc.ctrip td.m2{order:2;flex:1 1 0}
+  .scroll table.mc.trtab td.mr,.scroll table.mc.ctrip td.mr{order:3;margin-left:0;flex:0 0 56px}
+  .scroll table.mc.trtab td:not(.m1):not(.m2):not(.mr),.scroll table.mc.ctrip td:not(.m1):not(.m2):not(.mr){order:4;text-align:right}   /* 폭은 아래 칸마다(여기 flex 를 두면 우선순위가 높아 아래 100px 를 덮는다) */
+  .scroll table.mc.trtab td[data-l],.scroll table.mc.ctrip td[data-l]{flex:0 0 100px}
+  .scroll table.mc.trtab td.mx[data-l]{display:block !important}   /* 주차 「—」 칸도 자리를 지켜 통행료 열이 줄마다 같은 자리 */
+  .scroll table.mc.trtab td.m1:first-child{flex:0 0 84px}
+  .scroll table.mc.trtab td.whoc{flex:0 0 52px}
+  .scroll table.mc.trtab td.m1:not(:first-child):not(.whoc){flex:0 0 52px}
+  .scroll table.mc.ctrip td.cday{flex:0 0 66px}
+  .scroll table.mc.ctrip td.m1.n{flex:0 0 40px}
+  .scroll table.mc.ctrip td.m1:not(.cday):not(.n){flex:0 0 52px}
+}
 </style>
 </head>
 <body>

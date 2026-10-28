@@ -6173,7 +6173,7 @@
     }
     var pg = g ? pageOf(g, rows.length) : { n: rows.length, more: '' };
     // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-19 사용성 2차 #7): 날짜·목적·거리 / 방문처·통행료·주차. PC 는 표 그대로.
-    var h = '<div class="panel"><div class="scroll" data-rows><table class="mc"><thead><tr>' +
+    var h = '<div class="panel"><div class="scroll" data-rows><table class="mc trtab"><thead><tr>' +
       th('날짜', 'date', -1) + (showWho ? th('소속 · 이름', 'who', 1) : '') + th('목적', 'purp', 1) + th('차량', 'car', 1) +
       th('거리', 'dist', -1, true) + (opt.compact ? '' : th('계기판', 'odo', -1, true)) +
       th('통행료', 'toll', -1, true) + (opt.compact ? '' : th('주차', 'park', -1, true)) +

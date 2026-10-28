@@ -393,6 +393,16 @@ footer .wrap{font-size:13px}
 @media (max-width:480px){
   footer .wrap > span:first-child{flex:1 1 100%}
   footer .wrap > .sp{display:none}
+  /* 회원가입(폰) — 두 칸 묶음 안에서만 칸 아래 10 + 묶음 간격 10 이 겹쳐 23px(다른 곳 13) → 묶음 간격 0(R2-20) */
+  .two{gap:0}
+}
+/* 시스템 칸 내 상태 줄 — 「·」 양쪽이 11~13px(날짜 줄은 5) → 5px, 「결재할 것」 딱지만 조금 더 띄운다(R2-30) */
+.launch p.mine{column-gap:5px}
+.launch p.mine .ap{margin-left:4px}
+/* PC 오늘 할 일 · 마감 일정 — 두 카드 아래 끝이 146px 어긋나 빈 칸(R3-06) → 같은 높이. 할 일이 여섯 줄 넘게 길면 예전처럼 위 맞춤 */
+@media (min-width:901px){
+  .pgrid{align-items:stretch}
+  .pgrid:has(.ptodo .trw:nth-child(6)){align-items:start}
 }
 </style>
 </head>
