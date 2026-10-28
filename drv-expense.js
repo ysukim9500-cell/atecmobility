@@ -753,10 +753,16 @@
     }, Promise.resolve()).then(function () {
       session.busy = false; session.sent = true; X_SENDING = false;
       if (XUP === session) { freeUrls(); XUP.items = []; XUP.pages = []; }
+      // 움직임 ② — 다시 받은 목록에서 올리기 전에 없던 줄
+      var bk = ITEMS[itemKey(false, session.cyc)], before = {};
+      ((bk && bk.rows) || []).forEach(function (r) { before[String(r.id)] = 1; });
       dropItems(session.cyc);
       if ($('xDrop')) C.closePanel();
       C.toastOk('경비 ' + n0(done) + '건을 올렸어요.');
-      loadItems(session.cyc, false, true).then(function () { C.render(); });
+      loadItems(session.cyc, false, true).then(function (rows) {
+        if (C.markJust && bk && bk.rows) C.markJust((rows || []).filter(function (r) { return !before[String(r.id)]; }).map(function (r) { return '[data-xedit="' + r.id + '"]'; }));
+        C.render();
+      });
     }).catch(function (e) {
       session.busy = false; X_SENDING = false;
       session.items.splice(0, done);
@@ -829,6 +835,7 @@
     })() : Promise.resolve();
     var saved = function () {
       XEDIT = null; dropItems(S.CYCKEY); C.closePanel(); C.toast('고쳤어요.');
+      if (C.markJust) C.markJust(['[data-xedit="' + it.id + '"]']);   // 움직임 ② — 고친 줄
       loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
     };
     var failed = function (e) {
@@ -880,7 +887,8 @@
     var btn = $('btnXDelGo'); if (btn) { btn.disabled = true; btn.textContent = '지우는 중…'; }
     delOne(it)
       .then(function () {
-        dropItems(S.CYCKEY); C.closePanel(); C.toast('지웠어요.');
+        C.closePanel(); if (C.markGone) C.markGone(['[data-xdel="' + id + '"]', '[data-xedit="' + id + '"]']);   // 움직임 ③ — 지운 줄 흐리게
+        dropItems(S.CYCKEY); C.toast('지웠어요.');
         loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
       }).catch(function (e) {
         if (btn) { btn.disabled = false; btn.textContent = '삭제'; }

@@ -62,11 +62,13 @@
     return s ? (s.length <= 2 ? s : s.slice(-2)) : '—';
   }
 
-  function toast(msg, bad) {
+  function toast(msg, bad, opt) {
     var t = $('toast');
     // 오류는 화면낭독기가 하던 말을 끊고 바로 읽게 한다(alert). 그 밖의 알림은 차례를 기다린다(status).
     t.setAttribute('role', bad ? 'alert' : 'status');
     t.textContent = msg;
+    // 움직임 ④(2026-10-28) — 상신·승인을 마쳤을 때만 글 앞에 체크를 한 번 그린다(opt.done · 경고가 붙은 알림은 그리지 않는다)
+    if (opt && opt.done && !bad) t.insertAdjacentHTML('afterbegin', '<svg class="tk" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>');
     // 옆 창이 열려 있으면 창 아랫줄(단추) 위로 띄운다(2026-10-20 AU6-L8 — 폰에서 토스트가 창의 단추를 6초까지 가렸다).
     var pn = $('panel'), pf = pn && pn.classList.contains('open') ? $('pFoot') : null, pr = pf && pf.getBoundingClientRect();
     t.style.bottom = pr && pr.height ? Math.max(30, Math.round(window.innerHeight - pr.top + 12)) + 'px' : '';
@@ -77,8 +79,8 @@
   }
   /** 성공했는데 경고가 딸린 경우 — 성공을 먼저 말하고 경고를 잇는다.
    *  예전에는 빨간 경고만 떠서 "상신이 실패했나?" 로 읽혔다. 두 문장은 줄표 대신 마침표로 잇는다(2026-10-24 해요체). */
-  function toastOk(msg, warning) {
-    toast(warning ? endDot(msg) + ' ' + warning : msg, !!warning);
+  function toastOk(msg, warning, opt) {
+    toast(warning ? endDot(msg) + ' ' + warning : msg, !!warning, opt);
   }
   /** 서버 문구 끝에 마침표가 없으면 붙인다 — 뒤에 다른 문장을 이을 때 「승인했습니다 검증: …」처럼 붙어 읽혔다(2026-10-16 3차). */
   function endDot(s) {
@@ -804,6 +806,7 @@
   var TRIP_CACHE = {};                   // 'scope|lo|hi' → { rows, at }
   var STATIC_AT = 0, CACHE_MS = 180000;
   var LOADED_ALL = false;                // 지금 운행 목록이 전 직원 것인가(관리자가 여러 주기를 볼 때는 본인 것만 받는다)
+  var ONLOAD = [];   // loadAll 이 다 받아 그린 뒤 한 번 부를 것(움직임 ② 등)
   function loadAll(opt) {
     // ★ 예전에는 로딩 중이면 그냥 돌아갔다. 주기를 빠르게 두 번 바꾸면 두 번째
     //   요청이 버려져 옛 주기 데이터가 새 주기 이름으로 그려졌다. 이제는 표를
@@ -912,6 +915,9 @@
       paintPills();
       paintCycle();
       render();
+      // 다 받아 그린 뒤 할 일(움직임 ② — 방금 올린 영수증 줄 찾기 등). 한 번씩만
+      var onl = ONLOAD; ONLOAD = [];
+      onl.forEach(function (f) { try { f(); } catch (e) { } });
       // 안전교육 이번 회차 내 대상 여부 스냅샷(앱 MainScreen 의 eduEnsureSelfTarget 과 같다, 2026-10-14).
       eduEnsureSelf();
     }).catch(function (e) {
@@ -3728,7 +3734,8 @@
         var midOk = payload && payload.action === 'approve' && res.j.row && res.j.row.status === 'submitted';
         toastOk(endDot(res.j.message || okMsg || '처리했어요.') +
           (midOk ? ' 다음 결재자가 결재하기 전까지는 ‘그 밖의 건’에서 승인을 취소할 수 있어요.' : '') +
-          (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) + '.' : ''), res.j.warning);
+          (res.j.verify && EXT.sumText ? ' 검증: ' + EXT.sumText(res.j.verify) + '.' : ''), res.j.warning,
+          { done: !!payload && /^(submit|approve)$/.test(payload.action || '') });   // 움직임 ④ — 상신·승인을 마쳤을 때만 체크
         closePanel();
         TRIP_CACHE = {};                   // 잠금 상태가 바뀌었다 — 다른 주기 캐시도 믿지 않는다
         // 개인경비 결재 건이면 그 모듈이 자기 결재 목록을 다시 받는다.
@@ -7398,6 +7405,9 @@
       EVUP.items = []; EVUP.pages = [];
       closePanel();
       toastOk('영수증 ' + n0(done) + '건을 올렸어요.');
+      // 움직임 ② — 다시 받은 목록에서 올리기 전에 없던 줄(서버가 새 번호를 돌려주지 않아 전후를 견준다)
+      var evBefore = {}; EVID.forEach(function (x) { evBefore[String(x.id)] = 1; });
+      ONLOAD.push(function () { markJust(EVID.filter(function (x) { return !evBefore[String(x.id)]; }).map(function (x) { return '[data-evdel="' + x.id + '"]'; })); });
       AUDIT = null; loadAll();
     }).catch(function (e) {
       EVUP.busy = false; EV_SENDING = false;
@@ -7505,7 +7515,7 @@
     evDelOne(e)
       .then(function (fileGone) {
         return (picked.length ? applyUndo(picked) : Promise.resolve(null)).then(function (u) {
-          closePanel(); AUDIT = null; TRIP_CACHE = {}; loadAll();
+          closePanel(); markGone(['[data-evdel="' + e.id + '"]']); AUDIT = null; TRIP_CACHE = {}; loadAll();   // 움직임 ③ — 지운 줄 흐리게
           var m = '지웠어요.' + undoSay(u);
           if (u && u.fail) toast(m + (fileGone ? '' : ' 기록은 지웠지만 사진 파일은 남았어요.'), true);
           else toastOk(m, fileGone ? null : '기록은 지웠지만 사진 파일은 남았어요.');
@@ -10283,6 +10293,7 @@ window.EduGuard = {
         TRIP_CACHE = {};
         AUDIT = null;
         toastOk(note, res.j.warning);
+        if (res.j.row && res.j.row.id != null) markJust(['tr[data-trip="' + res.j.row.id + '"]']);   // 움직임 ② — 넣은 운행 줄
         closePanel();
         loadAll();                            // 밀린 운행까지 서버 값으로 다시 받는다
       }).catch(function () {
@@ -10371,6 +10382,7 @@ window.EduGuard = {
         AUDIT = null;
         TRIP_CACHE = {};                     // 다른 기간으로 갔다 왔을 때 고치기 전 값이 나오지 않게
         toastOk((res.j.changed || []).join('·') + ' 항목을 고쳤어요.', res.j.warning);
+        markJust(['tr[data-trip="' + id + '"]']);   // 움직임 ② — 고친 운행 줄
         closePanel(); paintPills(); render();
       }).catch(function () {
         btn.disabled = false; btn.textContent = '저장';
@@ -12774,10 +12786,73 @@ window.EduGuard = {
     });
   }
   function wrapEndsSoon() { if (!wrapEndsQ) wrapEndsQ = requestAnimationFrame(wrapEnds); }
+
+  /* ══════════════════ 움직임 넷(2026-10-28 사용자 「너무 많이는 아니더라도 좀」 — 승인된 넷만) ══════════════════
+     ① 금액이 바뀌면 새 숫자가 아래서 살짝 올라오고 옆에 「+3,300원」이 2초 · ② 방금 넣거나 고친 줄은 바탕이 연하게 칠해졌다 1.5초에 걸쳐 빠짐
+     ③ 지운 줄은 다시 그리기 전까지 0.25초 흐려짐 · ④ 상신·승인을 마치면 알림 띠의 체크가 0.4초 동안 그려짐(toast 의 opt.done).
+     규칙: 바뀔 때만 · 한 번만 · 0.2~0.6초(줄 칠은 1.5초에 걸쳐 빠짐) · 기기 「동작 줄이기」면 하나도 하지 않는다 · 화면을 처음 열 때는 움직이지 않는다.
+     빛나는·무지개·계속 깜빡임 없음(「지금 할 일 단추 하나만 깜빡」 규칙 그대로). 숫자는 늘 맞는 값 — 움직이는 것은 자리·흐림뿐(0부터 세지 않는다). */
+  var RMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function lessMotion() { return !!(RMQ && RMQ.matches); }
+  // ① 금액 — 같은 화면(주소 #…)에서 지난번 본 값과 다를 때만. 다른 화면·다른 기간으로 옮기면 기억을 버린다(처음 그릴 때는 그대로).
+  var AMT_SEL = [['cmoney', '.cmoney .cbig b'], ['verdict', '.hero .verdict'], ['xsum', '.xsum .xst.big b']];
+  var AMT_SEEN = { hash: '', v: {} };
+  function amtNum(el) {
+    var t = String(el.textContent || '').replace(/\s+/g, '');
+    return /^-?[\d,]+원?$/.test(t) ? Number(t.replace(/[^\d-]/g, '')) : null;
+  }
+  function amtWatch() {
+    // 같은 화면이면 지난 값을 이어 간다 — 다시 받는 동안 잠깐 그린 「불러오는 중」 화면(금액 칸 없음)이 기억을 지워 움직이지 않았다
+    var h = location.hash, seen = AMT_SEEN.hash === h ? AMT_SEEN.v : {}, next = {};
+    Object.keys(seen).forEach(function (k) { next[k] = seen[k]; });
+    AMT_SEL.forEach(function (g) { Array.prototype.forEach.call(document.querySelectorAll(g[1]), function (el, i) {
+      var n = amtNum(el); if (n == null) return;
+      var key = g[0] + '#' + i;
+      next[key] = n;
+      if (!(key in seen) || seen[key] === n || lessMotion()) return;
+      var d = n - seen[key];
+      el.classList.remove('amtup'); void el.offsetWidth; el.classList.add('amtup');
+      el.setAttribute('data-amtd', (d > 0 ? '+' : '−') + n0(Math.abs(d)) + '원');
+      el.classList.toggle('amtdn', d < 0);
+      clearTimeout(el._amtT); el._amtT = setTimeout(function () { el.removeAttribute('data-amtd'); el.classList.remove('amtup', 'amtdn'); }, 2100);
+    }); });
+    AMT_SEEN = { hash: h, v: next };
+  }
+  // ② 방금 넣거나 고친 줄 — 줄 안의 무엇이든 가리키는 선택자를 받아 그 줄(tr)을 칠한다. 다시 그려지기 전·후 어느 쪽에 와도 되게
+  //   8초 동안 기억하고, 새로 그려진 줄에 한 번씩만. 표 칸(table-row)은 칸 바탕을, 폰 카드 줄은 안쪽 덧칠을 뺀다.
+  var JUST = { sels: [], until: 0, done: (window.WeakSet ? new WeakSet() : null) };
+  function rowOf(el) { return (el.closest && el.closest('tr')) || el; }
+  function markJust(sels) {
+    if (lessMotion() || !sels || !sels.length) return;
+    JUST.sels = JUST.sels.concat(sels); JUST.until = Date.now() + 8000;
+    setTimeout(applyJust, 60);
+  }
+  function applyJust() {
+    if (!JUST.sels.length) return;
+    if (Date.now() > JUST.until) { JUST.sels = []; return; }
+    JUST.sels.forEach(function (s) {
+      Array.prototype.forEach.call(document.querySelectorAll(s), function (e) {
+        var r = rowOf(e);
+        if (JUST.done && JUST.done.has(r)) return;
+        if (JUST.done) JUST.done.add(r);
+        var cls = getComputedStyle(r).display === 'table-row' ? 'justrow' : 'justcard';
+        r.classList.remove(cls); void r.offsetWidth; r.classList.add(cls);
+      });
+    });
+  }
+  // ③ 지운 줄 — 서버가 지운 뒤 목록을 다시 받는 동안 그 줄을 흐린다(다시 그리면 사라진다)
+  function markGone(sels) {
+    if (lessMotion() || !sels) return;
+    sels.forEach(function (s) { Array.prototype.forEach.call(document.querySelectorAll(s), function (e) { rowOf(e).classList.add('gonerow'); }); });
+  }
+  // ★ 이름은 motionPaint — 위(그리기 공통)의 afterPaint 와 같은 이름이면 그쪽(표 높이·고른 개수·미리보기 붙이기)을 덮어쓴다(2026-10-28 전체 시험에서 잡음)
+  var MOVEQ = 0;
+  function motionPaint() { MOVEQ = 0; wrapEnds(); applyJust(); amtWatch(); }
+  function motionPaintSoon() { if (!MOVEQ) MOVEQ = requestAnimationFrame(motionPaint); }
   if (window.MutationObserver) new MutationObserver(function (ms) {
     for (var i = 0; i < ms.length; i++) {
       var add = ms[i].addedNodes;
-      for (var j = 0; j < add.length; j++) if (add[j].nodeType === 1 && (add[j].matches('.aprog') || add[j].querySelector('.aprog'))) return wrapEndsSoon();
+      for (var j = 0; j < add.length; j++) if (add[j].nodeType === 1 && !(add[j].id === 'toast' || (add[j].closest && add[j].closest('#toast')))) return motionPaintSoon();
     }
   }).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', wrapEndsSoon);
@@ -12829,6 +12904,7 @@ window.EduGuard = {
       // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
       fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
+      markJust: markJust, markGone: markGone,   // 움직임 ②③(2026-10-28) — 개인경비·법인카드도 같은 줄 칠·흐림
       // 의견 모아 보기(2026-10-21) — 담당 상신 의견 → 결재자 승인 의견. 개인경비·법인카드 결재 띠도 같은 조각
       opinions: opinionsHtml,
       inbox: inbox, paintPills: paintPills, openSubmit: openSubmit,

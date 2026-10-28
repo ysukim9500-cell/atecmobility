@@ -556,6 +556,7 @@
     delOne(id)
       .then(function () {
         C.closePanel(); C.toast('지웠어요.');
+        if (C.markGone) C.markGone(['tr[data-crow="' + id + '"]']);   // 움직임 ③ — 지운 줄 흐리게
         var S = C.state(); dropItems(S.CYCKEY);
         return loadItems(S.CYCKEY, false, true).then(function () { C.render(); });
       }).catch(function (e) {
