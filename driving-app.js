@@ -5366,9 +5366,10 @@
     var monthOf = function (c) { return keyShort(c, String(c || '')); };   // 추가 기간(2026-12b)도 이름으로(연말 마감)
     var inboxCard = function () {
       return '<div class="cards3 one"><div class="cardx"><div class="k">내가 결재할 것</div><div class="v hot">' + n0(ib.length) + '<small>건</small></div>' +
-        '<div class="rows">' + ib.slice(0, 2).map(function (a) {
+        // 세 건까지 줄로(「3건」인데 두 줄만 보였다 — 2026-10-28 검사 로봇), 넘으면 「외 N건」
+        '<div class="rows">' + ib.slice(0, 3).map(function (a) {
           return '<div><span>' + esc(nameOf(a.username)) + ' · ' + esc(monthOf(a.cycle)) + '</span><b>' + won((a.snapshot || {}).cost) + '</b></div>';
-        }).join('') + '</div><button class="lk" data-v="inbox">결재함 열기 →</button></div></div>';
+        }).join('') + (ib.length > 3 ? '<div><span class="dim">외 ' + n0(ib.length - 3) + '건</span></div>' : '') + '</div><button class="lk" data-v="inbox">결재함 열기 →</button></div></div>';
     };
     // 상신 뒤(결재 중·완료)·빈 기간에는 남은 일·금액 카드가 없다(결재 띠 요약과 같은 숫자 — 2026-10-15 2차). 「내가 결재할 것」은 있을 때만.
     var TK = null;

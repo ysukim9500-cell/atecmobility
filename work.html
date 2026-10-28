@@ -388,6 +388,12 @@ footer .wrap{font-size:13px}
   .trw .tdue{grid-area:t;flex-direction:row;align-items:center;gap:8px}
   .trw .btn{grid-area:b}
 }
+/* 폰 맨 아래 줄 — 왼쪽 글이 240px 에서 꺾여 첫 줄 오른쪽 100px 이 비고 「정도 · 혁신 · 협업」만 오른쪽 셋째 줄(2026-10-28 로봇 R5-17)
+   → 두 줄 모두 왼쪽에서 시작(글 한 덩이 + 그 아래 표어) */
+@media (max-width:480px){
+  footer .wrap > span:first-child{flex:1 1 100%}
+  footer .wrap > .sp{display:none}
+}
 </style>
 </head>
 <body>

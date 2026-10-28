@@ -3215,6 +3215,36 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   .ctab td:nth-child(8){grid-row:3;grid-column:4 / span 6}
   .ctab td:nth-child(9){grid-row:3;grid-column:10 / span 3}
 }
+/* ═══ 3묶음 작은 손질(2026-10-28 오와열 로봇 r1·r4·r5 남은 것) ═══ */
+@media screen and (max-width:600px){
+  /* F17 개인경비 날짜 띠 — 일곱째 칸이 카드 안쪽 여백 선에서 잘려 깨진 것처럼 보였다 → 띠를 카드 테두리까지 넓혀 넘치는 칸이 테두리 밑으로 들어간다(칸 폭 44 는 그대로) */
+  .xstripp .xstrip{margin-inline:-16px;padding-inline:16px;scroll-padding-inline:16px}
+  /* R5 결재함 카드 「⋯」 — 첫 줄이 차면 「⋯」만 둘째 줄로 떨어져 빈 띠가 생겼다 → 기간 글이 남는 폭에서 줄바꿈하고 「⋯」는 늘 첫 줄 끝 */
+  .acard.cmp .ahd>.acyc{flex:1 1 0;min-width:0}
+}
+@media screen and (max-width:820px){
+  /* F19 체크칸이 있는 목록 카드 — 둘째 줄부터 체크칸 밑에서 시작해 첫 줄 글과 35px 어긋났다 → 글은 모두 같은 자리, 체크칸만 왼쪽으로 */
+  table.mc tbody tr:has(> td.mseltd){padding-left:49px}
+  table.mc tbody tr:has(> td.mseltd) > td.mseltd{margin-left:-35px}
+  /* F14 최근 운행 — 통행료 옆 딱지 칸 폭이 줄마다 달라(「영수증 없음」 70 · 「—」 12) 통행료 숫자가 들쭉 → 딱지 칸 70px 오른쪽 맞춤 */
+  .scroll table.mc td.cev{min-width:70px;text-align:right}
+  /* F25 영수증 올리기 줄 — 금액 칸 뒤 68px 구멍 → 「＋」「제외」를 위 날짜 칸 시작에 맞춘다 */
+  table.evup td.evx{justify-content:flex-start}
+}
+@media screen and (max-width:900px){
+  table.xtab tbody tr:not(.xsec):not(.xsub):not(.xgrp):has(.mselhit){padding-left:49px}
+  table.xtab tbody tr:not(.xsec):not(.xsub):not(.xgrp):has(.mselhit) > td:first-child{margin-left:-35px}
+}
+/* F26 결재함 「그 밖의 건 0건」 — 고를 것이 「전체」 하나뿐이면 탭을 숨긴다(머리 오른쪽에 혼자 떠 단추처럼 보였다). 다른 탭을 고른 채면 「전체」로 돌아가게 그대로 */
+.sect > .hd > .seg:has(> button.on:only-child){display:none}
+/* R4-20 결재 완료 머리 단추 — 「출력 안 한 것만」만 그림이 없어 글자 기준선 맞춤에서 3px 아래로 → 단추는 줄 가운데 */
+.sect > .hd > .btn{align-self:center}
+@media screen and (min-width:901px){
+  /* R4-29 보는 범위 — 사업부·팀·파트·센터 칸 폭이 168·179·134 로 제각각 → 같은 최소 폭(긴 이름은 그대로 넓어진다) */
+  .orgbar .osel select{min-width:180px}
+  /* R4-17 월 마감 오른쪽 칸 — 「정산 예정 금액」(안쪽 24) 아래 「내가 결재할 것」만 안쪽 18 이라 이름·금액 시작·끝이 6px 어긋났다 → 24 */
+  .cards3.one .cardx{padding:20px 24px}
+}
 </style>
 </head>
 <body>
