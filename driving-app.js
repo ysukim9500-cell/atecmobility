@@ -6261,10 +6261,10 @@
     var tfold = isAll();
     if (tfold) {
       var tfw = filterWords(); if (FILT.q) tfw.push('‘' + FILT.q + '’');
-      h += '<div class="bar tfbar' + (TFOLD_OPEN ? ' open' : '') + '"><button type="button" class="btn tfoldbtn" data-tfold aria-expanded="' + TFOLD_OPEN + '" aria-controls="tfFields">' +
+      h += '<div class="bar trbar tfbar' + (TFOLD_OPEN ? ' open' : '') + '"><button type="button" class="btn tfoldbtn" data-tfold aria-expanded="' + TFOLD_OPEN + '" aria-controls="tfFields">' +
         ic('list', 14) + '<span class="tft">조건' + (tfw.length ? ' · ' + esc(tfw.join(' · ')) : '') + '</span><span class="tfar" aria-hidden="true">▾</span></button>' +
         '<div class="tfields" id="tfFields">';
-    } else h += '<div class="bar">';
+    } else h += '<div class="bar trbar">';
     if (isAll()) {
       // ★ 지금 걸린 사람은 운행이 0건이어도 목록에 남겨야 한다. 안 그러면 셀렉트가
       //   '사람 전체' 로 보이는데 표는 비어 있고, 같은 항목 재선택은 change 가 안 나서

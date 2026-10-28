@@ -2858,7 +2858,8 @@ table.mday td.mact .mlinkb{margin-top:0}
 /* ── 관리자 운행 기록 — 폰(≤600px)에서 조건 칸 다섯 개를 「조건 ▾」 한 줄로 접는다(AU6-L3). PC·태블릿은 예전처럼 한 줄·두 칸 격자 ── */
 .tfoldbtn{display:none}
 .tfbar .tfields{display:contents}
-@media screen and (max-width:900px){
+/* ★ 폭 ≤600 — 위 「.bar > .field」 두 칸 격자가 ≤600 이다. ≤900 이던 때는 태블릿(flex 줄)에서 칸마다 width:100% 라 다섯 칸이 한 줄씩 쌓였다(2026-10-28 로봇 R6-01) */
+@media screen and (max-width:600px){
   /* 칸들이 .tfields 안에 들어가 위 「.bar > .field」 규칙이 안 닿는다 — 같은 값을 여기서 */
   .tfbar .tfields > .field,.tfbar .tfields > .dfil{width:100%;min-width:0;height:38px}
   .tfbar .tfields > .dfil{grid-column:1 / -1;height:auto}
@@ -3150,6 +3151,69 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   /* 팀별 결재 완료 — 360 폭에서 긴 팀 이름이 「…지원 / 팀」으로 끊겼다. 완료율 칸은 막대 없이 숫자만 두고 팀 이름 칸을 넓힌다 */
   .d2team th:nth-child(4){width:64px}
   .d2team .d2pbar{display:none}
+}
+</style>
+<style id="tabcss">
+/* ═══ 태블릿(601~900px) 배치 — 3묶음(2026-10-28 오와열 로봇 R6). 폰 모양을 그대로 늘린 곳만 태블릿 폭에 맞춘다.
+   폰(≤600)·PC(≥901) 규칙은 그대로. 색·글꼴·둥근 모서리는 :root 토큰 그대로(새 색 없음). :has 는 규칙마다 따로(모르는 브라우저가 묶음째 버린다). */
+@media screen and (min-width:601px){
+  /* 관리자 운행 기록 조건 칸 — .tfields 안이라 「.bar > .field」 높이 40 이 안 닿아 34·38 이었다 */
+  .tfbar .tfields > .field,.tfbar .tfields > .dfil{height:40px}
+  /* R6-25 남은 일 — 단추 하나인 줄은 단추 칸(296px)을 다 채운다(왼쪽 칸만 쓰고 오른쪽이 비어 단추 열 오른쪽 끝이 들쭉) */
+  .ctb > .btn:only-child{flex:1 1 auto}
+  /* R6-12 팀별 비용 줄 — 오른쪽 「미확정」 칸이 빈 화면(개인경비·법인카드)은 막대가 그 자리까지(태블릿에서 카드 오른쪽 115px 이 비었다) */
+  .trow:has(> .tu:empty){grid-template-columns:minmax(0,1.4fr) 130px minmax(120px,1fr)}
+  .trow > .tu:empty{display:none}
+}
+@media screen and (min-width:601px) and (max-width:900px){
+  /* R6-01·R6-18 운행 기록 거르기 줄 — 칸마다 남는 폭을 나눠 가져 줄 양 끝이 맞는다(찾기 칸 200px 뒤 350px 빈칸이던 것) */
+  .trbar > .sp{display:none}
+  .trbar > .field,.trbar .tfields > .field,.trbar > .dfil,.trbar .tfields > .dfil{flex:1 1 auto;width:auto;min-width:0}
+  .trbar .field select{flex:1 1 auto;min-width:0}
+  .trbar .dfil input{flex:1 1 0;min-width:0;width:auto}
+  .trbar > .sp + .btn{margin-left:auto}
+  /* R6-17 마감 단계표(721px 부터 가로 4칸) — 설명 글이 칸 오른쪽 끝에 붙어 다음 단계 제목 옆에 왔다 → 제목 아래 왼쪽 */
+  .steps .stp span{text-align:left}
+  /* R6-21 「검증·상신으로」·「상신 전 N명에게 알림」 — 폰처럼 줄 전체로 늘어났다 → 제목 줄 오른쪽에 글 폭만큼 */
+  .xtopact{width:auto;margin-left:auto}
+  .xtopact .btn{width:auto}
+  .d2act{width:auto;justify-content:flex-end;margin-left:auto}
+  .d2act .btn.pri{flex:0 0 auto}
+  /* R6-22 요약 숫자 칸 — 두 칸 격자에서 홀수 개면 마지막이 혼자 한 줄 → 3개는 세 칸, 5개는 위 3 · 아래 2 */
+  .facts:has(> .fact:nth-child(3):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}
+  .facts:has(> .fact:nth-child(3):last-child) > .fact:last-child{grid-column:auto}
+  .facts:has(> .fact:nth-child(5):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}
+  .facts:has(> .fact:nth-child(5):last-child) > .fact{grid-column:span 2}
+  .facts:has(> .fact:nth-child(5):last-child) > .fact:nth-child(n+4){grid-column:span 3}
+  /* R6-18 결재함 거르기 — 줄 끝이 417·383 으로 들쭉 → 찾기 칸과 상신일 칸이 남는 폭을 가져 두 줄 오른쪽 끝을 맞춘다 */
+  .ibflt > label.field{flex:1 1 200px}
+  .ibflt .ibdate input{flex:0 1 auto;min-width:0}   /* 날짜 칸은 제 폭 — 늘리면 두 칸이 330px 씩 벌어졌다 */
+  /* R6-26 결재함 카드 — 결재선 줄 위아래가 단추 줄 사이에 7·6px 로 끼였다 → 12px */
+  .acard.turn .acrow{margin-top:12px}
+  .acard.turn .acrow > .aprog{margin-bottom:6px}
+  /* R6-09 개인경비 내역 줄 — 「사진」·「수정」 단추가 맨 아래 혼자 한 줄(줄마다 120~170px) → 오른쪽 칸, 글 줄 옆 아래 끝 */
+  table.xtab tbody tr:not(.xsec):not(.xsub):not(.xgrp) td{grid-column:1}
+  table.xtab tbody tr:not(.xsec):not(.xsub):not(.xgrp) td.xact{grid-column:2;grid-row:2 / span 4;align-self:end}
+}
+@media screen and (min-width:601px) and (max-width:820px){
+  /* R6-12 팀별 결재 완료 — 팀 칸만 500px 이고 인원·완료·완료율이 오른쪽 190px 에 몰려 막대가 30px → PC(≤1399)와 같은 폭 */
+  .d2team th:nth-child(2),.d2team th:nth-child(3){width:64px}
+  .d2team th:nth-child(4){width:40%}
+  /* R6-09 영수증 등 목록 카드 — 「사진」「삭제」 단추가 셋째 줄에 혼자(줄마다 120px 넘게) → 둘째 줄 오른쪽 끝(넘치면 그때만 다음 줄) */
+  .scroll table.mc td.mact,.scroll table.mc td.mact:first-child{flex:0 0 auto;margin-left:auto;padding-top:0 !important}
+}
+@media screen and (min-width:601px) and (max-width:820px){
+  /* R6-05 법인카드 내역 카드 — 구분·사용목적·비고를 한 줄에(폰 폼을 늘린 모양이라 카드 한 장이 300~390px). 열 12칸: 순번 | 날짜 | 시간 … | 금액 */
+  .ctab tr{grid-template-columns:auto auto repeat(10,minmax(0,1fr))}
+  .ctab td:nth-child(1){grid-column:1}
+  .ctab td:nth-child(2){grid-column:2}
+  .ctab td:nth-child(3){grid-column:3 / span 7}
+  .ctab td:nth-child(6){grid-column:10 / span 3}
+  .ctab td:nth-child(4){grid-column:1 / span 9}
+  .ctab td:nth-child(5){grid-column:10 / span 3}
+  .ctab td:nth-child(7){grid-row:3;grid-column:1 / span 3}
+  .ctab td:nth-child(8){grid-row:3;grid-column:4 / span 6}
+  .ctab td:nth-child(9){grid-row:3;grid-column:10 / span 3}
 }
 </style>
 </head>
