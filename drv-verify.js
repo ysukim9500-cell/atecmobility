@@ -468,7 +468,7 @@
         '<div class="v' + (alert ? ' alert' : '') + '">' + val + '</div><div class="sub">' + esc(sub || '') + '</div></div>';
     };
     h += '<div class="hero fade" data-lockedverify><div class="eyebrow"><span class="dot' + (v && !s.bad ? ' ok' : '') + '"></span>' +
-      '상신 때 검증 결과' + (at ? ' · ' + esc(whenText(at)) : '') + '</div>' +
+      '<span>상신 때 검증 결과' + (at ? ' · <span style="white-space:nowrap">' + esc(whenText(at)) + '</span>' : '') + '</span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (v ? '<div class="facts">' +
         fact('불일치', n0(s.bad), '금액·계기판이 서로 다름', s.bad > 0) +
@@ -490,7 +490,7 @@
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info, false, true));
     }
     h += '<div class="anote">' + (done ? '결재가 끝난 기간이라' : '결재 중인 기간이라') + ' 다시 검증하지 않고, ' +
-      '상신할 때 저장한 결과를 결재자도 같이 봐요. 결재 문서는 ‘PDF 다운로드’로 확인하세요.</div>';
+      '상신할 때 저장한 결과를 결재자도 같이 봐요. 결재 문서는 ‘PDF\u00a0다운로드’로 확인하세요.</div>';
     return h;
   }
 
@@ -783,9 +783,9 @@
     var viewer = (C.state().ME || {}).username, asApprover = a.username !== viewer;
     // ★ 상신 때 검증 결과를 못 받았으면(불러오는 중·실패·옛 건) 「이상 없음」이라고 하지 않는다.
     //   「검증 결과를 불러오는 중…」으로 시작하는 글 — driving-app.js apprLoading 이 이 앞부분으로 받는 중을 가린다(세 모듈 같은 글. 판정 줄은 문장이라 세 모듈 모두 끝에 마침표 — 2026-10-24 검수)
-    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 다운로드’로 문서를 열어 확인해 주세요.']
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF\u00a0다운로드’로 문서를 열어 확인해 주세요.']
       : nBad ? ['bad', asApprover
-        ? '확인이 필요해요. ' + (noRcpTxt ? '영수증 없음(' + noRcpTxt + ') 등 ' : '') + '문서의 불일치 항목을 보고 결재해 주세요.'
+        ? '확인이 필요해요. ' + (noRcpTxt ? '영수증 없음(' + noRcpTxt + ') 등 ' : '') + '문서의 불일치\u00a0항목을 보고 결재해 주세요.'
         : '검증에서 맞지 않는 곳' + (noRcpTxt ? '(영수증 없음 ' + noRcpTxt + ')' : '') + '이 있어요. 결재자도 문서에서 함께 봐요.']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
       : nWarn ? ['warn', '대체로 정상이에요. ' + warnTail(items, vs, asApprover) + '.']
       : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만

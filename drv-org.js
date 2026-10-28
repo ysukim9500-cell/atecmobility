@@ -217,7 +217,8 @@
       (OF ? '<button class="btn sm" data-of="">' + ic('close', 12) + (OF === 'noacct' ? '계정 없는 사람만' : '메일 없는 사람만') + ' — 풀기</button>' : '') +
       '<div class="sp" style="flex:1"></div>' +
       '<button class="btn sm pri" data-oadd>＋ 사람 추가</button></div>';
-    right += people.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
+    // 폰·태블릿(≤820)은 사람마다 한 덩이(rcard) — 가로 스크롤 표에서 보이는 이름 칸 옆으로 안 보이는 소속·결재선 칸이 줄을 98~147px 로 늘려 빈 띠가 생겼다(2026-10-28 로봇)
+    right += people.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr>' +
       '<th>이름</th><th>직급</th><th>직책</th><th>소속</th><th>담당 업무</th><th>앱 계정 · 메일</th><th>결재선</th><th></th></tr></thead><tbody>' +
       people.map(function (o) {
         var acct = o.username
@@ -227,19 +228,19 @@
         acct += o.username && S.PEOPLE[o.username]
           ? (noMail(o) ? '<div class="omail miss">메일 없음</div>' : '<div class="omail" title="' + esc(o.email) + '">' + esc(o.email).replace('@', '<wbr>@') + '</div>') : '';
         return '<tr><td><span class="lead">' + esc(o.name) + '</span>' + (o.outsourced ? ' <span class="kind">외주</span>' : '') + '</td>' +
-          '<td>' + esc(o.rank || '—') + '</td>' +
+          '<td data-l="직급">' + esc(o.rank || '—') + '</td>' +
           '<td>' + (o.role ? '<span class="kind biz">' + esc(o.role) + '</span>' : '<span class="dim">—</span>') + '</td>' +
           // 소속은 자르지 않는다(2026-10-14 사용자 「잘 안 보인다」) — 팀 / 센터·파트 두 줄.
-          '<td class="oplace"><b>' + esc(o.team || o.division) + '</b>' + (o.unit ? '<small>' + esc(o.unit) + '</small>' : '') + '</td>' +
-          '<td class="el" title="' + esc(o.duty || '') + '">' + esc(o.duty || '') + '</td>' +
-          '<td>' + acct + '</td>' +
+          '<td class="oplace" data-l="소속"><b>' + esc(o.team || o.division) + '</b>' + (o.unit ? '<small>' + esc(o.unit) + '</small>' : '') + '</td>' +
+          '<td class="el" data-l="담당" title="' + esc(o.duty || '') + '">' + esc(o.duty || '') + '</td>' +
+          '<td data-l="계정">' + acct + '</td>' +
           // 이 사람이 상신할 때 미리 채워질 결재선(계정이 있는 사람만 — 없으면 상신을 못 한다).
           // 관리자 지정이 있으면 지정 + 자동을 합친 것에 「지정」 딱지(2026-10-14).
           (function () {
             if (!(o.username && S.PEOPLE[o.username])) return '<td class="dim">—</td>';
             var ln = lineOf(o), lt = lineText(ln.steps), why = ln.notes.map(function (n) { return n.t; }).join(' / ');
             // 결재선도 자르지 않는다(2026-10-14) — 결재자 한 사람씩 한 줄: 「칸 이름  이름」.
-            return '<td class="olinec" data-oline="' + esc(o.username) + '" title="' + esc([lt, why].filter(Boolean).join(' · ')) + '">' +
+            return '<td class="olinec" data-l="결재선" data-oline="' + esc(o.username) + '" title="' + esc([lt, why].filter(Boolean).join(' · ')) + '">' +
               (ln.over ? '<span class="kind olov-tag" data-oover="1" title="관리자가 지정한 결재선(지정 안 한 칸은 자동)">지정</span>' : '') +
               (ln.steps.length ? '<ol>' + ln.steps.map(function (s) {
                 return '<li><em>' + esc(s.box) + '</em><b>' + esc(C.nameOf(s.approver)) + '</b></li>';

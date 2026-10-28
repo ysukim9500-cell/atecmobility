@@ -185,7 +185,7 @@
   function band() {
     var S = C.state(), cur = cCurrent();
     if (C.cmpCycle(S.CYC, cur) >= 0) return '';
-    return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + esc(cycName(S.CYCKEY)) + ' (' + esc(R.span(S.CYCKEY)) +
+    return '<div class="cycband"><span>' + ic('cal', 15) + '지금 <b>' + esc(cycName(S.CYCKEY)) + ' (' + esc(R.span(S.CYCKEY)) +
       ') · 지난 기간</b>을 보고 있어요. 법인카드는 <b>1일 ~ 말일</b>이 한 기간이에요.</span>' +
       '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + (cur.x || '') + '">이번 기간(' + esc(CR.short(cur)) + ' ' + esc(cSpan(cur)) + ')으로 →</button></div>';
   }
@@ -359,8 +359,9 @@
     if (nf) return '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span> <span>적은 값이 되돌아갔어요. ‘다시 저장’을 누르면 적었던 값을 다시 보내요.</span>' +
       '<button type="button" class="btn sm" id="btnCRetry" data-cretry>다시 저장</button>';
     var t = lastSaveMs(rows);
-    return '<span class="st ok">자동 저장됨</span> <span>' + (t ? '· 마지막 저장 ' + hhmm(t) + ' · ' : '') +
-      '같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적·비고는 그대로예요.</span>';
+    // 안내 글은 늘 둘째 줄(.csaven) — 한 덩이로 두면 좁은 폰에서 둘째 줄이 「· 마지막 저장…」처럼 「·」로 시작했다(2026-10-28 로봇)
+    return '<span class="st ok">자동 저장됨</span>' + (t ? ' <span>· 마지막 저장 ' + hhmm(t) + '</span>' : '') +
+      ' <span class="csaven">같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적·비고는 그대로예요.</span>';
   }
   /** 다시 받은 줄(지금 기간)에 없는 줄의 「저장 못 함」 표시는 지운다(지운 줄·다른 기간으로 옮겨진 줄). */
   function pruneFailed(cyc) {
@@ -587,7 +588,7 @@
     if (C_SENDING) { C.toast('앞서 고른 파일을 아직 올리는 중이에요. 끝난 뒤 다시 열어 주세요.'); return; }
     CUP = { cyc: S.CYCKEY, busy: false, sent: false, res: null, plan: null, file: '', useOwner: true };
     C.openPanel('ERP 엑셀 올리기 — 법인카드', cycName(S.CYCKEY) + ' · ' + R.span(S.CYCKEY),
-      '<div class="drop" id="cDrop" style="margin:0 0 14px">' +
+      '<div class="drop" id="cDrop" style="margin-bottom:14px">' +
       '<div class="dt">ERP에서 다운로드한 <b>내 법인카드 승인내역</b> 엑셀을 올려 주세요</div>' +
       '<div class="dd">.xls, .xlsx 파일이에요. PC에서는 여기에 끌어다 놓아도 돼요.<br>0원·취소 줄과 ' + esc(R.span(S.CYCKEY)) + ' 밖의 줄은 자동으로 빠져요.</div>' +
       '<label class="btn" style="margin-top:14px">파일 고르기<input type="file" id="cFile" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>' +
@@ -1004,7 +1005,7 @@
     else { verdict = '<em>이상 없었어요</em>'; clean = ' clean'; }
     var at = v && (v.ran_at || (f && f.frozen_at));
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && !s.block && !s.bad ? ' ok' : '') + '"></span>' +
-      '상신 때 검증 결과' + (at ? ' · ' + esc(C.vx.whenText(at)) : '') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
+      '<span>상신 때 검증 결과' + (at ? ' · <span style="white-space:nowrap">' + esc(C.vx.whenText(at)) + '</span>' : '') + ' · <span style="white-space:nowrap">카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</span></span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p></div>';
     if (v) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
@@ -1239,7 +1240,7 @@
     var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
       nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length;
     var asApprover = a.username !== (C.state().ME || {}).username;   // 결재하는 분 — 상신자 할 일(고치세요)은 보이지 않는다
-    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF 다운로드’로 문서를 열어 확인해 주세요.']
+    var verdict = !vs ? ['warn', (f === undefined && FZFAIL[fzKey(a)] ? '상신 때 검증 결과를 불러오지 못했어요' : f === undefined ? '검증 결과를 불러오는 중이에요' : '검증 결과를 아직 받지 못했어요') + '. ‘PDF\u00a0다운로드’로 문서를 열어 확인해 주세요.']
       : nBad ? ['bad', asApprover ? '확인이 필요해요. 문서의 불일치 항목을 보고 결재해 주세요.' : '검증에서 맞지 않는 곳이 있어요. 결재자도 문서에서 함께 봐요.']   // 상신한 본인에게는 본인용 문구(2026-10-16 3차)
       : nWarn ? ['warn', '대체로 정상이에요. ' + C.vx.warnTail(items, vs, asApprover) + '.']
       : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
@@ -1339,13 +1340,14 @@
       }).join('') + '</div>') + '</section>';
     }
     list.sort(function (x, y) { return y.sum - x.sum; });
-    h += C.sect('직원별', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th>' +
+    // 폰·태블릿(≤820)은 사람마다 한 덩이(rcard) — 가로 스크롤 표라 금액 칸이 화면 밖에 있었다(2026-10-28 로봇)
+    h += C.sect('직원별', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>파트·센터</th><th>이름</th>' +
       '<th class="n">건수</th><th class="n">금액</th><th>빈칸</th><th></th></tr></thead><tbody>' +
       C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
         return C.orgGroupRow(g, 6, '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
-          return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="n">' + n0(x.n) + '</td>' +
-            '<td class="n total">' + n0(x.sum) + '</td><td>' + (x.blank ? '<span class="st bad">' + n0(x.blank) + '줄</span>' : '<span class="dim">—</span>') + '</td>' +
-            '<td class="n" style="white-space:nowrap">' +
+          return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="n" data-l="건수">' + n0(x.n) + '</td>' +
+            '<td class="n total" data-l="금액">' + n0(x.sum) + '</td><td' + (x.blank ? ' data-l="빈칸"><span class="st bad">' + n0(x.blank) + '줄</span>' : ' class="rnone"><span class="dim">—</span>') + '</td>' +
+            '<td class="n rbtn" style="white-space:nowrap">' +
             (x.n ? '<button class="btn sm" data-cperson="' + esc(x.u) + '">내역</button>' : '') + '</td></tr>';
         }).join('');
       }).join('') + '</tbody></table></div></div>' : C.blank('이 기간에 카드 내역이 있는 사람이 없어요.', null, 'users'));
@@ -1514,7 +1516,9 @@
       '<th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>결재선</th><th></th></tr></thead><tbody>' +
       C.orgGroups(shown, function (a) { return a.username; }, true).map(function (g) {
         return C.orgGroupRow(g, 9, '합계 <b>' + won(g.list.reduce(function (s, a) { return s + (Number((a.snapshot || {}).cost) || 0); }, 0)) + '</b>', FIN.grp('card', g)) + g.list.map(function (a) {
-          var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
+          var line = (a.steps || []).map(function (s) { return C.stepText(s); }).join(' → ');
+          // 화면 글 — 「(대표이사 칸)」 괄호 안에서는 줄을 바꾸지 않는다(「(대표이사 / 칸)」으로 갈렸다, 2026-10-28 로봇). title 은 위 line 그대로
+          var lineH = (a.steps || []).map(function (s) { var w = C.stepText(s), i = w.lastIndexOf(' ('); return i < 0 ? esc(w) : esc(w.slice(0, i)) + ' <span style="white-space:nowrap">' + esc(w.slice(i + 1)) + '</span>'; }).join(' → ');   // 이름 직책 (칸) — 진행 줄·상신 창과 같은 직책(2026-10-16 5차)
           return '<tr' + FIN.row('card', a.id, a.username, (a.snapshot || {}).cost) + '><td><input type="checkbox" data-cfinsel="' + a.id + '"' + FIN.box('card', a.id) +
             (FINSEL[a.id] ? ' checked' : '') + ' aria-label="' + esc(C.nameOf(a.username)) + ' 고르기"></td>' +
             C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
@@ -1522,7 +1526,7 @@
             // 1280 에서 표가 칸보다 넓던 것(2026-10-20 AU6-M3, 개인경비와 같게): 날짜 「MM.DD HH:MM」 · 결재선 두 줄 말줄임 · 단추 셋은 「⋯」 하나
             '<td class="dim" style="white-space:nowrap"' + (a.closed_at ? ' title="결재 완료 ' + esc(C.vx.whenText(a.closed_at)) + '">' + esc(finWhen(a.closed_at)) : '>—') + '</td>' +
             '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n total" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td class="el dim" data-l="결재선" title="' + esc(line) + '"><span style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">' + esc(line) + '</span></td>' +
+            '<td class="el dim" data-l="결재선" title="' + esc(line) + '"><span style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">' + lineH + '</span></td>' +
             '<td class="n ract" style="white-space:nowrap">' + C.kmenu(C.nameOf(a.username) + ' 님 결재 완료 문서', [
               ['data-cfzpdf="' + a.id + '"', 'PDF 다운로드'], ['data-cfzxlsx="' + a.id + '"', '엑셀 다운로드'],
               ['data-appr="reopen" data-kind="card" data-id="' + a.id + '"', '정정 열기', true]]) + '</td></tr>';
@@ -1619,8 +1623,8 @@
       C.vx.setPdfUrls([url]);
       var file = '법인카드_결재완료_' + S.CYCKEY + FIN.fileTag(ord.team) + '_' + parts.length + '명.pdf';   // 한 팀만이면 팀 이름(2026-10-23)
       $('pBody').innerHTML = '<div class="pdfdone"><div class="big">' + n0(res.pages) + '<small>쪽</small></div><div class="dim">' + (blob.size / 1e6).toFixed(1) + ' MB · ' + n0(parts.length) + '명 결재 완료 문서</div>' +
-        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) + ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF 다운로드’를 다시 눌러 주세요.</span></div>' : '') +
-        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF 다운로드’를 다시 눌러 확인해 주세요.<br>' + checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
+        (skipped.length ? '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(skipped.join(', ')) + ' 님 문서는 만들지 못했어요. 한 사람씩 ‘PDF\u00a0다운로드’를 다시 눌러 주세요.</span></div>' : '') +
+        (checks.length ? '<div class="awarn">' + ic('alert', 15) + '<span>확인이 필요한 문서가 있어요. 한 사람씩 ‘PDF\u00a0다운로드’를 다시 눌러 확인해 주세요.<br>' + checks.map(function (x) { return esc(x); }).join('<br>') + '</span></div>' : '') +
         (!skipped.length && !checks.length ? '<div class="pdfok">' + ic('check', 15) + '<span>모두 묶었어요. 합계도 맞아요.</span></div>' : '') + '</div>';
       $('pFoot').innerHTML = '<span style="flex:1"></span><button class="btn" data-close>닫기</button><a class="btn" href="' + url + '" download="' + esc(file) + '">' + ic('dl', 14) + '다운로드</a>' +
         '<a class="btn pri" href="' + url + '" target="_blank" rel="noopener">열기 · 인쇄</a>';

@@ -46,6 +46,12 @@
     if (s.biz_trips != null) return '업무 운행 ' + n0(s.biz_trips) + '건 · ' + km(s.biz_km) + 'km' + (+s.biz_trips !== +s.trips ? ' (전체 ' + n0(s.trips) + '건)' : '');
     return '업무 운행 ' + km(s.biz_km) + 'km (전체 ' + n0(s.trips) + '건)';
   }
+  /** 결재함 카드 요약의 줄바꿈 — 금액이 앞말에서 떨어져 혼자 다음 줄로 가거나 줄 끝이 「·」로 끝나지 않게 마지막 「 · 」를 붙이고,
+   *  「(전체 N건)」 안도 떼지 않는다(2026-10-28 로봇, 폰). 화면에만 쓴다(마우스 글·엑셀·PDF 는 그대로). */
+  function nbSum(t) {
+    var s = String(t || '').replace(/\(전체 /g, '(전체\u00a0'), i = s.lastIndexOf(' · ');
+    return i < 0 ? s : s.slice(0, i) + '\u00a0·\u00a0' + s.slice(i + 3);
+  }
   function pad(n) { return String(n).padStart(2, '0'); }
   function kd(ms) { return new Date(Number(ms) + KST); }
   function md(ms) { var d = kd(ms); return pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate()); }
@@ -599,12 +605,12 @@
     if (pv() && !RANGE) return pv().band ? pv().band() : '';
     if (RANGE) {
       // 닫는 </b> 는 esc 밖에(2026-10-24 검수 — 안에 있어 「</b>」가 글자로 보이고 뒤 문장까지 굵었다)
-      return '<div class="cycband multi">' + ic('cal', 15) + '<span><b>' + esc(cycleName(RANGE.from) + '~' + cycleName(RANGE.to)) + '</b>' +
+      return '<div class="cycband multi"><span>' + ic('cal', 15) + '<b>' + esc(cycleName(RANGE.from) + '~' + cycleName(RANGE.to)) + '</b>' +
         ' (' + cyclesInView().length + '개 기간)을 한꺼번에 보고 있어요. 조회만 하고 고칠 수는 없어요.</span>' +
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
     if (cmpCycle(CYC, cur) < 0) {
-      return '<div class="cycband">' + ic('cal', 15) + '<span>지금 <b>' + cycleName(CYC) + ' (' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을 보고 있어요. ' +
+      return '<div class="cycband"><span>' + ic('cal', 15) + '지금 <b>' + cycleName(CYC) + ' (' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을 보고 있어요. ' +
         '운행일지, 영수증, 정산 모두 이 기간 기준이에요.</span>' +
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
@@ -620,7 +626,7 @@
       : st === 'approved' ? '결재가 끝났어요.' : st === 'submitted' ? '결재 중이에요.'
       : st === 'rejected' ? (!P && reopenInfo(myAppr(key)) ? '정정 중이에요. 고쳐서 다시 상신해 주세요.' : '반려됐어요. 고쳐서 다시 상신해 주세요.')
       : '아직 상신 전이면 지금 상신해 주세요.';
-    return '<div class="cycband grace" data-graceband>' + ic('cal', 15) + '<span><b>' + cycleName(CYC) + ' (' + esc(span) + ') · ' +
+    return '<div class="cycband grace" data-graceband><span>' + ic('cal', 15) + '<b>' + cycleName(CYC) + ' (' + esc(span) + ') · ' +
       esc(dueText(r, Date.now())) + '</b>. ' + say + '</span>' +
       '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + ' 보기 →</button></div>';
   }
@@ -1527,13 +1533,13 @@
       if (nTwice) line.push('두 번 정산 의심 ' + n0(nTwice) + '일');
       if (nDupF) line.push('같은 금액 영수증 ' + n0(nDupF) + '일');
       var hideHow = fold && line.length > 0 && !myCycLocked();
-      var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히 보기’에 있어요.' : '') + '</div>' : '';
+      var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히\u00a0보기’에 있어요.' : '') + '</div>' : '';
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
         (fold ? '자세히 보기 (' + n0(MC.days.length) + '일)' : '접기') + '</button>';
       var table = '<div class="scroll"' + (fold && !nFlag ? ' hidden' : '') + '><table class="mtable mday' + (fold ? ' fold' : '') + '"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행 금액</th>' +
         '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th><th><span class="sr">할 일</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
-        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. ‘자세히 보기’를 누르면 보여요.</div>' : '');
+        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. ‘자세히\u00a0보기’를 누르면 보여요.</div>' : '');
       return box(!nBad && !nNoTrip && !nTwice && !nDupF, parts.join(' · '),
         // 올린 영수증 합이 정산과 왜 다른지 한 마디(2026-10-17 모르는 로봇 「영수증 7,500원인데 정산 4,400원 — 잘못 들어간 줄」)
         '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) +
@@ -2996,6 +3002,8 @@
   function stepWho(s) { var p = stepPos(s), n = (s && (s.name || nameOf(s.approver))) || ''; return n + (p ? ' ' + p : ''); }
   /** 「홍길동 센터장 (센터·파트장 칸)」 — 직책과 결재란 칸 이름을 나눠 적는다(칸 이름이 직책처럼 읽히지 않게). */
   function stepText(s) { return stepWho(s) + (s && s.box ? ' (' + s.box + ' 칸)' : ''); }
+  /** 화면용 — 「이름 직책 (칸 이름 칸)」의 괄호 안에서는 줄을 바꾸지 않는다(「(팀장 / 칸)」으로 갈렸다, 2026-10-28 검사 로봇). 글은 esc 한 HTML */
+  function nwBox(w) { w = String(w || ''); var i = w.lastIndexOf(' ('); return i < 0 ? esc(w) : esc(w.slice(0, i)) + ' <span style="white-space:nowrap">' + esc(w.slice(i + 1)) + '</span>'; }
   function canApprove(u) {
     return !!PEOPLE[u] && ORG.some(function (o) { return o.username === u && o.active !== false; });
   }
@@ -3539,7 +3547,7 @@
     h += '</div>';
     // 결재 순서 — 채워진 칸을 왼쪽부터.
     h += '<div class="ag-order">' + (DRAFT.length
-      ? '결재 순서: ' + DRAFT.map(function (s, i) { return (i + 1) + '. ' + esc(stepText(s)); }).join(' → ')
+      ? '결재 순서: ' + DRAFT.map(function (s, i) { return (i + 1) + '. ' + nwBox(stepText(s)); }).join(' → ')
       : '아직 넣은 분이 없어요. 결재받을 칸을 누르고 이름을 넣어 주세요.') + '</div>';
     // 미리 채운 출처 + 비운 칸의 까닭(그 칸을 아직 비워 둔 동안만) — 2026-10-14
     var fs = FILL_SRC[draftKey()];
@@ -4440,12 +4448,12 @@
       // 긴 반려 사유는 한 줄로 줄이고(끝 「…」) 「자세히」에서 전부 — 마우스를 올려도 전부 보인다
       '<span class="st ' + st.cls + (longSt ? ' along' : '') + '"' + (longSt ? ' title="' + esc(st.t) + '"' : '') + '>' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' +
-      (kd ? (kd.sumLine ? '<span class="asum">' + kd.sumLine(a) + '</span>' : '')
+      (kd ? (kd.sumLine ? '<span class="asum">' + nbSum(kd.sumLine(a)) + '</span>' : '')
         : // 머리 줄 — 업무 운행 건수·거리 · 금액(2026-10-20 사용자 ③ 「결재함에 업무 운행 N건」 — 고정본에 biz_trips 가 있을 때, 전체 건수는 다를 때만).
           //   옛 문서(biz_trips 없음)는 예전처럼 업무 거리 · 금액만. 마우스를 올리면 snapTrips 전체 글.
         (s.trips != null ? '<span class="asum" title="' + esc(snapTrips(s)) + '">' +
-          (s.biz_trips != null && s.biz_km != null ? esc(snapTrips(s)) : s.biz_km != null ? '업무 ' + km(s.biz_km) + 'km' : n0(s.trips) + '건 · ' + km(s.km) + 'km') +
-          ' · ' + won(s.cost) + '</span>' : '')) +
+          nbSum((s.biz_trips != null && s.biz_km != null ? esc(snapTrips(s)) : s.biz_km != null ? '업무 ' + km(s.biz_km) + 'km' : n0(s.trips) + '건 · ' + km(s.km) + 'km') +
+          ' · ' + won(s.cost)) + '</span>' : '')) +
       // 「자세히」(판정 상자·긴 사유) / 「확인 항목 N건」 — 머리 줄 오른쪽(아래 줄은 단추가 많아 넘쳤다)
       detBtn +
       // 내 차례 — 반려·승인을 머리 줄 오른쪽에(카드를 내리지 않고 누른다). 빨간 「승인」은 맨 앞 카드 하나(opt.lead === false 면 테두리, 2026-10-20 V3 다듬기)
@@ -4494,7 +4502,7 @@
        · 모두 접은 채로 시작해 「문서 보기」로 편다(2026-10-19 — 예전에는 내 차례 카드를 펼쳐서 시작). 누른 것은 카드마다 sessionStorage 에 남긴다.
        · 실패해도 카드는 그대로 — 짧은 안내만. 서버에서 더 받는 것은 단추가 받는 그 고정본뿐이다(RLS 그대로). */
   var APV = { cache: {}, q: [], busy: 0, io: null, MAX: 1 };
-  var APV_FAIL = '미리보기를 만들지 못했어요. ‘PDF 다운로드’로 열어 보세요.';
+  var APV_FAIL = '미리보기를 만들지 못했어요. ‘PDF\u00a0다운로드’로 열어 보세요.';
   var APV_PDFATTR = { '': 'data-fzpdf', expense: 'data-xfzpdf', card: 'data-cfzpdf' };
   function apvProv(kind) { return kind ? (EXT.kinds[kind] || {}).previewBytes : EXT.previewBytes; }
   // 그림 열쇠 — 결재란이 바뀌면 열쇠도 바뀐다(2026-10-21 매뉴얼 로봇: 중간 승인은 상태·상신·완료 시각이 그대로라
@@ -5151,7 +5159,7 @@
       var same = days.every(function (d) { return d.T === days[0].T; });
       list.push({ k: 'norcp-' + cat, sev: 'bad', t: cat + ' 영수증이 없는 날 ' + n0(days.length) + '일',
         d: days.slice(0, 4).map(function (d) { return dayDow(d.day); }).join(' · ') + (days.length > 4 ? ' 외 ' + n0(days.length - 4) + '일' : '') +
-          ', 운행 ' + word + ' ' + (same ? (days.length > 1 ? '각 ' : '') + won0(days[0].T) : '합계 ' + won0(sum)),
+          ', 운행 ' + word + ' ' + (same ? (days.length > 1 ? '각\u00a0' : '') + won0(days[0].T) : '합계\u00a0' + won0(sum)),
         b1: { t: '사진 올리기', a: 'data-evupcat="' + cat + '"', i: 'camera' },
         b2: cat === '통행료' ? { t: '하이패스 PDF', hp: 1 } : { t: '영수증 보기', a: 'data-evstep="' + cat + '"', i: 'eye' }, nx: cat + ' 영수증' });
     });
@@ -5430,7 +5438,7 @@
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
       // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
-      (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선도 불러올 수 있어요.</div>') +
+      (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선도 불러올\u00a0수\u00a0있어요.</div>') +
       (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x, { ops: false }); })(EXT.apprExtra(a)) : '') +
       // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
       (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없어요. ' +
@@ -6493,7 +6501,7 @@
           (canDel ? ' <button class="btn sm" data-evdel="' + esc(e.id) + '">삭제</button>' : '') +
           '</td></tr>';
       }).join('') + '</tbody><tfoot><tr><td colspan="' + (isAll() ? 4 : 3) + '">보이는 ' + n0(rows.length) +
-      '건 합계</td><td class="n total">' + n0(sumShown) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>' +
+      '건 합계</td><td class="n total" data-u="원">' + n0(sumShown) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>' +
         (selOn ? mselBar('ev') : '')
         : '<div class="panel"><div class="blank"><div class="t">조건에 맞는 영수증이 없어요.</div>' +
           '<div style="margin-top:12px"><button class="btn sm" data-fclear>조건 초기화</button></div></div></div>') + '</div>');
@@ -6566,7 +6574,7 @@
     $('pTitle').textContent = odo ? '계기판 사진 올리기' : '영수증 올리기';
     $('pSub').textContent = cycleName(CYC) + ' · ' + cycleSpan(CYC);
     $('pBody').innerHTML =
-      '<div class="drop gemdrop" id="evDrop" style="margin:0 0 14px">' +
+      '<div class="drop gemdrop" id="evDrop" style="margin-bottom:14px">' +
       '<div class="gemorb">' + gemSvg(28) + '</div>' +
       '<div class="gemchip">' + gemSvg(12) + 'AI가 읽어 드려요</div>' +
       (odo
@@ -6582,9 +6590,9 @@
       '<div class="form" style="margin-top:0"><div class="frow">' +
       '<label class="flab" for="evCar">차량</label><div class="fbody">' +
       (cars.length
-        ? '<select class="inp" id="evCar" style="max-width:200px">' +
+        ? '<select class="inp" id="evCar">' +
           cars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') + '</select>'
-        : '<input class="inp" id="evCar" style="max-width:200px" placeholder="예) 12가3456" value="' +
+        : '<input class="inp" id="evCar" placeholder="예) 12가3456" value="' +
           esc(my.plate_no || '') + '">') +
       '<div class="fhint">올리는 파일 모두에 같이 적혀요.</div></div></div></div>' +
       '<div id="evList"></div>' +
@@ -9905,16 +9913,17 @@ window.EduGuard = {
       (E0.toll === 'amount' ? n0(E0.tollAmt) : '') + '"><span class="unit">원</span></div>',
       '<span id="eTollHint">' + tollEditHint(E0.toll, E0.toll, srcTxt, othToll) + '</span>');
     // 아래 안내는 통행료 고르기 바로 아래에 둔다 — 창 맨 아래에 있으면 1280×800 에서 창을 내려야 보였다(2026-10-16 6차)
-    h += '</div>' + '<div class="anote" id="eNote" style="margin:-4px 0 16px">' +
+    //   값 칸에 맞춰 들여 쓴다(.fnote — 이름 칸 74 + 사이 16) — 이름 칸부터 시작해 두 칸 양식이 여기서만 깨졌다(2026-10-28 로봇)
+    h += '</div>' + '<div class="anote fnote" id="eNote">' +
       '통행료를 고치면 <b>직접 정한 값</b>으로 남아 길찾기나 하이패스 요금 같은 <b>자동 계산</b>이 덮어쓰지 않아요. ' +
       '단, 통행료나 주차비를 ‘없음’으로 두었는데 그날 다른 업무 운행에도 그 항목 금액이 하나도 없으면, 그날 올린 그 항목의 <b>영수증 금액</b>이 들어가요.</div>' + '<div class="form">';
 
     if (canOdo) {
       h += fld('계기판',
         // n0(null) 은 '—' 다. 그걸 칸에 박아 두면 목적만 바꿔도 저장이 막힌다.
-        '<input class="inp num" id="eOdoS" inputmode="numeric" value="' + odoVal(t.start_odometer) + '">' +
+        '<div class="fpair"><input class="inp num" id="eOdoS" inputmode="numeric" value="' + odoVal(t.start_odometer) + '">' +
         '<span class="arrowto">→</span>' +
-        '<input class="inp num" id="eOdoE" inputmode="numeric" value="' + n0(t.end_odometer) + '">',
+        '<input class="inp num" id="eOdoE" inputmode="numeric" value="' + n0(t.end_odometer) + '"></div>',
         '고치면 <b>주행거리도 같이 바뀌어요</b>. 한 번에 3,000km를 넘을 수 없어요.');
     }
     h += '</div>';
@@ -10013,15 +10022,16 @@ window.EduGuard = {
       : '<input class="inp" id="cPlateEtc" placeholder="예) 12가3456">');
     h += fld('날짜 <em class="req">*</em>', '<input class="inp" type="date" id="cDate" value="' + dstr + '" min="' + minD + '" max="' + maxD + '">', '<span id="cDateHint"></span>');
     h += '<div id="cPosRow"></div>';
-    h += fld('출발지 <em class="req">*</em>', placeBox('cFrom', '건물 이름·주소로 찾기 (예: 서울버스 본사)'), '<span id="cFromHint">목록에서 골라 주세요. 출발지로 수도권·지방 유류단가가 정해져요.</span>');
+    h += fld('출발지 <em class="req">*</em>', placeBox('cFrom', '건물 이름·주소로 찾기'), '<span id="cFromHint">목록에서 골라 주세요(예: 서울버스 본사). 출발지로 수도권·지방 유류단가가 정해져요.</span>');
     h += fld('도착지 <em class="req">*</em>', placeBox('cTo', '건물 이름·주소로 찾기'), '<span id="cToHint">목록에서 고르면 도로 거리로 도착 계기판이 채워져요.</span>');
     h += fld('계기판 <em class="req">*</em>',
-      '<input class="inp num" id="cOdoS" inputmode="numeric" placeholder="출발">' +
+      // 출발 → 도착 두 칸은 한 줄(.fpair) — 폰(값 칸 260px)에서 도착 칸이 아랫줄로 떨어져 화살표가 빈 곳을 가리켰다(2026-10-28 로봇)
+      '<div class="fpair"><input class="inp num" id="cOdoS" inputmode="numeric" placeholder="출발">' +
       '<span class="arrowto">→</span>' +
-      '<input class="inp num" id="cOdoE" inputmode="numeric" placeholder="도착">',
+      '<input class="inp num" id="cOdoE" inputmode="numeric" placeholder="도착"></div>',
       '<span id="cOdoHint">출발은 앞 운행의 도착값, 도착은 도로 거리로 채워져요. 직접 고쳐도 돼요.</span>');
-    h += fld('시각', '<input class="inp num" type="time" id="cFromT" style="width:150px">' +
-      '<span class="arrowto">→</span><input class="inp num" type="time" id="cToT" style="width:150px">',
+    h += fld('시각', '<div class="fpair"><input class="inp num" type="time" id="cFromT">' +
+      '<span class="arrowto">→</span><input class="inp num" type="time" id="cToT"></div>',
       '고른 자리에 맞춰 정해져요. 도착 시각이 있으면 나중에 <b>하이패스 기록과 맞출 수 있어요</b>.');
     h += fld('운행목적', '<div class="radios" role="radiogroup" aria-label="운행목적">' + PURPOSES.map(function (p) {
       return '<label class="radio"><input type="radio" name="cPurpose" value="' + esc(p) + '"' + (p === '일반업무' ? ' checked' : '') + '><span>' + esc(p) + '</span></label>';
@@ -12749,6 +12759,28 @@ window.EduGuard = {
     if (act && cs.indexOf(act) >= 0) { try { act.focus({ preventScroll: true }); } catch (e) { } }
   }
   if (window.MutationObserver && $('pFoot')) new MutationObserver(footOrder).observe($('pFoot'), { childList: true });
+
+  /* 결재 진행 줄(.aprog)이 두 줄로 넘어가면 윗줄 끝 단계 뒤의 선은 빈 곳을 가리킨다 — 그 단계에 .wend 를 붙여 선을 숨긴다(CSS visibility,
+     자리는 그대로라 숨겨도 줄바꿈이 바뀌지 않는다). 화면이 바뀌거나 창 크기가 바뀔 때 한 프레임에 한 번(2026-10-28 로봇, 폰) */
+  var wrapEndsQ = 0;
+  function wrapEnds() {
+    wrapEndsQ = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.aprog'), function (p) {
+      var st = p.children;
+      for (var i = 0; i < st.length; i++) {
+        var nx = st[i + 1];
+        st[i].classList.toggle('wend', !!nx && nx.offsetTop > st[i].offsetTop + 4);
+      }
+    });
+  }
+  function wrapEndsSoon() { if (!wrapEndsQ) wrapEndsQ = requestAnimationFrame(wrapEnds); }
+  if (window.MutationObserver) new MutationObserver(function (ms) {
+    for (var i = 0; i < ms.length; i++) {
+      var add = ms[i].addedNodes;
+      for (var j = 0; j < add.length; j++) if (add[j].nodeType === 1 && (add[j].matches('.aprog') || add[j].querySelector('.aprog'))) return wrapEndsSoon();
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('resize', wrapEndsSoon);
 
   /* ══════════════════ 확장 모듈 이음매 ══════════════════
      drv-*.js 가 window.DrvExtQ 에 올려 둔 것을 여기서 붙인다. 화면(view)을 더하고,
