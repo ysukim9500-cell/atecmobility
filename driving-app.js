@@ -4828,6 +4828,10 @@
       if (lab) lab.innerHTML = hpSumHtml(g);
       var btn = document.querySelector('[data-hpapply="' + gi + '"]');
       if (btn) { btn.disabled = !picked.length; btn.textContent = hpBtnText(picked); }
+      // 「전부 고르기」 칸도 줄 체크를 따라간다(그릴 때의 allOn 과 같은 셈) — 줄을 다 켜도 빈칸이던 것(2026-10-29 교육 자료 로봇)
+      var todo = (g.matched || []).filter(function (e) { return !hpDone(e); });
+      var allOn = !!todo.length && todo.every(function (x) { return x.pick || x.locked; });
+      document.querySelectorAll('input[data-hpall="' + gi + '"]').forEach(function (x) { x.checked = allOn; });
     });
   }
   /** 입력칸에 넣을 계기판 값. 비어 있으면 빈 문자열(n0 은 '—' 를 돌려준다). */
@@ -9653,9 +9657,12 @@ window.EduGuard = {
     files = Array.prototype.slice.call(files);   // 고른 파일을 붙잡아 둔다 — 원본 보관(hpKeep)이 나중에 다시 읽는다
     if (!window.Hipass) { toast('PDF 읽기 도구를 불러오지 못했어요. 새로고침한 뒤 다시 올려 주세요.', true); return; }
     // 사진만 골랐으면 읽지 말고 어디로 올리는지 알려 준다(웹 8차)
+    //   앞서 읽어 둔 결과가 있으면 그대로 두고 알림만 — 잘못 고른 사진 한 장에 결과가 지워져 PDF를 다시 올려야 했다(2026-10-29 교육 자료 로봇).
+    //   안내 줄에 쓰면 그 뒤 확정해도 경고가 남는다(hpApply 는 안내 줄을 고치지 않는다)
     if (!Array.prototype.some.call(files, function (f) { return /pdf/i.test(f.type || '') || /pdf$/i.test(f.name || ''); })) {
-      HP.noteBad = true; HP.groups = [];
-      HP.note = '여기는 하이패스 이용내역 PDF만 올릴 수 있어요. 영수증 사진은 통행료 화면에서 올려 주세요.';
+      var photoMsg = '여기는 하이패스 이용내역 PDF만 올릴 수 있어요. 영수증 사진은 통행료 화면에서 올려 주세요.';
+      if (HP.groups.length) { toast(photoMsg, true); return; }
+      HP.noteBad = true; HP.note = photoMsg;
       render(); return;
     }
     HP.busy = true; HP.note = 'PDF를 읽는 중…';
