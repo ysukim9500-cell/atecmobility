@@ -1110,7 +1110,9 @@
     other.forEach(function (cat) { put(cat, cat || '기타', ''); });
     return secs;
   }
-  /** 여러 영수증을 한 번에 찍은 원본 — 장마다 그 장의 이 문서 줄(장 안 자리 page_idx 차례, 모르면 뒤에 id 순)과 판독한 영수증 수.
+  /** 여러 영수증을 한 번에 찍은 원본 — 장마다 그 장의 이 문서 줄(영수증 날짜 차례 · 같은 날은 장 안 자리 page_idx → id)과 판독한 영수증 수.
+   *  (2026-10-29 사용자 「날짜순으로 정리가 되어야」 — 예전엔 장 안 자리 차례라, 하이패스 영수증 출력(최신이 위)을 찍은 장은 09.30 → 09.29 처럼 거꾸로였다.
+   *   같은 날 안은 표에 날짜만 나오니 장 안 자리 그대로 — 판독 시각은 쓰지 않는다: 일부 줄에만 있으면 차례가 꼬이고, 결재자는 판독을 못 받아 출력하는 사람마다 달라진다.)
    *  돌려주는 것: { pages: [{ path, lines, n, extra, pageNo }], pos: { 영수증 id: { g, k(몇 번째) } } } */
   function scanPlan(ev) {
     var by = {}, pages = [], pos = {};
@@ -1123,7 +1125,12 @@
       if (n != null && isFinite(Number(n))) g.n = Math.max(g.n || 0, Number(n));
     });
     pages.forEach(function (g) {
-      g.lines.sort(function (a, b) { var ia = idx(a), ib = idx(b); return (ia == null ? 1e9 : ia) - (ib == null ? 1e9 : ib) || Number(a.id) - Number(b.id); });
+      g.lines.sort(function (a, b) {
+        var da = ymdK(a.ms), db = ymdK(b.ms);
+        if (da !== db) return da < db ? -1 : 1;
+        var ia = idx(a), ib = idx(b);
+        return (ia == null ? 1e9 : ia) - (ib == null ? 1e9 : ib) || Number(a.id) - Number(b.id);
+      });
       g.lines.forEach(function (e, k) { pos[String(e.id)] = { g: g, k: k + 1 }; });
       // 「이 장에는 정산에 넣지 않은 영수증 N장도 보입니다」 — 판독(all)의 영수증 수 − 이 기간 이 장의 줄 수
       g.extra = g.n != null ? Math.max(0, g.n - g.lines.length) : 0;
@@ -1273,7 +1280,7 @@
       c.y = LIMIT;
     }
   }
-  /** 여러 영수증을 한 번에 찍은 원본 — 장마다 한 쪽(줄 목록 + 그 장 사진). 줄 목록 차례 = 장 안 자리(page_idx). */
+  /** 여러 영수증을 한 번에 찍은 원본 — 장마다 한 쪽(줄 목록 + 그 장 사진). 줄 목록 차례 = 영수증 날짜(scanPlan). */
   function drawScanPages(c, S, imgs, meta, noOf) {
     var pages = S.pages;
     pages.forEach(function (g, si) {
@@ -1473,12 +1480,30 @@
       var total = any ? (info.map(function (p) { return p && p.total; }).filter(Boolean)[0] || null) : null;
       return { f: f, on: on, keep: keep, skipped: keep.filter(function (x) { return !x; }).length, total: total };
     });
+    // 날짜 차례(2026-10-29 사용자 「톨게이트비나 이런게 날짜순으로 정리가 되어야」) — 하이패스 홈페이지 「영수증 출력」은 최신 영수증이
+    //   첫 쪽이라, 원본 쪽 차례 그대로 실으면 10.17 → 09.29 처럼 거꾸로 나왔다. 실을 쪽 = 그 쪽 정산 줄의 가장 이른 시각 차례.
+    //   줄 없는 쪽이 섞이면(쪽 글자를 못 읽은 파일) 그 쪽 날짜를 모르니, 줄 있는 첫 쪽이 끝 쪽보다 늦을 때만 그 사이를 통째로 뒤집는다.
+    //   파일도 가장 이른 줄 차례 · 「파일 N / M」은 싣는 차례. 쪽 안 영수증 배치는 원본 그림 그대로다(위 표만 날짜순).
+    var early = function (list) { var v = list.map(function (r) { return Number(r.ms); }).filter(isFinite); return v.length ? Math.min.apply(null, v) : Infinity; };
+    plan.forEach(function (p) {
+      var js = p.keep.map(function (x, j) { return x ? j : -1; }).filter(function (j) { return j >= 0; });
+      var w = js.filter(function (j) { return isFinite(early(p.on[j])); });
+      if (w.length === js.length) js.sort(function (a, b) { return early(p.on[a]) - early(p.on[b]) || a - b; });
+      else if (w.length > 1 && early(p.on[w[0]]) > early(p.on[w[w.length - 1]])) {
+        var lo = js.indexOf(w[0]), hi = js.indexOf(w[w.length - 1]);
+        js = js.slice(0, lo).concat(js.slice(lo, hi + 1).reverse(), js.slice(hi + 1));
+      }
+      p.order = js;
+      p.early = w.length ? Math.min.apply(null, w.map(function (j) { return early(p.on[j]); })) : Infinity;
+    });
+    plan = plan.map(function (p, i) { return { p: p, i: i }; })
+      .sort(function (a, b) { return (a.p.early - b.p.early) || (a.i - b.i); }).map(function (x) { return x.p; });
     var count = plan.reduce(function (s, p) { return s + p.keep.filter(Boolean).length; }, 0), k = 0;
     plan.forEach(function (p, fi) {
       var f = p.f, firstOfFile = true;
       f.start = c.pdf.getPageCount() + 1;
-      f.pages.forEach(function (ep, j) {
-        if (!p.keep[j]) return;
+      p.order.forEach(function (j) {
+        var ep = f.pages[j];
         k++;
         var mine = p.on[j].slice().sort(function (a, b) { return a.ms - b.ms; });
         var sum = sumOf(mine, function (r) { return r.amount; });

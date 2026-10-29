@@ -1127,7 +1127,9 @@
   var EV_SUB_DESC = {
     // 웹 8차(2026-10-17 「직원들이 잘 모를 것 같은데… 좀 쉽게」) — 맨 위 한 줄은 할 일만
     '주차': '주차비를 낸 날마다 주차 영수증 사진을 하나씩 올려 주세요. 운행에 주차비를 적지 않은 날은 영수증 금액이 그 운행에 들어가요.',
-    '통행료': '통행료를 낸 날마다 증빙이 하나 있으면 돼요. 영수증 사진이나 하이패스 이용내역 PDF(한 달치)를 올려 주세요.',
+    // 2026-10-29 올리는 곳 하나 — 영수증 사진이든 하이패스 이용내역 PDF든 같은 곳에(올리기 창이 가려 읽는다, evHipassOf)
+    // 첫 문장은 할 일(「올려 주세요」 — 결재 중 기간 문구와 갈리는 곳, 시험 r15ui open_evid) · 「알아서 가려 읽어요」는 그림 둘 아래 줄에(폰 390 에서 한 단어만 셋째 줄로 갔다)
+    '통행료': '통행료를 낸 날마다 증빙을 하나씩 올려 주세요. 영수증 사진이든 하이패스 이용내역 PDF든 한 곳에 올리면 돼요.',
     '주유': '주유 영수증은 증빙용이에요. 유류비는 거리 × 단가로 따로 계산해요.',
     '계기판': '월초·월말 계기판 사진을 올려 주세요. 운행 기록의 계기판 숫자와 비교해요.'
   };
@@ -1193,6 +1195,24 @@
       '<dt>올린 ' + cat + ' 영수증</dt><dd>' + n0(MS.R) + '원</dd>' + (H ? '<dt>하이패스 이용내역</dt><dd>' + n0(H) + '원</dd>' : '') + '</dl>' +
       '<p>운행 금액이 있는 날은 운행 금액으로 정산하고 영수증 금액은 더하지 않아요. 운행이 없는 날의 영수증은 정산에서 빠져요.</p></div>';
   }
+  /** 통행료에 올리는 것 두 가지 — 같은 크기·같은 선의 그림 + 언제 쓰는지(2026-10-29 사용자 「영수증 사진과 하이패스 이용내역과 잘 이해를 못하는 것 같애 …
+   *  통일성 있게 이미지를」). 단추가 아니라 설명이다 — 올리는 곳은 끌어 놓기 상자 하나. 그림 색은 CSS(.evkimg)가 정한다.
+   *  PC 에서는 끌어 놓기 상자와 같은 카드 안 옆 칸이라, 여기에 놓아도 상자와 같이 받는다(data-evdrop — 2026-10-29 검토: 그림 위에 놓으면 브라우저가 파일을 열었다). */
+  function evKindsHtml() {
+    var svg = function (d) { return '<svg class="evkimg" viewBox="0 0 44 52" width="44" height="52" aria-hidden="true" focusable="false">' + d + '</svg>'; };
+    // 하이패스 이용내역 — 접힌 귀퉁이가 있는 문서 + 줄마다 통과 시각(빨간 짧은 선)
+    var hp = svg('<path class="pg" d="M9 3h18l9 9v35a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path class="ln" d="M27 3v9h9"/>' +
+      '<path class="hd" d="M12 18h19"/><path class="ac" d="M12 25h4M12 31h4M12 37h4M12 43h4"/><path class="tx" d="M20 25h11M20 31h8M20 37h11M20 43h6"/>');
+    // 영수증 사진 — 사진 틀(네 귀퉁이) 안의 톱니 끝 영수증 + 금액 줄(빨간 선)
+    var rc = svg('<path class="fr" d="M3 10V5a2 2 0 0 1 2-2h5M34 3h5a2 2 0 0 1 2 2v5M41 42v5a2 2 0 0 1-2 2h-5M10 49H5a2 2 0 0 1-2-2v-5"/>' +
+      '<path class="pg" d="M12 9h20v31l-2.5 2-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2z"/>' +
+      '<path class="tx" d="M16 15h12M16 20h8M16 25h10"/><path class="ac" d="M16 33h12"/>');
+    return '<div class="evkinds" role="note" aria-labelledby="evklab" data-evdrop="통행료">' +
+      '<span class="evklab" id="evklab">올리는 것 두 가지</span>' +
+      '<div class="evkind">' + hp + '<div><b>하이패스로 냈으면</b><span>하이패스 누리집 › 이용내역에서 받은 한 달치 PDF 하나면 돼요. 통과한 시각으로 맞는 운행을 찾아 줘요.</span></div></div>' +
+      '<div class="evkind">' + rc + '<div><b>현금·카드로 냈으면</b><span>요금소에서 받은 영수증을 찍어 올려요. 날짜와 금액으로 그날 운행에 붙어요.</span></div></div>' +
+      '<p>둘 다 같은 곳에 올리면 알아서 가려 읽어요. 같은 통행료를 둘 다 올려도 한 번만 계산해요.</p></div>';
+  }
   /** 영수증 화면 위 — 주차 → 통행료 → 주유 → 계기판 차례와 지금 차례의 할 일. */
   function evSubHtml(by, unk) {
     var cur = evSub(), name = EV_SUBS[cur];
@@ -1234,17 +1254,19 @@
     //   아직 1단계 차례(evAhead — 맨 아래 「1단계로 가기」가 빨강)면 올리기 단추도 빨갛게 하지 않는다.
     //   그 빨간 단추가 이 화면에서 깜빡이는 하나(cta — 「확인 N」이 있어도 올리기 단추가 깜빡인다, 2026-10-20 V3 U1)
     var side = '', main = '', hot = !!need[name] && !evAhead();
+    // 통행료도 올리는 곳은 하나(2026-10-29 사용자 「영수증 사진 PDF 올린거랑 하이패스로 올린거랑 하나로 통일해서 자동으로 … 인식」) — 예전엔
+    //   영수증 사진 상자와 「하이패스 이용내역 PDF 올리기」 단추가 따로라, 같은 하이패스 영수증 출력 PDF 를 두 곳에 다 올린 분이 있었다.
+    //   이제 올리기 창이 PDF 를 먼저 하이패스로 읽어 보고 통행 기록이 나오면 하이패스 확인 화면으로 보낸다(evAddFiles · evHipassOf).
+    //   옆에는 무엇을 올리는지 그림 둘(evKindsHtml — 같은 크기·같은 선).
     if ((name === '주차' || name === '통행료') && canUp) {
-      side += '<div class="evpick' + (name === '통행료' ? ' two' : '') + '">' +
-        '<div class="evpk" data-evdrop="' + esc(name) + '"><span class="ico" aria-hidden="true">' + ic('upload', 24) + '</span><b>영수증 사진·PDF를 여기에 끌어 놓으세요</b>' +
+      var tl = name === '통행료';
+      side += '<div class="evpick">' +
+        '<div class="evpk" data-evdrop="' + esc(name) + '"><span class="ico" aria-hidden="true">' + ic('upload', 24) + '</span>' +
+          '<b>' + (tl ? '사진·PDF를 여기에 끌어 놓으세요' : '영수증 사진·PDF를 여기에 끌어 놓으세요') + '</b>' +
           '<button class="btn' + (hot ? ' pri cta' : '') + '" data-evupcat="' + esc(name) + '">' + ic('receipt', 15) +
-          (name === '통행료' ? '영수증 사진 올리기' : '주차 영수증 올리기') + '</button>' +
-          '<span class="dim">' + (name === '통행료' ? '통행료 영수증 사진이나 PDF를 여러 장 한 번에 올려도 돼요.' : '영수증 사진이나 PDF를 여러 장 한 번에 올려도 돼요.') + '</span></div>' +
-        (name === '통행료'
-          ? '<div class="evpk"><b>하이패스 이용내역 PDF</b><label class="btn" data-hpquick>' + ic('ticket', 15) + '하이패스 이용내역 PDF 올리기' +
-              '<input type="file" id="hpQuick" accept="application/pdf,.pdf" multiple class="sr"></label>' +
-              '<span class="dim">한국도로공사 하이패스 누리집 › 이용내역에서 PDF로 다운로드한 한 달치 파일이에요. 통과 시각으로 운행을 찾아 그날 통행료 증빙이 돼요. 하이패스로 낸 통행료는 영수증 사진을 따로 올리지 않아도 되고, 올려도 한 번만 계산해요. 하이패스 홈페이지의 영수증 출력 화면을 PDF로 저장한 파일도 돼요.</span></div>'
-          : '') +
+          (tl ? '통행료 증빙 올리기' : '주차 영수증 올리기') + '</button>' +
+          '<span class="dim">' + (tl ? '여러 개를 한 번에 올려도 돼요.' : '영수증 사진이나 PDF를 여러 장 한 번에 올려도 돼요.') + '</span></div>' +
+        (tl ? evKindsHtml() : '') +
         '</div>' + evAmtHtml(name);
     }
     if (name === '통행료') {
@@ -5119,11 +5141,9 @@
   var DOWK = ['일', '월', '화', '수', '목', '금', '토'];
   /** 'YYYY-MM-DD' → 'MM.DD(요)' */
   function dayDow(k) { var p = String(k).split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return p[1] + '.' + p[2] + '(' + DOWK[d.getUTCDay()] + ')'; }
-  /** 남은 일 단추 { t 글, a 속성, i 아이콘, danger, hp(하이패스 PDF 고르기 — 영수증 화면 통행료 차례와 같은 #hpQuick) } */
+  /** 남은 일 단추 { t 글, a 속성, i 아이콘, danger } — 하이패스 PDF 고르기 단추는 없앴다(2026-10-29 — 올리기 창 하나가 하이패스 이용내역도 가려 읽는다) */
   function ctBtn(b, cls) {
     if (!b) return '';
-    if (b.hp) return '<label class="btn' + (cls ? ' ' + cls : '') + '" data-hpquick>' + ic('upload', 15) + esc(b.t) +
-      '<input type="file" id="hpQuick" accept="application/pdf,.pdf" multiple class="sr"></label>';
     return '<button type="button" class="btn' + (b.danger ? ' danger' : '') + (cls ? ' ' + cls : '') + '" ' + b.a + '>' + (b.i ? ic(b.i, 15) : '') + esc(b.t) + '</button>';
   }
   /** 지금 단계 — 제목 줄 오른쪽 단추·남은 일 맨 위 한 줄·폰 「다음 할 일」(남은 일이 없을 때). 상신한 기간·빈 기간은 null. */
@@ -5167,8 +5187,10 @@
       list.push({ k: 'norcp-' + cat, sev: 'bad', t: cat + ' 영수증이 없는 날 ' + n0(days.length) + '일',
         d: days.slice(0, 4).map(function (d) { return dayDow(d.day); }).join(' · ') + (days.length > 4 ? ' 외 ' + n0(days.length - 4) + '일' : '') +
           ', 운행 ' + word + ' ' + (same ? (days.length > 1 ? '각\u00a0' : '') + won0(days[0].T) : '합계\u00a0' + won0(sum)),
-        b1: { t: '사진 올리기', a: 'data-evupcat="' + cat + '"', i: 'camera' },
-        b2: cat === '통행료' ? { t: '하이패스 PDF', hp: 1 } : { t: '영수증 보기', a: 'data-evstep="' + cat + '"', i: 'eye' }, nx: cat + ' 영수증' });
+        // 통행료는 올리기 창 하나가 하이패스 이용내역 PDF 도 가려 읽는다(2026-10-29) — 따로 「하이패스 PDF」 단추를 두지 않는다
+        //   글은 「증빙 올리기」 — 「영수증·하이패스 올리기」는 폰(360·390) 단추 칸(125px)을 넘쳤다(QA 로봇)
+        b1: cat === '통행료' ? { t: '증빙 올리기', a: 'data-evupcat="통행료"', i: 'upload' } : { t: '사진 올리기', a: 'data-evupcat="' + cat + '"', i: 'camera' },
+        b2: { t: '영수증 보기', a: 'data-evstep="' + cat + '"', i: 'eye' }, nx: cat + ' 영수증' });
     });
     // 금액이 다른 날(R10) — 하루 단위 차이만(특정 운행 금액은 제안하지 않는다, money-rule.js adviceOf 와 같은 원칙)
     var mm = [];
@@ -5389,7 +5411,7 @@
     //   1단계(운행 기록 확인) 차례면 위 안내와 같은 일 = 지금 단계 단추(2026-10-20 V3 U2 — 위는 「운행 기록 확인」인데 아래 띠는 「사진 올리기」였다).
     //   폰에서 이 화면의 깜빡이는 단추 하나(cta, V3 U1)
     var nx = TK && TK.list.length && !(step && step.n === 1) ? TK.list[0] : null, nb = (nx && (nx.b1 || nx.b2)) || (step && step.b) || null;
-    if (nb && !nb.hp) h += '<div class="cnext-sp" aria-hidden="true"></div><div class="cnext" role="region" aria-label="다음 할 일"><span class="cnn">' +
+    if (nb) h += '<div class="cnext-sp" aria-hidden="true"></div><div class="cnext" role="region" aria-label="다음 할 일"><span class="cnn">' +
       (nx ? '다음 할 일 1 / ' + n0(TK.list.length) + ' · ' + esc(nx.nx || nx.t) : '지금 할 일 · ' + esc(step.t)) + '</span>' + ctBtn(nb, 'pri cta') + '</div>';
     return h;
   }
@@ -6591,7 +6613,9 @@
           '날짜는 <b>사진을 찍은 날</b>로 미리 넣어요. 맞는지 확인해 주세요.</div>'
         : '<div class="dt">영수증을 올리면 <b class="gemtxt">AI</b>가 구분, 날짜, 금액을 읽어 드려요</div>' +
           '<div class="dd">JPG, PNG, PDF 파일을 여러 장 올릴 수 있어요. PC에서는 여기에 끌어다 놓아도 돼요.<br>' +
-          '<b>A4에 여러 장 붙여 스캔한 파일도 그대로</b> 올리세요. 영수증마다 한 줄씩 나눠 적어요.</div>') +
+          '<b>A4에 여러 장 붙여 스캔한 파일도 그대로</b> 올리세요. 영수증마다 한 줄씩 나눠 적어요.' +
+          // 통행료 올리는 곳 하나(2026-10-29) — 하이패스 이용내역 PDF 도 이 창으로(evHipassOf 가 가려 하이패스 확인 화면으로)
+          (EVUP.defCat === '통행료' || !EVUP.defCat ? '<br><b>하이패스 이용내역 PDF</b>도 여기에 올리면 알아서 하이패스로 읽어요.' : '') + '</div>') +
       '<label class="btn" style="margin-top:14px">파일 고르기' +
       '<input type="file" id="evFile" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple class="sr"></label>' +
       '</div>' +
@@ -6603,6 +6627,7 @@
         : '<input class="inp" id="evCar" placeholder="예) 12가3456" value="' +
           esc(my.plate_no || '') + '">') +
       '<div class="fhint">올리는 파일 모두에 같이 적혀요.</div></div></div></div>' +
+      '<div id="evHpNote" class="hpnote" aria-live="polite" hidden></div>' +
       '<div id="evList"></div>' +
       '<div id="evNote" class="fhint" style="margin-top:10px"></div>' +
       '<div id="evAiNote" class="fhint"></div>';
@@ -6735,30 +6760,35 @@
     var session = EVUP;
     var live = function () { return EVUP === session; };
     var fresh = [];                // 이번에 새로 들어온 장
+    var hpNew = [];                // 하이패스 이용내역으로 읽힌 PDF(2026-10-29) — 영수증 줄을 만들지 않고 하이패스 확인 화면으로 보낸다(evHipassGo)
     var chain = Promise.resolve();
     list.forEach(function (file) {
       chain = chain.then(function () {
         if (!live()) return;
         evNote('<b>' + esc(file.name) + '</b> 읽는 중…');
-        // 사진을 찍은 날 — 고른 파일 그대로에서 읽는다(줄인 그림은 캔버스를 거쳐 EXIF 가 빠진다). PDF 쪽은 없음(null).
-        var shotP = evShotOf(file);
-        return fileToJpegs(file, function (n, total) {
+        return evHipassOf(file).then(function (nHp) {
           if (!live()) return;
-          evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
-            (total > 3 ? ' <span class="dim">다른 탭으로 가면 잠시 멈췄다가, 돌아오면 이어서 바꿔요.</span>' : ''));
-        }).then(function (blobs) {
-          return shotP.then(function (shot) {
+          if (nHp) { hpNew.push({ file: file, n: nHp }); return; }
+          // 사진을 찍은 날 — 고른 파일 그대로에서 읽는다(줄인 그림은 캔버스를 거쳐 EXIF 가 빠진다). PDF 쪽은 없음(null).
+          var shotP = evShotOf(file);
+          return fileToJpegs(file, function (n, total) {
             if (!live()) return;
-            // PDF 에서 나온 장인가(2026-10-23) — 영수증이 하나뿐인 장도 오릴지 가른다(evScanPages · 폰 사진은 그대로)
-            var fromPdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
-            blobs.forEach(function (b, i) {
-              var pi = EVUP.pages.length;
-              EVUP.pages.push({
-                blob: b, url: URL.createObjectURL(b), ai: '', shot: shot, pdf: fromPdf,
-                name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : '')
+            evNote('<b>' + esc(file.name) + '</b> ' + n + ' / ' + total + '쪽 바꾸는 중…' +
+              (total > 3 ? ' <span class="dim">다른 탭으로 가면 잠시 멈췄다가, 돌아오면 이어서 바꿔요.</span>' : ''));
+          }).then(function (blobs) {
+            return shotP.then(function (shot) {
+              if (!live()) return;
+              // PDF 에서 나온 장인가(2026-10-23) — 영수증이 하나뿐인 장도 오릴지 가른다(evScanPages · 폰 사진은 그대로)
+              var fromPdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+              blobs.forEach(function (b, i) {
+                var pi = EVUP.pages.length;
+                EVUP.pages.push({
+                  blob: b, url: URL.createObjectURL(b), ai: '', shot: shot, pdf: fromPdf,
+                  name: file.name + (blobs.length > 1 ? ' (' + (i + 1) + '/' + blobs.length + '쪽)' : '')
+                });
+                EVUP.items.push(evBlankItem(pi));
+                fresh.push(pi);
               });
-              EVUP.items.push(evBlankItem(pi));
-              fresh.push(pi);
             });
           });
         });
@@ -6767,7 +6797,9 @@
     chain.then(function () {
       session.busy = false;
       if (!live()) return;
-      evNote(''); paintEvList();
+      evNote('');
+      if (hpNew.length) { session.hp = (session.hp || []).concat(hpNew); if (evHipassGo()) return; }
+      paintEvList();
       return askAi().then(function (on) { if (on && fresh.length && live()) evScanPages(fresh); });
     }).catch(function (e) {
       session.busy = false;
@@ -6781,6 +6813,59 @@
               : '파일을 읽지 못했어요. 다른 파일로 다시 올려 주세요.') + '</b>');
       if (m && m !== 'pdfjs' && m !== 'toomany' && m !== 'image') console.warn('영수증 읽기 실패', m);
     });
+  }
+  /** 이 파일이 하이패스 이용내역 PDF 인가 — 읽은 통행 기록 수(아니면 0). 영수증 올리기 창 하나로 하이패스도 받는다(2026-10-29 사용자
+   *  「하나로 통일해서 자동으로 영수증으로 인식하거나, 하이패스는 하이패스로 인식」). 하이패스 화면(hpFiles)과 같은 읽기(hipass.js parsePdf) —
+   *  기록이 하나라도 나오면 하이패스, 아니면(못 읽음·다른 PDF·사진) 예전처럼 영수증으로 판독한다. 계기판 창은 보지 않는다. */
+  function evHipassOf(file) {
+    var pdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+    // 큰 파일(8MB 넘음 — 스캔한 영수증)은 하이패스로 읽어 보지 않는다: 하이패스 이용내역은 글자 PDF 라 작고,
+    //   큰 파일을 하이패스 읽기로 통째로 두 번 더 읽으면 느리다(2026-10-29 검토)
+    if (!pdf || !window.Hipass || EVUP.defCat === '계기판' || !file.arrayBuffer || file.size > 8e6) return Promise.resolve(0);
+    return file.arrayBuffer().then(function (buf) { return window.Hipass.parsePdf(buf, { pdfjs: loadPdfJs }); })
+      .then(function (rs) { return rs && rs.length ? rs.length : 0; }, function () { return 0; });
+  }
+  /** 하이패스 이용내역을 받았을 때 — 영수증 줄이 없으면 창을 닫고 바로 하이패스 확인 화면으로(true · 예전 「하이패스 이용내역 PDF 올리기」와 같은 길).
+   *  영수증 줄도 있으면 창에 한 줄 알리고(evHpNotePaint) 영수증을 다 올린 뒤 이어서 연다(runEvUpload). */
+  function evHipassGo() {
+    var hp = EVUP.hp || [];
+    if (!hp.length) return false;
+    if (EVUP.items.length) { evHpNotePaint(); return false; }
+    var files = hp.map(function (x) { return x.file; });
+    closePanel();
+    go('hipass');
+    // 운행을 다시 받는 중이면(영수증 자동 채움 등이 다시 받기를 부른다) 다 받은 뒤에 읽는다 — hpFiles 는 운행을 다 받아야 맞추고,
+    //   받는 중에 부르면 「불러오는 중」 한 줄만 남기고 파일을 버린다(2026-10-29 검토).
+    //   왜 이 화면인지는 알림이 아니라 하이패스 화면 안내 줄 맨 앞에(HP.from — 알림은 「겹친 기록」 알림 등에 금방 덮였다, QA 로봇)
+    if (LOADED) { HP.from = HP_FROM_EV; hpFiles(files); }
+    else { hpAfterLoad(files); toast('하이패스 이용내역이라 하이패스 화면으로 왔어요. 운행을 다 불러오면 바로 읽어요.'); }
+    return true;
+  }
+  var HP_FROM_EV = '올리기 창에 넣은 PDF가 하이패스 이용내역이라 이 화면에서 읽었어요.';
+  /** 운행을 다 받은 뒤 하이패스 확인 화면에서 읽기. 그 사이 다른 기간·다른 화면으로 옮겨 갔으면 하지 않는다
+   *  (2026-10-29 검토 — 다시 받기가 실패하거나 겹치면 ONLOAD 가 다음 받기까지 남아 엉뚱한 기간에서 열릴 수 있었다). */
+  function hpAfterLoad(files) {
+    var ck = CYCKEY(), v0 = VIEW;
+    ONLOAD.push(function () {
+      if (CYCKEY() !== ck || VIEW !== v0) return;
+      if (VIEW !== 'hipass') go('hipass');
+      HP.from = HP_FROM_EV; hpFiles(files);
+    });
+  }
+  function evHpNotePaint() {
+    var el = $('evHpNote'), hp = EVUP.hp || [];
+    if (!el) return;
+    var rows = EVUP.items.length > 0;
+    // 같은 내용이면 다시 쓰지 않는다(읽어 주는 프로그램이 같은 말을 되풀이하지 않게 — aria-live)
+    var key = hp.length + '|' + (rows ? 1 : 0);
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    el.hidden = !hp.length;
+    if (!hp.length) { el.innerHTML = ''; return; }
+    // 영수증 줄을 다 지웠으면 단추가 「하이패스 확인하기」로 바뀐다(paintEvList) — 안내도 그 말로(2026-10-29 검토).
+    //   통행 건수는 적지 않는다 — 파일끼리 겹친 기록은 하이패스 화면에서 한 번만 세서 여기 수와 달랐다(QA 로봇: 「2개(통행 8건)」 → 화면 4건)
+    el.innerHTML = ic('ticket', 15) + '<span><b>하이패스 이용내역 ' + n0(hp.length) + '개</b>는 영수증과 따로 하이패스 확인 화면에서 봐요. ' +
+      (rows ? '‘올리기’를 누르면 영수증을 올린 뒤 이어서 그 화면이 열려요.' : '‘하이패스 확인하기’를 누르면 그 화면이 열려요.') + '</span>';
   }
   /** 빈 줄 하나. 날짜는 오늘 — 단 오늘이 보는 기간 밖이면 비워 두고 고르게 한다(2026-10-20 AU2).
    *  예전엔 기간 안으로 당겨 넣어, 마감 뒤 5일(지난 기간을 보는 중)에 올린 오늘 영수증이 지난 기간 마지막 날로 조용히 들어갔다.
@@ -7219,9 +7304,12 @@
     var n = EVUP.items.length;
     var running = EVUP.pages.filter(function (p) { return p.ai === 'run'; }).length;
     var b = $('btnEvGo'), f = $('evFill');
+    evHpNotePaint();             // 하이패스 이용내역 안내 한 줄 — 줄 수에 따라 말이 바뀐다
     if (!n) {
       box.innerHTML = '';
-      if (b) { b.disabled = true; b.classList.remove('gembtn', 'running'); b.textContent = '올리기'; }
+      // 영수증 줄을 다 지우고 하이패스 이용내역만 남았으면 그 화면으로 가는 단추(runEvUpload → evHipassGo, 2026-10-29)
+      var hpOnly = (EVUP.hp || []).length > 0;
+      if (b) { b.disabled = !hpOnly; b.classList.remove('gembtn', 'running'); b.textContent = hpOnly ? '하이패스 확인하기' : '올리기'; }
       if (f) f.hidden = true;
       return;
     }
@@ -7312,7 +7400,7 @@
   function runEvUpload() {
     if (EVUP.busy) { toast('아직 파일을 읽는 중이에요. 잠시만 기다려 주세요.'); return; }
     if (EVUP.pages.some(function (p) { return p.ai === 'run'; })) { toast('AI가 아직 읽는 중이에요. 기다리거나 ‘직접 입력’을 눌러 주세요.'); return; }
-    if (!EVUP.items.length) { toast('올릴 파일을 골라 주세요.', true); return; }
+    if (!EVUP.items.length) { if (!evHipassGo()) toast('올릴 파일을 골라 주세요.', true); return; }
     evRead();
     var car = String(($('evCar') || {}).value || '').trim();
     var mine = myName();
@@ -7401,6 +7489,7 @@
         });
       });
     }, Promise.resolve()).then(function () {
+      var hpAfter = (EVUP.hp || []).map(function (x) { return x.file; });   // 같이 고른 하이패스 이용내역(2026-10-29) — 창을 닫으면 EVUP 이 비므로 먼저 잡는다
       EVUP.busy = false; EVUP.sent = true; EV_SENDING = false;
       evFreeUrls();
       EVUP.items = []; EVUP.pages = [];
@@ -7409,6 +7498,8 @@
       // 움직임 ② — 다시 받은 목록에서 올리기 전에 없던 줄(서버가 새 번호를 돌려주지 않아 전후를 견준다)
       var evBefore = {}; EVID.forEach(function (x) { evBefore[String(x.id)] = 1; });
       ONLOAD.push(function () { markJust(EVID.filter(function (x) { return !evBefore[String(x.id)]; }).map(function (x) { return '[data-evdel="' + x.id + '"]'; })); });
+      // 그다음 하이패스 확인 화면 — 운행을 다 다시 받은 뒤에 연다(hpFiles 는 운행을 다 받아야 맞춘다 · 그 사이 기간·화면을 옮기면 안 연다)
+      if (hpAfter.length) hpAfterLoad(hpAfter);
       AUDIT = null; loadAll();
     }).catch(function (e) {
       EVUP.busy = false; EV_SENDING = false;
@@ -9552,6 +9643,9 @@ window.EduGuard = {
   }
 
   function hpFiles(files) {
+    // 영수증 올리기 창에서 넘어온 PDF 면(2026-10-29 evHipassGo · hpAfterLoad) 왜 이 화면인지 안내 줄 맨 앞에 — 알림은 다른 알림에 금방 덮였다.
+    //   한 번 읽으면 바로 비운다(다음에 이 화면에서 직접 올린 PDF 에 붙지 않게)
+    var from = HP.from || ''; HP.from = '';
     // ★ 운행을 다 못 받은 상태로 대조하면 "맞는 운행이 없습니다" 가 되고,
     //   로드가 끝나도 다시 맞추지 않아 PDF 를 또 올려야 했다.
     if (!LOADED) { toast('운행을 불러오는 중이에요. 잠시 후 다시 올려 주세요.'); return; }
@@ -9591,7 +9685,7 @@ window.EduGuard = {
           if (dup) toast('여러 파일에 겹친 기록 ' + n0(dup) + '건은 한 번만 계산해요.');
           if (!recs.length) {
             HP.noteBad = true;
-            HP.note = bad ? '읽지 못한 파일이 있어요. 한국도로공사 이용내역 PDF가 맞는지 확인하고, 영수증 사진은 ‘영수증 사진 올리기’로 올려 주세요.'
+            HP.note = bad ? '읽지 못한 파일이 있어요. 한국도로공사 이용내역 PDF가 맞는지 확인하고, 영수증 사진은 통행료 화면의 ‘통행료 증빙 올리기’로 올려 주세요.'
               : 'PDF에서 통행 기록을 찾지 못했어요.';
             HP.groups = []; render(); return;
           }
@@ -9604,7 +9698,7 @@ window.EduGuard = {
           // 지금 보는 기간 밖의 기록 수(2026-10-20 AU2 #7) — 그 기간 화면에서 올리라고 한 줄 더한다(카드마다 아래 「이 기간 밖의 기록」에 목록)
           var nOut = recs.filter(function (r) { return !hpInView(r); }).length;
           // 다음에 할 일까지 한 줄로(웹 8차 — 「확정하기」를 눌러야 증빙이 된다는 것을 몰랐다)
-          var base = n0(recs.length) + '건을 읽었어요.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐어요.' : '') + (bad ? ' 읽지 못한 파일이 ' + bad + '개 있어요.' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
+          var base = (from ? from + ' ' : '') + n0(recs.length) + '건을 읽었어요.' + (dup ? ' 여러 파일에 겹친 ' + n0(dup) + '건은 뺐어요.' : '') + (bad ? ' 읽지 못한 파일이 ' + bad + '개 있어요.' : '') + (warns.length ? ' ' + warns.join(' ') : '') +
             (nOut ? ' 지금 보는 기간(' + viewSpan() + ') 밖의 기록 ' + n0(nOut) + '건은 그 기간 화면에서 올려 주세요.' : '');
           var how = isAll() ? '' : ' 운행이 맞으면 ‘확정하기’를 눌러 주세요. 확정하면 그날 통행료 증빙이 돼요.';
           HP.note = base + how;
@@ -9620,11 +9714,23 @@ window.EduGuard = {
               (nfix || isAll() ? '.' : '. ‘원본 첨부’를 눌러 주세요.');
             if (!ok) { HP.noteBad = true; HP.note += ' 이미 맞춘 운행에 원본이 첨부돼 있는지 확인하지 못했어요. 다시 올려 주세요.'; }
             render();
+            if (from) hpShowNote();
           });
         });
     });
   }
 
+  /** 올리기 창에서 넘어왔을 때(2026-10-29 QA 로봇) — 폰에서는 화면 맨 위 끌어 놓기 상자에 밀려 읽은 결과·「확정하기」가 첫 화면 밖이었다.
+   *  안내 줄(끌어 놓기 상자 바로 아래 .hpnote)이 화면 아래쪽에 있으면 머리띠 바로 아래로 올린다(evSubTop 과 같은 방법). */
+  function hpShowNote() {
+    var go1 = function () {
+      var d = $('hpDrop'), n = d && d.nextElementSibling;
+      if (!n || !n.classList.contains('hpnote')) return;
+      var hd = document.querySelector('header.top'), hb = hd ? hd.getBoundingClientRect().bottom : 0, top = n.getBoundingClientRect().top;
+      if (top > window.innerHeight * 0.5) window.scrollTo({ top: Math.max(0, window.scrollY + top - hb - 12), behavior: (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') });
+    };
+    if (window.requestAnimationFrame) requestAnimationFrame(go1); else setTimeout(go1, 0);
+  }
   /** 결재가 끝난 운행에는 표시를 달고 선택을 풀어 둔다. 서버가 되돌리기 때문이다. */
   function hpMarkLocked(groups) {
     (groups || []).forEach(function (g) {
@@ -11444,15 +11550,7 @@ window.EduGuard = {
     }
     if (e.target.id === 'selCar') { FILT.car = e.target.value; renderKeepFocus('selCar'); return; }
     if (e.target.id === 'hpFile') { hpFiles(e.target.files); return; }
-    // 통행료 차례의 「하이패스 이용내역 PDF 올리기」(웹 8차) — 고르자마자 하이패스 화면으로 가서 읽은 결과를 보인다
-    if (e.target.id === 'hpQuick') {
-      var hq = Array.prototype.slice.call(e.target.files || []), isPdf = function (f) { return /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name); };
-      var hpdf = hq.filter(isPdf), hpic = hq.filter(function (f) { return !isPdf(f); });
-      // 사진을 여기로 골랐으면 영수증 올리기 창으로 넘긴다(2026-10-17 모르는 로봇 — 사진이 하이패스 칸으로 들어가 「읽지 못한 파일」)
-      if (!hpdf.length && hpic.length) { openEvUpload('통행료'); evAddFiles(hpic); toast('사진이라 영수증 올리기 창으로 옮겼어요. 하이패스 버튼은 이용내역 PDF만 받아요.'); return; }
-      if (hpdf.length) { go('hipass'); hpFiles(hpdf); if (hpic.length) toast('사진 ' + hpic.length + '장은 빼고 PDF만 읽어요. 영수증 사진은 ‘영수증 사진 올리기’로 올려 주세요.', true); }
-      return;
-    }
+    // (예전 통행료 차례 「하이패스 이용내역 PDF 올리기」 #hpQuick 은 2026-10-29 에 없앴다 — 올리기 창 하나가 가려 읽는다, evHipassOf)
     if (e.target.id === 'evFile') { evAddFiles(e.target.files); e.target.value = ''; return; }
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
       var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
@@ -11478,15 +11576,20 @@ window.EduGuard = {
   /* 영수증 화면 「올리기」 카드에 사진·PDF 를 끌어 놓기(2026-10-20 디자인 v2, P_Evid) — 기존 영수증 올리기 창(openEvUpload)을 그 구분으로 열고
      놓은 파일을 그대로 넣는다(하이패스 단추에 사진을 고른 경우와 같은 길). 잠긴 기간·여러 기간·올리는 중이면 openEvUpload 가 까닭을 알린다. */
   var evDropZone = function (e) { return e.target && e.target.closest ? e.target.closest('[data-evdrop]') : null; };
+  // 파일을 끄는 중인가 — 놓는 곳이 아닌 데 놓으면 브라우저가 그 파일을 열어 이 화면을 떠났다(2026-10-29 검토).
+  //   놓는 곳 밖에서는 「놓을 수 없음」으로 둔다. 다른 놓는 곳(올리기 창·하이패스 화면 — bindDrop)이 먼저 받았으면(defaultPrevented) 건드리지 않는다.
+  var dragFiles = function (e) { var t = e.dataTransfer && e.dataTransfer.types; return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0; };
   document.addEventListener('dragover', function (e) {
-    var z = evDropZone(e); if (!z) return;
+    var z = evDropZone(e);
+    if (!z) { if (!e.defaultPrevented && dragFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } return; }
     e.preventDefault(); z.classList.add('over');
   });
   document.addEventListener('dragleave', function (e) {
     var z = evDropZone(e); if (z && !z.contains(e.relatedTarget)) z.classList.remove('over');
   });
   document.addEventListener('drop', function (e) {
-    var z = evDropZone(e); if (!z) return;
+    var z = evDropZone(e);
+    if (!z) { if (!e.defaultPrevented && dragFiles(e)) e.preventDefault(); return; }
     e.preventDefault(); z.classList.remove('over');
     var fs = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []);
     if (!fs.length) return;

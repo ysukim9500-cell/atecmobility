@@ -998,13 +998,11 @@ details.kmenu:not([open])>.kpop{display:none}
 .tchoice span{font-size:13px;color:var(--ink-500);line-height:1.6}
 .tchoice em{font-style:normal;color:var(--ok);font-weight:700}
 .evsact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
-/* 웹 8차(2026-10-17) — 주차·통행료 차례의 「할 일」 단추: 통행료는 같은 크기 둘(영수증 사진 · 하이패스 이용내역 PDF) */
+/* 웹 8차(2026-10-17) — 주차·통행료 차례의 「할 일」 단추. 통행료도 올리는 곳 하나(2026-10-29 — 올리기 창이 하이패스 이용내역 PDF 를 가려 읽는다) */
 .evpick{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:12px 0 4px}
-.evpick.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .evpk{display:flex;flex-direction:column;gap:6px;min-width:0}
 .evpk > .btn{width:100%;justify-content:center;min-height:44px;font-size:14px}
 .evpk > .dim{font-size:13px;line-height:1.5}
-@media (max-width:720px){.evpick.two{grid-template-columns:minmax(0,1fr)}}
 .mtable .mlinkb{margin-top:6px}
 .mbox .mfoldnote{padding:8px 16px 12px;font-size:13px}
 .hpphoto{font-size:12px;color:var(--ok);margin-top:2px;white-space:normal}
@@ -2652,37 +2650,54 @@ table.ctrip td.cday .dim{margin-left:1px}
 .evside .evpk:first-child.over{border-color:var(--red);background:var(--red-50)}
 .evside .evpk:first-child > .ico{color:var(--ink-600)}
 .evside .evpk:first-child > b{font-size:14px;color:var(--ink-900)}
-.evside .evpk + .evpk{gap:8px;padding-top:14px;border-top:1px solid var(--ink-200)}
-.evside .evpk + .evpk > b{font-size:14px;color:var(--ink-900)}
 .evside .evpk > .btn{width:100%}
 .evamt{padding-top:14px;border-top:1px solid var(--ink-200)}
 .evamt .cdl{margin-top:0}
 .evamt p{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--ink-600)}
+/* 통행료에 올리는 것 두 가지(2026-10-29 사용자 「통일성 있게 이미지를」, evKindsHtml) — 그림 둘은 같은 크기(44×52)·같은 선 굵기·
+   같은 강조(빨간 선 = 통과 시각·금액). 단추가 아니라 설명이라 테두리·그림자 없이 */
+.evkinds{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start;min-width:0}
+/* 이 칸에 파일을 끌어 오면(data-evdrop) 끌어 놓기 상자와 같은 빨간 점선으로 받는다는 표시(2026-10-29 검토) */
+.evkinds.over{outline:1.5px dashed var(--red);outline-offset:4px;border-radius:var(--r-sm);background:var(--red-50)}
+.evklab{font-size:12px;font-weight:700;color:var(--ink-500)}
+.evkind{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start}
+.evkind b{display:block;margin-bottom:2px;font-size:14px;color:var(--ink-900)}
+.evkind span{display:block;font-size:13px;line-height:1.5;color:var(--ink-600)}
+.evkinds > p{margin:0;font-size:13px;line-height:1.5;color:var(--ink-600)}
+.evkimg{display:block;width:44px;height:52px}
+.evkimg path{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.evkimg .pg{fill:var(--surface);stroke:var(--ink-600)}
+.evkimg .ln{stroke:var(--ink-600)}
+.evkimg .fr{stroke:var(--ink-400)}
+.evkimg .hd{stroke:var(--ink-700);stroke-width:2}
+.evkimg .tx{stroke:var(--ink-300)}
+.evkimg .ac{stroke:var(--red);stroke-width:2}
 @media screen and (min-width:821px){ table.mc td.mact .btn + .btn{margin-left:4px} }   /* PC — 띄어쓰기 4px 뿐이라 거의 붙어 보였다(사이 8px) */
 table.mday td.mact{white-space:nowrap;text-align:right}
 table.mday td.mact .btn{min-width:96px;justify-content:center}
 table.mday td.mact .mlinkb{margin-top:0}
 /* PC 표 — 칸 사이를 시안처럼 12px 로(줄 끝 단추 칸이 생겨 운행 칸이 너무 좁아지지 않게) */
 @media screen and (min-width:821px){ table.mday th,table.mday td{padding-left:12px;padding-right:12px} }
-/* PC: 올리기 카드는 날짜별 확인 표 위 한 줄(끌어 놓기 | 하이패스 PDF | 금액) — 시안은 오른쪽 칸이지만, 표(약 840px — 결과 칸의 할 일 글 그대로)와
+/* PC: 올리기 카드는 날짜별 확인 표 위 한 줄(끌어 놓기 | (통행료) 올리는 것 두 가지 | 금액) — 시안은 오른쪽 칸이지만, 표(약 840px — 결과 칸의 할 일 글 그대로)와
    오른쪽 칸이 본문 최대 폭(1128)에 함께 들어가지 않는다. 오른쪽에 두면 결과·단추 칸이 표 안쪽 가로 스크롤 뒤로 숨는다(AU6-M7) */
 @media screen and (min-width:1100px){
   .evside{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px 24px;align-items:start;padding:16px;border:1px solid var(--ink-200);border-radius:var(--r);background:var(--surface)}
   .evside .evpick{display:contents}
-  .evside .evpk + .evpk,.evamt{padding-top:0;border-top:0}
-  /* 하이패스 칸도 끌어 놓기 상자와 같은 안쪽 여백(테두리는 투명) — 두 올리기 단추가 같은 크기(웹 8차 2026-10-17 「같은 크기 단추 둘」 — r8ui.
-     한 줄 세 칸에서는 끌어 놓기 상자 여백만큼 사진 단추가 좁았다 — 247 · 281px, 2026-10-20 통합 검증) */
-  .evside .evpk + .evpk{padding:20px 16px;border:1.5px solid transparent}
+  .evamt{padding-top:0;border-top:0}
 }
 @media (max-width:1099px){
   /* 좁으면 올리기 단추를 위에(M_Evid) — 끌어 놓기 상자 대신 단추, 설명 한 줄은 그대로(무엇을 올리는지) */
   .evside .evpk:first-child{align-items:stretch;padding:0;border:0;background:none;text-align:left}
-  .evside .evpk:first-child > .ico,.evside .evpk:first-child > b,.evside .evpk + .evpk > b{display:none}
-  .evside .evpk + .evpk{padding-top:0;border-top:0}
+  .evside .evpk:first-child > .ico,.evside .evpk:first-child > b{display:none}
   .evside .evpk > .btn{min-height:48px;font-size:15px}
   .evamt{display:none}
+  /* 올리는 것 두 가지는 단추 아래 옅은 바탕 한 덩이(설명이지 누르는 것이 아니다) */
+  .evside .evkinds{padding:12px;border-radius:var(--r-sm);background:var(--ink-50)}
 }
-@media (min-width:601px) and (max-width:1099px){ .evside .evpick.two{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (min-width:601px) and (max-width:1099px){
+  .evside .evkinds{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}
+  .evside .evkinds > .evklab,.evside .evkinds > p{grid-column:1 / -1}
+}
 @media (max-width:820px){
   table.mday td.mact{grid-column:1 / -1;text-align:left}
   table.mday td.mact .btn{width:100%;min-height:44px}
