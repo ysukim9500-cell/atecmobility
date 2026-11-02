@@ -1291,10 +1291,19 @@ table.kv tr+tr th,table.kv tr+tr td{border-top:1px solid var(--ink-100)}
   /* 줄어들 차례는 긴 반려 사유가 먼저 — 요약(금액)은 사유가 다 줄어든 뒤에야 줄인다. 예전에는 요약 너비가 0 에서 시작해
      긴 사유(최대 460px) 옆에서 「업무 운행 13건 · 796km (…」 처럼 금액이 아예 안 보였다(2026-10-28 로봇, 1280) */
   .acard.cmp .ahd>.asum{flex:0 1 auto}
-  .acard.cmp .ahd>.st.along{flex-shrink:100}
-  /* PC 머리 줄은 한 줄로 — 긴 반려 사유가 먼저 줄어(「…」) 요약·「자세히」가 둘째 줄로 넘어가지 않게(얇은 카드 ≤ 110px 지킴).
-     넘어가면 1280 반려 카드에서 요약이 둘째 줄 왼쪽 끝에 있었다(2026-10-28 검사 로봇·r12ui) */
-  .acard.cmp .ahd{flex-wrap:nowrap}
+  /* PC 머리 줄은 다 들어가면 한 줄 그대로(얇은 카드) — 긴 반려 사유가 남는 자리를 채우고(「…」) 요약·「자세히」는 그 오른쪽.
+     다 들어가지 않을 때만(901~1100 의 「내 차례」 카드 · 「 · 카드 끝 1234 · 추가 1」로 길어진 법인카드 이름) 뒤쪽 덩이(요약 · 확인 항목 · 반려·승인)가
+     둘째 줄 오른쪽 끝으로 넘어간다(2026-11-03 최종 화면 검사 H1). 예전에는 한 줄에 묶어 두어 줄어들 수 있는 상태 딱지가 「내/차/례/예/요」처럼 글자마다 꺾이고
+     요약이 「…」로 잘리거나 사라졌고 901 에서는 「반려·승인」이 카드 밖으로 나갔다(운행일지·개인경비 「내 차례」 카드도 901~1100 에서 같았다).
+     · 첫 줄에 남는 자리는 상태 딱지 뒤 빈칸(span flex:1)이 먹는다 — 다 들어가는 카드는 예전과 같은 자리(픽셀 그대로). 둘째 줄은 빈칸이 없어 오른쪽 끝(flex-end)
+     · 이름(.acyc) 오른쪽 auto 여백 — 상태 딱지까지 둘째 줄로 넘어가도 첫 줄(딱지·이름·기간)은 왼쪽에 그대로(남는 자리는 빈칸이 먼저 먹어 보통은 0)
+     · 상태 딱지(짧은 상태)는 한 덩이로 줄지 않는다
+     · 긴 반려 사유(.along)는 남는 자리를 채우되 5em 밑으로는 줄이지 않는다 — 그보다 좁으면 요약·「자세히」가 둘째 줄로.
+       예전(flex-shrink 100)에는 사유와 함께 요약도 조금 줄어 금액 끝이 「189,03…」처럼 잘렸다(1280 까지) */
+  .acard.cmp .ahd{flex-wrap:wrap;justify-content:flex-end}
+  .acard.cmp .ahd>.acyc{margin-right:auto}
+  .acard.cmp .ahd>.st:not(.along){white-space:nowrap;flex-shrink:0}
+  .acard.cmp .ahd>.st.along{flex:1000 1 0%;min-width:5em}
   .acard.cmp .ahd>:not(.st):not(.asum){flex-shrink:0}
   .acard.cmp .acrow>.aext>span.dim{text-align:right}
 }
@@ -3352,6 +3361,158 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   .scroll table.mc.ctrip td.cday{flex:0 0 66px}
   .scroll table.mc.ctrip td.m1.n{flex:0 0 40px}
   .scroll table.mc.ctrip td.m1:not(.cday):not(.n){flex:0 0 52px}
+}
+</style>
+<style id="cmcss">
+/* ═══ 법인카드 추가 상신(2026-11-03 docs/card-multi/SPEC.md §5 · PLAN K8) — 한 달에 카드마다 문서 ═══
+   카드 묶음 머리 줄(tr.cgrp) · 상신할 카드 고르기(.cpick) · 접힌 결재 띠(.astrip.fold) · 관리 「카드」 칸(td.ccards).
+   잠긴 줄(tr.clock)은 칸이 disabled 라 위 「잠긴 입력칸」(회색 바탕·자물쇠) 그대로. 색·글꼴·둥근 모서리는 위 :root 토큰 그대로(새 색·새 움직임 없음). */
+
+/* 카드 묶음 머리 줄 — PC 표에서는 관리 표 팀 묶음 줄(tr.ogrp)과 같은 띠: 옅은 바탕 · 위 선 · 굵은 이름 · 회색 숫자 · 문서 딱지 · 오른쪽 끝 단추.
+   글 왼쪽 끝 = 아래 줄 첫 칸 글(안쪽 여백 15 · 1280 이하 12). 낱말·숫자·딱지는 덩이째(줄이 모자라면 덩이 사이에서만 넘어간다) */
+.ctab tr.cgrp td{background:var(--ink-50);border-top:1px solid var(--ink-200);padding:9px 16px !important;white-space:normal;text-align:left;color:var(--ink-700)}
+.ctab tbody tr.cgrp:first-child td{border-top:0}
+/* 덩이는 단추 글까지 모두 한 글 기준선에(굵은 이름이 옆 13px 글·딱지보다 1.2px 아래였다 — 2026-11-03 디자인 검사 L6).
+   단추만 가운데로 두면 단추(32·44)가 줄 높이를 정해 글이 단추 글보다 5~11px 위로 떴다(실측) — 단추도 기준선 */
+.cgh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
+.cgh > b{font-size:14px;font-weight:800;color:var(--ink-900);white-space:nowrap}
+.cgh .cgn{font-size:13px;color:var(--ink-600);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cgh .cgd{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
+/* 문서 딱지 「● 결재 중」 — 딱지의 기준선이 글에서 오게(점 ::before 는 기준선이 없어 가운데 맞춤이면 딱지 글이 1.1px 아래로 갔다) · 점은 가운데 */
+.cgh .cgd .st{white-space:nowrap;align-items:baseline}
+.cgh .cgd .st::before{align-self:center}
+/* 「상신 전 N줄」은 진한 회색 — 앞 딱지 「● 결재 중」(주황)과 같은 색이라 한 말처럼 읽혔다(L3) */
+.cgh .cgo{font-size:13px;font-weight:600;color:var(--ink-700);white-space:nowrap}
+.cgh > .btn{flex:none;white-space:nowrap}
+.cgh > .btn:first-of-type{margin-left:auto}   /* 한 카드에 대상이 둘(「추가 1 상신하기 →」)이면 단추끼리는 붙여 오른쪽 끝에 */
+/* 안쪽 여백 = 아래 줄 칸(1281 이상 16 · 1280 이하 12 — 15 라 1440 에서 1px 어긋났다, L5) */
+@media screen and (max-width:1280px){ .ctab tr.cgrp td{padding-left:12px !important;padding-right:12px !important} }
+/* PC — 표가 상자보다 넓어 옆으로 밀릴 때(긴 가맹점 이름 등) 머리 줄 글·단추는 늘 보이는 폭 안에(오른쪽 끝 단추가 상자 밖으로 숨던 것 —
+   관리 표 팀 묶음 줄 .ogrp 의 폰 규칙과 같은 방법). 보이는 폭 = 표 상자(container) 폭. 모르는 브라우저는 예전 그대로(표 끝) */
+@media screen and (min-width:821px){
+  .scroll.cscroll{container-type:inline-size}
+  .ctab tr.cgrp .cgh{position:sticky;left:16px;max-width:calc(100cqw - 32px)}
+}
+@media screen and (min-width:821px) and (max-width:1280px){ .ctab tr.cgrp .cgh{left:12px;max-width:calc(100cqw - 24px)} }
+/* 카드 내역 표 PC 폭(2026-11-03 디자인 검사 M5 — 예전부터: 긴 가맹점이면 1280 에서도 표가 상자보다 넓어 맨 끝 「삭제」가 밖으로 밀렸다)
+   A — 821~1280 은 구분·비고 칸 최소 폭 92 → 80(사용목적은 줄의 180 그대로): 하이패스 가맹점 자료 1280 에서 넘침 0, 「삭제」 오른쪽 끝 = 「상신하기 →」 오른쪽 끝.
+   B — 그래도 넓으면(더 긴 가맹점 · 1024 등) 「삭제」 칸이 상자 오른쪽 끝에 붙어 늘 보인다(묶음 머리 줄은 빼고 · 합계 줄 빈칸도 빼고 — 넓은 빈칸이 합계를 덮는다).
+     머리 칸은 다른 머리 칸(2)보다 위(3) — 1 이면 「비고」 머리 글이 위로 비쳤다. 줄 바탕(파일에 없는 줄·깜빡임·고른 줄)은 그 칸에도 */
+@media screen and (min-width:821px) and (max-width:1280px){ .ctab .cin{min-width:80px} }
+/* 잠긴 줄 칸(821~1280 — 구분·비고 칸 80px)은 자물쇠를 작게(9px) 칸 끝 가까이 두고 글 자리를 넓힌다(2026-11-03 최종 화면 검사 M2: 자물쇠 자리 26px 라
+   글 자리 41px — 「소모품비」가 「소모품ㅂ」로 잘렸다). 칸 폭을 92 로 되돌리면 1280 하이패스 가맹점 자료(잠긴 줄 있음)에서 표가 11px 넘쳐 A 가 깨졌다(실측) —
+   칸 폭은 그대로. 글 자리 53px(80px 칸) — 네 글자 다 보이고 다섯 글자(56.2)는 예전 92px 칸과 같은 3px. 한 표 안 자물쇠 크기가 같게 잠긴 칸 모두 */
+@media screen and (min-width:821px) and (max-width:1280px){
+  .ctab tr.clock .cin:disabled{padding-right:14px;background-position:right 3px center;background-size:9px 9px}
+}
+@media screen and (min-width:821px){
+  .ctab thead th:last-child,.ctab tbody tr:not(.cgrp) > td:last-child{position:sticky;right:0;z-index:2;background:var(--surface)}
+  .ctab thead th:last-child{z-index:3;background:#F7F9FA}
+  .ctab tbody tr.cmiss:not(.cgrp) > td:last-child{background:var(--warn-50)}
+  .ctab tbody tr.flash:not(.cgrp) > td:last-child{background:var(--red-50)}
+  .ctab tbody tr.msel-on:not(.cgrp) > td:last-child{background:var(--red-50)}
+  /* 붙은 칸 왼쪽 세로 줄은 표가 상자보다 넓어 그 칸이 다른 칸 위에 겹칠 때만(.panel.scrollmore — afterPaint 가 단다, 끝까지 밀면 빠진다) —
+     표가 다 들어가는 폭(1440 등)에도 줄이 새로 보였다(2026-11-03 최종 화면 검사 L1) */
+  .panel.scrollmore .ctab:has([data-cdel]:not([hidden])) thead th:last-child,
+  .panel.scrollmore .ctab:has([data-cdel]:not([hidden])) tbody tr:not(.cgrp) > td:last-child{box-shadow:inset 1px 0 0 var(--ink-100)}
+  /* 「삭제」가 하나도 없으면(줄이 모두 잠김 — 문서 하나 결재 중) 끝 칸을 붙이지 않는다 — 빈 붙은 칸이 사용목적·비고 칸을 가렸다(L1) */
+  .ctab:not(:has([data-cdel]:not([hidden]))) thead th:last-child,
+  .ctab:not(:has([data-cdel]:not([hidden]))) tbody tr:not(.cgrp) > td:last-child{position:static}
+}
+/* 폰·태블릿(≤820 — 줄이 카드 한 장씩) — 머리 줄은 카드 밖 맨바탕 한 줄 띠(결재 완료 문서 팀 머리와 같은 모양: 머리 아래 8px · 묶음 사이 20px),
+   단추는 오른쪽 끝(넘치면 다음 줄 오른쪽) · 누름 높이 44 */
+@media (max-width:820px){
+  .ctab tr.cgrp{display:block;border:0;border-radius:0;background:transparent;padding:8px 2px 0;margin:0 0 8px}
+  .ctab tbody tr.cgrp:first-child{padding-top:0}
+  .ctab tr.cgrp td{display:block;padding:0 !important;border:0 !important;background:none !important}
+  .ctab tr.cgrp .btn{min-height:44px;height:44px}
+}
+/* 태블릿(601~820)은 같은 화면 다른 단추(카드의 「삭제」·접힌 띠 「회수」·「펼치기」)와 같은 38 — 44 라 혼자 컸다(2026-11-03 디자인 검사 L1). 폰은 모두 44 */
+@media (min-width:601px) and (max-width:820px){ .ctab tr.cgrp .btn{min-height:38px;height:38px} }
+
+/* 상신할 카드 고르기(검증·상신 화면 머리 아래) — 기간 빠른 단추(.cpq) 꼴. 단추마다 「카드 끝 1234 · 12건 · ₩X」(+ 「반려 · 다시 상신」), 고른 것은 진한 바탕.
+   단추 안 덩이는 끊지 않고(줄이 모자라면 덩이 사이에서만), 폰(≤600)은 단추마다 한 줄 전체(왼쪽 끝이 같다) · 폰·태블릿 누름 높이 44 */
+.cpick{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.cpick .cpl{flex:1 1 100%;font-size:13px;font-weight:600;color:var(--ink-700)}   /* 「상신할 카드」 이름표 — 단추 줄 위 한 줄(왼쪽 끝 = 단추) */
+.cpick .cpq{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 8px;height:auto;min-height:36px;padding:6px 14px;
+  font-size:13px;line-height:1.4;text-align:left;color:var(--ink-800);word-break:keep-all}
+.cpick .cpq > *{white-space:nowrap}
+.cpick .cpq b{font-weight:700}
+.cpick .cpq .cpqn{color:var(--ink-600);font-variant-numeric:tabular-nums}
+/* 「회수 · 다시 상신」은 회색, 「반려 · 다시 상신」(.bad)만 빨강 — 같은 화면의 띠·묶음 딱지 「● 반려」와 같은 색(2026-11-03 디자인 검사 L4) */
+.cpick .cpq .cpqs{font-weight:600;color:var(--ink-600)}
+.cpick .cpq .cpqs.bad{color:var(--red)}
+.cpick .cpq[aria-pressed="true"],.cpick .cpq.on{border-color:var(--ink-900);background:var(--ink-900);color:#fff;font-weight:500}
+.cpick .cpq[aria-pressed="true"] *,.cpick .cpq.on *,.cpick .cpq[aria-pressed="true"] .cpqs.bad,.cpick .cpq.on .cpqs.bad{color:inherit}
+.cpick .cpq[aria-pressed="true"] .st::before,.cpick .cpq.on .st::before{background:currentColor}
+@media (max-width:820px){ .cpick .cpq{min-height:44px} }
+@media (max-width:600px){ .cpick .cpq{flex:1 1 100%} }
+
+/* 접힌 결재 띠(문서 셋 이상 — 머리 줄만 보이고 「펼치기」로 펼친다) — 머리 줄 한 줄 띠(위아래 여백 같게) */
+.astrip.fold{padding-top:12px;padding-bottom:12px}
+.astrip.fold > :not(.ahd){display:none !important}
+.astrip.fold > .ahd{margin-bottom:0}
+/* 법인카드 결재 띠 머리 줄(문서 이름 b) — 단추 글까지 한 글 기준선(L6 — 위 묶음 머리 줄과 같은 까닭) · 폰(≤600)은 이름이 첫 줄을 차지해
+   상태 딱지·단추가 늘 둘째 줄 같은 자리(이름 길이에 따라 딱지가 첫 줄 오른쪽·둘째 줄 왼쪽을 오갔다 — 2026-11-03 디자인 검사 M4, 검사 로봇이 잰 식 그대로) */
+.astrip .ahd:has(> .akind.c ~ b){align-items:baseline}
+/* 상태 딱지의 기준선도 글에서(점은 첫 줄 가운데 그대로 — 긴 반려 사유는 여러 줄) */
+.astrip .ahd:has(> .akind.c ~ b) > .st{align-items:baseline}
+.astrip .ahd:has(> .akind.c ~ b) > .st::before{align-self:flex-start}
+@media (max-width:600px){ .astrip .ahd > .akind.c ~ b{flex:1 0 calc(100% - 90px)} }
+
+/* 관리 「카드」 칸(법인카드 현황 직원별 · 직원 현황 명단, 2026-11-02 사용자 요청) — 「1111 · 2222 · 3333 (하)」. 카드 끝자리 덩이는 줄을 안 바꾼다.
+   ★ .ccard 는 위 마감 화면 카드 상자(테두리·안쪽 여백 20px)와 같은 이름 — 이 칸 안에서는 그 모양을 모두 뗀다 */
+td.ccards{white-space:nowrap}
+td.ccards .ccard{display:inline;margin:0;padding:0;border:0;border-radius:0;background:none;min-width:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.ccards .csep,td.ccards .dsep{color:var(--ink-500)}
+/* 걸린 구분점 조각(C.dnJoin — 디자인 검사 L2)일 때 표 칸에서는 카드 셋까지 늘 한 줄(PLAN 확인 8 — 줄갈림 없음 · 다른 칸처럼 한 줄 높이,
+   가로로 밀리는 좁은 표에서 칸이 카드 한 장 폭까지 줄어 세 줄로 쌓이지 않게) · 넷 이상이면 카드 사이에서만 꺾는다(줄 끝·처음 「·」 없음 · 표가 덜 넓어짐 —
+   줄은 9em 이상이라 한 장씩 세로로 쌓이지 않는다). :has 를 모르는 브라우저는 늘 한 줄(예전과 같음) */
+td.ccards .dnl{flex-wrap:nowrap}
+td.ccards .dnl:has(> .dn:nth-child(4)){flex-wrap:wrap;min-width:9em}
+/* 폰·태블릿 한 덩이(table.rcard) — 이름 줄 아래 한 줄(「카드 1111 · 2222」), 그 줄 안에서는 카드 사이에서만 넘어간다 */
+@media (max-width:820px){
+  .scroll table.rcard td.ccards{order:20;flex:1 1 100%;white-space:normal}
+  .scroll table.rcard td.ccards .dnl{flex-wrap:wrap;min-width:0}
+}
+
+/* ═══ 「 · 」로 이은 이름의 줄바꿈 조각(2026-11-03 디자인 검사 M1·M3·L2 — driving-app.js dnJoin · C.dn · C.dnJoin) ═══
+   <span class="dnl"> 안에 조각 <span class="dn"><span>글</span></span>, 둘째 조각부터 맨 앞에 <i class="dsep" aria-hidden="true"> · </i>.
+   조각마다 한 덩이(nowrap — 줄은 조각 사이에서만 바뀌어 「카드 끝 1234」가 안 갈린다). 구분점은 다음 조각 왼쪽 바로 바깥에 걸려(포털 .ph 와 같은 방법)
+   같은 줄이면 조각 사이에 보이고, 줄이 바뀌면 그 조각이 줄 맨 앞이라 점이 칸 밖으로 나가 잘린다(overflow:hidden) —
+   줄이 「·」로 끝나거나 시작하지 않는다(붙는 공백 문자로 잇는 방법은 크롬에서 점 뒤에서 그대로 줄이 바뀌었다 — 검사 로봇 실측).
+   조각 사이 = 오른쪽 .55em + 칸 .3em(글 「 · 」 폭과 같다 — 한 줄일 때 예전 글과 같은 모양), 점은 다음 조각 .27em 앞(가운데). 글자 크기를 따라간다.
+   조각 글은 안쪽 span(inline-block)에 — 조각이 칸보다 넓을 때만(글자를 아주 크게 키움 · 좁은 표 칸) 그 안에서 낱말 사이로 꺾인다(잘리지 않음, 낱말은 keep-all).
+   구분점 글 「 · 」의 앞뒤 띄어쓰기는 그려지지 않고(절대 위치 상자 안 맨 앞·끝) 복사·읽는 글(textContent)만 예전 「A · B」 그대로.
+   표 칸(결재 완료 문서 이름 아래 꼬리 · 관리 「카드」 칸)도 같은 규칙 — 꼬리가 칸을 넓히지 않고 칸 안에서 조각 사이(모자라면 낱말 사이)로 꺾인다
+   (2026-11-03 디자인 검사 M3: 「카드 끝 1234」를 한 줄로 묶어 두니 1024 에서 이름 칸이 59.9 → 89.3 으로 넓어져 표가 넘쳤다). 넓은 폭에서는 한 줄 그대로 */
+.dnl{display:inline-flex;flex-wrap:wrap;column-gap:.3em;row-gap:0;max-width:100%;overflow:hidden;vertical-align:top}
+.dnl > .dn{position:relative;white-space:nowrap;margin-right:.55em;max-width:100%}
+.dnl > .dn:last-child{margin-right:0}
+.dnl > .dn > span{display:inline-block;max-width:100%;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;vertical-align:top}
+.dnl > .dn > .dsep{position:absolute;right:100%;margin-right:.27em;top:0;font-style:normal;white-space:nowrap}
+
+/* 결재 완료 문서(세 시스템) 표 PC — 표가 상자보다 넓어도(1024 등 · 긴 결재선·날짜) 맨 끝 동작 칸(「⋯」·「관리자 반려」)은 상자 오른쪽 끝에 붙어 늘 보인다
+   (2026-11-03 디자인 검사 M3: 1024 에서 「관리자 반려」가 다 가려졌다). 바탕·테두리는 그 줄 카드 그대로.
+   sticky 칸은 z-index 가 없어도 칸마다 쌓임 맥락이라 「⋯」 메뉴 창(fixed)이 그 칸 안에 갇혀 아래 줄의 같은 칸 밑으로 깔렸다(실측) —
+   메뉴를 연 동안만 그 칸을 위로(5 — 표 머리 칸 2 보다 위) */
+@media screen and (min-width:821px){
+  table.rcard.ftab tbody tr:not(.ogrp):not(.finnone) > td:last-child{position:sticky;right:0}
+  table.rcard.ftab tbody tr:not(.ogrp):not(.finnone) > td:last-child:has(details.kmenu[open]){z-index:5}
+}
+/* 붙은 끝 칸이 옆 칸 글 위에 겹칠 때만(표가 상자보다 넓고 끝까지 밀지 않음 — .panel.scrollmore) 그 칸 왼쪽에 흐림 그림자 — 글이 글자 중간에서
+   잘린 게 아니라 칸 밑으로 들어간 것(밀어서 더 보기)이 보이게(2026-11-03 최종 화면 검사 M1: 1024 결재 중 표 「현재 결재자」가 「(센」+ 반쪽 「터」).
+   색·폭은 폰의 「더 있음」 그림자(.panel.scrollmore::after)와 같다. 표가 상자 안이면 없다(결재 완료 표 1024 · 1100 이상 그대로).
+   900 이하는 상자 오른쪽 끝 그림자가 이미 있어 두 겹이 되므로 901 이상만 */
+@media screen and (min-width:901px){
+  .panel.scrollmore > .scroll > table.rcard.ftab tbody tr:not(.ogrp):not(.finnone) > td:last-child::before{content:"";position:absolute;top:-1px;bottom:-1px;right:100%;
+    width:16px;pointer-events:none;background:linear-gradient(to left,rgba(29,37,43,.14),rgba(29,37,43,0))}
+  /* 결재 중 표(data-fin 없는 표) 이름 꼬리 — 「카드 끝 1111」·「추가 1」 조각은 덩이째(조각 사이에서만 꺾인다). 이름 칸이 조각 폭보다 좁아지지 않는다
+     (M1: 이름 칸 44px 에 「카드 / 끝 / 1111 / 추가 1」 네 줄). 결재 완료 표(data-fin)는 1024 에서 상자 안에 들게 그대로(칸 안에서 꺾임 — M3) */
+  table.rcard.ftab:not([data-fin]) td .dnl > .dn > span{white-space:nowrap}
+  /* 그만큼 넓어진 이름 칸을 「현재 결재자」가 내준다 — 「이름 직책 (센터·파트장 칸)」을 칸 이름 앞에서만 두 줄로(괄호 안은 drv-card.js 가 한 덩이로 묶는다 —
+     결재 완료 표 결재선과 같은 규칙). 안 내주면 1100 에서 상자 안이던 결재 중 표가 36px 넘쳤다(실측). 넉넉한 폭(1180 이상)은 한 줄 그대로 */
+  table.rcard.ftab td.fcur{white-space:normal;word-break:keep-all;overflow-wrap:break-word}
 }
 </style>
 </head>

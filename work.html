@@ -417,6 +417,28 @@ footer .wrap{font-size:13px}
 /* 시스템 칸 내 상태 줄 — 「·」 양쪽이 11~13px(날짜 줄은 5) → 5px, 「결재할 것」 딱지만 조금 더 띄운다(R2-30) */
 .launch p.mine{column-gap:5px}
 .launch p.mine .ap{margin-left:4px}
+/* 같은 줄(2026-11-03 Fix 2 — 줄이 「·」로 시작하거나 끝나지 않고, 「결재 중 1건」 같은 말은 한 줄에서 안 갈린다): 조각(.ph)마다 한 덩이(nowrap — 줄은 조각 사이에서만 바뀐다)이고,
+   구분점 「·」은 다음 조각 맨 앞에 걸려(hang) 있다 — 같은 줄이면 조각 사이(오른쪽 9 + 칸 5 = 예전 구분점 칸과 같은 14px 한가운데)에 보이고, 줄이 바뀌면 그 조각이 줄 맨 앞이라
+   점이 칸 왼쪽 밖으로 나가 잘린다(overflow:clip — 아래 R1). 줄 끝에는 점이 없다(점은 늘 뒤 조각 몫). 마지막 조각(.end)은 딱지와의 간격(5 + 4)을 그대로 두려고 오른쪽 여백 없음.
+   Fix 3(검토 L1 — 글자만 아주 크게 키웠을 때 칸보다 넓은 조각이 잘리던 것): 조각 글은 안쪽 span(inline-block) 에 넣어 칸보다 넓을 때만 그 안에서 꺾이게 한다(max-width:100%) —
+   보통 크기에서는 조각이 칸보다 좁아 예전과 같은 한 줄이다. 점은 조각 왼쪽 바로 바깥(right:100%)에 걸어 글자 크기와 상관없이 줄 맨 앞에서는 늘 칸 밖이다.
+   ★ 칸 밖 자르기는 overflow:hidden 이 아니라 overflow:clip + clip-path(2026-11-03 회귀 점검 R1): hidden 은 폰(≤600) 시스템 칸 격자(grid)에서 이 칸의 「자동 최소 높이」를 0 으로 만들어
+   아이콘(3칸에 걸침) 높이를 비어 있는 셋째 줄에 7.5px 나눠 담는다 → 막대가 숨겨진 칸(「내역 없음」 등 세 시스템 모두)이 72.1 → 79.6px 로 커졌다. clip 은 스크롤 상자·최소 크기 변화 없이 자르기만 한다.
+   clip-path 는 overflow:clip 을 모르는 브라우저(Safari 16 미만)의 대신 — 칸 모양(inset(0))으로 그려지는 것만 자른다(배치는 그대로). */
+.launch p.mine{overflow:clip;clip-path:inset(0)}
+.launch p.mine .ph{position:relative;white-space:nowrap;margin-right:9px;max-width:100%}
+.launch p.mine .ph.end{margin-right:0}
+.launch p.mine .ph > span{display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.launch p.mine .ph > i{position:absolute;right:100%;margin-right:5px;top:0;font-style:normal}
+/* 「오늘 할 일」 법인카드 줄 작은 글의 접두 「상신 전 N줄 · 」(.cpre)(2026-11-03 Fix 3 — 검토 L2): 평소엔 말·숫자·점이 다음 낱말까지 한 덩이로 한 줄 안(줄이 점으로 끝나거나 시작하지 않고
+   「상신 전」과 「N줄」이 갈리지 않는다). PC 4칸 나눔에서 제목 칸이 아주 좁은 901~950px(95~125px)에서는 그 덩이(약 100~130px)가 칸보다 넓어 마감 딱지를 덮으므로,
+   접두를 한 줄로 따로 세우고 점은 숨긴다 — 구분점에서 줄이 바뀌되 점이 줄 끝·처음에 남지 않는다.
+   ★ 클래스 이름 .lp 는 첫 화면(landing)의 .lp(padding-block 64/56px)와 겹쳐 쓸 수 없다 — .cpre */
+.trw .tt .cpre > i{font-style:normal}
+@media (min-width:901px) and (max-width:950px){
+  .trw .tt .cpre{display:block}
+  .trw .tt .cpre > i{display:none}
+}
 /* PC 오늘 할 일 · 마감 일정 — 두 카드 아래 끝이 146px 어긋나 빈 칸(R3-06) → 같은 높이. 할 일이 여섯 줄 넘게 길면 예전처럼 위 맞춤 */
 @media (min-width:901px){
   .pgrid{align-items:stretch}
@@ -907,7 +929,10 @@ footer .wrap{font-size:13px}
      body[data-live] = 다 읽음 'ok' · 일부 못 읽음 'part'(시험 하네스가 기다리는 표시이기도 하다).
      ★ 2026-11-02 「이번 기간 내역 없음」(docs/none-mark/SPEC.md §6): 함께 ④ 내 표시(approval_none — 이번·지난 기간 열쇠 한 번에)
        ⑤ 이번 기간 자료가 있나(limit=1, 지난 기간과 같은 표·조건)를 읽는다. 지난 기간은 반려·회수일 때도 자료를 센다.
-       표시를 못 읽거나(표가 아직 없는 서버 포함) 자료를 못 읽으면 「표시 없음」과 같다 — data-live 는 결재 상태 읽기만 본다. */
+       표시를 못 읽거나(표가 아직 없는 서버 포함) 자료를 못 읽으면 「표시 없음」과 같다 — data-live 는 결재 상태 읽기만 본다.
+     ★ 2026-11-03 법인카드 「추가 상신」(docs/card-multi/SPEC.md §5-8): 법인카드는 한 기간에 문서가 여럿일 수 있다(카드마다 따로 상신).
+       그래서 법인카드만 그 기간 결재 건 모두(예전엔 첫 건 하나) + 그 기간 줄(id·묶인 문서 approval_id)을 읽어 달 상태(cardMonth — 서버·웹 monthState 와 같은 규칙)를 센다.
+       「이번 기간 자료가 있나」(has)도 이 줄 읽기에서 나온다(limit=1 대신). 문서를 못 읽으면 예전처럼 hint 로, 줄만 못 읽으면 문서만으로 센다. */
   var LIVE = null, STEPQ = null;
   // 탭으로 돌아올 때 조용히 다시 읽기(2026-11-02 docs/nav-refresh/SPEC.md §7) — LIVE_AT 마지막으로 읽기 시작한 시각 · LIVE_Q 조용히 읽는 중인 것(다 읽기 전에는 LIVE 로 그린다)
   var LIVE_AT = 0, LIVE_Q = null;
@@ -921,7 +946,10 @@ footer .wrap{font-size:13px}
     if (!at || !who) return;
     // has 이번 기간 자료 있음 · pv 지난 기간(남길지는 다 읽은 뒤 liveNone) · nm 표시('driving|2026-11') · none 효력 · key 읽은 이번 기간 열쇠
     //   hasMiss 이번 기간 자료를 못 읽은 갈래(조용히 읽기는 읽어 둔 값을 쓴다)
-    var now = Date.now(), R = deadlines(now), L = { u: who, done: false, bad: {}, st: {}, ro: {}, inbox: {}, prev: {}, has: {}, pv: {}, nm: {}, none: {}, key: {}, hasMiss: {} };
+    // cm 법인카드 이번 기간 달 상태(cardMonth) · lv 법인카드에 살아 있는 문서(결재 중·완료)가 있나 — 「내역 없음」 효력이 되지 않는다
+    //   cl 법인카드 기간 열쇠 → 읽은 줄([{ id, approval_id }]) — 조용히 다시 읽기에서 줄을 잠깐 못 읽으면 이 줄로 센다(2026-11-03 합치기)
+    var now = Date.now(), R = deadlines(now), prevL = quiet ? LIVE : null;
+    var L = { u: who, done: false, bad: {}, st: {}, ro: {}, inbox: {}, prev: {}, has: {}, pv: {}, nm: {}, none: {}, key: {}, hasMiss: {}, cm: {}, lv: {}, cl: {} };
     LIVE_AT = now;
     if (quiet) LIVE_Q = L;
     else { LIVE = L; LIVE_Q = null; document.body.removeAttribute('data-live'); }
@@ -932,9 +960,10 @@ footer .wrap{font-size:13px}
     // 그 기간에 올린 자료(운행·경비·카드 줄)가 하나라도 있나 — 서버 remindCounts 와 같은 표·조건(운행은 지우지 않은 것만)
     var dataQ = function (k, P) {
       return k === 'd' ? 'trips?select=id&deleted_at=is.null&username=eq.' + wq + '&start_time=gte.' + P.loMs + '&start_time=lt.' + P.endMs + '&limit=1'
-        : k === 'x' ? 'expense_items?select=id&username=eq.' + wq + '&date_millis=gte.' + P.loMs + '&date_millis=lt.' + P.endMs + '&limit=1'
-        : 'card_items?select=id&username=eq.' + wq + '&cycle=eq.' + encodeURIComponent(P.key) + '&limit=1';
+        : 'expense_items?select=id&username=eq.' + wq + '&date_millis=gte.' + P.loMs + '&date_millis=lt.' + P.endMs + '&limit=1';
     };
+    // 법인카드 줄(id · 묶인 문서) — 자료 있음(has)과 열린 줄(상신 전 N줄)을 한 번에. 서버 remindCounts 와 같은 표·조건(cycle = 그 열쇠). 못 읽으면 null
+    var cardQ = function (key) { return 'card_items?select=id,approval_id&username=eq.' + wq + '&cycle=eq.' + encodeURIComponent(key); };
     var jobs = [], allKeys = [];
     R.list.forEach(function (x) {
       // pv = 마감 뒤 며칠이 지나 처음 보일 기간이 오늘 기간이 됐으면 바로 앞 기간(V3 U11 — 그 기간을 상신하지 않았으면 「오늘 할 일」에서 빠졌다)
@@ -942,24 +971,59 @@ footer .wrap{font-size:13px}
       var keys = [x.key].concat(pv ? [pv.key] : []), P = CR.byKey(DL_KIND[k], x.key);
       keys.forEach(function (y) { if (allKeys.indexOf(y) < 0) allKeys.push(y); });
       L.key[k] = x.key;
-      // 이번 기간 자료 — 결재 상태와 나란히 읽는다(기다리는 시간이 늘지 않게). 못 읽으면 모름(「내역 없음」 단추·효력 없음)
-      if (P) jobs.push(get(dataQ(k, P)).then(function (r2) { L.has[k] = !!(r2 && r2.length); }, function () { L.hasMiss[k] = 1; }));
-      // steps 도 받는다 — 관리자가 정정으로 다시 연 건(상태는 rejected, 칸에 reopened_by)을 「반려됨」이 아니라 「정정 중」으로(2026-10-21 매뉴얼 로봇,
-      //   운행일지 화면 apprStatusText·reopenInfo 와 같은 판정)
-      jobs.push(get(t + '?select=cycle,status,submitted_at,steps&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
-        .then(function (rows) {
-          var rowOf = function (key) { return (rows || []).filter(function (r) { return r.cycle === key; })[0] || null; };
-          var stOfKey = function (key) { var a = rowOf(key); return a ? String(a.status || '') : ''; };
-          L.st[k] = stOfKey(x.key);
-          L.ro[k] = reopened(rowOf(x.key));
+      if (k === 'c') {
+        // 법인카드(2026-11-03 추가 상신 — SPEC §5-8): 그 기간 결재 건 모두 + 그 기간 줄을 함께 받아 달 상태를 센다. 지난 기간도 같이(문서가 여럿일 수 있어
+        //   상태를 줄까지 봐야 안다). 문서를 못 받으면 L.bad.c(hint 로), 줄을 못 받으면 문서만으로 세고 자료 있음은 모름(null)
+        //   ★ 조용히 다시 읽기(탭 복귀 — nav-refresh SPEC §7)는 「읽은 것은 새것, 못 읽은 것은 읽어 둔 것」: 줄을 잠깐 못 읽으면 읽어 둔 줄(같은 기간 열쇠 — cl)로
+        //     새 문서와 함께 센다(줄 하나 못 읽었다고 「결재 중 1건 · 상신 전 6줄」이 「결재 중」으로 바뀌지 않게, 2026-11-03 합치기). 처음 읽기는 예전 그대로(문서만으로)
+        if (quiet && prevL && prevL.u === who && prevL.cl) keys.forEach(function (y) { if (prevL.cl[y]) L.cl[y] = prevL.cl[y]; });
+        //   clNew = 이번 기간 줄을 이 읽기에서 새로 읽었다(읽어 둔 줄 cl 로 센 것이 아님 — 아래 결재 건만 못 읽었을 때 「자료 있나」를 그 줄로)
+        var oneLines = function (key) {
+          return get(cardQ(key)).then(function (r2) { if (!Array.isArray(r2)) return null; L.cl[key] = r2; if (key === x.key) L.clNew = 1; return r2; }, function () { return null; })
+            .then(function (r2) { if (r2 || !L.cl[key]) return r2; L.clHeld = 1; return L.cl[key]; });
+        };
+        var lines = keys.map(oneLines);
+        jobs.push(Promise.all([
+          get(t + '?select=id,cycle,status,submitted_at,steps,card_no&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
+        ].concat(lines)).then(function (res) {
+          var docsOf = function (key) { return (res[0] || []).filter(function (r) { return r.cycle === key; }); };
+          var c0 = cardMonth(res[1], docsOf(x.key));
+          L.cm.c = c0; L.st.c = c0.st; L.ro.c = c0.rej > 0 && c0.reo === c0.rej; L.lv.c = c0.sub + c0.app > 0;
+          if (res[1] && P) L.has.c = res[1].length > 0;
           if (!pv) return;
-          var ps = stOfKey(pv.key);
-          if (ps === 'submitted' || ps === 'approved' || ps === 'draft') return;
-          // 상신 전·반려·회수 — 그 기간 자료를 센다. 상신 전은 자료가 있을 때만 남기고(운행일지 화면 prevPending 과 같은 생각),
-          //   반려·회수는 자료와 상관없이 남기되 0건이면 「내역 없음」 단추를 붙인다(2026-11-02). 남길지는 표시까지 다 읽은 뒤(liveNone)
-          var p = L.pv[k] = { key: pv.key, st: ps, hi: pv.hi, ro: reopened(rowOf(pv.key)) };
-          return get(dataQ(k, pv)).then(function (r2) { p.has = !!(r2 && r2.length); }, function () { p.miss = 1; });
-        }).catch(function () { L.bad[k] = 1; delete L.st[k]; delete L.ro[k]; delete L.pv[k]; }));
+          var c1 = cardMonth(res[2], docsOf(pv.key));
+          if (c1.st === 'submitted' || c1.st === 'approved') return;      // 지난 기간 문서가 모두 결재 중·완료이고 열린 줄이 없다
+          // 상신 전(열린 줄)·반려·회수 — 상신 전은 줄이 있을 때만 남기고, 반려·회수는 줄과 상관없이 남기되 0줄이면 「내역 없음」 단추(liveNone 이 가른다)
+          var p = L.pv.c = { key: pv.key, st: c1.st, hi: pv.hi, ro: c1.rej > 0 && c1.reo === c1.rej, cm: c1, lv: c1.sub + c1.app > 0 };
+          if (res[2]) p.has = res[2].length > 0;
+        }).catch(function () {
+          L.bad.c = 1; delete L.st.c; delete L.ro.c; delete L.pv.c; delete L.cm.c; delete L.lv.c; delete L.has.c;
+          // 탭 복귀 다시 읽기에서 결재 건만 못 읽었어도 이번 기간 줄을 새로 읽었으면 「자료 있나」(has)는 그 줄로 — 읽은 것은 새것(운행일지·개인경비 has 와 같은 규칙,
+          //   2026-11-03 최종 검토 L2: 아래 합치기가 읽어 둔 has 로 되돌려 그 사이 줄이 생겼는데도 가짜 「내역 없음」이 할 일 줄을 가렸다).
+          //   결재 건 읽기가 먼저 실패해도 줄 읽기가 끝날 때까지 기다린다. 줄도 못 읽어 읽어 둔 줄로 셌으면 두지 않는다(합치기가 읽어 둔 has 를 쓴다).
+          //   처음 읽기는 예전 그대로(결재 상태를 모르면 「내역 없음」 효력·단추가 has 를 보지 않는다)
+          if (quiet) return lines[0].then(function (r1) { if (L.clNew && P && Array.isArray(r1)) L.has.c = r1.length > 0; });
+        }));
+      } else {
+        // 이번 기간 자료 — 결재 상태와 나란히 읽는다(기다리는 시간이 늘지 않게). 못 읽으면 모름(「내역 없음」 단추·효력 없음)
+        if (P) jobs.push(get(dataQ(k, P)).then(function (r2) { L.has[k] = !!(r2 && r2.length); }, function () { L.hasMiss[k] = 1; }));
+        // steps 도 받는다 — 관리자가 정정으로 다시 연 건(상태는 rejected, 칸에 reopened_by)을 「반려됨」이 아니라 「정정 중」으로(2026-10-21 매뉴얼 로봇,
+        //   운행일지 화면 apprStatusText·reopenInfo 와 같은 판정)
+        jobs.push(get(t + '?select=cycle,status,submitted_at,steps&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
+          .then(function (rows) {
+            var rowOf = function (key) { return (rows || []).filter(function (r) { return r.cycle === key; })[0] || null; };
+            var stOfKey = function (key) { var a = rowOf(key); return a ? String(a.status || '') : ''; };
+            L.st[k] = stOfKey(x.key);
+            L.ro[k] = reopened(rowOf(x.key));
+            if (!pv) return;
+            var ps = stOfKey(pv.key);
+            if (ps === 'submitted' || ps === 'approved' || ps === 'draft') return;
+            // 상신 전·반려·회수 — 그 기간 자료를 센다. 상신 전은 자료가 있을 때만 남기고(운행일지 화면 prevPending 과 같은 생각),
+            //   반려·회수는 자료와 상관없이 남기되 0건이면 「내역 없음」 단추를 붙인다(2026-11-02). 남길지는 표시까지 다 읽은 뒤(liveNone)
+            var p = L.pv[k] = { key: pv.key, st: ps, hi: pv.hi, ro: reopened(rowOf(pv.key)) };
+            return get(dataQ(k, pv)).then(function (r2) { p.has = !!(r2 && r2.length); }, function () { p.miss = 1; });
+          }).catch(function () { L.bad[k] = 1; delete L.st[k]; delete L.ro[k]; delete L.pv[k]; }));
+      }
       // 지금 내 차례인 결재 건(결재선의 지금 칸 = 나) — 운행일지 결재함 inbox() 와 같은 판정
       jobs.push(get(t + '?select=cur_seq,steps&status=eq.submitted').then(function (rows) {
         L.inbox[k] = (rows || []).filter(function (a) { return (a.steps || []).some(function (s) { return s && s.seq === a.cur_seq && s.approver === who; }); }).length;
@@ -985,7 +1049,17 @@ footer .wrap{font-size:13px}
         Object.keys(L.bad).forEach(function (k) {
           if (old.key[k] !== L.key[k]) return;
           var ok = true;
-          if (!(k in L.st)) { if (k in old.st) { L.st[k] = old.st[k]; L.ro[k] = old.ro[k]; if (old.pv[k]) L.pv[k] = old.pv[k]; } else ok = false; }
+          // 법인카드는 달 상태(cm)·살아 있는 문서(lv)·자료 있나(has — 그 갈래 줄 읽기에서 나온다)도 같은 읽기의 것이라 함께(2026-11-03 합치기 — 빠지면 cardView 가 모름이 되어
+          //   「결재 중 1건 · 상신 전 6줄」이 「결재 중」으로 바뀌었다). 운행일지·개인경비는 cm·lv 가 없고 has 는 따로 읽어 hasMiss 가 맡는다.
+          //   법인카드 has 는 줄을 새로 읽었으면 이미 새것(위 법인카드 읽기 catch — L2)이라 읽어 둔 것으로 덮지 않는다
+          if (!(k in L.st)) {
+            if (k in old.st) {
+              L.st[k] = old.st[k]; L.ro[k] = old.ro[k]; if (old.pv[k]) L.pv[k] = old.pv[k];
+              if (old.cm && k in old.cm) L.cm[k] = old.cm[k];
+              if (old.lv && k in old.lv) L.lv[k] = old.lv[k];
+              if (!(k in L.has) && k in old.has) L.has[k] = old.has[k];
+            } else ok = false;
+          }
           if (!(k in L.inbox)) { if (k in old.inbox) L.inbox[k] = old.inbox[k]; else ok = false; }
           if (ok) { delete L.bad[k]; held.push(k); }
         });
@@ -997,6 +1071,7 @@ footer .wrap{font-size:13px}
         // 「내역 없음」 표시를 잠깐 못 읽었으면(일시 오류) 읽어 둔 표시 그대로 — 같은 기간 열쇠들을 읽었을 때만(2026-11-02 재검토 R1 — 그 한 번
         //   표시가 없는 것으로 그려 마감 D-day·할 일 줄이 다시 보였다). 읽어 둔 표시가 없으면(첫 읽기도 못 읽음 · 표가 없는 서버) 표시 없음 그대로
         if (!L.nmRead && old.nmRead && old.nmKeys === L.nmKeys) { L.nm = old.nm; L.nmRead = true; held.push('none'); }
+        if (L.clHeld) held.push('card_items');                // 법인카드 줄을 잠깐 못 읽어 읽어 둔 줄로 셌다(위 법인카드 읽기)
         if (held.length) console.warn('[새로 읽기] 일부를 읽지 못해 그 갈래는 읽어 둔 것 그대로', held.join(','));
       }
       liveNone(L, R);
@@ -1011,8 +1086,18 @@ footer .wrap{font-size:13px}
       document.body.setAttribute('data-live', Object.keys(L.bad).length ? 'part' : 'ok');
     });
   }
-  /** 읽은 것의 지문 — 조용히 다시 읽은 것이 앞과 같으면 다시 그리지 않는다. */
-  function liveSig(L) { return JSON.stringify([L.st, L.ro, L.inbox, L.prev, L.has, L.nm, L.nmRead, L.none, L.key]); }
+  /** 읽은 것의 지문 — 조용히 다시 읽은 것이 앞과 같으면 다시 그리지 않는다.
+   *  법인카드 달 상태(cm — 문서 수·상신 전 줄 수)·살아 있는 문서(lv)도 넣는다(2026-11-03 합치기 — 상태(st)는 그대로인데 「상신 전 5줄」이 6줄이 된 것도 그리게).
+   *  열쇠 차례는 맞춰서 본다(sigSort — 갈래 읽기가 끝나는 차례대로 { d, x, c } 열쇠가 들어가 값이 같아도 글이 달라 늘 다시 그렸다, 2026-11-03 합치기 시험에서 봄).
+   *  그리는 쪽(stateOf·cardView·inboxOf·paintToday)은 열쇠로만 찾으므로 열쇠 차례는 화면과 상관없다. */
+  function sigSort(v) {
+    if (Array.isArray(v)) return v.map(sigSort);
+    if (!v || typeof v !== 'object') return v;
+    var o = {};
+    Object.keys(v).sort().forEach(function (k) { o[k] = sigSort(v[k]); });
+    return o;
+  }
+  function liveSig(L) { return JSON.stringify(sigSort([L.st, L.ro, L.inbox, L.prev, L.has, L.nm, L.nmRead, L.none, L.key, L.cm || null, L.lv || null])); }
   /** 탭으로 돌아오면(visibilitychange · 앞뒤 이동 캐시 pageshow) — 마지막으로 읽은 지 30초가 넘었으면 조용히 다시 읽는다(2026-11-02).
    *  읽는 중·로그인 전·창(로그인·「내역 없음」 확인 등)이 열려 있으면 하지 않는다. 시험은 window.__NAV_REFRESH_MS 로 30초를 줄인다. */
   function liveWake() {
@@ -1023,13 +1108,14 @@ footer .wrap{font-size:13px}
     liveRead(m, true);
   }
   /** 다 읽은 뒤(2026-11-02) — 「내역 없음」 효력과 지난 기간 줄. 효력 = 표시 && 결재 중·완료가 아님 && 그 기간 자료 0건(SPEC §1 —
-   *  자료를 못 읽었으면 효력 없음, 자료가 생기면 표시는 그대로 두고 무시한다). 지난 기간이 효력이면 「오늘 할 일」 맨 위에 남기지 않는다. */
+   *  자료를 못 읽었으면 효력 없음, 자료가 생기면 표시는 그대로 두고 무시한다). 지난 기간이 효력이면 「오늘 할 일」 맨 위에 남기지 않는다.
+   *  법인카드(2026-11-03)는 문서가 여럿이라 st 가 반려·회수로 덮일 수 있다 — 살아 있는 문서(lv)가 하나라도 있으면 효력이 아니다(card-multi SPEC §5-9). */
   function liveNone(L, R) {
     R.list.forEach(function (x) {
       var k = x.k, kind = DL_KIND[k], st = L.st[k], p = L.pv[k];
-      L.none[k] = st !== undefined && st !== 'submitted' && st !== 'approved' && L.has[k] === false && !!L.nm[kind + '|' + x.key];
+      L.none[k] = st !== undefined && st !== 'submitted' && st !== 'approved' && !L.lv[k] && L.has[k] === false && !!L.nm[kind + '|' + x.key];
       if (!p) return;
-      if (p.has === false && L.nm[kind + '|' + p.key]) return;     // 지난 기간을 「내역 없음」으로 표시했다(p.st 는 상신 전·반려·회수뿐)
+      if (p.has === false && !p.lv && L.nm[kind + '|' + p.key]) return;     // 지난 기간을 「내역 없음」으로 표시했다(p.st 는 상신 전·반려·회수뿐)
       if (p.st === '' && !p.has) return;                           // 상신 전은 자료가 있을 때만 — 못 읽었으면 남기지 않는다(예전과 같다)
       L.prev[k] = p;
     });
@@ -1059,6 +1145,62 @@ footer .wrap{font-size:13px}
   }
   /** 반려된 기간 글 — 정정으로 연 것이면 「정정 중」(운행일지 결재함·마감 화면과 같은 말), 아니면 「반려됨」 */
   function rejWord(ro) { return ro ? '정정 중' : '반려됨'; }
+
+  /* ── 법인카드 한 기간의 달 상태(2026-11-03 추가 상신 — docs/card-multi/SPEC.md §4-1 cardMonthState · §5-8) ──
+     카드 한 장 = 문서 하나라 한 기간에 문서가 여럿일 수 있다. 서버 _shared/card-doc.ts cardMonthState · 웹 card-rules.js monthState 와 같은 규칙을 포털이 작은 함수로 센다(card-rules.js 는 싣지 않는다).
+     살아 있는 문서 = 결재 중·결재 완료, 죽은 문서 = 반려·회수·draft(다시 상신할 수 있다). 잠긴 줄 = 살아 있는 문서에 묶인 줄(card_items.approval_id) — 카드를 가르지 않은 옛 문서
+     (card_no 가 null, 여러 카드)가 살아 있으면 그 달 줄은 모두 잠긴다. 열린 줄 = 잠기지 않은 줄(안 묶임 + 죽은 문서에 묶임).
+     st: 여러 카드 살아 있는 문서 → 그 상태 · 반려 문서 → 'rejected' · 회수·draft → 'withdrawn' · 열린 줄 → '' · 결재 중 → 'submitted' · 모두 완료 → 'approved' · 없음 → ''.
+     lines = [{ id, approval_id }] — 못 받았으면 null(문서만으로 반려 > 회수 > 결재 중 > 결재 완료, left 는 null = 모름) · docs = [{ id, status, card_no, steps }] */
+  function cardMonth(lines, docs) {
+    var o = { st: '', sub: 0, app: 0, rej: 0, wd: 0, reo: 0, left: null }, by = Object.create(null), whole = '';
+    docs.forEach(function (d) {
+      var s = String(d.status || '');
+      by[d.id] = s;
+      if (s === 'submitted') o.sub++;
+      else if (s === 'approved') o.app++;
+      else if (s === 'rejected') { o.rej++; if (reopened(d)) o.reo++; }
+      else if (s === 'withdrawn' || s === 'draft') o.wd++;
+      if ((s === 'submitted' || s === 'approved') && d.card_no == null) whole = whole === 'submitted' ? 'submitted' : s;   // 여러 카드 문서가 살아 있다
+    });
+    // 열린 줄 = 안 묶인 줄 + 죽은 문서에 묶인 줄. 목록에 없는 문서에 묶인 줄은 잠긴 것으로 센다(card-rules.js monthState · SPEC §5-1 — 결재 목록을 못 받았을 때)
+    if (lines) o.left = whole ? 0 : lines.filter(function (l) {
+      if (!l) return false;
+      if (l.approval_id == null || l.approval_id === '') return true;
+      var s = by[l.approval_id];
+      return s !== undefined && s !== 'submitted' && s !== 'approved';
+    }).length;
+    o.st = whole || (o.rej ? 'rejected' : o.wd ? 'withdrawn' : o.left > 0 ? '' : o.sub ? 'submitted' : o.app ? 'approved' : '');
+    return o;
+  }
+  /** 법인카드 그 기간(x.key)의 문서 수·열린 줄 — 로그인 직후 읽은 값(LIVE)이 먼저, 못 읽었으면 운행일지 화면이 적어 둔 것(hint.cs.docs · hint.cs.left, 약속 K6). 모르면 null.
+   *  left 가 null 이면 줄을 받지 못한 것 — 열린 줄은 모르는 채로(없는 것으로 치지도 않고 글에서 뺀다). ro = 반려 문서가 모두 정정으로 다시 연 것(「정정 중」) */
+  function cardView(x, hint, m) {
+    if (!x || x.k !== 'c') return null;
+    if (LIVE && LIVE.u === m.username && LIVE.st.c !== undefined) {
+      var c = LIVE.key.c === x.key ? LIVE.cm.c : null;
+      return c ? { sub: c.sub, app: c.app, rej: c.rej, wd: c.wd, left: c.left, ro: c.rej > 0 && c.reo === c.rej } : null;
+    }
+    var s = hint && hint.cs, n = function (v) { v = Math.floor(Number(v)); return v > 0 ? v : 0; };
+    if (!s || s.cyc !== x.key || !s.docs || typeof s.docs !== 'object') return null;
+    return { sub: n(s.docs.sub), app: n(s.docs.app), rej: n(s.docs.rej), wd: n(s.docs.wd), left: typeof s.left === 'number' && s.left >= 0 ? Math.floor(s.left) : null, ro: !!s.ro && n(s.docs.rej) === 1 };
+  }
+  /** 문서가 여럿이거나 살아 있는 문서에 열린 줄이 더 있나 — 그때만 새 글. 문서가 0~1건이고 그 밖이면 지금 글 그대로(SPEC §5-8) */
+  function cardMulti(v) { return !!v && (v.sub + v.app + v.rej + v.wd >= 2 || (v.sub + v.app === 1 && v.left > 0)); }
+  /** 법인카드 「내 상태」 줄 — 차례대로: D-day(열린 줄·반려·회수가 있을 때만, 빨강은 예전 규칙 그대로) · 결재 중 N건 · 결재 완료 N건(다른 것이 같이 있을 때만) ·
+   *  상신 전 N줄(열린 줄 — 죽은 문서에 묶인 줄 포함) · 반려 N건 · 다시 상신(빨강 · 정정으로 다시 연 것만이면 「정정 중」) · 회수 N건. 보일 것이 결재 완료뿐이면 null(지금 글 「결재 완료」). */
+  function cardParts(v, x) {
+    var open = v.left > 0, todo = open || v.rej > 0 || v.wd > 0, ps = [];
+    if (todo) ps.push({ t: ddWord(x.dday, true), hot: x.dday <= 3 });
+    if (v.sub) ps.push({ t: '결재 중 ' + v.sub + '건' });
+    if (v.app && (v.sub || todo)) ps.push({ t: '결재 완료 ' + v.app + '건' });
+    if (open) ps.push({ t: '상신 전 ' + v.left + '줄' });
+    if (v.rej) ps.push({ t: (v.ro ? '정정 중' : '반려') + ' ' + v.rej + '건 · 다시 상신', hot: true });
+    if (v.wd) ps.push({ t: '회수 ' + v.wd + '건' });
+    return ps.length ? ps : null;
+  }
+  /** 「오늘 할 일」 법인카드 줄 작은 글 앞의 「상신 전 N줄 · 」 — 새 글일 때(cardMulti)만, 열린 줄을 알 때만 */
+  function cardLeft(v) { return cardMulti(v) && v.left > 0 ? '상신 전 ' + v.left + '줄 · ' : ''; }
   /** 종류별 「결재할 것」 수 — 읽은 값(LIVE)이 먼저, 없으면 hint. */
   function inboxOf(hint, m) {
     var ib = (hint && hint.inbox) || {}, o = {};
@@ -1073,9 +1215,15 @@ footer .wrap{font-size:13px}
     R.list.forEach(function (x) { dd[x.k] = x; });
     var ddTxt = function (k) { var x = dd[k]; return x ? ddWord(x.dday, true) : ''; };
     var cyc = dd.d ? dd.d.key : '';   // 운행일지 기간 키(엔진 — 12월 추가 기간이면 '2026-12b', 2026-10-20)
+    // 「내 상태」 줄 — 조각마다 한 덩이(.ph, CSS nowrap)라 줄은 조각 사이에서만 바뀐다(「결재 중 1건」·「반려 1건 · 다시 상신」이 갈리지 않는다). 구분점 「·」은 다음 조각 맨 앞에 걸어 둔다
+    //   (<i>, CSS 로 왼쪽 바깥에 hang) — 같은 줄이면 조각 사이에 보이고, 줄이 바뀌면 그 조각이 줄 맨 앞이라 점이 칸 밖으로 나가 잘린다 → 줄이 「·」로 시작하지도 끝나지도 않는다
+    //   (2026-11-03 설계 규칙, Fix 1·2). 조각 안의 「 · 」(반려됨 · 다시 상신)는 dotJoin(&nbsp;)으로 붙인다. 「결재할 것」 딱지는 조각 다음 칸(예전 그대로).
     var put = function (id, parts, nAp) {
       var e = $(id); if (!e) return;
-      var h = parts.filter(Boolean).map(function (p) { return '<span' + (p.hot ? ' class="hot"' : '') + '>' + p.t + '</span>'; }).join('<span aria-hidden="true">·</span>');
+      var ps = parts.filter(Boolean);
+      var h = ps.map(function (p, i) {
+        return '<span class="ph' + (i === ps.length - 1 ? ' end' : '') + '">' + (i ? '<i aria-hidden="true">·</i>' : '') + '<span' + (p.hot ? ' class="hot"' : '') + '>' + dotJoin(p.t) + '</span></span>';
+      }).join('');
       if (nAp) h += ' <span class="ap">결재할 것 ' + nAp + '건</span>';
       e.innerHTML = h; e.hidden = !h;
     };
@@ -1101,6 +1249,8 @@ footer .wrap{font-size:13px}
     // 개인경비·법인카드 — 그 갈래 처음 보일 기간의 내 결재 상태(LIVE · 없으면 운행일지 화면이 적어 둔 hint.xs·cs)
     var kParts = function (k) {
       var x = dd[k], st = x ? stateOf(k, x, hint, m) : null;
+      // 법인카드 — 한 기간에 문서가 여럿이거나 살아 있는 문서에 열린 줄이 더 있으면 새 글(2026-11-03 추가 상신 · SPEC §5-8). 「내역 없음」 효력이면 그 말이 먼저
+      if (k === 'c' && st !== 'none') { var cv = cardView(x, hint, m), cp = cardMulti(cv) ? cardParts(cv, x) : null; if (cp) return cp; }
       if (st === 'submitted') return [{ t: '결재 중' }];
       if (st === 'approved') return [{ t: '결재 완료' }];
       if (st === 'none') return [{ t: '내역 없음' }];
@@ -1134,6 +1284,19 @@ footer .wrap{font-size:13px}
   var KN = { d: '운행일지', x: '개인경비', c: '법인카드' };
   var VERIFY_OF = { d: 'driving.html#/verify', x: 'driving.html#/x_verify', c: 'driving.html#/c_verify' };
   var escH = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  /** 글 안의 구분점 「·」는 앞뒤를 &nbsp; 로 붙이고(줄이 「·」로 끝나거나 시작하지 않게), 「상신 전 N줄」은 낱말 사이를 &nbsp; 로 붙인다(말과 숫자가 두 줄로 갈리지 않게) —
+   *  HTML 글에서, escH 를 거친 뒤에(2026-11-03 설계 규칙, Fix 1·2). 「내 상태」 줄 조각(put)과 「오늘 할 일」 줄 작은 글의 「상신 전 N줄 · …」가 쓴다. */
+  var DOT = '&nbsp;·&nbsp;';
+  var dotJoin = function (h) { return String(h).replace(/ · /g, DOT).replace(/상신 전 (\d+줄)/g, '상신&nbsp;전&nbsp;$1'); };
+  /** 「오늘 할 일」 줄 작은 글의 HTML — 「 · 」를 &nbsp; 로 묶는 것은 **법인카드 줄만**(2026-11-03 Fix 3 — 검토 H1): 운행일지 「남은 일」 hint 의 「날짜 · 날짜 · …」 같은 다른 줄의 글까지 묶으면
+   *  칸(.tt, PC 4칸 나눔에서 95~294px)보다 넓은 한 덩이(244px)가 되어 마감 딱지를 덮고 폰 큰 글씨에서 칸 밖으로 나간다. 다른 줄은 escH 만(띄어쓰기에서 꺾인다).
+   *  법인카드 줄의 접두 「상신 전 N줄 · 」은 .cpre(말·숫자·점 한 덩이 — 좁은 901~950px 에서는 CSS 가 한 줄로 따로 세우고 점을 숨긴다, 검토 L2)로 묶는다. */
+  var smallHtml = function (r) {
+    if (r.k !== 'c') return escH(r.s);
+    var s = r.s == null ? '' : String(r.s), m = /^(상신 전 \d+줄) · /.exec(s);
+    if (!m) return dotJoin(escH(s));
+    return '<span class="cpre">' + m[1].replace(/ /g, '&nbsp;') + '<i aria-hidden="true">' + DOT + '</i></span>' + dotJoin(escH(s.slice(m[0].length)));
+  };
   function ddCls(n) { return n < 0 ? 'warn' : n <= 3 ? 'bad' : ''; }
   // 그 줄의 기간 열쇠 — deadlines 가 넣어 둔 엔진 열쇠(x.key, 12월 추가 기간이면 '2026-12b')가 먼저(2026-10-20 V3 — 예전 식은 마감일의 달이라
   //   12월분 2차(마감 12.31)가 '2026-12' 가 되어 운행일지 화면이 적어 둔 상태·남은 일과 안 맞았다). 기본 설정에서는 둘이 같다.
@@ -1156,8 +1319,9 @@ footer .wrap{font-size:13px}
     // 「내역 없음」 단추를 붙일 이번 기간 줄인가(2026-11-02 SPEC §6) — 로그인 직후 다 읽었고(LIVE) 그 기간 상태를 알며 자료가 0건인 상신 전(회수 포함)·반려 줄.
     //   반려 줄은 지난 기간 반려됨 줄과 같게 붙인다(2026-11-02 결정). 정정 중 줄(아래 반려 가지에서 뺀다) · 상태를 모르는 줄 · 결재할 문서 줄에는 안 붙인다.
     //   표시 읽기가 된 때만(nmRead — 표가 없거나 되돌린 서버면 단추 없이 예전 화면 그대로). 지난 기간 줄은 아래 late 에서(p.has)
+    //   법인카드는 살아 있는 문서(lv)가 하나라도 있으면 붙이지 않는다(문서가 여럿이면 st 가 반려·회수로 덮여도 — card-multi SPEC §5-9)
     var nmOk = function (x, st) {
-      return !!(LIVE && LIVE.u === m.username && LIVE.done && LIVE.nmRead && LIVE.key[x.k] === x.key && LIVE.st[x.k] !== undefined && LIVE.has[x.k] === false) &&
+      return !!(LIVE && LIVE.u === m.username && LIVE.done && LIVE.nmRead && LIVE.key[x.k] === x.key && LIVE.st[x.k] !== undefined && LIVE.has[x.k] === false && !LIVE.lv[x.k]) &&
         st !== null && st !== 'submitted' && st !== 'approved' && st !== 'none';
     };
     R.list.forEach(function (x) {
@@ -1170,9 +1334,11 @@ footer .wrap{font-size:13px}
       if (st === 'submitted' || st === 'approved' || st === 'none') return;   // 이미 상신했다 · 「내역 없음」으로 표시했다 — 할 일이 아니다
       var quiet = st === null, due = [quiet ? '' : ddCls(x.dday), ddWord(x.dday)], until = x.dday < 0 ? mdOf(x.due + CR.graceDays() * DAY) + '까지 상신' : '';
       var nm = nmOk(x, st);
+      // 법인카드 — 문서가 여럿이거나 살아 있는 문서에 열린 줄이 더 있으면 작은 글 앞에 「상신 전 N줄」(2026-11-03 추가 상신 · SPEC §5-8). 줄은 그대로 하나(들어가서 카드를 고른다)
+      var cv = k === 'c' ? cardView(x, hint, m) : null, lw = cardLeft(cv);
       if (st === 'rejected') {
-        var ro = reopenOf(k, x, hint, m);
-        rows.push({ k: k, key: x.key, nm: nm && !ro, t: KN[k] + ' ' + mon + ' ' + rejWord(ro), s: (ro ? '정정' : '반려') + ' 사유를 확인하고 고쳐서 다시 상신하세요.', due: due, note: until, b: '다시 상신', href: VERIFY_OF[k] });
+        var ro = cardMulti(cv) ? cv.ro : reopenOf(k, x, hint, m);
+        rows.push({ k: k, key: x.key, nm: nm && !ro, t: KN[k] + ' ' + mon + ' ' + rejWord(ro), s: lw + (ro ? '정정' : '반려') + ' 사유를 확인하고 고쳐서 다시 상신하세요.', due: due, note: until, b: '다시 상신', href: VERIFY_OF[k] });
         return;
       }
       if (k === 'd') {
@@ -1193,7 +1359,7 @@ footer .wrap{font-size:13px}
         }
         return;
       }
-      if (x.dday <= 3) rows.push({ k: k, key: x.key, nm: nm, t: KN[k] + ' ' + mon + (quiet ? ' 마감' : ' 아직 상신 전'), s: quiet ? '상신했는지 들어가서 확인하세요.' : '검증하고 상신하세요.',
+      if (x.dday <= 3) rows.push({ k: k, key: x.key, nm: nm, t: KN[k] + ' ' + mon + (quiet ? ' 마감' : ' 아직 상신 전'), s: lw + (quiet ? '상신했는지 들어가서 확인하세요.' : '검증하고 상신하세요.'),
         due: due, note: until, b: quiet ? '들어가서 확인' : '상신 준비', href: VERIFY_OF[k], quiet: quiet });
     });
     // 마감 뒤 GRACE_DAYS 일이 지나 오늘 기간으로 넘어간 지난 기간 — 아직 상신 전(자료 있음)·반려·회수면 맨 위에 남긴다(2026-10-20 V3 U11 —
@@ -1207,10 +1373,11 @@ footer .wrap{font-size:13px}
       var hi = Date.UTC(+p.hi.slice(0, 4), +p.hi.slice(5, 7) - 1, +p.hi.slice(8, 10)), past = Math.round((R.today - hi) / DAY);
       // 관리자가 정정으로 다시 연 지난 기간은 늦은 것이 아니라 고칠 차례 — 「늦었지만」·빨간 「N일 지남」 대신 이번 기간 정정 줄과 같은 말(2026-10-21 매뉴얼 로봇)
       var reo = p.st === 'rejected' && !!p.ro;
-      late.push({ k: k, key: p.key, nm: !!LIVE.nmRead && p.has === false && !reo, dday: -past, ro: reo, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' ' + rejWord(p.ro) : p.st === 'withdrawn' ? ' 회수됨' : ' 아직 상신 전'),
+      //   법인카드는 문서가 여럿이거나 살아 있는 문서에 열린 줄이 더 있으면 작은 글 앞에 「상신 전 N줄」(p.cm — 2026-11-03 추가 상신), 살아 있는 문서(p.lv)가 있으면 「내역 없음」 단추 없음
+      late.push({ k: k, key: p.key, nm: !!LIVE.nmRead && p.has === false && !p.lv && !reo, dday: -past, ro: reo, t: KN[k] + ' ' + CR.short(p.key) + (p.st === 'rejected' ? ' ' + rejWord(p.ro) : p.st === 'withdrawn' ? ' 회수됨' : ' 아직 상신 전'),
         // 지난 기간도 반려면 고쳐서, 회수면 다시 — 그냥 「상신해 주세요」면 그대로 다시 올리라는 말로 읽혔다(2026-10-24 검수)
-        s: reo ? '정정 사유를 확인하고 고쳐서 다시 상신하세요.' : p.st === 'rejected' ? '마감이 지났어요. 반려 사유를 확인하고 고쳐서 다시 상신해 주세요.'
-          : p.st === 'withdrawn' ? '마감이 지났어요. 다시 상신해 주세요.' : '마감이 지났어요. 지금 상신해 주세요.', due: reo ? ['', '정정'] : ['warn', ddWord(-past)],
+        s: cardLeft(p.cm) + (reo ? '정정 사유를 확인하고 고쳐서 다시 상신하세요.' : p.st === 'rejected' ? '마감이 지났어요. 반려 사유를 확인하고 고쳐서 다시 상신해 주세요.'
+          : p.st === 'withdrawn' ? '마감이 지났어요. 다시 상신해 주세요.' : '마감이 지났어요. 지금 상신해 주세요.'), due: reo ? ['', '정정'] : ['warn', ddWord(-past)],
         note: mdOf(hi) + ' 마감', b: reo ? '다시 상신' : '상신하러 가기', href: VERIFY_OF[k] + '/' + p.key });
     });
     rows = late.concat(rows);
@@ -1251,7 +1418,7 @@ footer .wrap{font-size:13px}
         nb = '<button type="button" class="btn nm" data-nm="' + escH(nk) + '" aria-label="' + escH(KN[r.k] + ' ' + CR.short(r.key) + ' 내역 없음') + '">내역 없음</button>';
       }
       return '<li class="trw" data-k="' + r.k + '"' + (r.key ? ' data-key="' + escH(r.key) + '"' : '') + '><span class="tsys"><span class="cp line">' + KN[r.k] + '</span></span>' +
-        '<span class="tt"><b>' + escH(r.t) + '</b><span>' + escH(r.s) + '</span></span>' +
+        '<span class="tt"><b>' + escH(r.t) + '</b><span>' + smallHtml(r) + '</span></span>' +
         '<span class="tdue"><span class="cp ' + r.due[0] + '">' + escH(r.due[1]) + '</span>' + (r.note ? '<small>' + escH(r.note) + '</small>' : '') + '</span>' +
         '<span class="tbtns">' + nb + '<a class="btn' + (i === hot ? ' pri' : '') + '" href="' + r.href + '"' + (r.mode ? ' data-mode="' + r.mode + '"' : '') + '>' + escH(r.b) + '</a></span></li>';
     }).join('') : '<li class="tnone">지금 할 일이 없어요. 마감이 다가오면 여기에 보여요.</li>';

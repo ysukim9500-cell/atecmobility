@@ -9,6 +9,8 @@
      7월 승인 · 8월 취소가 한 파일에 있으면 7월분에서도 빠진다.
    ★ 취소는 구분에 「취소」가 들어 있거나 승인금액이 음수인 줄이다(구분이 「승인」이어도 음수면 취소 — 양수 지출로 두지 않는다).
    ★ 손 칸(구분·사용목적·비고)은 여기서 만들지도, 서버로 보내지도 않는다(toRow). 다시 올려도 손 칸은 그대로다.
+   ★ 2026-11-02 추가 상신(docs/card-multi/SPEC.md §5-3): 살아 있는 문서에 든 줄(잠긴 줄)은 다시 올려도 보내지 않는다(plan opt.locked).
+     문서에 묶는 칸(approval_id)도 여기서 만들지 않는다 — 상신만 쓴다.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (root, factory) {
   // ★ 2026-10-20 연말 마감 설정: 기간 키는 엔진(cycle-rules.js)에서 — 브라우저는 window.CycleRules(이 파일보다 먼저 싣는다), Node 는 require.
@@ -263,31 +265,49 @@
 
   /* ── 다시 올리기 계획 — (승인번호, 승인일)로 맞춘다. 손 칸은 보지 않는다 ── */
   function same(a, b) { return String(a == null ? '' : a) === String(b == null ? '' : b); }
+  /** 잠긴 줄 판정 — opt.locked = 잠긴 줄 id 모음(배열 · Set · { id: true }) 또는 줄을 받는 함수. 없으면 잠긴 줄 없음(예전 그대로). */
+  function lockedBy(lk) {
+    if (lk == null) return function () { return false; };
+    if (typeof lk === 'function') return function (e) { return !!lk(e); };
+    if (Array.isArray(lk)) { var m = {}; lk.forEach(function (x) { if (x != null) m[String(x)] = 1; }); return function (e) { return m[String(e.id)] === 1; }; }
+    if (typeof lk.has === 'function') return function (e) { return lk.has(e.id) || lk.has(String(e.id)) || lk.has(Number(e.id)); };
+    return function (e) { return Object.prototype.hasOwnProperty.call(lk, String(e.id)) && !!lk[String(e.id)]; };
+  }
   /**
    * existing = 이 기간에 이미 있는 줄 · items = 이 파일에서 넣을 줄 · dropped = 이 파일의 뺀 줄(parse 결과, 없어도 된다).
    * cancelled(2026-10-20 AU2 #5) = 이미 있는 줄 가운데 이 파일에서 **전액 취소로 확인된** 승인(뺀 줄의 「취소된 승인」 원래 줄과 열쇠가 같음).
    *   예전엔 그냥 「파일에 없는 줄」로만 표시돼(그것도 그 화면에서만) 환불된 결제가 청구에 남았다. 화면이 「같이 지우기」로 묶는다.
    * missing = 그 밖의 「파일에 없는 줄」(지우지 않는다 — SPEC 결정 그대로).
+   * ★ 2026-11-02 추가 상신(docs/card-multi/SPEC.md §5-3): opt.locked = 잠긴 줄(살아 있는 문서에 든 줄) — 그 줄은 보내지 않는다(트리거가 CARD_LOCKED 로 막는다).
+   *   frozen = 파일 줄과 열쇠가 같은 잠긴 줄 id(그대로 둠) · frozenDiff = 그 가운데 ERP 칸이 다른 것 { id, item, cols }(값이 달라졌다고만 알림) ·
+   *   frozenCancelled = 이 파일에서 전액 취소로 확인된 잠긴 줄(지우지 않고 알림). updates·same·missing·cancelled 는 열린 줄만,
+   *   새 줄(inserts)은 그대로 넣는다(살아 있는 문서가 있어도 — 같은 카드의 다음 문서로 따로 상신한다). opt 가 없으면 예전 결과 그대로(새 셋은 빈 목록).
    */
-  function plan(existing, items, dropped) {
+  function plan(existing, items, dropped, opt) {
+    var isLocked = lockedBy(opt && opt.locked);
     var byKey = {};
     (existing || []).forEach(function (e) { byKey[e.appr_no + '|' + e.appr_date] = e; });
-    var seen = {}, inserts = [], updates = [], same0 = [];
+    var seen = {}, inserts = [], updates = [], same0 = [], frozen = [], frozenDiff = [];
     (items || []).forEach(function (it) {
       var k = it.appr_no + '|' + it.appr_date, e = byKey[k];
       seen[k] = 1;
       if (!e) { inserts.push(it); return; }
       var cs = ERP_COLS.filter(function (c) { return !same(e[c], it[c]); });
+      if (isLocked(e)) { frozen.push(e.id); if (cs.length) frozenDiff.push({ id: e.id, item: it, cols: cs }); return; }
       if (cs.length) updates.push({ id: e.id, item: it, cols: cs }); else same0.push(e.id);
     });
     var gone = {};
     (dropped || []).forEach(function (d) { if (d && d.reason === 'cancel' && !d.cancel) gone[d.appr_no + '|' + d.appr_date] = 1; });
-    var missing = [], cancelled = [];
+    var missing = [], cancelled = [], frozenCancelled = [];
     (existing || []).forEach(function (e) {
       var k = e.appr_no + '|' + e.appr_date;
-      if (!seen[k]) (gone[k] ? cancelled : missing).push(e);
+      if (seen[k]) return;
+      // 잠긴 줄이 파일에 없으면 아무 일 없음(「파일에 없는 줄」로도 세지 않는다) · 전액 취소로 확인되면 따로 알린다
+      if (isLocked(e)) { if (gone[k]) frozenCancelled.push(e); return; }
+      (gone[k] ? cancelled : missing).push(e);
     });
-    return { inserts: inserts, updates: updates, same: same0, missing: missing, cancelled: cancelled };
+    return { inserts: inserts, updates: updates, same: same0, missing: missing, cancelled: cancelled,
+      frozen: frozen, frozenDiff: frozenDiff, frozenCancelled: frozenCancelled };
   }
   /** 서버로 보낼 한 줄 — ERP 칸 + 열쇠 + src 만. category·purpose·note 는 절대 넣지 않는다(upsert 가 손 칸을 덮지 않게). */
   function toRow(it, username, src) {

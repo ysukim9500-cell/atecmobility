@@ -3151,14 +3151,22 @@
       }).sort(function (a, b) { return (b.submitted_at || '').localeCompare(a.submitted_at || ''); })[0];
     };
     // 개인경비·법인카드는 그 종류 결재 건에서 먼저 찾고, 처음 올리는 것이면 운행일지 때의 결재선을 불러온다.
-    var past = cur || (kd ? (latest(kd.rows() || []) || latest(APPR)) : latest(APPR));
+    //   한 기간에 문서가 여럿인 종류(법인카드 추가 상신)는 이번 기간에 먼저 올린 다른 문서의 결재선이 「지난번」이다(sameMonthLine).
+    var past = cur || sameMonthLine() || (kd ? (latest(kd.rows() || []) || latest(APPR)) : latest(APPR));
     if (!past) return null;
     return usableSteps(past.steps);
   }
-  /** 이번 기간에 반려·회수된 내 결재 건(새 칸 모양 v2 일 때만) — 상신 창을 열 때 자동 결재선보다 먼저 쓴다. 없으면 null. */
+  /** 이번 기간에 반려·회수된 내 결재 건(새 칸 모양 v2 일 때만) — 상신 창을 열 때 자동 결재선보다 먼저 쓴다. 없으면 null.
+   *  한 기간에 문서가 여럿인 종류는 모듈 mine(기간) = 이번 상신이 덮을 죽은 대상 문서(다시 상신) — 새 문서면 null. */
   function sameCycleLine() {
     var kd = kindDef(SUB_KIND), cur = kd ? kd.mine(CYCKEY()) : myAppr();
     return cur && (cur.status === 'rejected' || cur.status === 'withdrawn') && (cur.steps || []).length && boxSetOf(cur) === 'v2' ? cur : null;
+  }
+  /** 같은 기간 가장 최근 내 문서(새 칸 모양 v2, 상태 상관없음) — 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 SPEC §5-4 ③)의 모듈 lineFrom(기간).
+   *  갈고리가 없으면(운행일지·개인경비·옛 모듈) null — 예전 그대로. */
+  function sameMonthLine() {
+    var kd = kindDef(SUB_KIND), d = kd && typeof kd.lineFrom === 'function' ? kd.lineFrom(CYCKEY()) : null;
+    return d && d.username === myName() && (d.steps || []).length && boxSetOf(d) === 'v2' ? d : null;
   }
   /** 지금 규칙(새 칸 모양 · 칸마다 한 명 · 결재할 수 있는 사람)으로 거른 [{approver, box}], 칸 순서. 남는 것이 없으면 null. */
   function usableSteps(steps) {
@@ -3531,7 +3539,12 @@
   /* ── 상신 창 ── */
   /** 상신 창이 다루는 결재 문서 종류. '' = 운행일지, 'expense' = 개인경비(EXT.kinds). */
   var SUB_KIND = '';
-  function draftKey() { return (SUB_KIND ? SUB_KIND + ':' : '') + CYCKEY(); }
+  /** 넣다 만 결재선·의견·미리 채운 출처의 열쇠 — 종류:기간. 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K5)는
+   *  모듈의 draftTag()(이번 상신 대상 표시 — 문서 번호·카드 짧은 지문, 카드번호 아님)를 뒤에 붙여 대상마다 따로. 갈고리가 없으면 예전 그대로. */
+  function draftKey() {
+    var kd = SUB_KIND ? kindDef(SUB_KIND) : null, tg = kd && typeof kd.draftTag === 'function' ? String(kd.draftTag() || '') : '';
+    return (SUB_KIND ? SUB_KIND + ':' : '') + CYCKEY() + (tg ? '|' + tg : '');
+  }
   function openSubmit(kind) {
     SUB_KIND = kindDef(kind) ? kind : '';
     APPR_SWAP = false;
@@ -3546,12 +3559,15 @@
     //   ③ 관리자가 지정한 결재선(effLine — 지정 안 한 칸은 자동, 2026-10-14)
     //   ④ 조직도 자동 결재선(autoLine)
     //   예전 칸 모양(v1)으로 올린 결재선은 미리 채우는 데 쓰지 않는다.
+    //   (한 기간에 문서가 여럿인 종류 — 법인카드 추가 상신, 2026-11-03 SPEC §5-4: ② 다음에 「같은 기간 가장 최근 문서의 결재선」(새 칸 모양, 상태 상관없음 — 모듈 lineFrom))
     var key = draftKey();
     if (Object.prototype.hasOwnProperty.call(DRAFT_KEEP, key)) {
       DRAFT = DRAFT_KEEP[key].slice();
     } else {
       var back = sameCycleLine(), bs = back && usableSteps(back.steps);
+      var mon = bs ? null : sameMonthLine(), ms = mon && usableSteps(mon.steps);
       if (bs) { DRAFT = bs; FILL_SRC[key] = { src: 'prev', notes: [] }; }
+      else if (ms) { DRAFT = ms; FILL_SRC[key] = { src: 'month', notes: [] }; }
       else if (lineOverride(myName())) {
         var el = effLine(myName()); DRAFT = el.steps.slice(); FILL_SRC[key] = { src: 'admin', notes: el.notes, part: !!el.part };
       }
@@ -3705,8 +3721,13 @@
 
   /** 주기별로 넣다 만 결재선(상신 창을 닫아도 남는다, 상신하면 비운다). */
   var DRAFT_KEEP = {};
-  /** 주기별로 처음 미리 채운 출처 — { src: 'auto'(조직도) | 'prev'(이번 기간 반려·회수 건) | 'admin'(관리자 지정, part = 자동 칸이 섞임), notes: 비운 칸의 까닭 }. */
+  /** 주기별로 처음 미리 채운 출처 — { src: 'auto'(조직도) | 'prev'(이번 기간 반려·회수 건) | 'month'(같은 기간 먼저 올린 다른 문서 — 법인카드 추가 상신) |
+   *  'admin'(관리자 지정, part = 자동 칸이 섞임), notes: 비운 칸의 까닭 }. */
   var FILL_SRC = {};
+  /** 모듈의 잠금 문장(lockText) → 상신 창 글. 글자만 왔으면 esc 하고 「먼저 회수해야 해요」를 예전 문장처럼 굵게, 굵은 표시(<b>)째 왔으면 그대로. */
+  function lockHtml(t) {
+    return /<\/?b>/.test(t) ? t : esc(t).replace('먼저 회수해야 해요', '<b>먼저 회수해야 해요</b>');
+  }
   function renderSubmit() {
     // 창을 다시 그리면 돌고 있던 '검증 뒤 상신'은 무효다 — 화면의 버튼은 다시 「상신」으로 돌아가 있다.
     SUBMIT.token = null; SUBMIT.send = null;
@@ -3719,9 +3740,12 @@
     //   양 보였다. 서버가 굳히는 snapshot 은 본인 것이므로 화면만 거짓말했다.
     var T = KD ? null : totals(TRIPS.filter(function (t) { return t.username === myName(); }), { who: myName() });
 
-    $('pTitle').textContent = KD ? KH.title : cycleName(CYC) + ' 상신';
+    // 모듈 문서(개인경비·법인카드)의 제목·아래 줄 — 「… 법인카드 상신 · 카드 끝 1234 · 추가 1」처럼 「 · 」로 이은 것은 조각으로(2026-11-03 디자인 검사 M1).
+    //   운행일지는 예전 그대로(글자). 글자(textContent)는 어느 쪽이든 같다.
+    if (KD) { dnSet($('pTitle'), KH.title); dnSet($('pSub'), KH.sub); }
+    else $('pTitle').textContent = cycleName(CYC) + ' 상신';
     // 금액은 업무 운행만 — 건수도 업무 운행을 먼저 적는다(2026-10-16 5차: 머리 「7건」인데 문서의 일반업무 표는 5건이었다).
-    $('pSub').textContent = KD ? KH.sub : cycleSpan(CYC) + ' · ' +
+    if (!KD) $('pSub').textContent = cycleSpan(CYC) + ' · ' +
       (T.biz === T.n ? '운행 ' + n0(T.n) + '건' : '업무 운행 ' + n0(T.biz) + '건 · 전체 ' + n0(T.n) + '건') + ' · ' + won(T.cost);
 
     // ── 결재란: 운행기록부에 찍히는 모양 그대로 ──
@@ -3761,6 +3785,7 @@
       var left = (fs.notes || []).filter(function (n) { return !n.box || n.keep || !draftAt(n.box); });
       h += '<div class="ag-fill" data-fill="' + esc(fs.src) + '">' + (fs.src === 'prev'
         ? '이번 기간에 반려·회수된 결재선을 불러왔어요.'
+        : fs.src === 'month' ? '이번 기간에 먼저 올린 문서의 결재선을 불러왔어요.'
         : fs.src === 'last' ? '지난번 결재선을 불러왔어요.'
         : fs.src === 'admin' ? '관리자가 지정한 결재선을 불러왔어요.' + (fs.part ? ' 지정하지 않은 칸은 조직도로 채웠어요.' : '')
           : '조직도의 센터·파트장, 팀장, 사업부장 순서로 결재선을 미리 채웠어요.') +
@@ -3825,9 +3850,12 @@
     if (warn.length) {
       h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(warn.map(endDot).join(' ')) + '</span></div>';
     }
-    h += '<div class="anote"><b>지금 자료로 결재가 진행</b>돼요. 상신한 뒤에 이 기간의 ' +
+    // 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K5)는 무엇이 잠기는지 문장째(lockText — 「상신한 뒤에 이 문서에 든 … 먼저 회수해야 해요.」)
+    var LT = KD && KD.lockText ? String(typeof KD.lockText === 'function' ? KD.lockText() : KD.lockText) : '';
+    h += '<div class="anote"><b>지금 자료로 결재가 진행</b>돼요. ' + (LT ? lockHtml(LT)
+      : '상신한 뒤에 이 기간의 ' +
       // 종류마다 무엇이 잠기는지(lockNoun, 조사까지) — 없으면 예전 그대로 「경비를」(개인경비 글자 그대로). 법인카드 「카드 내역을」.
-      (KD ? esc(KD.lockNoun || '경비를') : '운행·영수증을') + ' 고치려면 <b>먼저 회수해야 해요</b>. ' +
+      (KD ? esc(KD.lockNoun || '경비를') : '운행·영수증을') + ' 고치려면 <b>먼저 회수해야 해요</b>.') + ' ' +
       '상신을 누르면 먼저 검증하고, 맞지 않는 곳이 있으면 올리기 전에 알려 드려요.</div>';
 
     $('pBody').innerHTML = h;
@@ -3925,6 +3953,12 @@
           toast(apiErrText(ej, res.st) || '처리하지 못했어요.', true);
           // 그 사이 다른 처리가 있었다(409 「결재 중인 건이 아니에요」·403 「지금은 … 님 차례예요」 등) — 결재 건을 바로 새로 받아 창·결재함을 맞춘다(2026-11-02)
           if (payload && payload.id && (res.st === 409 || res.st === 403)) apprCheckOpen(payload.action, +payload.id, payload.kind || '', 0);
+          // 상신 실패는 그 종류 모듈에 알린다(onSubmitFail — 법인카드 추가 상신: 409·404·400 CARD_* 면 문서·줄을 다시 받는다, 2026-11-03 PLAN K5).
+          //   알림 글은 위에서 이미 띄웠다(모듈이 바꿔 띄울 수 있다). 갈고리가 없으면 예전 그대로.
+          if (payload && payload.action === 'submit') {
+            var kdF = kindDef(payload.kind);
+            if (kdF && typeof kdF.onSubmitFail === 'function') { try { kdF.onSubmitFail(ej, res.st); } catch (e) { console.error('상신 실패 처리(모듈) 오류', e); } }
+          }
           return false;
         }
         // 방금 결재한 건(승인·반려·승인 취소)은 결재함 「그 밖의 건」 기간 거르기와 상관없이 보이게 — 9월분을 10월분 화면에서
@@ -4473,6 +4507,8 @@
       (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : act === 'recall_reject' ? '승인 취소하고 반려' : '반려') + '</button>' +
       // 승인 취소·반려 창에서는 창 닫기를 「닫기」로 — 「취소」가 옆 단추(승인 취소)와 헷갈렸다(2026-10-19 로봇)
       '<button class="btn" data-close>' + (act === 'recall_reject' ? '닫기' : '취소') + '</button>');
+    // 창 아래 줄(문서 이름) — 「 · 」로 이은 이름은 조각으로(폰에서 줄 끝 「·」 없게, 2026-11-03 디자인 검사 M1). 글자는 같다
+    dnSet($('pSub'), cname);
     if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
     // 연 문서가 지금 것인지 — 결재 건을 다시 받아 바뀌었으면 창을 새 자료로 다시 그리거나 닫는다(2026-11-02, checked = 방금 그렇게 다시 연 창)
     if (!checked) apprCheckOpen(act, id, kind);
@@ -4724,8 +4760,9 @@
     return pad(d.getUTCMonth() + 1) + '.' + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
   }
   function noteDoc(a) {
-    var kd = kindDef(kindOf(a));
-    return { sys: kd ? (kd.mode || 'x') : 'd', tag: kd ? kd.tag : '운행일지', month: keyShort(a.cycle, String(a.cycle || '')) };
+    // 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K5)는 문서 짧은 이름(docShort — 「10월분 · 카드 끝 1234」, 끝자리만)
+    var kd = kindDef(kindOf(a)), ds = kd && typeof kd.docShort === 'function' ? kd.docShort(a) : '';
+    return { sys: kd ? (kd.mode || 'x') : 'd', tag: kd ? kd.tag : '운행일지', month: ds ? String(ds) : keyShort(a.cycle, String(a.cycle || '')) };
   }
   /** 알림 글의 사람 — 「홍길동 센터장 님」. 칸 이름은 끝에 따로(noteBox). 예전 「실장 홍길동 님」은 칸 이름이 직책처럼 읽혔다(2026-10-16 5차). */
   function noteWho(s) { return stepWho(s) + ' 님'; }
@@ -5036,8 +5073,10 @@
     var s = a.snapshot || {};
     var canAct = inbox().indexOf(a) >= 0;
     // 반려·회수된 내 건이고 그 기간의 가장 최근 건이면 「고쳐서 다시 상신」(「올리기」는 업로드로 읽혀 바꿈 — 2026-10-15 2차)
-    var kd0 = kindDef(kindOf(a)), latest0 = kd0 ? (kd0.mine ? kd0.mine(a.cycle) : null) : apprOf(myName(), a.cycle);
-    var canFix = a.username === myName() && (a.status === 'rejected' || a.status === 'withdrawn') && (!latest0 || latest0.id === a.id);
+    //   한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K5)는 모듈 canFix(문서)가 정한다(내 반려·회수 문서마다 — SPEC §5-6). 갈고리가 없으면 예전 그대로.
+    var kd0 = kindDef(kindOf(a)), canFix = a.username === myName() && (a.status === 'rejected' || a.status === 'withdrawn');
+    if (canFix && kd0 && typeof kd0.canFix === 'function') canFix = !!kd0.canFix(a);
+    else if (canFix) { var latest0 = kd0 ? (kd0.mine ? kd0.mine(a.cycle) : null) : apprOf(myName(), a.cycle); canFix = !latest0 || latest0.id === a.id; }
     var canWithdraw = a.username === myName() && a.status === 'submitted' &&
       !(a.steps || []).some(function (x) { return x.result; });
     // 결재 문서 종류(개인경비 등)가 붙어 있으면 한 결재함에서 어느 문서인지 딱지로 가른다.
@@ -5087,7 +5126,8 @@
       '<b>' + esc(nameOf(a.username)) + '</b>' +
       // 다른 화면과 같은 이름으로 부른다("2026-09분" → "2026년 9월분").
       // 개인경비는 기간이 20일~19일이라 달 이름만으로는 헷갈린다 — 범위를 같이 적는다(kd.cycLabel).
-      '<span class="acyc">' + esc(kd && kd.cycLabel ? kd.cycLabel(a) : keyName(a.cycle, a.cycle + '분')) + '</span>' +
+      //   「… · 카드 끝 1234 · 추가 1」처럼 「 · 」로 이은 이름은 조각으로(dnMaybe — 폰에서 줄 끝 「·」·「카드 끝」/「1234」 갈림 없게, 2026-11-03 디자인 검사 M1)
+      '<span class="acyc">' + dnMaybe(kd && kd.cycLabel ? kd.cycLabel(a) : keyName(a.cycle, a.cycle + '분')) + '</span>' +
       // 폰 「⋯」는 카드 오른쪽 위(첫 줄 끝) — 단추 줄 끝에 두면 360px 에서 혼자 한 줄을 썼다(2026-10-24)
       (moreIt.length ? '<span class="amore">' + kmenu('다른 작업', moreIt) + '</span>' : '') +
       // 긴 반려 사유는 한 줄로 줄이고(끝 「…」) 「자세히」에서 전부 — 마우스를 올려도 전부 보인다
@@ -5342,6 +5382,24 @@
     return '<div class="phead"><h1>' + esc(title) + '</h1>' +
       (sub ? '<p>' + sub + '</p>' : '') + '</div>';
   }
+  /* ── 「 · 」로 이은 이름을 줄바꿈 조각으로(2026-11-03 디자인 검사 M1 — 「2026년 11월분 (11.01~11.30) · 카드 끝 1234 · 추가 1」) ──
+     <span class="dnl"> 안에 조각 <span class="dn"><span>글</span></span>, 둘째 조각부터 맨 앞에 구분점 <i class="dsep" aria-hidden="true"> · </i>.
+     줄은 조각 사이에서만 바뀌고(「카드 끝 1234」가 안 갈린다), 줄이 바뀌면 구분점은 칸 왼쪽 밖이라 잘린다 — 줄이 「·」로 끝나거나 시작하지 않는다
+     (CSS driving-v2.html .dnl — 포털 「내 상태」 줄 .ph 와 같은 방법). 글자(textContent)는 예전 그대로 「A · B」. 모듈도 C.dn · C.dnJoin 으로 같은 모양을 쓴다. */
+  function dnParts(text) { return String(text == null ? '' : text).split(' · ').map(function (s) { return s.trim(); }).filter(Boolean); }
+  /** 조각(이미 esc 한 HTML — <b> 등 가능)들을 한 줄로. 조각이 하나여도 한 덩이(nowrap)로 싼다. */
+  function dnJoin(parts) {
+    var ps = (parts || []).filter(function (p) { return p != null && String(p) !== ''; });
+    return '<span class="dnl">' + ps.map(function (p, i) {
+      return '<span class="dn">' + (i ? '<i class="dsep" aria-hidden="true"> · </i>' : '') + '<span>' + p + '</span></span>';
+    }).join('') + '</span>';
+  }
+  /** 글 「A · B · C」 → dnJoin(조각마다 esc). */
+  function dnHtml(text) { return dnJoin(dnParts(text).map(esc)); }
+  /** 조각이 둘 이상일 때만 조각으로, 아니면 글자 그대로(esc) — 운행일지·개인경비 이름처럼 「 · 」 없는 글은 예전 그대로 그린다. */
+  function dnMaybe(text) { return dnParts(text).length > 1 ? dnHtml(text) : esc(text == null ? '' : text); }
+  /** 칸(창 제목·아래 줄)에 넣기 — 조각이 둘 이상이면 innerHTML(조각), 아니면 textContent(예전 그대로). */
+  function dnSet(el, text) { if (!el) return; if (dnParts(text).length > 1) el.innerHTML = dnHtml(text); else el.textContent = text == null ? '' : text; }
   function sect(title, cnt, right, body) {
     return '<section class="sect"><div class="hd"><h2>' + esc(title) + '</h2>' +
       (cnt ? '<span class="cnt">' + cnt + '</span>' : '') +
@@ -5421,19 +5479,27 @@
     }
     afterPaint();
   }
+  /** 표가 오른쪽으로 더 있으면 감싼 상자(.panel)에 「더 있음」 표시(.scrollmore) — 끝까지 밀면 뺀다. */
+  function scrollMore(w) { var box = w.parentNode; if (box && box.classList) box.classList.toggle('scrollmore', w.scrollWidth - w.clientWidth - w.scrollLeft > 2); }
+  //   그린 때·밀 때만 재면 글꼴이 늦게 실려 표가 좁아지거나 창 폭이 바뀐 뒤에도 표시가 그대로 남았다(1024 결재 완료 표가 상자 안인데 「더 있음」) —
+  //   표·상자 크기가 바뀌면 다시 잰다(2026-11-03 최종 화면 검사 — PC 붙은 끝 칸의 세로 줄·그림자가 이 표시를 따른다)
+  var MORE_RO = typeof ResizeObserver === 'function' ? new ResizeObserver(function (es) {
+    es.forEach(function (e) { var w = e.target.closest && e.target.closest('.scroll[data-rows]'); if (w) scrollMore(w); });
+  }) : null;
   /** 화면을 그린 뒤 늘 하는 일(전체·부분 그리기 공통). */
   function afterPaint() {
     var cf = $('btnClearFilt');
     // 빈 표의 「전체 보기」·「출퇴근 등 N건 보기」 — 목적까지 비운다(「조건 지우기」와 같게, 2026-10-20 AU6-M5: 예전엔 목적이 일반업무로 돌아가 헛단추)
     if (cf) cf.addEventListener('click', function () { clearFilters(); FILT.purp = ''; render(); });
+    if (MORE_RO) MORE_RO.disconnect();      // 지난 그림의 표는 놓는다(아래에서 지금 표만 다시 본다)
     // 행이 많은 표만 자체 스크롤 + 머리글 고정. 짧은 표까지 가두면 답답하다.
     Array.prototype.forEach.call($('inner').querySelectorAll('.scroll[data-rows]'), function (w) {
       var n = w.querySelectorAll('tbody tr').length;
       w.classList.toggle('tall', n > 22);
       // 표가 오른쪽으로 더 있으면 감싼 상자(.panel)에 「더 있음」 그림자(좁은 화면 CSS 만 그린다, 2026-10-08)
-      var box = w.parentNode, more = function () { box.classList.toggle('scrollmore', w.scrollWidth - w.clientWidth - w.scrollLeft > 2); };
-      if (!w.dataset.moreOn) { w.dataset.moreOn = '1'; w.addEventListener('scroll', more, { passive: true }); }
-      more();
+      if (!w.dataset.moreOn) { w.dataset.moreOn = '1'; w.addEventListener('scroll', function () { scrollMore(w); }, { passive: true }); }
+      scrollMore(w);
+      if (MORE_RO) { MORE_RO.observe(w); if (w.firstElementChild) MORE_RO.observe(w.firstElementChild); }
     });
     apvMount();
     mselSync();             // 여러 줄 골라 지우기 — 고른 칸·띠를 다시 맞춘다(2026-10-19)
@@ -8596,7 +8662,8 @@
      숨은 줄은 고른 채 남아도 묶음에 몰래 들어가지 않는다(「출력 안 한 것만」과 같은 원칙). 고른 것 자체는 모듈이 가진다(finReg 의 sel).
      찾는 말은 화면을 옮기거나 기간을 바꾸면 비운다(notifyGo · setPeriod). */
   var FINK = {}, FINQ = {};
-  /** def: { sel: function () → 고른 것 { 결재번호: 1 }, busy: function () → 묶는 중인가 } */
+  /** def: { sel: function () → 고른 것 { 결재번호: 1 }, busy: function () → 묶는 중인가, unit?: 줄 하나를 세는 말(기본 '명' — 한 사람 한 줄.
+   *  법인카드는 한 사람이 문서 여럿이라 줄 = 문서 '건', 2026-11-03 추가 상신) } */
   function finReg(kind, def) { FINK[kind] = def; }
   /** 찾는 이름들 — 띄어 쓰거나 쉼표로 여러 명(그중 하나라도 이름에 들어 있으면 보인다). */
   function finWords(kind) { return String(FINQ[kind] || '').toLowerCase().split(/[\s,]+/).filter(Boolean); }
@@ -8646,7 +8713,7 @@
   function finSync(kind) {
     var d = FINK[kind]; if (!d) return;
     var t = document.querySelector('#inner table[data-fin="' + kind + '"]');
-    var sel = d.sel() || {}, words = finWords(kind), G = {}, vis = 0, nSel = 0, all = 0;
+    var sel = d.sel() || {}, words = finWords(kind), G = {}, vis = 0, nSel = 0, all = 0, U = d.unit || '명';   // 줄을 세는 말(법인카드 = 문서 '건')
     if (t) {
       Array.prototype.forEach.call(t.querySelectorAll('tbody tr[data-frow]'), function (tr) {
         var id = tr.dataset.frow, ok = finHit(words, tr.dataset.fname), on = !!sel[id], b = tr.querySelector('input[data-fid]');
@@ -8664,7 +8731,7 @@
         if (b) { b.checked = g.n > 0 && g.s === g.n; b.indeterminate = g.s > 0 && g.s < g.n; }
         // 팀 사람 수·합계 = 보이는 줄(찾는 중이면 찾은 사람만 — 「출력 안 한 것만」 때처럼)
         var on = tr.querySelector('.on'), sum = tr.querySelector('.or b');
-        if (on) on.textContent = n0(g.n) + '명';
+        if (on) on.textContent = n0(g.n) + U;
         if (sum) sum.textContent = won(g.amt);
       });
       var none = t.querySelector('tr.finnone'); if (none) none.hidden = vis > 0 || !all;
@@ -8674,13 +8741,13 @@
     }
     var busy = !!(d.busy && d.busy());
     Array.prototype.forEach.call(document.querySelectorAll('#inner [data-finbtn="' + kind + '"]'), function (b) {
-      var lab = nSel ? '고른 ' + n0(nSel) + '명 PDF 한 파일로' : 'PDF 한 파일로 묶기';
+      var lab = nSel ? '고른 ' + n0(nSel) + U + ' PDF 한 파일로' : 'PDF 한 파일로 묶기';
       b.disabled = !nSel || busy;
       b.classList.toggle('pri', nSel > 0);
       if (b.textContent !== lab) b.innerHTML = ic('dl', 13) + esc(lab);
     });
     var qn = document.querySelector('#inner [data-finqn="' + kind + '"]');
-    if (qn) qn.textContent = words.length ? '찾은 ' + n0(vis) + '명' + (nSel ? ' · 그중 고른 ' + n0(nSel) + '명' : '') : '';
+    if (qn) qn.textContent = words.length ? '찾은 ' + n0(vis) + U + (nSel ? ' · 그중 고른 ' + n0(nSel) + U : '') : '';
     var qx = document.querySelector('#inner [data-finqx="' + kind + '"]'); if (qx) qx.hidden = !words.length;
   }
   function finSyncAll() { Object.keys(FINK).forEach(finSync); }
@@ -11581,7 +11648,17 @@ window.EduGuard = {
         var k = cycKey(toC(CR.defaultPeriod(kindOfMode(mode))));          // 기간 엔진(2026-10-20 연말 마감)
         var r = p.row ? p.row(k) : null;
         // ro = 정정으로 다시 연 건(포털이 「반려됨」 대신 「정정 중」 — 2026-10-21)
-        return { cyc: k, st: p.status(k) || '', ro: !!(r && r.status === 'rejected' && reopenInfo(r)) };
+        var o = { cyc: k, st: p.status(k) || '', ro: !!(r && r.status === 'rejected' && reopenInfo(r)) };
+        // 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K6) — docs = 상태별 문서 수 · left = 상신 전 줄 수(그 기간 줄을 받았을 때만 숫자, 아니면 null).
+        //   모듈이 period.docs 를 줄 때만 싣는다(개인경비·옛 모듈은 칸 없음 — 예전 그대로). 이번에 모르면(null) 같은 기간에 알던 값을 그대로 둔다(none 과 같은 규칙).
+        if (typeof p.docs === 'function') {
+          var oc = old[mode + 's'] && old[mode + 's'].cyc === k ? old[mode + 's'] : null, dc = p.docs(k), cnt = function (v) { v = Number(v); return isFinite(v) && v > 0 ? Math.floor(v) : 0; };
+          if (dc && typeof dc === 'object') {
+            o.docs = { sub: cnt(dc.sub), app: cnt(dc.app), rej: cnt(dc.rej), wd: cnt(dc.wd) };
+            o.left = typeof dc.left === 'number' && isFinite(dc.left) && dc.left >= 0 ? Math.floor(dc.left) : (oc && typeof oc.left === 'number' ? oc.left : null);
+          } else if (oc && oc.docs) { o.docs = oc.docs; o.left = typeof oc.left === 'number' ? oc.left : null; }
+        }
+        return o;
       };
       // 포털 「오늘 할 일」(2026-10-20 디자인 v2) — 마감 화면이 그릴 때 센 남은 일(그때 시각 at 과 함께). 이 기간 것이 없으면 지난번 것을 그대로 둔다.
       var todo = CLOSE_TODO && CLOSE_TODO.cyc === cur ? CLOSE_TODO : (old.todo && old.todo.cyc === cur ? old.todo : null);
@@ -12223,13 +12300,18 @@ window.EduGuard = {
       var earlyMsg = '';
       if (Date.now() < rEnd) {
         var endD = md(rEnd - 1);
+        // 한 기간에 문서가 여럿인 종류(법인카드 추가 상신, 2026-11-03 PLAN K5)는 모듈이 완성한 글(earlyText — 모듈이 esc) — 「나중에 올리는 … 다음 문서(추가)로 따로 상신해요」
+        var et = subKD && typeof subKD.earlyText === 'function' ? subKD.earlyText(endD) : '';
         // 개인경비는 「뒤의 경비가 빠진다」가 아니다 — 상신하면 그 기간이 잠겨 회수 전에는 영수증을 더 올리거나 고칠 수 없다(2026-10-08).
-        earlyMsg = subKD
+        earlyMsg = et ? String(et) : subKD
           ? '아직 기간이 끝나지 않았어요. 이 기간은 ' + esc(endD) + '까지예요. 상신하면 회수하기 전에는 이 기간의 ' + (subKD.earlyNoun || '영수증을 더 올리거나') + ' 고칠 수 없어요.'
           : '아직 기간이 끝나지 않았어요. 이 기간은 ' + esc(endD) + '까지예요. 지금 상신하면 이후 운행과 영수증은 결재 문서에 들어가지 않아요.';
       }
       sb.disabled = true; sb.textContent = '검증하는 중…';
       var cyc0 = CYCKEY();
+      // 누른 순간의 상신 대상 — 넣다 만 결재선·의견 열쇠(draftKey, 대상 표시 포함)와 상신 본문에 더할 칸(모듈 submitExtra — 법인카드 {card_no, approval_id}).
+      //   검증(beforeSubmit)이 도는 사이 화면이 바뀌어도 검증한 그 대상으로 올린다. 갈고리가 없으면 예전 그대로(열쇠 = 종류:기간 · 더하는 칸 없음).
+      var dk0 = draftKey(), ex0 = subKD && typeof subKD.submitExtra === 'function' ? subKD.submitExtra() : null;
       // 창을 닫거나(취소·Esc) 결재선을 고쳐 창을 다시 그리면 이 표가 바뀐다 —
       // 검증이 끝난 뒤에, 다시 누르지도 않았는데 말없이 상신되지 않게.
       var token = SUBMIT.token = {};
@@ -12249,8 +12331,10 @@ window.EduGuard = {
           steps: DRAFT.map(function (s) { return { approver: s.approver, box: s.box }; })
         };
         if (subKD) payload.kind = subKind;             // 개인경비 상신 — 서버가 그 기간 expense_items 를 굳힌다
+        // 상신 대상(법인카드 추가 상신 — card_no·approval_id, null 도 그대로 싣는다). 위 칸(action·cycle·결재선·종류)은 덮지 않는다.
+        if (ex0 && typeof ex0 === 'object') Object.keys(ex0).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(payload, k)) payload[k] = ex0[k]; });
         // 상신 의견(선택, 2026-10-21) — 결재선처럼 보내는 순간의 칸에서 읽는다. 비었으면 보내지 않는다(서버도 빈 글은 의견 없음).
-        var nkey = myName() + '|' + (subKD ? subKind + ':' : '') + cyc0;
+        var nkey = myName() + '|' + dk0;
         var noteEl = $('subNote'), noteTxt = String(noteEl ? noteEl.value : (SUB_NOTE[nkey] || '')).trim();
         if (noteTxt) payload.note = noteTxt;
         var b = $('btnSubmitAnyway') || sb;
@@ -12258,8 +12342,8 @@ window.EduGuard = {
         callAppr(payload, '상신했어요.').then(function (ok) {
           if (ok) { delete SUB_NOTE[nkey]; delete SUB_NOTE_PREV[nkey]; }     // 올라간 의견은 결재 건에 있다 — 적던 글은 지운다
           // 상신되면 그 주기는 잠긴다 — 통행료 채우기에 쳐 둔 값은 더 저장할 수 없다.
-          if (ok && subKD) delete DRAFT_KEEP[subKind + ':' + cyc0];
-          else if (ok) { FILLS = {}; delete DRAFT_KEEP[cyc0]; }
+          if (ok && subKD) delete DRAFT_KEEP[dk0];
+          else if (ok) { FILLS = {}; delete DRAFT_KEEP[dk0]; }
           if (!ok && document.contains(b)) { b.disabled = false; b.textContent = b.id === 'btnSubmitAnyway' ? '그래도 상신' : '상신'; }
         });
       };
@@ -13800,6 +13884,8 @@ window.EduGuard = {
       // 숫자 칸 엄격하게 읽기(2026-10-20 AU2 #9) — 개인경비 금액 칸도 같은 규칙
       numIn: numIn, numMark: numMark, numStop: numStop, NUM_BAD: NUM_BAD,
       head: head, sect: sect, blank: blank, skeleton: skeleton,
+      // 「 · 」로 이은 이름 → 줄바꿈 조각(2026-11-03 디자인 검사 M1·M3·L2): dn(글) = 글을 「 · 」에서 나눠 조각마다 esc · dnJoin([이미 esc 한 HTML 조각]) — 둘 다 <span class="dnl">…</span>
+      dn: dnHtml, dnJoin: dnJoin,
       nameOf: nameOf, personOf: personOf, myName: myName,
       orgCell: orgCell, orgGroups: orgGroups, orgGroupRow: orgGroupRow, orgMatch: orgMatch, orgPath: orgPath, orgName: orgName, myAppr: myAppr, apprOf: apprOf,
       cycleRange: cycleRange, cycleName: cycleName, cycleSpan: cycleSpan,
@@ -13838,6 +13924,9 @@ window.EduGuard = {
       fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
       apprRefresh: apprRefresh,      // 결재 건만 새로 받기(2026-11-02) — 모듈이 낡은 목록을 알아챘을 때(loadAll 대신) 부를 수 있다
+      // 지금 다시 그리면 안 되는가(칸에 초점·한글 조합·창·⋯ 메뉴·적어 두고 저장하지 않은 글 … — 조용히 새로 받기의 navHold 그대로, 읽기만).
+      //   모듈이 스스로 다시 그릴 때 같은 규칙을 따른다(2026-11-03 최종 검토 L1 — 법인카드 결재 목록 실패 띠 걷기)
+      navHold: navHold,
       markJust: markJust, markGone: markGone,   // 움직임 ②③(2026-10-28) — 개인경비·법인카드도 같은 줄 칠·흐림
       // 의견 모아 보기(2026-10-21) — 담당 상신 의견 → 결재자 승인 의견. 개인경비·법인카드 결재 띠도 같은 조각
       opinions: opinionsHtml,

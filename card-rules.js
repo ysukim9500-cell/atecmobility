@@ -6,6 +6,8 @@
    · 구분 추천(웹만): ① 같은 가맹점에 본인이 전에 쓴 구분 ② 음식 업종은 승인 시각
      (05–10 조식대 · 10–15 중식대 · 15–17 다과비 · 17–05 석식대) ③ 주유·충전 → 주유비 ④ 주차 → 주차비 ⑤ 통신 → 통신비
      ⑥ 철도·항공·택시·고속 → 교통비 ⑦ 그 밖은 추천 없음. AI 는 쓰지 않는다. 추천은 확정 전까지 연하게(화면 몫).
+   · 추가 상신(2026-11-02, docs/card-multi/SPEC.md): 한 사람·한 달에 문서 여럿(문서 하나 = 카드 한 장) — 이름(docName·docSuffix)·대상 목록(docTargets)·
+     달 상태(monthState)·관리 「카드」 칸(cardList)이 서버 _shared/card-doc.ts 와 같은 판정(card-parity 시험).
    · 문자열 비교는 < > 로만(localeCompare 는 런타임마다 다를 수 있다), 천 단위 쉼표는 정규식으로(toLocaleString 금지).
    브라우저(window.CardRules)·Node(require) 양쪽.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -166,7 +168,8 @@
   var PER_ROW_MAX = 30;
 
   /**
-   * 검증. items = 그 사람·그 기간의 card_items 줄. opts = { cycle, submitterName, expenses?, ai? }.
+   * 검증. items = 검증하는 줄(추가 상신 뒤로는 대상 문서의 줄 — 2026-11-02). opts = { cycle, submitterName, expenses?, ai?, known? }.
+   * known = 그 달 내 모든 줄(C05 하이패스 카드 판정에만 더한다). C03 같은 승인번호도 items 안에서만 본다(승인번호는 카드사마다 따로).
    * C01 구분 빈칸(block) · C02 사용목적 빈칸(block) · C03 같은 승인번호 두 번 이상(bad) · C04 기간 밖 승인일(warn)
    * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시 — 하이패스 카드 줄은 보지 않는다, 2026-11-02) · C06 0원 줄(info)
    * C07 구분·내역 불일치(warn, Gemini — opts.ai.rows) · C08 사용목적 성의 없음(warn, 규칙 + Gemini) · C09 개인경비 이중 청구 의심(warn, opts.expenses)
@@ -212,7 +215,9 @@
     }
     var me = normName(opts.submitterName);
     if (me) {
-      var hp = hipassCards(list);
+      // 하이패스 카드 판정 = 검증하는 줄 ∪ opts.known(그 달 내 모든 줄 — 같은 카드의 다른 문서 줄 포함, 추가 상신 2026-11-02 SPEC §4-3).
+      //   소유자를 보는 줄은 검증하는 줄만 — known 줄은 판정 재료일 뿐 항목에 나오지 않는다. 서버 runCardVerify(items, { known }) 와 같다.
+      var hp = hipassCards(Array.isArray(opts.known) ? list.concat(opts.known) : list);
       var who = list.filter(function (e) { var o = normName(e.owner_name); return o !== '' && o !== me && !onHipass(e, hp); });
       if (who.length) add('C05', 'warn', '소유자가 상신자와 다른 줄 ' + who.length + '건',
         'ERP 소유자가 ' + str(opts.submitterName).trim() + ' 님이 아니에요: ' + some(who.map(function (e) { return tagOf(e) + '(' + str(e.owner_name).trim() + ')'; }), 8), idsOf(who));
@@ -301,6 +306,203 @@
     return { n: (items || []).length, cost: cost, by_cat: by };
   }
 
+  /* ── 추가 상신 — 한 사람·한 달에 문서 여럿(2026-11-02 사용자 결정, docs/card-multi/SPEC.md §1·§2·§3-4·§4-1) ──
+     문서 하나 = 카드 한 장. 줄은 card_items.approval_id 로 문서에 묶인다. 서버 _shared/card-doc.ts 와 같은 판정(card-parity 시험) —
+     한쪽을 고치면 다른 쪽도 고친다. DB card_doc_plan 이 정본이고 이것은 화면(대상 목록·달 상태·이름)과 하네스 가짜 서버 몫.
+     · 카드 키 = card_no 에서 공백(\s)을 뺀 것(cardKey) — 「같은 카드」·문서의 card_no·하이패스 카드 판정이 모두 이것.
+     · 끝자리 = 카드 키의 숫자만 모아 뒤 4자리(적으면 있는 만큼, 없으면 '') — 가림 「*」는 빠진다. 카드번호 전체는 이름·DOM·저장소 열쇠에 넣지 않는다.
+     · 살아 있는 문서 = submitted·approved(그 문서에 묶인 줄은 잠긴다) · 죽은 문서 = rejected·withdrawn·draft(다시 상신하면 같은 문서 번호).
+     · 여러 카드 문서 = 이 기능 전에 카드 둘 이상을 한 문서로 올린 예전 문서(card_no null, 달마다 하나). 살아 있으면 그 달 줄이 모두 잠긴다(예전 그대로).
+     · 열린 줄 = 잠기지 않은 줄(안 묶임 + 죽은 문서에 묶임). 목록에 없는 문서에 묶인 줄은 잠긴 것으로 본다(결재 목록을 못 받았을 때 — SPEC §5-1).
+     lines = 그 사람·그 달 줄 { id, card_no, approval_id, category, purpose, … } · docs = 그 사람·그 달 문서 { id, status, card_no, seq }. */
+  function stOf(x) { return x != null && typeof x === 'object' ? str(x.status) : str(x); }
+  /** 살아 있는 문서인가 — 'submitted'·'approved'(글자 또는 { status }). */
+  function isLive(st) { var s = stOf(st); return s === 'submitted' || s === 'approved'; }
+  /** 그 달 문서들의 살아 있는 상태 — submitted 가 하나라도 있으면 'submitted', 아니면 approved 가 있으면 'approved', 아니면 ''(글자 또는 { status } 목록). */
+  function liveStatus(list) {
+    var a = (Array.isArray(list) ? list : []).map(stOf);
+    return a.indexOf('submitted') >= 0 ? 'submitted' : a.indexOf('approved') >= 0 ? 'approved' : '';
+  }
+  /** 끝자리 — 카드 키의 숫자(0-9)만 모아 뒤 4자리. 4자리보다 적으면 있는 숫자, 없으면 ''. 「1234-****-****-5678」 → '5678'. */
+  function cardTail(v) { return str(v).replace(/[^0-9]/g, '').slice(-4); }
+  function intOf(v) { var n = Number(v); return isFinite(n) && Math.floor(n) === n ? n : NaN; }
+  /** 문서 이름 꼬리(SPEC §2) — card_no 가 undefined → ''(문서가 아닌 기간) · null → ' · 여러 카드' · 끝자리 없음 → ' · 카드 번호 없음' · 그 밖 ' · 카드 끝 1234'.
+   *  seq 가 정수 2 이상이면 뒤에 ' · 추가 {seq-1}'(같은 카드 두 번째 문서부터 — 여러 카드·번호 없음도 같다. 여러 카드 문서는 달마다 하나라 실제로는 seq 1). */
+  function docSuffix(card_no, seq) {
+    if (card_no === undefined) return '';
+    var t = card_no === null ? null : cardTail(card_no), s = intOf(seq);
+    return (t === null ? ' · 여러 카드' : t === '' ? ' · 카드 번호 없음' : ' · 카드 끝 ' + t) + (s >= 2 ? ' · 추가 ' + (s - 1) : '');
+  }
+  /** '2026-10' → '10월분' · '2026-12b' → '12월분 2차' · 그 밖 「<글자>분」(서버 cycle-rules.ts periodShort 와 같다). */
+  function pshort(c) { var s = str(c); return KEY_X.test(s) ? '12월분 2차' : KEY_STD.test(s) ? +s.slice(5, 7) + '월분' : s + '분'; }
+  /** 짧은 이름 — 「10월분 · 카드 끝 1234」·「10월분 · 카드 끝 1234 · 추가 1」·「12월분 2차 · 카드 끝 1234」(알림·종·포털·단추).
+   *  긴 이름은 웹이 cycName + ' (' + span + ')' + docSuffix 로 만든다(팀즈 글은 서버 cardDocLabel). 이름은 굳히지 않는다 — 칸에서 그때 만든다. */
+  function docName(cycle, card_no, seq) { return pshort(cycle) + docSuffix(card_no, seq); }
+
+  function bound(e) { return !!e && e.approval_id != null && e.approval_id !== ''; }
+  /** 문서 차례 — 정수 1 이상이 아니면 1(DB 는 not null default 1). */
+  function seqOf(d) { var s = intOf(d && d.seq); return s >= 1 ? s : 1; }
+  /** 문서의 카드 — 카드 키, 여러 카드 문서(card_no null·없음)는 null. */
+  function docKey(d) { return d.card_no == null ? null : cardKey(d.card_no); }
+  function byIdAsc(a, b) { return (Number(a.id) || 0) - (Number(b.id) || 0); }
+  /** 줄·문서를 한 번 훑어 둔다 — 문서(번호가 같으면 앞의 것) · 번호 → 문서 · 살아 있는 여러 카드 문서. */
+  function ctxOf(lines, docs) {
+    var by = Object.create(null), ds = [];
+    (Array.isArray(docs) ? docs : []).forEach(function (d) { if (d && d.id != null && !(String(d.id) in by)) { by[String(d.id)] = d; ds.push(d); } });
+    var c = { ls: (Array.isArray(lines) ? lines : []).filter(function (e) { return !!e; }), ds: ds, by: by, got: Array.isArray(lines) };
+    c.liveMulti = ds.filter(function (d) { return d.card_no == null && isLive(d.status); });
+    c.docOf = function (e) { return bound(e) ? by[String(e.approval_id)] || null : null; };
+    c.boundTo = function (e, d) { return bound(e) && String(e.approval_id) === String(d.id); };
+    // 빈 죽은 문서(2026-11-02 검토 M1 · 리더 결정) — 그 달에 그 카드 줄이 하나도 없는 죽은 문서(반려·회수·draft): 그 문서에 묶인 줄이 없고,
+    //   카드 한 장 문서(카드 K)면 카드 키가 K 인 열린 줄(안 묶임 + 죽은 문서에 묶임)도 없다 · 여러 카드 문서는 묶인 줄만 본다.
+    //   달 상태(반려·회수로 세지 않음)·대상·카드로 정하기(「K 의 죽은 문서」로 세지 않음)에서 뺀다 — 줄을 지운 반려 문서가 그 달을 영영 「반려」로 묶지 않게.
+    //   그 카드 줄이 다시 올라오면 비어 있지 않아 다시 그 문서가 대상(같은 번호로 다시 상신). 문서 번호로 바로 가리키면 그대로 그 문서.
+    //   그 달 줄을 안 받았으면(lines 가 배열이 아님) 비었는지 모르니 예전처럼 센다. 서버 card-doc.ts emptyDead 와 같다(card-parity 시험).
+    c.empty = function (d) {
+      if (!c.got || isLive(d.status)) return false;
+      var k = docKey(d);
+      return !c.ls.some(function (e) { return c.boundTo(e, d) || (k !== null && c.open(e) && cardKey(e.card_no) === k); });
+    };
+    // 열린 줄 — 살아 있는 여러 카드 문서가 있는 달은 줄이 모두 잠긴다(DB card_line_locked) · 목록에 없는 문서에 묶인 줄도 잠긴 것으로
+    c.open = function (e) {
+      if (c.liveMulti.length) return false;
+      if (!bound(e)) return true;
+      var d = c.docOf(e);
+      return !!d && !isLive(d.status);
+    };
+    return c;
+  }
+  /** 죽은 문서 D 의 줄(SPEC §3-4 표) — 카드 한 장 문서: 카드 키 = K 그리고 (안 묶임 또는 D 에 묶임) ·
+   *  여러 카드 문서: D 에 묶임 또는 (안 묶임 그리고 카드 키 ∈ D 에 묶인 줄의 카드 키). 다른 죽은 문서에 묶인 줄은 그 문서 몫. */
+  function deadLines(c, d) {
+    if (d.card_no != null) {
+      var k = cardKey(d.card_no);
+      return c.ls.filter(function (e) { return cardKey(e.card_no) === k && (!bound(e) || c.boundTo(e, d)); });
+    }
+    var keys = Object.create(null);
+    c.ls.forEach(function (e) { if (c.boundTo(e, d)) keys[cardKey(e.card_no)] = true; });
+    return c.ls.filter(function (e) { return c.boundTo(e, d) || (!bound(e) && keys[cardKey(e.card_no)] === true); });
+  }
+  /** 카드 키 K 의 죽은 문서 — 죽은 문서 중 card_no = K, 또는 card_no null 이고 묶인 줄에 K 가 있는 것(빈 죽은 문서는 뺀다 — 검토 M1). */
+  function deadOfKey(c, k) {
+    return c.ds.filter(function (d) {
+      if (isLive(d.status) || c.empty(d)) return false;
+      if (d.card_no != null) return cardKey(d.card_no) === k;
+      return c.ls.some(function (e) { return c.boundTo(e, d) && cardKey(e.card_no) === k; });
+    });
+  }
+  function planOf(d, items, k, seq) {
+    var its = items.slice().sort(byIdAsc);
+    return { doc_id: d ? d.id : null, card_no: d ? docKey(d) : k, seq: d ? seqOf(d) : seq, ids: its.map(function (e) { return e.id; }), items: its };
+  }
+  /**
+   * 대상·줄 정하기 — DB card_doc_plan(SPEC §3-4)을 줄·문서 목록으로(하네스 가짜 서버·시험 몫, 화면은 docTargets).
+   * card_no = 고른 카드(번호 그대로도 된다 — 키로 바꾼다) · approval_id = 다시 상신할 문서 번호 · review = 결재자 검증(살아 있는 문서를 대상으로).
+   * → { doc_id, card_no, seq, ids, items } 또는 { error: 'ALREADY_SUBMITTED'|'ALREADY_APPROVED'|'CARD_DOC_GONE'|'CARD_MISMATCH'|'CARD_PICK'|'CARD_PICK_DOC' }.
+   * 1 살아 있는 여러 카드 문서 L → review 이고 L 번호면 L, 아니면 ALREADY_<L 상태> · 2 번호 있음 → 그 문서(없으면 CARD_DOC_GONE · 살아 있으면 review 가 아니면 ALREADY ·
+   *   카드와 문서 카드가 둘 다 있고 다르면 CARD_MISMATCH(review 여도) · 살아 있으면 묶인 줄) · 3 번호 없음 → 카드도 없으면 CARD_PICK · 그 카드의 죽은 문서 1건 → 그 문서 ·
+   *   2건 이상 → CARD_PICK_DOC · 0건 → 새 문서(seq = 그 카드 문서 최댓값 + 1 — 빈 죽은 문서의 차례도 센다, 줄이 없어도). 3 의 「죽은 문서」에서 빈 죽은 문서는 뺀다(검토 M1).
+   *   서버 card-doc.ts cardDocPlanLocal 과 같다(card-parity 시험).
+   */
+  function docPlan(lines, docs, card_no, approval_id, review) {
+    var c = ctxOf(lines, docs), i, d;
+    var boundOf = function (x) { return c.ls.filter(function (e) { return c.boundTo(e, x); }); };
+    if (c.liveMulti.length) {
+      for (i = 0; i < c.liveMulti.length; i++) {
+        d = c.liveMulti[i];
+        if (review && approval_id != null && String(approval_id) === String(d.id)) return planOf(d, boundOf(d));
+      }
+      return { error: 'ALREADY_' + liveStatus(c.liveMulti).toUpperCase() };
+    }
+    if (approval_id != null && approval_id !== '') {
+      d = c.by[String(approval_id)];
+      if (!d) return { error: 'CARD_DOC_GONE' };
+      var live = isLive(d.status);
+      if (live && !review) return { error: 'ALREADY_' + str(d.status).toUpperCase() };
+      if (card_no != null && d.card_no != null && cardKey(card_no) !== docKey(d)) return { error: 'CARD_MISMATCH' };
+      return planOf(d, live ? boundOf(d) : deadLines(c, d));
+    }
+    if (card_no == null) return { error: 'CARD_PICK' };
+    var k = cardKey(card_no), dead = deadOfKey(c, k);
+    if (dead.length === 1) return planOf(dead[0], deadLines(c, dead[0]));
+    if (dead.length > 1) return { error: 'CARD_PICK_DOC' };
+    var top = 0;
+    c.ds.forEach(function (x) { if (docKey(x) === k) top = Math.max(top, seqOf(x)); });
+    return planOf(null, c.ls.filter(function (e) { return !bound(e) && cardKey(e.card_no) === k; }), k, top + 1);
+  }
+  /** 카드 키 짧은 지문 — 새 문서 대상의 tid('n…'). 카드번호를 DOM·sessionStorage·주소에 두지 않으려고(FNV-1a 32비트 → 36진). */
+  function keyFp(k) {
+    var h = 0x811c9dc5, s = str(k);
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(36);
+  }
+  /**
+   * 이번 달 상신·검증 대상 목록(SPEC §3-4·§4-1) — [{ approval_id, card_no, seq, status, items, tid }], 줄이 있는 대상만.
+   * 죽은 문서마다 하나(그 문서 번호로 다시 상신 · 빈 죽은 문서는 줄이 없어 안 나온다) + 죽은 문서가 없는 카드의 안 묶인 줄마다 새 문서 하나(card_no = 카드 키, seq = 그 카드 문서 최댓값 + 1, status '').
+   * 살아 있는 여러 카드 문서가 있는 달은 빈 목록(모두 ALREADY). 차례 = 여러 카드 문서 → 끝자리 → seq(같으면 카드 키 → 문서 번호).
+   * tid = 'd{문서 번호}' 또는 'n{카드 키 짧은 지문}'. items 는 줄 번호 순(card_doc_plan ids 와 같은 차례).
+   */
+  function docTargets(lines, docs) {
+    var c = ctxOf(lines, docs), out = [];
+    if (c.liveMulti.length) return out;
+    c.ds.forEach(function (d) {
+      if (isLive(d.status) || c.empty(d)) return;
+      var p = planOf(d, deadLines(c, d));
+      if (p.items.length) out.push({ approval_id: d.id, card_no: p.card_no, seq: p.seq, status: str(d.status), items: p.items, tid: 'd' + d.id });
+    });
+    var seen = Object.create(null);
+    c.ls.forEach(function (e) {
+      var k = cardKey(e.card_no);
+      if (bound(e) || seen[k]) return;
+      seen[k] = true;
+      if (deadOfKey(c, k).length) return;
+      var p = docPlan(c.ls, c.ds, k, null, false);
+      out.push({ approval_id: null, card_no: k, seq: p.seq, status: '', items: p.items, tid: 'n' + keyFp(k) });
+    });
+    var aid = function (t) { return t.approval_id == null ? Infinity : Number(t.approval_id); };
+    out.sort(function (a, b) {
+      var x = aid(a), y = aid(b);
+      return (a.card_no == null ? 0 : 1) - (b.card_no == null ? 0 : 1) || cmpS(cardTail(a.card_no), cardTail(b.card_no)) || a.seq - b.seq ||
+        cmpS(cardKey(a.card_no), cardKey(b.card_no)) || (x < y ? -1 : x > y ? 1 : 0);
+    });
+    return out;
+  }
+  /**
+   * 달 상태(SPEC §4-1) — { st, sub, app, rej, wd, left, blank_left }. sub·app·rej·wd = 문서 수(wd 는 회수 + draft) · left = 열린 줄 수 · blank_left = 열린 줄 가운데 빈칸 줄.
+   * st: 살아 있는 여러 카드 문서 → 그 상태 · 반려 문서 → 'rejected' · 회수·draft → 'withdrawn' · 열린 줄 → '' · 결재 중 → 'submitted' · 모두 완료 → 'approved' · 없음 → ''.
+   * 빈 죽은 문서(묶인 줄도 그 카드의 열린 줄도 없는 반려·회수·draft — ctxOf 의 empty, 검토 M1)는 세지 않는다(rej·wd·st 모두).
+   * lines 가 배열이 아니면(그 달 줄을 안 받음) 문서만으로 반려 > 회수 > 결재 중 > 결재 완료, left·blank_left 는 null(SPEC §5-9) — 이때는 죽은 문서를 모두 센다.
+   */
+  function monthState(lines, docs) {
+    var c = ctxOf(lines, docs), n = { submitted: 0, approved: 0, rejected: 0, withdrawn: 0, draft: 0 };
+    c.ds.forEach(function (d) { var s = str(d.status); if (Object.prototype.hasOwnProperty.call(n, s) && !c.empty(d)) n[s]++; });
+    var got = Array.isArray(lines), open = got ? c.ls.filter(c.open) : [];
+    var left = got ? open.length : null, wd = n.withdrawn + n.draft;
+    var st = c.liveMulti.length ? liveStatus(c.liveMulti) : n.rejected ? 'rejected' : wd ? 'withdrawn' : left ? '' :
+      n.submitted ? 'submitted' : n.approved ? 'approved' : '';
+    return { st: st, sub: n.submitted, app: n.approved, rej: n.rejected, wd: wd, left: left, blank_left: got ? blankRows(open) : null };
+  }
+  /** 빈 죽은 문서 번호(줄 번호처럼 오름차순) — 위 ctxOf 의 empty(검토 M1). 그 달 줄을 안 받았으면 []. 서버 cardEmptyDocIds 와 같다. */
+  function emptyDocIds(lines, docs) {
+    var c = ctxOf(lines, docs);
+    return c.ds.filter(c.empty).map(function (d) { return d.id; }).sort(function (a, b) { return (Number(a) || 0) - (Number(b) || 0); });
+  }
+  /**
+   * 관리 「카드」 칸(SPEC §5-7, 2026-11-02 사용자) — 줄의 카드마다 [{ key, tail, hipass }](끝자리 순, 같으면 카드 키 순 · 카드 키가 같으면 하나).
+   * hpSet = hipassCards(그 화면이 받은 그 달 모든 줄 — 센터 카드의 통행료 줄이 다른 직원 쪽에 있어도 (하)), 없으면 lines 로. key 는 가려 쓰는 몫이 아니다 — 화면에 내지 않는다.
+   */
+  function cardList(lines, hpSet) {
+    var hp = hpSet || hipassCards(lines), seen = Object.create(null), out = [];
+    var has = function (k) { return k !== '' && (typeof hp.has === 'function' ? hp.has(k) === true : hp[k] === true); };
+    (Array.isArray(lines) ? lines : []).forEach(function (e) {
+      var k = cardKey(e && e.card_no);
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push({ key: k, tail: cardTail(k), hipass: has(k) });
+    });
+    return out.sort(function (a, b) { return cmpS(a.tail, b.tail) || cmpS(a.key, b.key); });
+  }
+
   /* ── 구분 추천(SPEC §4) — 웹만 ── */
   var FOOD = /음식|식당|한식|중식|일식|양식|분식|커피|제과|카페|베이커리|제빵|패스트푸드|뷔페|레스토랑|치킨|피자|주점/;
   function normMerchant(s) {
@@ -341,6 +543,8 @@
     blankRows: blankRows, runVerify: runVerify, totals: totals,
     kstDate: kstDate, expenseRangeMs: expenseRangeMs, purposeVague: purposeVague,
     isHipassMerchant: isHipassMerchant, fuelOrToll: fuelOrToll, hipassCards: hipassCards, onHipass: onHipass,
+    cardKey: cardKey, cardTail: cardTail, isLive: isLive, liveStatus: liveStatus, docSuffix: docSuffix, docName: docName,
+    docPlan: docPlan, docTargets: docTargets, monthState: monthState, emptyDocIds: emptyDocIds, cardList: cardList,
     MEAL_LIMIT: MEAL_LIMIT, isMealLine: isMealLine, mealNoteOk: mealNoteOk, needsMealNote: needsMealNote,
     suggest: suggest, mealOf: mealOf, normMerchant: normMerchant
   };
