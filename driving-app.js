@@ -3648,7 +3648,8 @@
       SUB_NOTE[nk] = nprev; SUB_NOTE_PREV[nk] = !!nprev;
     }
     h += '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="subNote">의견</label><div class="fbody">' +
-      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재자에게 남길 말(선택). 예: ' + (SUB_KIND === 'expense' ? '10.05 식비는 세 명이 함께 먹었어요' : SUB_KIND === 'card' ? '10.05 주유는 출장 차량에 넣었어요' : '09.30 통행료 두 장은 왕복이에요') + '">' +
+      // 개인경비 예시는 인원 수를 말하지 않는다(2026-11-02 docs/meal-note/SPEC.md — 13,000원 넘는 식비는 줄마다 비고에 함께한 분 이름)
+      '<textarea class="inp" id="subNote" rows="3" maxlength="300" placeholder="결재자에게 남길 말(선택). 예: ' + (SUB_KIND === 'expense' ? '10.05 식비는 현장 점검 후 점심이에요' : SUB_KIND === 'card' ? '10.05 주유는 출장 차량에 넣었어요' : '09.30 통행료 두 장은 왕복이에요') + '">' +
       esc(SUB_NOTE[nk]) + '</textarea>' +
       '<div class="fhint">' + (SUB_NOTE_PREV[nk] ? '지난번 상신 때 남긴 의견을 불러왔어요. 고치거나 지울 수 있어요. ' : '') +
       '결재선의 모든 결재자가 결재함에서 봐요(300자까지).</div></div></div>';

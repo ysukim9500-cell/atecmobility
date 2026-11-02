@@ -7,9 +7,11 @@
    ★ 자료는 직원이 ERP 에서 받은 자기 카드 승인내역 엑셀(card-erp.js 가 읽는다 — SheetJS 는 올리기 창을 열 때만 싣는다).
      손으로 적는 칸은 구분·사용목적·비고뿐. 칸을 고치면 바로 저장한다(화면을 다시 그리지 않는다 — 커서가 튀지 않게).
    ★ 구분·사용목적이 빈 줄이 있으면 상신하지 못한다(beforeSubmit {blocked} + 서버 CARD_INCOMPLETE). 나머지 검증은 표시만.
-   ★ 검증(2026-10-12): 「검증하기」 = expense-ai op card_review(서버가 줄을 읽어 규칙 C01~C09 + Gemini C07·C08, card_verifications 에 저장).
+   ★ 검증(2026-10-12): 「검증하기」 = expense-ai op card_review(서버가 줄을 읽어 규칙 C01~C10 + Gemini C07·C08, card_verifications 에 저장).
      서버·Gemini 를 못 쓰면 브라우저 규칙(card-rules.js — 서버 _shared/card-verify.ts 와 같은 판정)만 + 「AI 검증을 하지 못해 규칙으로만 검증했어요」(AI_FAIL).
      Gemini 는 표시만 한다(warn). 상신을 막는 것은 빈칸(C01·C02)뿐. 사진 없음.
+   ★ 식대 13,000원(2026-11-02 docs/meal-note/SPEC.md §4): 13,000원 넘는 식사 줄인데 비고에 이름·사유가 없으면 이번 달 표의 비고 칸을 주황 점선(want)으로 —
+     판정은 card-rules.js(needsMealNote — 서버 C10 과 같은 판정). 칸에 적는 대로 바로 사라진다(paintMeal). 막지 않는다.
    ★ 저장(2026-10-12 → 2026-10-15): 칸은 자동 저장 + 표 위 저장 상태 줄(자동 저장됨·저장 중…·저장 못 함 N곳).
      「임시저장」 단추는 뺐다(2026-10-15 화면 정리) — 저장이 실패했을 때만 상태 줄에 「다시 저장」(그때 적은 값을 다시 보냄).
    ★ 다시 올리기는 ERP 칸만 upsert(CardErp.toRow) — 적어 둔 구분·사용목적·비고는 그대로, 파일에 없는 줄은 표시만.
@@ -24,6 +26,30 @@
   var ADMIN_C = ['ca_close', 'ca_list', 'ca_final', 'ca_people'];
   var LABEL = { category: '구분', purpose: '사용목적', note: '비고' };
   var MAXLEN = { category: 20, purpose: 200, note: 200 };
+
+  /* ── 식대 13,000원 → 비고 칸 안내(2026-11-02 docs/meal-note/SPEC.md §1~§4) ──
+     판정은 card-rules.js 의 needsMealNote(식사 낱말 구분 · 회식·접대·협의·회의 뺌 · 줄 금액 > 13,000 · 비고가 비었거나 「외 N명」·인원수뿐 —
+     서버 card-verify.ts C10 과 같은 판정, card-parity 시험)를 그대로 부른다. 화면 글은 개인경비 drv-expense.js 와 같은 글자.
+     앞 판 card-rules.js 와 섞여 실려도(배포 직후 캐시) 죽지 않게 — 함수가 없으면 안내 없음.
+     빈 비고 칸 자리 글은 짧게 「이름·사유」(2026-11-02 고침 1차 — PC 표 비고 칸(92~120px)에 끝까지 들어가게, 칸 폭은 그대로).
+     안내 글 전체(SPEC §4)는 PC 는 칸의 title, 폰·태블릿 카드는 칸 아래 줄. */
+  var MEAL_PH = '이름·사유';
+  var MEAL_HINT_EMPTY = '13,000원이 넘는 식사예요. 비고에 함께한 분 이름을 모두(혼자면 사유) 적어 주세요.';
+  var MEAL_HINT_COUNT = '‘외 N명’이나 인원수 대신 함께한 분 이름을 모두 적어 주세요.';
+  /** 비고 안내 글 — 안내가 필요 없는 줄이면 ''. 비고가 비었으면 첫째 글, 「외 N명」·인원수만이면 둘째 글. x = { category, amount, note } */
+  function mealHint(x) {
+    if (!R.needsMealNote || !R.needsMealNote(x)) return '';
+    var s = String(x.note == null ? '' : x.note);
+    return (s.normalize ? s.normalize('NFKC') : s).trim() ? MEAL_HINT_COUNT : MEAL_HINT_EMPTY;
+  }
+  /** 비고가 비어 있으면 안내가 필요한 줄인가(13,000원 넘는 식사 줄) — 빈 비고 칸의 placeholder 를 정한다. */
+  function mealWants(x) { return !!R.needsMealNote && R.needsMealNote({ category: x.category, amount: x.amount, note: '' }); }
+  /** 안내 글을 HTML 로 — 짝말·괄호를 한 덩이로(줄 끝에 「주세요.」만, 「(혼자면 / 사유)」로 갈리지 않게, 2026-11-02 화면 검토 U-L1·L2).
+   *  개인경비 drv-expense.js hintHtml 과 같은 글자. 글은 위 상수뿐(사용자 글 아님). */
+  function hintHtml(s) {
+    return esc(s).replace('‘외 N명’', '‘외&nbsp;N명’').replace(' 주세요', '&nbsp;주세요')
+      .replace('(혼자면 사유)', '<span style="white-space:nowrap">(혼자면 사유)</span>');
+  }
 
   /* ══════════════════ 기간 (1일 ~ 말일) ══════════════════
      ★ 2026-10-20 연말 마감 설정: 범위·이름은 엔진(cycle-rules.js 의 'card')이 정한다 — 관리자가 정하지 않으면 늘 달력 한 달(지금과 같다).
@@ -177,8 +203,9 @@
     return '<span class="st ' + m[1] + '">' + esc(m[0]) + '</span>';
   }
   function fact(k, v, sub, alert) {
+    // 설명의 가운뎃점 낱말(「구분·사용목적」)은 한 덩이로(keepDots) — 「확인 필요」 설명에 식대 비고를 더하자 360·390 에서 그 낱말이 두 줄로 갈렸다(2026-11-02 고침 2차)
     return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
-      '<div class="sub">' + esc(sub || '') + '</div></div>';
+      '<div class="sub">' + keepDots(esc(sub || '')) + '</div></div>';
   }
   function head(title, extra) {
     var S = C.state();
@@ -324,10 +351,14 @@
   }
   function rowHtml(it, i, locked, hist) {
     var sg = !locked && !String(it.category || '').trim() ? R.suggest(it, hist) : null;
+    // 식대 13,000원 비고 안내(2026-11-02) — 잠긴 기간(결재 중·완료)은 고칠 수 없으니 표시하지 않는다(빈칸 need 와 같게)
+    var mh = locked ? '' : mealHint(it);
     var inp = function (f, ph) {
-      var v = String(it[f] == null ? '' : it[f]), need = f !== 'note' && !v.trim();
-      return '<input class="inp cin' + (need ? ' need' : '') + (f === 'purpose' ? ' wide' : '') + '" data-cid="' + it.id + '" data-f="' + f + '" maxlength="' + MAXLEN[f] +
+      var v = String(it[f] == null ? '' : it[f]), need = f !== 'note' && !v.trim(), want = f === 'note' && !!mh;
+      return '<input class="inp cin' + (need ? ' need' : '') + (want ? ' want' : '') + (f === 'purpose' ? ' wide' : '') + '" data-cid="' + it.id + '" data-f="' + f + '" maxlength="' + MAXLEN[f] +
         '" value="' + esc(v) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + (locked ? ' disabled' : '') + ' aria-label="' + (i + 1) + '번째 줄 ' + LABEL[f] + '"' +
+        // 비고 칸 안내 글 — PC 표는 title(칸 크기·줄 맞춤 그대로), 폰·태블릿 카드는 칸 아래 작은 줄(.cmeal). 화면 읽기는 그 줄을 읽는다
+        (f === 'note' ? ' aria-describedby="cmh' + it.id + '"' + (want ? ' title="' + esc(mh) + '"' : '') : '') +
         // 사용목적 칸 최소 폭 220 → 180(2026-10-15) — PC 폭(1280)에서 맨 끝 「지우기」가 표 밖으로 잘리던 것
         (f === 'purpose' ? ' style="min-width:180px"' : '') + '>';
     };
@@ -347,7 +378,8 @@
       '<td data-l="구분">' + inp('category', '예: 중식대') +
         (sg ? '<button type="button" class="csug" data-csug="' + it.id + '" data-cat="' + esc(sg.cat) + '" title="' + esc(sg.why) + ' — 누르면 확정">' + esc(sg.cat) + ' ✓</button>' : '') + '</td>' +
       '<td data-l="사용목적">' + inp('purpose', '무엇에 썼는지') + '</td>' +
-      '<td data-l="비고">' + inp('note', '') + '</td>' +
+      '<td data-l="비고">' + inp('note', !locked && mealWants(it) ? MEAL_PH : '') +
+        '<div class="cmeal" id="cmh' + it.id + '"' + (mh ? '>' + hintHtml(mh) : ' hidden>') + '</div></td>' +
       '<td class="n" data-l=""><span class="csave" id="cs' + it.id + '" aria-live="polite"></span>' +
         (locked ? '' : '<button type="button" class="btn sm" data-cdel="' + it.id + '" aria-label="' + (i + 1) + '번째 줄 삭제">삭제</button>') + '</td></tr>';
   }
@@ -358,9 +390,22 @@
   // 저장 상태 줄(2026-10-12): INFL 'id|f' → id(보내는 중) · FAILED 'id|f' → { id, f, v, cyc }(마지막 저장이 실패한 칸과 그때 적은 값 — 「다시 저장」이 다시 보낸다, 2026-10-15)
   //   · LAST_SAVE 마지막으로 저장된 시각(ms)
   var INFL = {}, FAILED = {}, LAST_SAVE = 0;
+  /** 그 줄 비고 칸의 식대 안내(주황 점선 · placeholder · title · 칸 아래 줄)를 지금 칸 값으로 다시 — 구분·비고를 적을 때마다(다시 그리지 않는다). */
+  function paintMeal(id) {
+    var tr = document.querySelector('tr[data-crow="' + id + '"]'), it = findMine(id);
+    if (!tr || !it) return;
+    var nt = tr.querySelector('.cin[data-f="note"]'), ct = tr.querySelector('.cin[data-f="category"]'), hl = $('cmh' + id);
+    if (!nt || nt.disabled) return;
+    var x = { category: ct ? ct.value : it.category, amount: it.amount, note: nt.value }, h = mealHint(x);
+    nt.classList.toggle('want', !!h);
+    nt.placeholder = mealWants(x) ? MEAL_PH : '';
+    if (h) nt.title = h; else nt.removeAttribute('title');
+    if (hl) { if (hl.getAttribute('data-h') !== h) { hl.innerHTML = h ? hintHtml(h) : ''; hl.setAttribute('data-h', h); } hl.hidden = !h; }
+  }
   function queueSave(el, now) {
     var id = el.dataset.cid, f = el.dataset.f, k = id + '|' + f;
     if (f !== 'note') el.classList.toggle('need', !el.value.trim());
+    if (f !== 'purpose') paintMeal(id);                 // 구분·비고가 바뀌면 식대 안내도 그 자리에서(2026-11-02)
     var w = SAVE_T[k] || { id: id, f: f, cyc: C.state().CYCKEY };
     clearTimeout(w.t);
     w.v = el.value;
@@ -408,7 +453,7 @@
     if (!list.length) { C.toast('다시 보낼 값이 없어요. ‘저장 못 함’으로 표시된 칸을 다시 적어 주세요.', true); paintSave(); return; }
     list.forEach(function (x) {
       var el = document.querySelector('.cin[data-cid="' + x.id + '"][data-f="' + x.f + '"]');
-      if (el && el !== document.activeElement) { el.value = x.v; if (x.f !== 'note') el.classList.toggle('need', !String(x.v).trim()); }
+      if (el && el !== document.activeElement) { el.value = x.v; if (x.f !== 'note') el.classList.toggle('need', !String(x.v).trim()); if (x.f !== 'purpose') paintMeal(x.id); }
       saveCell(x.id, x.f, x.v, x.cyc);
     });
     paintSave();
@@ -444,7 +489,7 @@
     var el = document.querySelector('.cin[data-cid="' + id + '"][data-f="' + f + '"]');
     C.toast(msg, true);
     if (SAVE_T[id + '|' + f] || (el && el === document.activeElement)) return;     // 더 새 값이 기다리거나 쓰는 중이면 되돌리지 않는다
-    if (el && prev !== undefined) { el.value = prev == null ? '' : prev; if (f !== 'note') el.classList.toggle('need', !el.value.trim()); }
+    if (el && prev !== undefined) { el.value = prev == null ? '' : prev; if (f !== 'note') el.classList.toggle('need', !el.value.trim()); if (f !== 'purpose') paintMeal(id); }
   }
   function rowIn(cyc, id) {
     var x = ITEMS[itemKey(false, cyc)];
@@ -542,7 +587,7 @@
     C.vx.pool(todo, 3, function (x) {
       // 화면의 칸도 바로 채운다 — 다른 칸에 쓰는 중이면 다시 그리지 않으므로(커서가 튄다) 칸 값만 바꾼다
       var inp = document.querySelector('.cin[data-cid="' + x.id + '"][data-f="category"]');
-      if (inp && inp !== document.activeElement && !inp.value.trim()) { inp.value = x.cat; inp.classList.remove('need'); }
+      if (inp && inp !== document.activeElement && !inp.value.trim()) { inp.value = x.cat; inp.classList.remove('need'); paintMeal(x.id); }
       var chip = document.querySelector('[data-csug="' + x.id + '"]'); if (chip) chip.remove();
       return saveCell(x.id, 'category', x.cat, cyc);
     }).then(function () {
@@ -849,7 +894,7 @@
     if (on) PREV[k] = { at: Date.now(), sig: sig(p[0], p[1]) }; else delete PREV[k];
     try { sessionStorage.setItem('drv.cpreviewed', JSON.stringify(PREV)); } catch (e) { }
   }
-  /* ── AI 검증(2026-10-12, SPEC §3-1) — expense-ai op card_review: 서버가 card_items 를 직접 읽어 규칙(C01~C09) + Gemini(C07·C08).
+  /* ── AI 검증(2026-10-12, SPEC §3-1) — expense-ai op card_review: 서버가 card_items 를 직접 읽어 규칙(C01~C10) + Gemini(C07·C08).
      같은 자료면 서버가 보관해 둔 Gemini 결과를 쓴다. 서버·Gemini 를 못 쓰면 브라우저 규칙만 + 「AI 검증을 하지 못해 규칙으로만 검증했어요」(AI_FAIL). */
   var VRUN = { busy: false, note: '', k: '', t0: 0 }, VTICK = null, EXP = {};
   var AI_FAIL = 'AI 검증을 하지 못해 규칙으로만 검증했어요';   // 서버 expense-ai card_review FAIL_NOTE 와 같은 글자(2026-10-24 4단계 해요체)
@@ -932,22 +977,25 @@
     return ['규칙만', ai.note || AI_FAIL];
   }
   var LV = { block: ['빈칸', 'bad'], bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
+  /** 가운뎃점으로 이은 한글 낱말(「이름·사유를」·「구분·내역이」)은 한 덩이로 — 좁은 폭에서 줄 끝에 「·」가 남지 않게(2026-11-02 식대 C10 제목). esc 한 글에 쓴다. */
+  function keepDots(h) { return String(h).replace(/[가-힣]{1,12}(?:·[가-힣]{1,12}){1,4}/g, function (m) { return '<span style="white-space:nowrap">' + m + '</span>'; }); }
   function itemsHtml(items, links) {
     if (!items || !items.length) return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">확인이 필요한 항목이 없어요.</div></div></div>';
     return '<div class="panel vlist">' + items.map(function (it) {
       var lv = LV[it.level] || LV.info, ref = (it.ref && it.ref.items) || [], go = '';
       if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-cvfix="' + (VITEMS.length - 1) + '">바로 수정' + ic('chev', 12) + '</button>'; }
       return '<div class="vitem v-' + esc(it.level === 'block' ? 'bad' : it.level) + (it.ai ? ' v-ai' : '') + '" data-ccode="' + esc(it.code || '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + esc(it.title) + (it.ai ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
+        '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (it.ai ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
-  /** 그 줄로 가서 빈 칸(없으면 첫 칸)에 커서를 둔다. */
-  function focusRow(id) {
+  /** 그 줄로 가서 빈 칸(없으면 첫 칸 — 구분)에 커서를 둔다. code 가 C10(식대 비고)이면 비고 칸으로.
+   *  ★ 비고 칸은 C10 일 때만(2026-11-02 검토 M2 — 모든 항목이 비고로 가서 C07 「구분·내역이 맞지 않아 보임」을 고치러 가도 비고에 섰다). */
+  function focusRow(id, code) {
     if (C.state().VIEW !== 'c_month') C.go('c_month');
     setTimeout(function () {
       var tr = document.querySelector('tr[data-crow="' + id + '"]');
       if (!tr) return;
-      var el = tr.querySelector('.cin.need') || tr.querySelector('.cin');
+      var el = (code === 'C10' && tr.querySelector('.cin[data-f="note"]')) || tr.querySelector('.cin.need') || tr.querySelector('.cin');
       try { tr.scrollIntoView({ block: 'center' }); } catch (e) { }
       tr.classList.remove('flash'); void tr.offsetWidth; tr.classList.add('flash');
       if (el && !el.disabled) { try { el.focus({ preventScroll: true }); } catch (e) { } }
@@ -1015,7 +1063,8 @@
       (v ? '마지막 검증 ' + esc(C.vx.whenText(new Date(v.at).toISOString())) : '검증 전') + ' · 카드 ' + n0(rows.length) + '건 ' + won(R.totals(rows).cost) + '</div>' +
       '<p class="verdict' + (busy ? '' : clean) + '">' + verdict + '</p>' +
       (v && !busy ? '<div class="facts">' + fact('빈칸', n0(s.blank_rows) + '<small>줄</small>', '구분·사용목적이 비면 상신할 수 없어요', s.block > 0) +
-        fact('불일치', n0(s.bad), '같은 승인번호가 두 번', s.bad > 0) + fact('확인 필요', n0(s.warn), '기간 밖 · 소유자 · 구분·사용목적 · 개인경비 중복') + fact('참고', n0(s.info), '0원 줄') +
+        // 확인 필요 설명에 C10(식대 비고, 2026-11-02 검토 L2)
+        fact('불일치', n0(s.bad), '같은 승인번호가 두 번', s.bad > 0) + fact('확인 필요', n0(s.warn), '기간 밖 · 소유자 · 구분·사용목적 · 개인경비 중복 · 식대 비고') + fact('참고', n0(s.info), '0원 줄') +
         '<div class="fact" id="cAiFact"><div class="k">검토 ' + C.vx.gemBadge() + '</div><div class="v">' + esc(af[0]) + '</div><div class="sub">' + esc(af[1]) + '</div></div></div>' +
         (v.ai && v.ai.note ? '<div class="awarn" id="cAiNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.note) + '</span></div>' : '') +
         (v.ai && v.ai.exNote ? '<div class="awarn" id="cExNote" style="margin-top:12px">' + ic('alert', 15) + '<span>' + esc(v.ai.exNote) + '</span></div>' : '') : '') +
@@ -1118,7 +1167,7 @@
     var aiUsed = ai ? (ai.status === 'ok' || ai.status === 'cached') : typeof res.ai_used === 'boolean' ? res.ai_used : null;
     return {
       ranAt: isFinite(atMs) ? C.vx.whenText(new Date(atMs).toISOString()) : '', ai: false,
-      noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원 · 개인경비 중복)' +
+      noAiText: '규칙 검증(빈칸 · 같은 승인번호 · 기간 · 소유자 · 0원 · 개인경비 중복 · 식대 비고)' +   // 식대 비고 = C10(2026-11-02 검토 L2)
         (aiUsed === true ? ' + AI 구분·사용목적 확인' : aiUsed === false ? ' · AI 확인 없음' : ''),
       // 검증 결과 창(C.vx.showItems) 한 줄 — 검증 화면과 같은 말. 모르면 말하지 않는다(2026-10-21: 예전엔 늘 「Gemini 읽기 없음」)
       aiNote: aiUsed === true ? 'AI가 구분·사용목적을 봤어요' : aiUsed === false ? AI_FAIL : '',
@@ -1292,7 +1341,7 @@
       '<div class="abf"><span class="k">카드 승인</span><b>' + n0(s.n) + '<small>건</small></b><span class="sub">' + esc(R.span(a.cycle)) + '</span></div>' +
       cmp + '</div><div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
-        return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
+        return '<li class="' + i.level + '"><b>' + keepDots(esc(i.title || '')) + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
       }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건은 ‘검증’ 버튼을 누르면 모두 보여요.</li>' : '') +
         (asApprover ? '<li class="more">고치는 것은 상신자가 해요. 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') + '</div>';
   }
@@ -1699,7 +1748,7 @@
     if (e.target.closest('#btnCUpGo')) { runUpload(); return; }
     if ((el = e.target.closest('[data-csug]'))) {
       var inp = document.querySelector('.cin[data-cid="' + el.dataset.csug + '"][data-f="category"]');
-      if (inp && !inp.disabled) { inp.value = el.dataset.cat; inp.classList.remove('need'); saveCell(el.dataset.csug, 'category', el.dataset.cat); el.remove(); paintSug(); }
+      if (inp && !inp.disabled) { inp.value = el.dataset.cat; inp.classList.remove('need'); saveCell(el.dataset.csug, 'category', el.dataset.cat); paintMeal(el.dataset.csug); el.remove(); paintSug(); }
       return;
     }
     if (e.target.closest('[data-csugall]')) { fillSuggest(); return; }
@@ -1708,7 +1757,7 @@
     if ((el = e.target.closest('#btnCDelGo'))) { if (!el.disabled) runDel(el.dataset.id); return; }
     if (e.target.closest('[data-creload]')) { ITEMS = {}; C.render(); return; }
     if (e.target.closest('[data-cvrun]')) { runCheck(); return; }
-    if ((el = e.target.closest('[data-cvfix]'))) { var it = VITEMS[+el.dataset.cvfix], ref = (it && it.ref && it.ref.items) || []; if (ref.length) focusRow(ref[0]); return; }
+    if ((el = e.target.closest('[data-cvfix]'))) { var it = VITEMS[+el.dataset.cvfix], ref = (it && it.ref && it.ref.items) || []; if (ref.length) focusRow(ref[0], it.code); return; }
     if (e.target.closest('[data-cgoblank]')) { var bid = firstBlankId(); if (bid != null) focusRow(bid); return; }
     if (e.target.closest('[data-cpdf]')) { pdfMine(); return; }
     if ((el = e.target.closest('[data-cpdfok]'))) {

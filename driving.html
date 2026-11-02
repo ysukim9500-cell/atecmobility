@@ -161,6 +161,11 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 .ctab .cin:disabled{padding-right:26px;background-repeat:no-repeat;background-position:right 8px center;background-size:12px 12px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A0A6B0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E")}
 .ctab .cin.need:disabled{border-color:var(--ink-100);box-shadow:none}
+/* 식대 13,000원 넘는 줄의 비고 칸(2026-11-02 docs/meal-note/SPEC.md §4) — 구분·사용목적 빈칸(빨간 need, 2px)보다 약하게 주황 점선 1px(칸 크기·줄 맞춤 그대로).
+   안내 글은 PC 표에서는 칸의 title, 폰·태블릿 카드(아래 820px 묶음)에서는 칸 아래 작은 줄(.cmeal).
+   자리 글은 짧은 「이름·사유」(2026-11-02 고침 1차) — PC 표의 좁은 비고 칸(92~120px)에도 끝까지 들어간다(칸 폭은 그대로) */
+.ctab .cin.want{border-color:var(--warn);border-style:dashed}
+.ctab .cmeal{display:none}
 .csug{display:flex;width:max-content;align-items:center;margin-top:4px;height:24px;padding:0 9px;border-radius:999px;border:1px dashed var(--ink-300);
   background:transparent;color:var(--ink-500);font:inherit;font-size:12px;cursor:pointer}
 .csug:hover,.csug:focus-visible{border-color:var(--red);color:var(--red)}
@@ -209,6 +214,7 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
   .ctab tfoot td:empty{display:none}
   .ctab .cin,.ctab .cin.wide{min-width:0;width:100%;box-sizing:border-box;height:40px}
   .ctab .csug{height:34px;padding:0 12px;font-size:13px}
+  .ctab .cmeal{display:block;margin-top:4px;font-size:12px;line-height:1.5;color:var(--warn)}
 }
 .xcalp{padding:12px}
 .xcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
@@ -249,6 +255,8 @@ table.xtab tr.xsec td{background:var(--sunken)}
 table.xtab tr.xsub td{font-weight:700;background:var(--sunken);font-size:13px}
 table.xtab tr.xover td{background:#FFFBF2}
 .xmeal{white-space:normal;font-size:13px;margin-top:2px}
+/* 관리 전체 내역 금액 칸 「13,000원 초과」 — 참고라서 결재함 참고 딱지와 같은 회색·보통 굵기(금액 칸의 굵은 검정을 물려받지 않게, 2026-11-02 화면 검토 U-L4) */
+.xmealw .st.xmeal{color:var(--ink-600);font-weight:500}
 .xephoto{margin:0 0 14px}
 .xephoto img{max-width:100%;max-height:300px;border-radius:var(--r-sm);border:1px solid var(--line);display:block}
 table.xup td .inp{font-size:13px}
@@ -575,6 +583,14 @@ table.evup tbody tr:first-child td{border-top:0}
   border-radius:4px;padding:0 4px;line-height:15px}
 .evhint{font-size:12px;color:var(--warn);margin-top:5px;line-height:1.5}
 .evhint.ok{color:var(--ink-600)}
+/* 개인경비 식비 13,000원 비고 안내 칸(.xmh — 올리기 줄 · 고치기 창, 2026-11-02 고침 2차): 세 글(빔·외 N명·다 적음)을 한 자리에 겹쳐 두고 지금 것만 보인다.
+   칸 높이 = 가장 긴 글이라 비고를 적는 동안 칸·창이 위아래로 움직이지 않는다(화면 검토 U-M1·U-M2). 다 적음은 회색 */
+.evhint.xmh{display:grid}
+.evhint.xmh > span{grid-area:1 / 1;visibility:hidden}
+.evhint.xmh[data-st="e"] > [data-k="e"],.evhint.xmh[data-st="c"] > [data-k="c"],.evhint.xmh[data-st="o"] > [data-k="o"]{visibility:visible}
+.evhint.xmh[data-st="o"]{color:var(--ink-600)}
+/* 고치기 창(폼)의 안내는 같은 창의 다른 칸 안내(.fhint 14px · 7px)와 같은 크기·간격 — 색만 주황(화면 검토 U-L3) */
+.frow .fbody > .evhint.xmh{font-size:14px;line-height:1.6;margin-top:7px}
 .evhint b{font-size:12px;font-weight:700;letter-spacing:0;color:#fff;background:var(--ink-600);border-radius:3px;
   padding:1px 4px;margin-right:3px}
 .evwait td{color:var(--ink-500);font-size:13px;vertical-align:middle !important}
@@ -2341,6 +2357,9 @@ tr.justrow > td{animation:justtd 1.5s ease-out}
   table.evup td.evg{grid-column:2 / -1;grid-row:1}
   table.evup tr.evwait td.evx{grid-column:2 / -1;grid-row:2}
   table.evup td .inp{width:100% !important;max-width:none;min-width:0}
+  /* 개인경비 올리기(xup)는 칸이 모두 둘째 칸(위 table.xup td:not(.evth))이라 셋째 칸이 늘 비어 글이 96px 칸에 몰렸다 — 두 칸으로
+     (2026-11-02 화면 검토 U-M3: 360 에서 식비 안내 5줄 → 2줄, AI 안내 7줄 → 3줄) */
+  table.evup.xup tbody tr{grid-template-columns:56px minmax(0,1fr)}
 }
 /* ── 휴대폰 폭 표 넘침(2026-10-16 3차) ──
    table.rcard — 결재 완료 출력·권한 관리(승인) 등 처리 단추가 끝 칸에 있는 표: 옆으로 밀지 않고 줄마다 한 덩어리로.
@@ -2971,8 +2990,8 @@ table.mday td.mact .mlinkb{margin-top:0}
 .xmon td.el{max-width:none}
 .xmon .xdw{margin-left:2px;font-size:13px;color:var(--ink-600)}
 .xmon .xnote{display:block;margin-top:1px;font-size:13px;color:var(--ink-600);overflow:hidden;text-overflow:ellipsis}
-.xmon .xmeal2{display:block;margin-top:2px;white-space:normal}
-.xmon .xmeal2 .st{white-space:normal}
+/* 식비 13,000원 비고 안내(2026-11-02 docs/meal-note/SPEC.md §4) — 할 일 글이라 점 딱지가 아니라 주황 글 한 덩이, 사용내역·비고 글과 왼쪽 맞춤 */
+.xmon .xmeal2{display:block;margin-top:2px;white-space:normal;font-size:13px;line-height:1.5;color:var(--warn)}
 .xmon tr.xgrp td{background:var(--sunken);color:var(--ink-900);font-weight:700}
 .xmon tr.xgrp td > div{display:flex;align-items:baseline;gap:8px}
 .xmon .xgn{font-size:13px;font-weight:500;color:var(--ink-600);font-variant-numeric:tabular-nums}
@@ -3150,6 +3169,8 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   /* 짧은 판정·안내 상자도 끝줄에 「돼요.」「주세요.」만 남지 않게(2026-10-28 로봇) — 결재함 판정 띠 · 올리기 상자 · 빈 목록 · 챙길 사람 없음 */
   .abrief .abv b,.drop .dt,.drop .dd,.blank,.d2empty{text-wrap:balance}
   .edud,.vitem .vt,.acard .apvhint,.aext .dim,.ctask .cd{text-wrap:pretty}
+  /* 식비·식대 13,000원 비고 안내도 끝줄에 「주세요.」만 남지 않게(2026-11-02 화면 검토 U-L1) — 올리기·고치기 안내 · 카드 칸 아래 줄 · 이번 달 표 · 요약 줄 · 결재 요약 항목 */
+  .evhint,.ctab .cmeal,.xmon .xmeal2,.xsumnote,.abitems li{text-wrap:pretty}
   .educg .t{text-wrap:balance}
   /* 맞춰보기 「자세히 보기」 — 문장 사이에 끼어 그 줄만 높던 단추를 안내 글 아래 한 줄로 */
   .mbox .mfoldrow{margin-top:8px}

@@ -239,11 +239,15 @@
    *  문장째 빠져, 결재하는 분이 어느 날이 얼마 다른지 못 봤다). */
   function apprDetail(d) {
     d = noRecheck(d);
+    // 할 일 문장 끝에 괄호 꼬리가 붙어도 뺀다 — 식비 X07·식대 C10 「… 모두 적어 주세요(혼자 먹었으면 사유).」(2026-11-02 검토 L1)
     var parts = d.split(/\.\s+/), keep = parts.map(function (p) { return p.indexOf(':') >= 0 ? noAskParen(p) : p; })
-      .filter(function (p) { return !/(주세요|하세요|지우세요)[.)]?$/.test(p.trim()); });
+      .filter(function (p) { return !/(주세요|하세요|지우세요)(\([^)]*\))?[.)]?$/.test(p.trim()); });
     var same = keep.length === parts.length && keep.every(function (p, i) { return p === parts[i]; });
     return same ? d : keep.join('. ').replace(/([^.])$/, '$1.');
   }
+  /** 가운뎃점으로 이은 한글 낱말(「이름·사유를」·「구분·내역이」)은 한 덩이로 — 좁은 폭에서 줄 끝에 「·」가 남지 않게(2026-11-02 식비 X07·식대 C10 제목,
+   *  개인경비 drv-expense.js · 법인카드 drv-card.js 의 keepDots 와 같다). esc 한 글에 쓴다. */
+  function keepDots(h) { return String(h).replace(/[가-힣]{1,12}(?:·[가-힣]{1,12}){1,4}/g, function (m) { return '<span style="white-space:nowrap">' + m + '</span>'; }); }
   function itemsHtml(items, links, appr) {
     if (!items || !items.length) {
       return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div>' +
@@ -265,7 +269,7 @@
         go = '<button class="btn sm vgo vfix" data-vfix="' + (VITEMS.length - 1) + '">바로 수정' + ic('chev', 12) + '</button>';
       } else if (fx) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
       return '<div class="vitem v-' + esc(it.level) + (isAi(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + esc(it.title) + (isAi(it) ? ' ' + gemBadge() : '') + '</div>' +
+        '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (isAi(it) ? ' ' + gemBadge() : '') + '</div>' +
         '<div class="vd">' + esc(appr ? apprDetail(it.detail) : it.detail) + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
@@ -827,7 +831,7 @@
         if (asApprover && i.code === 'R02') { var ud = /:\s*((?:\d{2}\.\d{2}(?:, )?)+(?: 외 \d+건)?)/.exec(String(i.detail || '')); days = (ud ? ud[1].trim() + ' 운행은 ' : '') + '0원으로 정산돼요.'; }
         // 상신한 분 본인 — 결재 중이라 다시 검증할 수 없다: 끝의 「다시 검증하면 …」은 뗀다(2026-10-21)
         var dt = noRecheck(i.detail);
-        return '<li class="' + i.level + '"' + (i.code === 'R06' ? ' data-norcp="1"' : '') + '><b>' + esc(i.title || '') + '</b>' +
+        return '<li class="' + i.level + '"' + (i.code === 'R06' ? ' data-norcp="1"' : '') + '><b>' + keepDots(esc(i.title || '')) + '</b>' +
           (days ? ' — ' + esc(days) : dt && !asApprover ? ' — ' + esc(dt.slice(0, 110)) + (dt.length > 110 ? '…' : '') : '') + '</li>';
       }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건은 ‘검증’을 눌러 확인하세요.</li>' : '') +
         (asApprover ? '<li class="more">수정은 상신자가 해요. 고칠 곳이 있으면 반려하고 사유를 적어 주세요.</li>' : '') + '</ul>' : '') +

@@ -7,8 +7,9 @@
    ★ 기간은 운행일지와 다르다: 전월 20일 00:00 ~ 당월 19일 24:00(KST), 끝나는 달 이름.
      2026-09-20 ~ 2026-10-19 = '2026-10' = 「2026년 10월분」. 헷갈리지 않게 모든 화면에 범위를 함께 적는다.
    ★ 금액 계산은 단순 합이다(소계 = 구분별 합, 합계 = 소계의 합). 서버 approval-act 가 상신 때 같은 합을 굳힌다.
-   ★ 식비 기준(1인 1끼 13,000원)은 **알리기만** 한다. 인원은 사용내역의 「N명/인」(N, 붙여 쓴 것만), 「외 N명/인」(N+1), 없으면 1명(2026-10-08 규칙 — mealPeople 주석) —
-     서버 _shared/expense-verify.ts X07 과 같은 규칙(mealPeople·mealOver).
+   ★ 식비 13,000원(2026-11-02 docs/meal-note/SPEC.md)은 **알리기만** 한다. 식비 줄 금액이 13,000원을 넘으면 비고에 함께한 분 이름(혼자면 사유)을
+     적어 달라고 안내한다. 인원으로 나누지 않고 「외 N명」으로 인원을 세지 않는다(예전 mealPeople 은 지웠다) —
+     서버 _shared/expense-verify.ts X07 과 같은 판정(mealLine·mealOver·mealNoteOk·mealNeedsNote, 아래 「식비 13,000원」).
 
    화면: x_month(이번 달 경비) · x_verify(검증·상신) · 관리 xa_close(현황) · xa_list(전체 내역) · xa_final(결재 완료 출력)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -17,7 +18,6 @@
   var $ = C.$, esc = C.esc, ic = C.ic, n0 = C.n0, won = C.won, pad = C.pad;
   var KST = 9 * 3600e3;
   var CATS = ['소모품비', '식비', '기타비용'];
-  var MEAL_LIMIT = 13000;
   var XVIEWS = ['x_month', 'x_verify', 'xa_close', 'xa_list', 'xa_final', 'xa_people'];
   var ADMIN_X = ['xa_close', 'xa_list', 'xa_final', 'xa_people'];
 
@@ -43,35 +43,57 @@
   /** 'YYYY-MM-DD' → 그날 KST 12:00(앱과 같은 값). */
   function dayMs(s) { var ms = Date.parse(s + 'T12:00:00+09:00'); return isFinite(ms) ? ms : NaN; }
 
-  /* ══════════════════ 식비 기준 ══════════════════ */
-  /** 사용내역에서 인원 — 「외 N명」 = N+1, 「N명」 = N, 없으면 1. (서버 X07 과 같은 규칙) */
-  function mealPeople(usage) {
-    // ★ 2026-10-08 규칙 교체 — 서버·앱과 글자 하나까지 같게 바꾼다.
-    //   A 「외 N명/인」(띄어 써도 됨) = N+1 (N ≥ 1 일 때만).
-    //   B (A 가 없을 때만) 숫자 바로 뒤에 「명/인」이 붙고(띄우지 않음), 숫자 앞이 숫자·. , / : - 가 아닌 것 = N.
-    //     예전 규칙은 「123명」→23명, 「10.3 명동 점심」→3명으로 잘못 읽었다.
-    //   그 밖은 1명. 결과는 1~99.
-    var text = String(usage || ''), n = 1;
-    var a = /외\s*(\d{1,2})\s*(?:명|인)/.exec(text);
-    if (a) { if (+a[1] >= 1) n = +a[1] + 1; }
-    else {
-      var b = /(?:^|[^\d.,\/:\-])(\d{1,2})(?:명|인)/.exec(text);
-      if (b && +b[1] >= 1) n = +b[1];
-    }
-    return Math.max(1, Math.min(99, n));
+  /* ══════════════════ 식비 13,000원 → 비고 안내 ══════════════════
+     2026-11-02 사용자 결정(docs/meal-note/SPEC.md): 「외 N명으로 하는 건 안 돼. 이름을 쓰는 게 맞다」 — 사용내역으로 인원을 세던 예전 규칙
+     (mealPeople · 1인 13,000원)을 지웠다. 식사 줄 = 구분 「식비」 && 사용내역에 회식·접대·협의·회의 낱말(회식·회의는 앞 글자가 「호」·숫자면 아님)도
+     간식·숙식 낱말도 없음(2026-11-02 검토 L4 — NFKC 뒤 이어진 공백을 한 칸으로 줄인 글에서 찾는다, 공백을 모두 빼면 「야간 식사」·「합숙 식사」·「학회 식사」가
+     낱말 경계를 넘어 간식·숙식·회식으로 걸렸다 — 재검토 N1·N2), 초과 = 줄 금액 > 13,000원(같으면 아님, 인원으로 나누지 않음).
+     비고가 「됐다」 = NFKC 뒤 앞뒤 공백을 뺀 글이 비어 있지 않고 「외 N명·N인·N분」 꼴(자릿수 상관없이)이 없고 인원수만(「3명」·「４인」·「2분」) 적은 것도 아님 —
+     이름인지 사유인지는 가리지 않는다(결재자가 본다).
+     ★ 아래 MEAL_LIMIT ~ mealNeedsNote 는 서버 _shared/expense-verify.ts(mealLine·mealOver·mealNoteOk·mealNeedsNote)와 같은 판정이다 — 규칙을 고치면 둘 다
+       (test/expense-meal-parity.test.mjs 가 서버·가짜 서버와 맞춰 본다). 앱(Android·iOS)은 다음 앱 판까지 예전 인원 규칙.
+     mealOver = 이번 기간 「13,000원 넘는 식비」 수 · 관리 「식비 초과만」·전체 내역 딱지·CSV(비고가 됐어도 센다 — 참고라서 경고 색 없음).
+     mealNeedsNote = 비고 안내(올리기 표의 줄 · 고치기 창 비고 칸 아래 · 이번 달 표 줄 딱지 — 칸에 적는 대로 바로 다시 판정). */
+  var MEAL_LIMIT = 13000, MEAL_SKIP = /(?:^|[^호0-9])회(?:식|의)|접대|협의/, MEAL_NOT = /간식|숙식/;
+  function mealText(v) { var s = String(v == null ? '' : v); return (s.normalize ? s.normalize('NFKC') : s).replace(/\s+/g, ' '); }
+  function mealLine(it) { var t = mealText(it.usage); return it.category === '식비' && !MEAL_SKIP.test(t) && !MEAL_NOT.test(t); }
+  function mealOver(it) { return mealLine(it) && (Number(it.amount) || 0) > MEAL_LIMIT; }
+  function mealNoteOk(note) {
+    var s = String(note == null ? '' : note); s = (s.normalize ? s.normalize('NFKC') : s).trim();
+    return s !== '' && !/외\s*\d+\s*(?:명|인|분)/.test(s) && !/^\d+\s*(?:명|인|분)$/.test(s);
   }
-  /** 식비 줄이 1인 1끼 13,000원을 넘는가 — { n, per } 또는 null.
-   *  ★ 판정은 금액 > 13,000 × 인원(나누지 않고 — 서버와 같게). per 는 보여 줄 1인 금액(원 아래 올림, 2026-10-08 서버·앱과 같게). */
-  function mealOver(it) {
-    if (!it || it.category !== '식비') return null;
-    var n = mealPeople(it.usage), amt = Number(it.amount) || 0;
-    return amt > MEAL_LIMIT * n ? { n: n, per: Math.ceil(amt / n) } : null;
+  function mealNeedsNote(it) { return mealOver(it) && !mealNoteOk(it.note); }
+  // 화면 안내 글(SPEC §4 — 법인카드 drv-card.js 비고 칸과 같은 글자) — 비고가 비었을 때 / 「외 N명」이나 인원수만 적었을 때
+  var MEAL_HINT_EMPTY = '13,000원이 넘는 식사예요. 비고에 함께한 분 이름을 모두(혼자면 사유) 적어 주세요.';
+  var MEAL_HINT_COUNT = '‘외 N명’이나 인원수 대신 함께한 분 이름을 모두 적어 주세요.';
+  // 올리기 줄·고치기 창에서 13,000원 넘는 식비 줄의 비고를 다 적었을 때 같은 자리에 남기는 회색 글(2026-11-02 고침 2차 — 적는 순간 칸·창이 튀지 않게)
+  var MEAL_HINT_OK = '비고에 이름·사유를 적었어요.';
+  /** 비고 안내 글 — 안내가 필요 없는 줄이면 ''. it = { category, amount, usage, note }(올리기 줄은 cat·amt 를 바꿔 넣어 부른다). */
+  function mealHint(it) {
+    if (!it || !mealNeedsNote(it)) return '';
+    var s = String(it.note == null ? '' : it.note);
+    return (s.normalize ? s.normalize('NFKC') : s).trim() ? MEAL_HINT_COUNT : MEAL_HINT_EMPTY;
   }
+  /** 안내 칸 상태 — ''(13,000원 넘는 식비 줄이 아님 → 칸 숨김) · 'e'(비고 빔) · 'c'(외 N명·인원수만) · 'o'(이름·사유를 적음). */
+  function mealState(it) { var h = it && mealOver(it) ? mealHint(it) : null; return h === null ? '' : h === MEAL_HINT_EMPTY ? 'e' : h === MEAL_HINT_COUNT ? 'c' : 'o'; }
+  /** 안내 글을 HTML 로 — 짝말·괄호를 한 덩이로(줄 끝에 「주세요.」만, 「(혼자면 / 사유)」로 갈리지 않게). 글은 위 상수뿐(사용자 글 아님). */
+  function hintHtml(s) {
+    return esc(s).replace('‘외 N명’', '‘외&nbsp;N명’').replace(' 주세요', '&nbsp;주세요')
+      .replace('(혼자면 사유)', '<span style="white-space:nowrap">(혼자면 사유)</span>');
+  }
+  /** 안내 칸 — 세 글(빔·외 N명·다 적음)을 한 자리에 겹쳐 두고 지금 것만 보인다. 칸 높이 = 가장 긴 글이라 적는 동안 칸·창이 움직이지 않는다
+   *  (2026-11-02 화면 검토 U-M1·U-M2 — 이름을 적는 순간 고치기 창이 41px, 올리기 창(768)이 59px 튀었다). 13,000원 넘는 식비 줄이 아니면 칸째 숨긴다. */
+  function mealHintBox(id, it) {
+    var st = mealState(it);
+    return '<div class="evhint xmh" id="' + id + '" data-st="' + st + '"' + (st ? '' : ' hidden') + '>' +
+      '<span data-k="e">' + hintHtml(MEAL_HINT_EMPTY) + '</span><span data-k="c">' + hintHtml(MEAL_HINT_COUNT) + '</span><span data-k="o">' + esc(MEAL_HINT_OK) + '</span></div>';
+  }
+  /** 안내 칸(올리기 줄 .xmh · 고치기 창 #xeMeal)을 지금 값으로 — 상태만 바꾸고 줄·창은 다시 그리지 않는다(커서가 튀지 않게). */
+  function paintMealHint(el, it) { if (!el) return; var st = mealState(it); if (el.getAttribute('data-st') !== st) el.setAttribute('data-st', st); el.hidden = !st; }
+  /** 관리 전체 내역의 금액 칸 딱지 — 13,000원 넘는 식비(비고는 옆 칸에 보인다). 참고라서 경고 색 없는 회색 딱지(2026-11-02 고침 1차) —
+   *  비고가 안 된 줄은 그 줄의 옅은 바탕(xover)과 검증 X07 이 말한다. */
   function mealTag(it) {
-    var o = mealOver(it);
-    if (!o) return '';
-    return '<span class="st warn xmeal" title="식비 기준은 1인 1끼 13,000원이에요. 넘으면 알리기만 해요.">1인 ' + n0(o.per) + '원' +
-      (o.n > 1 ? ' (' + o.n + '명)' : '') + ' · 13,000원 초과</span>';
+    return mealOver(it) ? '<span class="st xmeal" title="13,000원이 넘는 식비예요. 비고에 함께한 분 이름이 있는지(혼자면 사유) 봐 주세요.">13,000원 초과</span>' : '';
   }
 
   /* ══════════════════ 서버 ══════════════════ */
@@ -200,15 +222,17 @@
   }
 
   /* ══════════════════ 공통 조각 ══════════════════ */
+  /** 구분별 합 · meal = 13,000원 넘는 식비 줄 수(비고가 됐어도 센다 — 결재 요약 meal_over 와 같은 뜻) · need = 그중 비고 안내가 필요한 줄 수(X07 과 같은 줄). */
   function sums(rows) {
     var by = {}; CATS.forEach(function (c) { by[c] = { n: 0, sum: 0 }; });
-    var all = 0, meal = 0;
+    var all = 0, meal = 0, need = 0;
     rows.forEach(function (it) {
       var c = by[it.category] ? it.category : '기타비용';
       by[c].n++; by[c].sum += Number(it.amount) || 0; all += Number(it.amount) || 0;
       if (mealOver(it)) meal++;
+      if (mealNeedsNote(it)) need++;
     });
-    return { by: by, all: all, n: rows.length, meal: meal };
+    return { by: by, all: all, n: rows.length, meal: meal, need: need };
   }
   function photoLink(it, label) {
     if (!it.photo_path) return '<span class="dim" style="font-size:12px">사진 없음</span>';
@@ -310,7 +334,11 @@
     };
     h += '<section class="sect xsumw" aria-label="이번 기간 경비 합계"><div class="panel d2pad"><div class="xsum">' +
       tile('합계', T.all, '영수증 ' + n0(T.n) + '장', true) + CATS.map(function (c) { return tile(c, T.by[c].sum, n0(T.by[c].n) + '건'); }).join('') +
-      '</div><div class="xsumnote">식비 기준은 1인 1끼 13,000원이고, 넘으면 표시만 해요. 이번 기간 초과는 <b>' + n0(T.meal) + '건</b>이에요.</div></div></section>';
+      // 식비 13,000원(2026-11-02 docs/meal-note/SPEC.md) — 넘는 줄 수(비고가 됐어도 센다)와 그중 비고에 아직 이름·사유가 없는 줄 수(표 줄 딱지와 같은 줄).
+      //   잠긴 기간(결재 중·완료 — 고칠 수 없다)에는 「아직 이름이 없어요」 꼬리를 빼고 수만(2026-11-02 검토 M1) · 「(혼자면 사유)」는 한 덩이
+      '</div><div class="xsumnote">식비가 13,000원을 넘으면 비고에 함께한 분 이름을 모두<span style="white-space:nowrap">(혼자면 사유)</span> 적어요. ' +
+      '이번 기간 13,000원 넘는 식비는 <b>' + n0(T.meal) + '건</b>' +
+      (T.need && !locked ? '이고, 그중 <b>' + n0(T.need) + '건</b>은 비고에 아직 이름이 없어요.' : '이에요.') + '</div></div></section>';
     // 결재 중 안내는 위 결재 띠에 이미 있다(회수 방법까지) — 여기서는 결재가 끝난 기간만 말한다(2026-10-15, 같은 안내 두 번)
     if (locked && a && a.status === 'approved') h += '<div class="hpnote">' + ic('check', 16) + '<span><b>결재가 끝난 기간이라 경비를 추가하거나 고칠 수 없어요.</b> ' +
       '고칠 게 있으면 관리자에게 정정을 요청하세요.</span></div>';
@@ -335,8 +363,9 @@
             (NM.can ? C.noneBtn('expense', cyc, false) : '')) +
           '</div></div>');
     h += '<div class="xgrid">' + upCard(rows, locked, upLabel, AI) + '<div class="xlistw">' + listSec + '</div></div>';
-    h += '<div class="anote">구분은 <b>소모품비, 식비, 기타비용</b>이에요. 식비는 1인 1끼 <b>13,000원</b> 기준이에요. 넘으면 표시만 하고 상신은 막지 않아요. 사용내역에 ‘3명’이나 ‘외 2명’처럼 ' +
-      '인원을 적으면 1인당 금액으로 봐요. 사진 없는 줄은 만들 수 없어요.</div>';
+    h += '<div class="anote">구분은 <b>소모품비, 식비, 기타비용</b>이에요. 식비가 <b>13,000원</b>을 넘으면 비고에 함께한 분 이름을 모두<span style="white-space:nowrap">(혼자면 사유)</span> 적어&nbsp;주세요. ' +
+      // 가운뎃점으로 이은 낱말은 한 덩이로(줄 끝에 「·」가 남지 않게)
+      '표시만 하고 상신은 막지 않아요. 사용내역에 <span style="white-space:nowrap">회식·접대·협의·회의가</span> 들어간 식비는 안내하지 않아요. 사진 없는 줄은 만들 수 없어요.</div>';
     return h;
   }
   /** 오른쪽 「영수증 올리기」 카드(2026-10-20 D2) — 끌어 놓기 자리 + 올리기 단추(예전 요약 칸의 단추 그대로 data-xup) + AI 확인 요약.
@@ -363,7 +392,7 @@
   }
 
   /** 날짜 띠(2026-10-20 D2 시안 P_Expense — 예전 큰 달력) — 기간(20일~19일) 날마다 한 칸: 요일 · 날짜 · 영수증 있는 날 점.
-   *  누르면 그날 것만(예전 달력과 같은 거르기 data-xday, 다시 누르면 기간 전체). 그날 건수·금액·식비 기준 초과는 칸 이름(화면 읽기·마우스)에.
+   *  누르면 그날 것만(예전 달력과 같은 거르기 data-xday, 다시 누르면 기간 전체). 그날 건수·금액·식비 13,000원 초과는 칸 이름(화면 읽기·마우스)에.
    *  .xcal 이름은 그대로 둔다(그날 고르기·초점 되돌리기가 .xcal [data-xday] 로 찾는다). */
   function stripHtml(rows, r) {
     var by = {};
@@ -373,7 +402,7 @@
       var d = C.kd(ms), k = C.ymd(ms), x = by[k], dow = d.getUTCDay(), first = d.getUTCDate() === 1 || ms === r.lo;
       var lab = first ? (d.getUTCMonth() + 1) + '/' + d.getUTCDate() : String(d.getUTCDate());
       var say = (d.getUTCMonth() + 1) + '월 ' + d.getUTCDate() + '일 ' + W[dow] + '요일, ' +
-        (x ? '영수증 ' + n0(x.n) + '장 ' + n0(x.sum) + '원' + (x.meal ? ' · 식비 기준 초과 ' + n0(x.meal) + '건' : '') : '영수증 없음');
+        (x ? '영수증 ' + n0(x.n) + '장 ' + n0(x.sum) + '원' + (x.meal ? ' · 식비 13,000원 초과 ' + n0(x.meal) + '건' : '') : '영수증 없음');
       cells += '<button type="button" class="xday' + (x ? ' has' : '') + (k === XDAY ? ' on' : '') + (k === today ? ' today' : '') + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') +
         '" data-xday="' + k + '" aria-pressed="' + (k === XDAY) + '" aria-label="' + esc(say) + '" title="' + esc(say) + '">' +
         '<span class="xwd">' + W[dow] + '</span><b class="xdn">' + lab + '</b><i class="xdot" aria-hidden="true"></i></button>';
@@ -463,14 +492,16 @@
         var selBox = sel ? C.mselBox('x', { id: String(it.id), amt: it.amount,
           line: C.md(it.date_millis) + ' ' + (it.category || '기타비용') + ' ' + n0(it.amount) + '원' + (it.merchant ? ' ' + it.merchant : ''),
           why: can ? '' : it.username !== me() ? '다른 분의 경비는 지울 수 없어요' : '결재 중이거나 결재가 끝난 기간이라 지울 수 없어요' }) : '';
-        var dd = C.kd(it.date_millis);
-        h += '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td>' + selBox + '<span class="lead">' + C.md(it.date_millis) + '</span><span class="xdw">(' + ['일', '월', '화', '수', '목', '금', '토'][dd.getUTCDay()] + ')</span></td>' +
+        // 식비 13,000원 비고 안내(2026-11-02) — 이름·사유를 적은 줄은 딱지·옅은 바탕 없음.
+        //   잠긴 기간(결재 중·완료)은 고칠 수 없으니 안내·바탕도 없다(검토 M1 — 법인카드 표와 같게)
+        var dd = C.kd(it.date_millis), mh = opt.locked ? '' : mealHint(it);
+        h += '<tr' + (mh ? ' class="xover"' : '') + '><td>' + selBox + '<span class="lead">' + C.md(it.date_millis) + '</span><span class="xdw">(' + ['일', '월', '화', '수', '목', '금', '토'][dd.getUTCDay()] + ')</span></td>' +
           (opt.who ? C.orgCell(it.username) : '') +
           '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td>' +
           '<td class="el xuse" title="' + esc([it.usage || '', it.note ? '비고: ' + it.note : ''].filter(Boolean).join(' · ')) + '">' +
             (it.usage ? esc(it.usage) : '<span class="st warn">비어 있음</span>') + (it.note ? '<span class="xnote">비고: ' + esc(it.note) + '</span>' : '') +
-            // 식비 기준 초과 표시는 사용내역 아래(인원 글이 거기 있다) — 금액 칸에 두면 좁은 칸을 넘어 옆 「AI 확인」을 덮었다(2026-10-20)
-            (mealOver(it) ? '<span class="xmeal2">' + mealTag(it) + '</span>' : '') + '</td>' +
+            // 식비 13,000원 비고 안내는 사용내역·비고 아래 — 금액 칸에 두면 좁은 칸을 넘어 옆 「AI 확인」을 덮었다(2026-10-20)
+            (mh ? '<span class="xmeal2">' + hintHtml(mh) + '</span>' : '') + '</td>' +
           '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span></td>' +
           '<td class="xai" data-l="AI 확인">' + aiCell(it) + '</td>' +
           // 줄 단추는 예전 그대로 사진(원본) · 고치기 · 지우기(2026-10-20 D2 — 시안은 사진만이지만 있던 단추는 없애지 않는다)
@@ -675,11 +706,12 @@
           '<input class="inp' + (it.date ? '' : ' need') + '" type="date" data-xdate style="width:150px;margin-top:6px" value="' + esc(it.date) + '" min="' + C.ymd(XUP.lo) + '" max="' + C.ymd(XUP.hi - 1) + '"' + lab('날짜') + '></td>' +
           '<td><input class="inp" data-xmer maxlength="60" style="width:100%" placeholder="사용처(상호)" value="' + esc(it.merchant) + '"' + lab('사용처') + '>' +
           '<input class="inp num' + (it.amt && !it.amtBad ? '' : ' need') + '"' + (it.amtBad ? ' aria-invalid="true" data-numbad="1"' : '') + ' data-xamt inputmode="numeric" style="width:120px;margin-top:6px" placeholder="금액(원)" value="' + esc(it.amtBad ? it.amt : it.amt ? n0(it.amt) : '') + '"' + lab('금액') + '></td>' +
-          '<td><input class="inp" data-xuse maxlength="200" style="width:100%" placeholder="사용내역 예) 장갑·청소용품 구입, 야간 작업 후 식사(3명)" value="' + esc(it.usage) + '"' + lab('사용내역') + '>' +
-          '<input class="inp" data-xnote maxlength="200" style="width:100%;margin-top:6px" placeholder="비고(선택)" value="' + esc(it.note) + '"' + lab('비고') + '>' +
+          '<td><input class="inp" data-xuse maxlength="200" style="width:100%" placeholder="사용내역 예) 장갑·청소용품 구입, 야간 작업 후 식사" value="' + esc(it.usage) + '"' + lab('사용내역') + '>' +
+          '<input class="inp" data-xnote maxlength="200" style="width:100%;margin-top:6px" placeholder="비고(선택)" value="' + esc(it.note) + '"' + lab('비고') + ' aria-describedby="xmh' + i + '">' +
           (it.hint ? '<div class="evhint">' + (it.ai ? C.gemTag() + ' ' : '') + esc(it.hint) + '</div>'
             : it.ai ? '<div class="evhint ok">' + C.gemTag() + ' 자동으로 채웠어요. 사진과 맞는지 확인해 주세요.</div>' : '') +
-          '<div class="evhint xmh"' + (mealOver({ category: it.cat, amount: it.amt, usage: it.usage }) ? '>' + mealTag({ category: it.cat, amount: it.amt, usage: it.usage }) : ' hidden>') + '</div></td>' +
+          // 식비 13,000원 비고 안내(2026-11-02 SPEC §4) — 구분·금액·사용내역·비고를 적는 대로 바로 다시(아래 mealLive)
+          mealHintBox('xmh' + i, { category: it.cat, amount: it.amt, usage: it.usage, note: it.note }) + '</td>' +
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-xaddrow="' + i + '" title="이 장에 영수증이 더 있으면 줄을 추가하세요." aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-xrm="' + i + '">제외</button></td></tr>';
       }).join('') + '</tbody></table></div>' +
@@ -836,8 +868,10 @@
       frow('날짜', 'xeDate', '<input class="inp" type="date" id="xeDate" style="max-width:200px" value="' + C.ymd(it.date_millis) + '" min="' + C.ymd(r.lo) + '" max="' + C.ymd(r.hi - 1) + '">', '이 기간(' + esc(xSpanKey(C.state().CYCKEY)) + ') 안의 날짜만 골라 주세요.') +
       frow('사용처', 'xeMer', '<input class="inp" id="xeMer" maxlength="60" value="' + esc(it.merchant || '') + '">') +
       frow('금액', 'xeAmt', '<input class="inp num" id="xeAmt" inputmode="numeric" style="max-width:200px" value="' + n0(it.amount) + '">') +
-      frow('사용내역', 'xeUse', '<input class="inp" id="xeUse" maxlength="200" value="' + esc(it.usage || '') + '">', '식비는 ‘3명’이나 ‘외 2명’처럼 인원을 적으면 1인당 금액으로 봐요.') +
-      frow('비고', 'xeNote', '<input class="inp" id="xeNote" maxlength="200" value="' + esc(it.note || '') + '">') +
+      frow('사용내역', 'xeUse', '<input class="inp" id="xeUse" maxlength="200" value="' + esc(it.usage || '') + '">') +
+      // 식비 13,000원 비고 안내(2026-11-02 SPEC §4) — 비고 칸 바로 아래, 칸을 고치는 대로 바로 다시(mealLive)
+      frow('비고', 'xeNote', '<input class="inp" id="xeNote" maxlength="200" value="' + esc(it.note || '') + '" aria-describedby="xeMeal">' +
+        mealHintBox('xeMeal', it)) +
       '</div>',
       '<button class="btn" data-xdel="' + it.id + '">삭제</button><span style="flex:1"></span><button class="btn" data-close>취소</button>' +
       '<button class="btn pri" id="btnXEditGo" data-id="' + it.id + '">저장</button>');
@@ -1030,6 +1064,8 @@
   var LV = { bad: ['불일치', 'bad'], warn: ['확인 필요', 'warn'], info: ['참고', ''] };
   var VITEMS = [];
   function isAiItem(it) { return /^X(0[2-5]|10)/.test(String(it && it.code || '')) || /^X06/.test(String(it && it.code || '')) && /승인번호/.test(String(it.detail || '')); }
+  /** 가운뎃점으로 이은 한글 낱말(「이름·사유를」)은 한 덩이로 — 좁은 폭에서 줄 끝에 「·」가 남지 않게(2026-11-02 식비 X07 제목). esc 한 글에 쓴다. */
+  function keepDots(h) { return String(h).replace(/[가-힣]{1,12}(?:·[가-힣]{1,12}){1,4}/g, function (m) { return '<span style="white-space:nowrap">' + m + '</span>'; }); }
   function itemsHtml(items, links) {
     if (!items || !items.length) return '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">확인이 필요한 항목이 없어요.</div></div></div>';
     return '<div class="panel vlist">' + items.map(function (it) {
@@ -1037,7 +1073,7 @@
       var go = '';
       if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-xvfix="' + (VITEMS.length - 1) + '">바로 수정' + ic('chev', 12) + '</button>'; }
       return '<div class="vitem v-' + esc(it.level) + (isAiItem(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + esc(it.title) + (isAiItem(it) ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
+        '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (isAiItem(it) ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
   function openFix(it) {
@@ -1103,7 +1139,7 @@
       (row ? '마지막 검증 ' + esc(C.vx.whenText(row.created_at)) : '검증 전') + ' · 경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all) + '</div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' + fact('불일치', n0(s.bad), '금액·영수증이 서로 다름', s.bad > 0) + fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
-        fact('참고', n0(s.info), '식비 기준 초과 등(알림만)') +
+        fact('참고', n0(s.info), '사용처 다름 등(알림만)') +       // 식비 13,000원(X07)은 2026-11-02 부터 「확인 필요」 — 참고(info)는 사용처 다름(X03)·아직 안 읽음(X00) 등
         '<div class="fact"><div class="k">사진 인식 ' + C.vx.gemBadge() + '</div><div class="v">' + (row.ai ? n0(s.read) + ' / ' + n0(s.receipts) + '<small>장</small>' : '—') + '</div><div class="sub">' + (row.ai ? 'AI가 읽은 영수증' : '규칙으로만 검증(AI 미설정)') + '</div></div></div>' : '') +
       '</div>';
     if (moving) { /* 결과는 응답 뒤에 — 지난 결과를 먼저 보이지 않는다 */ }
@@ -1583,7 +1619,9 @@
       if (vs.receipts) checks.push(vs.read >= vs.receipts ? ['ok', 'AI 인식 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장 완료'] : ['warn', 'AI 인식 ' + n0(vs.read) + '/' + n0(vs.receipts) + '장']);
     } else if (f === undefined) { if (!FZFAIL[fzKey(a)]) checks.push(['warn', '검증 결과를 불러오는 중…']); }   // 못 받았으면 그 줄은 없앤다(판정 띠가 말한다)
     else checks.push(['warn', '상신 때 검증 결과가 없어요']);
-    checks.push(s.meal_over ? ['warn', '식비 1인 13,000원 초과 ' + n0(s.meal_over) + '건(알림)'] : ['ok', '식비 기준 안']);
+    // 식비 13,000원 초과(2026-11-02 docs/meal-note/SPEC.md · 고침 1차) — 13,000원 넘는 식비 줄 수(비고에 이름·사유를 적은 줄도 센다, 예전 결재본은 1인 기준으로 센 수).
+    //   비고가 된 줄은 문제가 아니라서 경고(warn)가 아니라 참고 딱지(info — 회색, 판정 띠에 세지 않음). 확인 필요는 검증의 X07(비고가 안 된 줄만)이 말한다
+    checks.push(s.meal_over ? ['info', '식비 13,000원 초과 ' + n0(s.meal_over) + '건'] : ['ok', '식비 13,000원 초과 없음']);
     if (bigJump) checks.push(['warn', '전월보다 크게 늘었어요']);
     var nBad = (vs && vs.bad ? 1 : 0) + checks.filter(function (c) { return c[0] === 'bad'; }).length,
       nWarn = (vs && vs.warn ? 1 : 0) + checks.filter(function (c) { return c[0] === 'warn'; }).length;
@@ -1597,10 +1635,11 @@
       '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + esc(byLine(s)) + '</span></div>' +
       '<div class="abf"><span class="k">영수증</span><b>' + n0(s.n) + '<small>장</small></b><span class="sub">' + esc(xSpanKey(a.cycle)) + '</span></div>' +
       cmp +
-      '<div class="abf"><span class="k">식비 기준 초과</span><b>' + n0(s.meal_over || 0) + '<small>건</small></b><span class="sub">1인 1끼 13,000원(알림만)</span></div>' +
-      '</div><div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
+      '<div class="abf"><span class="k">식비 13,000원 초과</span><b>' + n0(s.meal_over || 0) + '<small>건</small></b><span class="sub">참고(알림만)</span></div>' +
+      // 딱지 앞 표시 — ok ✓ · warn·bad ! · 참고(info)는 표시 없이 회색 딱지(.ck 기본 모양)
+      '</div><div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓ ' : c[0] === 'info' ? '' : '! ') + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
-        return '<li class="' + i.level + '"><b>' + esc(i.title || '') + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
+        return '<li class="' + i.level + '"><b>' + keepDots(esc(i.title || '')) + '</b>' + (i.detail && !asApprover ? ' — ' + esc(String(i.detail).slice(0, 110)) + (String(i.detail).length > 110 ? '…' : '') : '') + '</li>';
       }).join('') + (items.length > 4 ? '<li class="more">외 ' + n0(items.length - 4) + '건은 ‘검증’ 버튼을 누르면 모두 보여요.</li>' : '') +
         (asApprover ? '<li class="more">수정은 상신자가 해요. 고쳐야 하면 반려하고 사유에 적어 주세요.</li>' : '') + '</ul>' : '') + '</div>';
   }
@@ -1610,7 +1649,9 @@
     if (s.cost == null) return '';
     return kv('기간', esc(cycName(a.cycle)) + ' <span class="dim">(' + esc(xSpanKey(a.cycle)) + ')</span>') +
       kv('구분별', esc(byLine(s))) +
-      kv('식비 기준', s.meal_over ? '<span class="st warn">1인 13,000원 초과 ' + n0(s.meal_over) + '건(알림만)</span>' : '<span class="dim">초과 없음</span>') +
+      // 식비 13,000원 초과 수는 참고(경고 색 없음, 2026-11-02 고침 1차) — 비고가 안 된 줄은 검증의 X07 이 확인 필요로 말한다.
+      //   이름 칸(86px)은 「식비」만, 「13,000원 초과」는 값 칸에 — 이름 칸이 두 줄로 갈렸다(고침 2차, 화면 검토 U-L7). 한 줄로 「식비 · 13,000원 초과 N건」
+      kv('식비', s.meal_over ? '13,000원 초과 ' + n0(s.meal_over) + '건 <span class="dim">(참고)</span>' : '<span class="dim">13,000원 초과 없음</span>') +
       kv('합계', '<b style="font-size:15px">' + won(s.cost) + '</b> <span class="dim">' + n0(s.n) + '건</span>');
   }
 
@@ -1648,7 +1689,7 @@
     //   (예전에는 두 화면이 같은 결재 상태 칸과 반려·정정 단추를 되풀이했다 — 군더더기 검토 상 9)
     var h = head('개인경비 현황', '직원별 금액·구분·팀');
     // 챙길 사람 + 팀즈 알림 보내기(2026-10-20 D2 — 운행일지 현황과 같은 조각 C.follow, 서버 approval-act op 'remind' 가 다시 확인).
-    //   결재 완료 출력 「챙겨야 할 사람」과 같은 사람: 이번 기간 경비가 있는데 상신 전 · 회수 · 반려. 남은 일은 이 화면이 이미 센 것만(건수·금액·식비 기준 초과, 반려면 사유).
+    //   결재 완료 출력 「챙겨야 할 사람」과 같은 사람: 이번 기간 경비가 있는데 상신 전 · 회수 · 반려. 남은 일은 이 화면이 이미 센 것만(건수·금액·식비 13,000원 초과, 반려면 사유).
     if (C.follow) {
       var lastX = {};
       rows.forEach(function (it) { var ms = Date.parse(it.created_at || '') || Number(it.date_millis) || 0; if (ms > (lastX[it.username] || 0)) lastX[it.username] = ms; });
@@ -1660,13 +1701,13 @@
         var a = x.a, st = !a ? 'none' : a.status, rs = st === 'rejected' ? (a.steps || []).filter(function (s) { return s && s.result === 'rejected'; })[0] : null;
         return { u: x.u, st: st, last: Math.max(lastX[x.u] || 0, a ? (Date.parse(a.closed_at || a.updated_at || '') || 0) : 0),
           left: st === 'rejected' ? '반려 사유: ' + (rs && rs.comment ? String(rs.comment).replace(/\s+/g, ' ') : '(사유 없음)')
-            : (st === 'withdrawn' ? '회수됨 · ' : '') + '경비 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.meal ? ' · 식비 기준 초과 ' + n0(x.meal) + '건' : '') };
+            : (st === 'withdrawn' ? '회수됨 · ' : '') + '경비 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.meal ? ' · 식비 13,000원 초과 ' + n0(x.meal) + '건' : '') };
       }), { wide: true, none: '이 기간 경비가 있는 사람은 모두 상신했어요' }) + '</div>';
     }
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>경비가 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.all) + '</p>' +
       '<div class="facts">' + CATS.map(function (c) { return fact(c, won(T.by[c].sum), n0(T.by[c].n) + '건'); }).join('') +
-      fact('식비 기준 초과', n0(T.meal) + '<small>건</small>', '1인 13,000원(알림만)') + '</div></div>';
+      fact('식비 13,000원 초과', n0(T.meal) + '<small>건</small>', '참고(알림만)') + '</div></div>';   // 참고 수 — 경고 색 없음(2026-11-02 고침 1차)
     // 팀별 합계 카드 — 누르면 그 팀으로 좁힌다(운행일지 관리와 같은 모양)
     var tb = {}, tl = [], byUnit = false;
     list.forEach(function (x) {
@@ -1689,11 +1730,13 @@
     list.sort(function (x, y) { return y.sum - x.sum; });
     // 폰·태블릿(≤820)은 사람마다 한 덩이(rcard) — 가로 스크롤 표라 금액 칸이 화면 밖에 있었다(2026-10-28 로봇)
     h += C.sect('직원별', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table class="rcard"><thead><tr><th>파트·센터</th><th>이름</th>' +
-      '<th class="n">건수</th><th class="n">금액</th><th>식비 기준</th><th></th></tr></thead><tbody>' +
+      // 표 머리는 짧게 「식비 초과」(전체 이름은 title) — 긴 머리가 좁은 폭에서 다른 칸 너비를 눌렀다(2026-11-02 고침 1차)
+      '<th class="n">건수</th><th class="n">금액</th><th class="n" title="식비 13,000원 초과">식비 초과</th><th></th></tr></thead><tbody>' +
       C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
         return C.orgGroupRow(g, 6, '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
           return '<tr>' + C.orgCell(x.u, true) + '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="n" data-l="건수">' + n0(x.n) + '</td>' +
-            '<td class="n total" data-l="금액">' + n0(x.sum) + '</td><td' + (x.meal ? ' data-l="식비 기준"><span class="st warn">초과 ' + n0(x.meal) + '건</span>' : ' class="rnone"><span class="dim">—</span>') + '</td>' +
+            // 식비 13,000원 초과 수는 참고 — 경고 색 없이 숫자만(2026-11-02 고침 1차), 다른 숫자 칸처럼 오른쪽 맞춤(고침 2차 — 「37,000 1건」처럼 붙어 읽혔다)
+            '<td class="n total" data-l="금액">' + n0(x.sum) + '</td><td' + (x.meal ? ' class="n" data-l="식비 초과" data-xmealn>' + n0(x.meal) + '건' : ' class="n rnone"><span class="dim">—</span>') + '</td>' +
             '<td class="n rbtn" style="white-space:nowrap">' +
             (x.n ? '<button class="btn sm" data-xperson="' + esc(x.u) + '">내역</button>' : '') + '</td></tr>';
         }).join('');
@@ -1727,7 +1770,8 @@
     list.sort(function (x, y) { return y.all - x.all; });
     h += C.sect('명단', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>직급</th>' +
       // 건수 칸은 폭을 정해 둔다(nmcol) — 「없음 표시」 딱지가 생겨도 표 칸 너비가 다시 나뉘지 않게(2026-11-02 화면 검토 L5)
-      '<th class="n nmcol">건수</th><th class="n">합계</th>' + CATS.map(function (c) { return '<th class="n">' + c + '</th>'; }).join('') + '<th>식비 기준</th><th>결재</th></tr></thead><tbody>' +
+      // 「식비 초과」 머리는 짧게(전체 이름은 title) — 긴 머리가 390 에서 건수 칸(nmcol)을 눌러 「없음 표시」가 생기면 칸 너비가 다시 나뉘었다(2026-11-02 고침 1차)
+      '<th class="n nmcol">건수</th><th class="n">합계</th>' + CATS.map(function (c) { return '<th class="n">' + c + '</th>'; }).join('') + '<th class="n" title="식비 13,000원 초과">식비 초과</th><th>결재</th></tr></thead><tbody>' +
       C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
         var gn = g.list.filter(function (x) { return x.n; }).length, gm = g.list.filter(marked).length;
         return C.orgGroupRow(g, 10, '경비 있음 ' + n0(gn) + '명' + (gm ? ' · 없음 표시 ' + n0(gm) + '명' : '') + ' · 합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.all; }, 0)) + '</b>') + g.list.map(function (x) {
@@ -1737,7 +1781,8 @@
             '<td class="n' + (x.n || nm ? '' : ' dim') + '">' + (nm ? '<span class="st dim" data-nonechip>없음 표시</span>' : n0(x.n)) + '</td>' +
             '<td class="n total">' + (x.all ? n0(x.all) : '—') + '</td>' +
             CATS.map(function (c) { return '<td class="n">' + (x.by[c].sum ? n0(x.by[c].sum) : '—') + '</td>'; }).join('') +
-            '<td>' + (x.meal ? '<span class="st warn">초과 ' + n0(x.meal) + '건</span>' : '<span class="dim">—</span>') + '</td>' +
+            // 식비 13,000원 초과 수는 참고 — 경고 색 없이 숫자만(2026-11-02 고침 1차), 다른 숫자 칸처럼 오른쪽 맞춤(고침 2차)
+            '<td class="n"' + (x.meal ? ' data-xmealn>' + n0(x.meal) + '건' : '><span class="dim">—</span>') + '</td>' +
             '<td>' + (x.a ? stChip(x.a) : (x.n ? '<span class="st warn">상신 전</span>' : '<span class="dim">—</span>')) + '</td></tr>';
         }).join('');
       }).join('') + '</tbody></table></div></div>' : C.blank('보는 범위에 직원이 없어요.', null, 'users'));
@@ -1771,7 +1816,9 @@
       return '<button class="' + (XL.cat === c ? 'on' : '') + '" aria-pressed="' + (XL.cat === c) + '" data-xcat="' + c + '">' + (c === 'all' ? '전체' : c) + ' <span class="c">' + n0(cnt(c)) + '</span></button>';
     }).join('') + '</div>' +
       '<label class="field"><select id="xWho" aria-label="사람"><option value="">사람 전체</option>' + whoOpts.map(function (u) { return '<option value="' + esc(u) + '"' + (XL.who === u ? ' selected' : '') + '>' + esc(C.nameOf(u)) + '</option>'; }).join('') + '</select></label>' +
-      '<button class="btn sm' + (XL.meal ? ' pri' : '') + '" data-xmeal aria-pressed="' + XL.meal + '">식비 기준 초과만 ' + n0(scoped.filter(mealOver).length) + '</button>' +
+      // 「식비 초과만」 = 13,000원 넘는 식비 줄(2026-11-02 — 예전 「식비 기준 초과만」은 1인 13,000원). 비고(이름·사유)는 표의 비고 칸에 보인다.
+      //   단추 글은 표 머리와 같은 「식비 초과」(전체 뜻은 title) — 「식비 13,000원 초과만」은 390 에서 도구 줄을 한 줄 늘렸다(화면 검토 U-L6, 102 → 154px)
+      '<button class="btn sm' + (XL.meal ? ' pri' : '') + '" data-xmeal aria-pressed="' + XL.meal + '" title="13,000원이 넘는 식비 줄만 봐요">식비 초과만 ' + n0(scoped.filter(mealOver).length) + '</button>' +
       '<span style="flex:1"></span><button class="btn sm" data-xcsv>' + ic('dl', 13) + '목록 CSV</button></div>';
     var total = rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0);
     var sorted = rows.slice().sort(function (a, b) { return Number(a.date_millis) - Number(b.date_millis) || a.id - b.id; });
@@ -1779,7 +1826,8 @@
       '<th>날짜</th><th>파트·센터</th><th>이름</th><th>구분</th><th>사용처</th><th class="n">금액</th><th>사용내역</th><th>비고</th><th>사진</th></tr></thead><tbody>' +
       C.orgGroups(sorted, function (it) { return it.username; }).map(function (g) {
         return C.orgGroupRow(g, 9, n0(g.list.length) + '건 · 합계 <b>' + won(g.list.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0)) + '</b>').replace(/<span class="on">[^<]*<\/span>/, '') + g.list.map(function (it) {
-          return '<tr' + (mealOver(it) ? ' class="xover"' : '') + '><td><span class="lead">' + C.md(it.date_millis) + '</span></td>' + C.orgCell(it.username, true) +
+          // 옅은 바탕은 비고(이름·사유)가 안 된 13,000원 넘는 식비 줄만(검증 X07 과 같은 줄) — 「13,000원 초과」 딱지는 회색 참고(2026-11-02 고침 1차)
+          return '<tr' + (mealNeedsNote(it) ? ' class="xover"' : '') + '><td><span class="lead">' + C.md(it.date_millis) + '</span></td>' + C.orgCell(it.username, true) +
             '<td>' + esc(C.nameOf(it.username)) + '</td><td><span class="kind">' + esc(it.category) + '</span></td>' +
             '<td class="el" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') + '</td><td class="n total"><span class="xamt">' + n0(it.amount) + '</span>' + (mealOver(it) ? '<div class="xmealw">' + mealTag(it) + '</div>' : '') + '</td>' +
             '<td class="el xuse" title="' + esc(it.usage || '') + '">' + esc(it.usage || '') + '</td><td class="el dim xnote">' + esc(it.note || '') + '</td><td class="xph" style="white-space:nowrap">' + photoLink(it) + '</td></tr>';
@@ -1802,13 +1850,14 @@
   function scopeSuffix() { var s = C.orgScopeName ? C.orgScopeName() : ''; return s ? '_' + s.replace(/[\\/:*?"<>|\s]+/g, '') : ''; }
   function listCsv() {
     var S = C.state(), x = ITEMS[itemKey(true, S.CYCKEY)], rows = listFiltered((x && x.rows) || []);
-    var out = [['날짜', '이름', '아이디', '소속', '구분', '사용처', '금액', '사용내역', '비고', '식비 1인 금액', '식비 기준 초과']];
+    // 「식비 1인 금액」 칸은 뺐다(2026-11-02 docs/meal-note/SPEC.md §4 — 인원을 세지 않는다). 「식비 13,000원 초과」 = 13,000원 넘는 식비 줄(mealOver)
+    var out = [['날짜', '이름', '아이디', '소속', '구분', '사용처', '금액', '사용내역', '비고', '식비 13,000원 초과']];
     rows.slice().sort(function (a, b) { return a.date_millis - b.date_millis; }).forEach(function (it) {
       var op = C.orgPath(it.username), mo = mealOver(it);
       out.push([C.ymd(it.date_millis), C.nameOf(it.username), it.username, [C.orgName(op), op.unit].filter(Boolean).join(' · '), it.category, it.merchant || '',
-        Number(it.amount) || 0, it.usage || '', it.note || '', it.category === '식비' ? Math.ceil((Number(it.amount) || 0) / mealPeople(it.usage)) : '', mo ? '초과' : '']);   // 1인 금액은 올림(2026-10-08 서버·앱과 같게)
+        Number(it.amount) || 0, it.usage || '', it.note || '', mo ? '초과' : '']);
     });
-    out.push(['합계', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '', '']);
+    out.push(['합계', '', '', '', '', '', rows.reduce(function (s, it) { return s + (Number(it.amount) || 0); }, 0), '', '', '']);
     C.saveBlob(new TextEncoder().encode(csvText(out)), '개인경비_내역_' + S.CYCKEY + scopeSuffix() + '.csv');
     C.toast('경비 ' + n0(rows.length) + '건을 CSV로 다운로드했어요.');
   }
@@ -1907,7 +1956,8 @@
   }
   function finCsv() {
     var S = C.state(), done = cycAppr().filter(function (a) { return a.status === 'approved' && C.orgMatch(a.username); });
-    var out = [['이름', '아이디', '소속', '결재 완료', '건수', '소모품비', '식비', '기타비용', '금액 합계', '식비 기준 초과', '결재 번호']];
+    // 「식비 13,000원 초과」(2026-11-02 고침 1차 — 화면과 같은 이름. 굳은 결재본 meal_over 그대로: 예전 결재본은 1인 13,000원으로 센 수)
+    var out = [['이름', '아이디', '소속', '결재 완료', '건수', '소모품비', '식비', '기타비용', '금액 합계', '식비 13,000원 초과', '결재 번호']];
     var t = [0, 0, 0, 0, 0, 0];
     done.forEach(function (a) {
       var s = a.snapshot || {}, by = s.by || {}, op = C.orgPath(a.username);
@@ -2059,16 +2109,28 @@
     if (e.target.closest('[data-xfinpdf]')) { finBundle(); return; }
     if (e.target.closest('[data-xfincsv]')) { finCsv(); return; }
   });
+  /** 식비 13,000원 비고 안내를 칸에 적는 대로 바로 다시(2026-11-02 docs/meal-note/SPEC.md §4 — 예전 2026-10-15 「구분을 바꿔도 남아 있었다」 고침을 이어받음).
+   *  올리기 창 줄(구분·금액·사용내역·비고) · 고치기 창(구분·금액·사용내역·비고). 안내 칸 글만 바꾼다 — 줄·창은 다시 그리지 않는다(커서가 튀지 않게). 다룬 칸이면 true. */
+  function mealLive(t) {
+    if (!t || !t.matches) return false;
+    if (XUP && t.matches('[data-xrow] [data-xucat], [data-xrow] [data-xamt], [data-xrow] [data-xuse], [data-xrow] [data-xnote]')) {
+      readRows();
+      var tr = t.closest('[data-xrow]'), it0 = XUP.items[+tr.dataset.xrow];
+      if (it0) paintMealHint(tr.querySelector('.xmh'), { category: it0.cat, amount: it0.amt, usage: it0.usage, note: it0.note });
+      return true;
+    }
+    if (t.matches('#xeCat, #xeAmt, #xeUse, #xeNote') && $('xeMeal')) {
+      var v = editVals();
+      paintMealHint($('xeMeal'), { category: v.cat, amount: C.numIn(v.amt), usage: v.usage, note: v.note });
+      return true;
+    }
+    return false;
+  }
+  document.addEventListener('input', function (e) { mealLive(e.target); });
   document.addEventListener('change', function (e) {
     var t = e.target;
     if (t.id === 'xFile') { addFiles(t.files); t.value = ''; return; }
-    // 올리기 창 줄 — 구분·금액·사용내역을 바꾸면 식비 13,000원 초과 표시를 그 자리에서 다시(2026-10-15: 구분을 바꿔도 남아 있었다)
-    if (t.matches && t.matches('[data-xrow] [data-xucat], [data-xrow] [data-xamt], [data-xrow] [data-xuse]') && XUP) {
-      readRows();
-      var tr = t.closest('[data-xrow]'), it0 = XUP.items[+tr.dataset.xrow], mh = tr.querySelector('.xmh');
-      if (it0 && mh) { var o = { category: it0.cat, amount: it0.amt, usage: it0.usage }; mh.innerHTML = mealOver(o) ? mealTag(o) : ''; mh.hidden = !mealOver(o); }
-      return;
-    }
+    if (mealLive(t)) return;
     if (t.id === 'xWho') { XL.who = t.value; C.render(); var w = $('xWho'); if (w) w.focus(); return; }
     if (t.id === 'xePhFile') {
       var f = t.files && t.files[0]; t.value = '';
@@ -2117,7 +2179,7 @@
   });
   /** 보이는 줄인가 — 「출력 안 한 것만」(2026-10-14) + 이름으로 찾기(2026-10-23). 고른 수·묶어 받기가 화면과 같은 판정. */
   function finVisible(a) { return (!C.prints || C.prints.keep('expense', a)) && FIN.match('expense', a.username); }
-  // 칸을 고칠 때 식비 초과 표시를 바로 바꾸려고 줄을 다시 그리지는 않는다(커서가 튄다) — 올리기 전 검사에서 다시 본다.
+  // 칸을 고칠 때 식비 13,000원 비고 안내는 안내 칸 글만 바꾼다(mealLive) — 줄을 다시 그리지 않는다(커서가 튄다).
 
   var S0 = {
     tag: '개인경비', mode: 'x',
@@ -2135,7 +2197,9 @@
       var S = C.state(), x = ITEMS[itemKey(false, S.CYCKEY)], rows = ((x && x.rows) || []).filter(function (it) { return it.username === me(); });
       var T = sums(rows), warn = [];
       if (!rows.length) warn.push('이 기간에 올린 경비가 없어요. 먼저 영수증을 올려 주세요.');
-      if (T.meal) warn.push('식비 1인 13,000원 초과가 ' + n0(T.meal) + '건 있어요. 상신은 할 수 있고 결재자도 같이 봐요.');
+      // 식비 13,000원(2026-11-02 SPEC §3) — 비고에 이름·사유가 아직 없는 줄만(X07 과 같은 줄). 이름을 적은 줄은 알리지 않는다
+      //   괄호 없이(이 창 글은 HTML 이 아니라 「(혼자면 / 사유)」로 갈릴 수 있다 — 2026-11-02 화면 검토 L2)
+      if (T.need) warn.push('13,000원 넘는 식비 ' + n0(T.need) + '건은 비고에 함께한 분 이름이나 사유를 적어 주세요. 상신은 할 수 있고 결재자도 같이 봐요.');
       var noUse = rows.filter(function (it) { return !String(it.usage || '').trim(); }).length;
       if (noUse) warn.push('사용내역이 빈 줄이 ' + n0(noUse) + '건 있어요.');
       return { title: cycName(S.CYCKEY) + ' 개인경비 상신', sub: xSpanKey(S.CYCKEY) + ' · ' + n0(T.n) + '건 · ' + won(T.all), warn: warn };

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    card-rules.js — 법인카드 지출결의 규칙(웹) (2026-10-09, docs/card/SPEC.md §0·§3·§4)
    ---------------------------------------------------------------------------
-   · 기간(달력 한 달)·검증(C01~C09 — C07·C08 의 AI 쪽은 서버가 받아 둔 Gemini 결과를 표시만)·합계 — 서버 supabase/functions/_shared/card-verify.ts 와 **글자 하나까지 같은 판정**.
+   · 기간(달력 한 달)·검증(C01~C10 — C07·C08 의 AI 쪽은 서버가 받아 둔 Gemini 결과를 표시만)·합계 — 서버 supabase/functions/_shared/card-verify.ts 와 **글자 하나까지 같은 판정**.
      한쪽을 고치면 다른 쪽도 고치고 `node ACTs-ATECmobility/web/test/card-parity.test.mjs` 를 돌린다.
    · 구분 추천(웹만): ① 같은 가맹점에 본인이 전에 쓴 구분 ② 음식 업종은 승인 시각
      (05–10 조식대 · 10–15 중식대 · 15–17 다과비 · 17–05 석식대) ③ 주유·충전 → 주유비 ④ 주차 → 주차비 ⑤ 통신 → 통신비
@@ -107,6 +107,30 @@
     return k !== '' && !!set && set[k] === true && fuelOrToll(e);
   }
 
+  /* ── 식대 13,000원 넘으면 비고에 이름·사유(2026-11-02 사용자 결정, docs/meal-note/SPEC.md) — C10 ──
+     식사 줄 = 구분(category)에 식사 낱말이 있고 회식·접대·협의·회의 낱말(회식·회의는 앞 글자가 「호」·숫자면 아님)도 간식·숙식도 없는 줄. 카드사 업종은 보지 않는다.
+     글자는 NFKC 로 고른 뒤, 식사 낱말은 공백을 모두 뺀 글에서(「중 식 대」 = 「중식대」) · 빼는 낱말은 공백을 남긴 글(이어진 공백은 한 칸)에서 찾는다
+     (「야간 식대」·「합숙 식사」·「학회 식대」가 낱말 경계를 넘어 간식·숙식·회식으로 걸리지 않게 — 2026-11-02 재검토 N1·N2). 금액은 줄 금액 > 13,000원(같으면 아님) — 인원으로 나누지 않는다.
+     비고가 「됐다」 = NFKC 뒤 앞뒤 공백을 뺀 글이 비어 있지 않고, 「외 N명」·「외 N인」·「외 N분」 꼴이 없고, 인원수만 적은 것(「3명」·「2분」)도 아닐 때. 이름인지 사유인지는 가리지 않는다(결재자가 본다).
+     「외 N명」·인원수로는 인원을 세지 않는다 — 함께한 분 이름을 모두 적게 한다.
+     서버 card-verify.ts(cardIsMealLine·cardMealNoteOk·cardMealNeedsNote)와 같은 판정(card-parity 시험). 이번 달 표의 비고 칸(drv-card.js)도 이것을 쓴다. */
+  var MEAL_LIMIT = 13000;
+  var MEAL_WORDS = /식대|식비|식사|조식|중식|석식|야식|점심|저녁|아침|도시락|밥/;
+  // 「회식」·「회의」는 바로 앞 글자가 「호」나 숫자가 아닐 때만(2026-11-02 검토 L4 — 「동호회 식대」·「1회 식대」는 식대) · 간식·숙식은 식사가 아니다(「간식비」·「숙식비」)
+  var MEAL_SKIP = /(?:^|[^호0-9])회(?:식|의)|접대|협의/;
+  var MEAL_NOT = /간식|숙식/;
+  /** 식사 낱말을 찾는 글 — NFKC 뒤 공백을 모두 뺀다(「중 식 대」 = 「중식대」). */
+  function mealKey(v) { return nfkc(v).replace(/\s+/g, ''); }
+  /** 빼는 낱말을 찾는 글 — NFKC 뒤 이어진 공백을 한 칸으로(공백은 남긴다, 2026-11-02 재검토 N1·N2). 서버 card-verify.ts mealText 와 같은 다듬기. */
+  function mealText(v) { return nfkc(v).replace(/\s+/g, ' '); }
+  /** 식사 줄인가 — 구분에 식사 낱말이 있고 회식·접대·협의·회의 낱말도 간식·숙식 낱말도 없을 때. 금액·비고는 보지 않는다. */
+  function isMealLine(e) { var t = mealText(e && e.category); return MEAL_WORDS.test(mealKey(t)) && !MEAL_SKIP.test(t) && !MEAL_NOT.test(t); }
+  /** 비고가 「됐다」 — NFKC 뒤 앞뒤 공백을 뺀 글이 비어 있지 않고, 「외 N명」·「외 N인」·「외 N분」 꼴(자릿수 상관없이)이 없고, 인원수만 적은 것(「3명」·「4인」·「2분」)도 아닐 때.
+   *  숫자만으로는 이름이 아니다. 전각 숫자(「외 ２명」·「４인」)는 NFKC 가 보통 숫자로 바꿔 준다. 그 밖(이름·사유·「팀원 점심」)은 됐다고 본다. */
+  function mealNoteOk(note) { var s = nfkc(note).trim(); return s !== '' && !/외\s*\d+\s*(?:명|인|분)/.test(s) && !/^\d+\s*(?:명|인|분)$/.test(s); }
+  /** 안내가 필요한 줄 — 13,000원 넘는 식사 줄인데 비고가 안 됨(비었거나 「외 N명」·인원수뿐). C10 이 이 줄을 모은다. */
+  function needsMealNote(e) { return isMealLine(e) && (Number(e && e.amount) || 0) > MEAL_LIMIT && !mealNoteOk(e && e.note); }
+
   /** 결제 시각(ms) → KST 날짜 'YYYY-MM-DD'. 숫자가 아니면 ''. */
   function kstDate(ms) {
     if (ms == null || ms === '') return '';
@@ -145,7 +169,8 @@
    * 검증. items = 그 사람·그 기간의 card_items 줄. opts = { cycle, submitterName, expenses?, ai? }.
    * C01 구분 빈칸(block) · C02 사용목적 빈칸(block) · C03 같은 승인번호 두 번 이상(bad) · C04 기간 밖 승인일(warn)
    * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시 — 하이패스 카드 줄은 보지 않는다, 2026-11-02) · C06 0원 줄(info)
-   * C07 구분·내역 불일치(warn, Gemini — opts.ai.rows) · C08 사용목적 성의 없음(warn, 규칙 + Gemini) · C09 개인경비 이중 청구 의심(warn, opts.expenses).
+   * C07 구분·내역 불일치(warn, Gemini — opts.ai.rows) · C08 사용목적 성의 없음(warn, 규칙 + Gemini) · C09 개인경비 이중 청구 의심(warn, opts.expenses)
+   * C10 13,000원 넘는 식대인데 비고에 이름·사유가 없음(warn, 2026-11-02 — 구분의 식사 낱말 · 회식·접대·협의·회의 뺌 · 비고가 비었거나 「외 N명」·인원수뿐).
    */
   function runVerify(items, opts) {
     opts = opts || {};
@@ -249,6 +274,12 @@
         add('C09', 'warn', '개인경비와 겹칠 수 있는 줄 그 밖 ' + rest9.length + '건', some(rest9.map(tagOf), 8), idsOf(rest9));
       }
     }
+    // ── C10 13,000원 넘는 식대인데 비고에 이름·사유가 없음(2026-11-02 — 위 「식대 13,000원 넘으면 비고에 이름·사유」) ──
+    //   식사 줄 && 줄 금액 > 13,000원 && 비고가 비었거나 「외 N명」·인원수뿐. 한 항목에 줄 목록(막지 않는다 — 구분·사용목적 빈칸 C01·C02 만 막는다).
+    var c10 = list.filter(needsMealNote);
+    if (c10.length) add('C10', 'warn', '13,000원 넘는 식대 ' + c10.length + '건 — 비고에 이름·사유를 적어 주세요',
+      '식대가 13,000원을 넘으면 비고에 함께한 분 이름을 모두 적어 주세요(혼자 먹었으면 사유). ‘외 N명’ 대신 이름을 적어 주세요. 막지는 않아요: ' +
+      some(c10.map(tagOf), 8), idsOf(c10));
     var rank ={ block: 0, bad: 1, warn: 2, info: 3 };
     out.sort(function (a, b) { return rank[a.level] - rank[b.level] || Number(a.code.slice(1)) - Number(b.code.slice(1)); });
     var cnt = function (l) { return out.filter(function (i) { return i.level === l; }).length; };
@@ -310,6 +341,7 @@
     blankRows: blankRows, runVerify: runVerify, totals: totals,
     kstDate: kstDate, expenseRangeMs: expenseRangeMs, purposeVague: purposeVague,
     isHipassMerchant: isHipassMerchant, fuelOrToll: fuelOrToll, hipassCards: hipassCards, onHipass: onHipass,
+    MEAL_LIMIT: MEAL_LIMIT, isMealLine: isMealLine, mealNoteOk: mealNoteOk, needsMealNote: needsMealNote,
     suggest: suggest, mealOf: mealOf, normMerchant: normMerchant
   };
 });
