@@ -102,9 +102,12 @@
     }
     return p;
   }
+  // 늦게 출발한 받기가 이긴다 — 먼저 출발해 늦게 끝난 받기(결재함 새로 받기)가 결재 뒤 받은 새 목록을 덮지 않게(2026-11-02 검증 로봇 M3)
+  var LA_SEQ = 0;
   function loadAppr() {
+    var seq = ++LA_SEQ;
     return C.fetchAll('/rest/v1/card_approvals?select=*&order=submitted_at.desc,id.desc')     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
-      .then(function (rows) { CAPPR = (rows || []).map(function (a) { a._kind = 'card'; return a; }); })
+      .then(function (rows) { if (seq !== LA_SEQ) return; CAPPR = (rows || []).map(function (a) { a._kind = 'card'; return a; }); })
       .catch(function () { if (!CAPPR) CAPPR = []; });
   }
   /** 칸에 쓰는 중이면 다시 그리지 않는다(커서가 튄다). */
@@ -278,11 +281,15 @@
       '고칠 것이 있으면 관리자에게 정정을 요청하세요.</span></div>';
     h += C.sect('내역', '<span id="cSectN">' + sectN(rows) + '</span>', '',
       rows.length ? (locked ? '' : saveLineHtml(rows)) + tableHtml(rows, locked, hist)
-        : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">이 기간에 올린 카드 내역이 없어요.</div>' +
-          (locked ? '' : '<div class="d">ERP에서 내 법인카드 승인내역을 엑셀(.xls, .xlsx)로 다운로드해서 올려 주세요. 0원·취소 줄은 자동으로 빠져요.<br>법인카드를 쓰지 않았으면 할 일이 없어요.</div>') +
+        : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">' +
+          '이 기간에 올린 카드 내역이 없어요.</div>' +
+          // 파일 형식은 줄에서 갈리지 않게 묶는다(2026-11-02 화면 로봇)
+          (locked ? '' : '<div class="d">ERP에서 내 법인카드 승인내역을 <span style="white-space:nowrap">엑셀(.xls, .xlsx)로</span> 다운로드해서 올려 주세요. 0원·취소 줄은 자동으로 빠져요.<br>' +
+            '법인카드를 쓰지 않았으면 할 일이 없어요.</div>') +
           '</div></div>');
-    if (!locked) h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없어요.</b> 구분 칸의 점선 버튼은 <b>추천</b>이라 ' +
-      '누르거나 ‘추천 구분 채우기’로 확정하세요.</div>';
+    // 줄이 없는 기간에는 빈칸 안내가 할 일이 아니다(2026-11-02 화면 로봇)
+    if (!locked && rows.length) h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없어요.</b> 구분 칸의 점선 버튼은 <b>추천</b>이라 ' +
+      '누르거나 <span style="white-space:nowrap">‘추천 구분 채우기’로</span> 확정하세요.</div>';
     return h;
   }
   function tableHtml(rows, locked, hist) {
@@ -464,7 +471,8 @@
     // 많이 쓴 구분 둘 + 나머지는 「외 N구분」 한 칸(2026-10-15 — 둘만 보여 위 합계와 안 맞아 보이던 것)
     var restSum = rest.reduce(function (s, x) { return s + (Number(x.sum) || 0); }, 0), restN = rest.reduce(function (s, x) { return s + x.n; }, 0);
     return fact('건수', n0(T.n) + '<small>건</small>', 'ERP에서 올린 승인') +
-      fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적을 채워야 상신할 수 있어요', blank > 0) +
+      // 줄이 없으면 빈칸 칸은 뺀다(할 일이 아니다, 2026-11-02 화면 로봇)
+      (rows.length ? fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적을 채워야 상신할 수 있어요', blank > 0) : '') +
       top.map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') +
       (rest.length ? fact('외 ' + n0(rest.length) + '구분', won(restSum), n0(restN) + '건 · ' + rest.map(function (x) { return x.c; }).join(' · ')) : '');
   }
@@ -610,6 +618,9 @@
     if (!f || !s || s.busy) return;
     // ★ 5MB 읽기 상한은 여기서(card-erp.js 는 크기를 보지 않는다) — SheetJS 에 넘기기 전에 막아야 큰 파일에서 브라우저가 멈추지 않는다.
     if (f.size > MAX_BYTES) {
+      // 앞서 고른 파일의 결과·「N건 올리기」 단추가 남아 눌리지 않게 지운다(검증 로봇 L10, 2026-11-02)
+      s.res = null; s.plan = null;
+      var b0 = $('btnCUpGo'); if (b0) { b0.disabled = true; b0.textContent = '올리기'; }
       prevMsg('파일이 너무 커요(' + (f.size / 1048576).toFixed(1) + 'MB). 5MB까지 올릴 수 있으니 ERP에서 한 달치만 다운로드해서 올려 주세요.');
       return;
     }
@@ -620,7 +631,7 @@
       if (CUP !== s) return;
       var bytes = new Uint8Array(r[1]);
       if (!E.looksLikeSheet(bytes)) throw new Error('NOT_SHEET');
-      var res = E.parse(E.sheetRows(r[0], bytes), { cycle: s.cyc, range: R.cycleRange(s.cyc), me: myFullName(), file: f.name });   // range — 연말 설정 기간(2026-10-20)
+      var res = E.parse(E.sheetRows(r[0], bytes), { cycle: s.cyc, range: R.cycleRange(s.cyc), me: myFullName(), file: f.name, known: mineRows(s.cyc) });   // range — 연말 설정 기간(2026-10-20) · known — 하이패스 카드 판정(2026-11-02)
       if (!res.ok) { var er = new Error(res.error); er.res = res; throw er; }
       s.res = res; s.file = f.name;
       s.useOwner = !res.owner.all;         // 모든 줄이 남의 카드면 기본으로 빼 둔다(경고만 — 사용자가 고른다)
@@ -661,7 +672,15 @@
         (badCancel.length ? ' 그 가운데 <b>취소 줄 ' + n0(badCancel.length) + '건</b>은 원래 승인과 맞추지 못해 <b>원래 승인이 그대로 들어가요</b>.' +
           ' 취소된 승인이면 올린 뒤 표에서 그 줄을 지워 주세요.' : ' ‘뺀 줄’에서 확인해 주세요.') + '</span></div>';
     }
-    if (!res.items.length) h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(cycName(s.cyc)) + '(' + esc(R.span(s.cyc)) + ') 줄이 없어요. 다른 달 파일인지 확인해 주세요.</span></div>';
+    // 이 기간에 넣을 줄이 없는 파일 — 다른 달·읽지 못한 줄이 있으면 「다른 달 파일인지」, 아니면(0원·취소 줄뿐·승인 줄 없음) 안내만(2026-11-02).
+    //   0원·취소로 뺀 줄도 날짜가 이 기간 밖이면 「다른 달」 — card-erp 가 0원·취소를 달 검사보다 먼저 뺀다(화면 로봇 C1b).
+    if (!res.items.length) {
+      var zrg = R.cycleRange(s.cyc);
+      var outRange = function (d) { return !!d.appr_date && !(d.appr_date >= zrg.lo && d.appr_date < zrg.hi); };
+      var otherRows = res.dropped.some(function (d) { return d.reason === 'month' || d.reason === 'invalid' || outRange(d); });
+      if (otherRows) h += '<div class="awarn">' + ic('alert', 15) + '<span>' + esc(cycName(s.cyc)) + '(' + esc(R.span(s.cyc)) + ') 줄이 없어요. 다른 달 파일인지 확인해 주세요.</span></div>';
+      else h += '<div class="fhint">' + esc(cycName(s.cyc)) + '에 새로 넣을 줄이 없어요. ' + (res.dropped.length ? '0원·취소 줄만 있어 빼요.' : '이 파일에는 승인 줄이 없어요.') + '</div>';
+    }
     if (res.owner.mismatch && s.useOwner) nCheck += res.owner.mismatch;
     if (res.owner.mismatch) {
       var names = {};
@@ -985,7 +1004,7 @@
       if (info.length) h += C.sect('참고', info.length + '건', '', itemsHtml(info));
     } else if (!none && !busy) {
       h += '<div class="panel"><div class="blank"><div class="ico">' + ic('check', 21) + '</div><div class="t">‘검증하기’를 누르면 이번 기간 카드 내역을 살펴봐요.</div>' +
-        '<div class="d">구분·사용목적이 빈 줄만 상신을 막아요. 같은 승인번호, 이 기간 밖 승인일, 소유자가 상신자와 다른 줄, 0원 줄, 구분·내역이 맞지 않아 보이는 줄, 짧거나 모호한 사용목적, 개인경비와 겹칠 수 있는 줄은 상신을 막지 않고 결재자도 같이 봐요.</div></div></div>';
+        '<div class="d">구분·사용목적이 빈 줄만 상신을 막아요. 같은 승인번호, 이 기간 밖 승인일, 소유자가 상신자와 다른 줄(하이패스 카드는 빼고), 0원 줄, 구분·내역이 맞지 않아 보이는 줄, 짧거나 모호한 사용목적, 개인경비와 겹칠 수 있는 줄은 상신을 막지 않고 결재자도 같이 봐요.</div></div></div>';
     }
     h += '<div class="anote">금액은 ERP 승인금액 그대로이고, ' + C.vx.gemBadge('AI') + '는 <b>가맹점·시간과 맞지 않아 보이는 구분과 성의 없는 사용목적을 표시</b>만 해요. 값을 고치거나 상신을 막지 않고, 카드번호·이름은 AI에 보내지 않아요.</div>';
     return h;
@@ -1316,7 +1335,8 @@
             : (st === 'withdrawn' ? '회수됨 · ' : '') + '카드 ' + n0(x.n) + '건 · ' + won(x.sum) + (x.blank ? ' · 빈칸 ' + n0(x.blank) + '줄' : '') };
       }), { wide: true, none: '이 기간 카드 내역이 있는 사람은 모두 상신했어요' }) + '</div>';
     }
-    h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>카드 내역이 있는 ' + n0(list.length) + '명 · ' + n0(T.n) + '건</div>' +
+    // 결재 건만 있고 줄이 없는 사람(0건)은 「카드 내역이 있는」 사람으로 세지 않는다(아래 직원별 표에는 0건으로 보인다, 2026-11-02)
+    h += '<div class="hero fade"><div class="eyebrow"><span class="dot ok"></span>카드 내역이 있는 ' + n0(list.filter(function (x) { return x.n > 0; }).length) + '명 · ' + n0(T.n) + '건</div>' +
       '<p class="verdict">' + won(T.cost) + '</p>' +
       (cats.length ? '<div class="facts">' + cats.slice(0, 4).map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') +
         (cats.length > 4 ? fact('그 밖의 구분', won(cats.slice(4).reduce(function (s, x) { return s + x.sum; }, 0)), n0(cats.length - 4) + '구분') : '') + '</div>' : '') +

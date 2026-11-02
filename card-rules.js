@@ -78,6 +78,35 @@
   /** 줄을 한 마디로: "07.03 가짜식당 19,800원" */
   function tagOf(e) { return str(e.appr_date).slice(5).replace('-', '.') + ' ' + merchantOf(e) + ' ' + n0(e.amount) + '원'; }
 
+  /* ── 하이패스 카드(2026-11-02 사용자) — 소유자 확인(C05)을 하지 않는 줄 ──
+     하이패스 카드는 ERP 소유자가 사람이 아니라 센터·차량(「○○센터1234」)으로 나오고 주유·통행료에만 쓸 수 있다(사용자).
+     하이패스 카드 = 가맹점에 「하이패스」가 든 줄(ERP 「후불하이패스N건」 통행료)이 한 줄이라도 있는 카드번호.
+     빼는 줄 = 하이패스 통행료 줄 자체 + 하이패스 카드의 주유·통행료 줄(업종·가맹점 FUEL). 그 카드의 다른 줄(식당 등)은 그대로 C05 —
+       하이패스 겸용 개인 카드를 남이 올린 경우를 잡으려고(검증 로봇 M2). 글자는 NFKC 로 고른 뒤 공백·-·_·.·가운뎃점을 빼고 본다.
+     올리기 화면의 「소유자가 내 이름이 아닌 줄」(card-erp.js)도 이것을 쓴다. 서버 card-verify.ts 와 같은 판정(card-parity 시험). */
+  function nfkc(v) { var s = str(v); return s.normalize ? s.normalize('NFKC') : s; }
+  // 사이 글자는 NFKC 앞뒤로 한 번씩 뺀다 — 「ㆍ」(U+318D)는 NFKC 에서 다른 글자(가운데 홀소리)로 바뀌어 뒤에서는 못 뺀다
+  var HP_SEP = /[\s\-_.·ㆍ・•‧]+/g;
+  function isHipassMerchant(m) { return /하이패스|hipass/i.test(nfkc(str(m).replace(HP_SEP, '')).replace(HP_SEP, '')); }
+  var FUEL = /주유|충전|오일|정유|s-?oil|에스오일|lpg|연료|에너지|도로공사|통행료|톨게이트/i;
+  /** 주유·통행료 줄인가(업종 또는 가맹점, 공백은 빼고 — ERP 업종은 「주 차 장」처럼 띄어 쓰기도 한다). */
+  function fuelOrToll(e) {
+    return isHipassMerchant(e && e.merchant) || FUEL.test(nfkc(e && e.biz_type).replace(/\s+/g, '')) || FUEL.test(nfkc(e && e.merchant).replace(/\s+/g, ''));
+  }
+  function cardKey(v) { return str(v).replace(/\s+/g, ''); }
+  /** 하이패스 카드 번호 모음 { 카드번호: true }(카드번호의 공백은 뺀다). */
+  function hipassCards(list) {
+    var set = Object.create(null);
+    (list || []).forEach(function (e) { var k = cardKey(e && e.card_no); if (k && isHipassMerchant(e && e.merchant)) set[k] = true; });
+    return set;
+  }
+  /** 소유자 확인을 하지 않는 줄인가 — 하이패스 통행료 줄이거나, 하이패스 카드의 주유·통행료 줄. */
+  function onHipass(e, set) {
+    if (isHipassMerchant(e && e.merchant)) return true;
+    var k = cardKey(e && e.card_no);
+    return k !== '' && !!set && set[k] === true && fuelOrToll(e);
+  }
+
   /** 결제 시각(ms) → KST 날짜 'YYYY-MM-DD'. 숫자가 아니면 ''. */
   function kstDate(ms) {
     if (ms == null || ms === '') return '';
@@ -115,7 +144,7 @@
   /**
    * 검증. items = 그 사람·그 기간의 card_items 줄. opts = { cycle, submitterName, expenses?, ai? }.
    * C01 구분 빈칸(block) · C02 사용목적 빈칸(block) · C03 같은 승인번호 두 번 이상(bad) · C04 기간 밖 승인일(warn)
-   * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시) · C06 0원 줄(info)
+   * C05 소유자 ≠ 상신자(warn, 띄어쓰기 무시 — 하이패스 카드 줄은 보지 않는다, 2026-11-02) · C06 0원 줄(info)
    * C07 구분·내역 불일치(warn, Gemini — opts.ai.rows) · C08 사용목적 성의 없음(warn, 규칙 + Gemini) · C09 개인경비 이중 청구 의심(warn, opts.expenses).
    */
   function runVerify(items, opts) {
@@ -158,7 +187,8 @@
     }
     var me = normName(opts.submitterName);
     if (me) {
-      var who = list.filter(function (e) { var o = normName(e.owner_name); return o !== '' && o !== me; });
+      var hp = hipassCards(list);
+      var who = list.filter(function (e) { var o = normName(e.owner_name); return o !== '' && o !== me && !onHipass(e, hp); });
       if (who.length) add('C05', 'warn', '소유자가 상신자와 다른 줄 ' + who.length + '건',
         'ERP 소유자가 ' + str(opts.submitterName).trim() + ' 님이 아니에요: ' + some(who.map(function (e) { return tagOf(e) + '(' + str(e.owner_name).trim() + ')'; }), 8), idsOf(who));
     }
@@ -279,6 +309,7 @@
     isCycle: isCycle, lastDay: lastDay, cycleRange: cycleRange, span: span, cycleLabel: cycleLabel,
     blankRows: blankRows, runVerify: runVerify, totals: totals,
     kstDate: kstDate, expenseRangeMs: expenseRangeMs, purposeVague: purposeVague,
+    isHipassMerchant: isHipassMerchant, fuelOrToll: fuelOrToll, hipassCards: hipassCards, onHipass: onHipass,
     suggest: suggest, mealOf: mealOf, normMerchant: normMerchant
   };
 });

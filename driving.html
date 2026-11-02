@@ -173,6 +173,10 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 /* PC — 추천 구분 칩이 붙은 줄도 입력 칸들이 한 줄에(가운데 맞춤이면 칩 있는 칸만 14px 위) — 글 기준선 맞춤 */
 @media screen and (min-width:821px){ .ctab tbody td{vertical-align:baseline} }
 .cdrop tr.cbad td{background:var(--red-50)}
+/* 폰 — 「뺀 줄」 표는 엑셀 행·승인번호 칸을 숨기고 표 폭을 화면에 맞춰 승인일·가맹점·금액·이유가 화면 안에(2026-11-02 화면 로봇) */
+@media (max-width:600px){ table.cdrop th:nth-child(1),table.cdrop td:nth-child(1),table.cdrop th:nth-child(3),table.cdrop td:nth-child(3){display:none}
+  .scroll table.cdrop{min-width:0;width:100%}
+  table.cdrop td.el{white-space:normal;word-break:keep-all;overflow-wrap:anywhere;max-width:none} }
 .cfacts{margin:0 0 12px}
 /* 저장 상태 줄(2026-10-12) — 표 위: 자동 저장됨 · 마지막 저장 HH:MM / 저장 중… / 저장 못 함 N곳 */
 .csaveline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 8px;font-size:13px;color:var(--ink-500);line-height:1.5;overflow-wrap:anywhere}
@@ -749,6 +753,8 @@ aside a.step.isnow .stepn{animation:ringnow 1.8s ease-out infinite}
 .vstep.now p,.vstep.work p,.vstep.done p{color:var(--ink-800)}
 .vstep.now .btn.big{border:0;background:var(--red);color:#fff;cursor:pointer;animation:vxpulse 1.6s ease-out infinite}
 .vstep.now .btn.big:hover{background:var(--red-700)}
+/* 옆 창(PDF 미리보기 등)이 열린 동안 뒤 화면 단계 카드는 깜빡이지 않는다 — 깜빡이는 단추는 창 안 하나만(2026-11-02 화면 로봇) */
+body:has(#panel.open) .vstep.now .btn.big,body:has(#panel.open) .vstep .btn.cta,body:has(#panel.open) .vstep.now .vsh i{animation:none}
 .vstep.work .btn.big,.vstep.work .btn.gembtn.running{border:0;background:var(--red-700);color:#fff;cursor:progress;opacity:1}
 .vstep.work .btn.gembtn.running::after{display:none}
 .vstep.work .gembtn.running .gemico{animation:none}
@@ -3113,7 +3119,7 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
    · 폰 정렬 칩 — 고른 칩이 600, 안 고른 칩이 표 머리 굵기(700)를 물려받아 거꾸로 보였다 */
 @media screen{
   .phead h1,.verdict,.ahd b,#panel .ph .t{text-wrap:balance}
-  .anote,.hpnote,.fhint,.nextstep .t,.vd,.issue .d,.phead p,.cycband span,.awarn{text-wrap:pretty}
+  .anote,.hpnote,.fhint,.nextstep .t,.vd,.issue .d,.phead p,.cycband span,.awarn,.vstep p,.blank .d{text-wrap:pretty}
   .cardx .v,.otile b,.tcard .tv,.issue .amt,.mcompare b,.mcompare .mop,.cmoney .cbig b,.edustat > b{line-height:1.25}
   .ltitle,.cstep .nowrow .verdict,.educg .t{line-height:1.3}
   .sect > .hd h2,.ccard .chd h2,.aimo .aimo-hd h2,.d2t h2,.vstep .vsh b,.evsh b,.sumline b,.abf b{line-height:1.4}

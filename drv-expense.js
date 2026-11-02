@@ -144,9 +144,13 @@
     }
     return p;
   }
+  // 늦게 출발한 받기가 이긴다 — 먼저 출발해 늦게 끝난 받기(결재함 새로 받기)가 결재 뒤 받은 새 목록을 덮지 않게(2026-11-02 검증 로봇 M3)
+  var LA_SEQ = 0;
   function loadAppr() {
+    var seq = ++LA_SEQ;
     return C.fetchAll('/rest/v1/expense_approvals?select=*&order=submitted_at.desc,id.desc')     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
       .then(function (rows) {
+        if (seq !== LA_SEQ) return;
         XAPPR = (rows || []).map(function (a) { a._kind = 'expense'; return a; });
       }).catch(function () { if (!XAPPR) XAPPR = []; });
   }

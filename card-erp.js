@@ -12,9 +12,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (root, factory) {
   // ★ 2026-10-20 연말 마감 설정: 기간 키는 엔진(cycle-rules.js)에서 — 브라우저는 window.CycleRules(이 파일보다 먼저 싣는다), Node 는 require.
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cycle-rules.js'));
-  else root.CardErp = factory(root.CycleRules);
-})(typeof self !== 'undefined' ? self : this, function (CR) {
+  // ★ 2026-11-02 하이패스 카드 판정은 card-rules.js 하나(window.CardRules — driving-v2.html 이 이 파일보다 먼저 싣는다).
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cycle-rules.js'), require('./card-rules.js'));
+  else root.CardErp = factory(root.CycleRules, root.CardRules);
+})(typeof self !== 'undefined' ? self : this, function (CR, RULES) {
   'use strict';
 
   var HEAD = { s: 'S', card: '법인카드', owner: '소유자', date: '승인일자', time: '승인시간', merchant: '가맹점',
@@ -230,7 +231,10 @@
       seenK[k] = 1; items.push(o);
     });
     var me = norm(opt.me);
-    items.forEach(function (o) { o.owner_mismatch = !!(me && o.owner_name && norm(o.owner_name) !== me); });
+    // 하이패스 카드의 통행료·주유 줄은 소유자를 견주지 않는다(2026-11-02 사용자 — 센터·차량 이름으로 나오고 주유·통행료에만 쓴다). 판정은 card-rules.js 하나.
+    //   하이패스 카드인지는 이 파일의 줄 + 이미 올린 이 기간 줄(opt.known)로 본다 — 통행료를 먼저 올리고 주유만 든 파일을 따로 올려도 검증(C05)과 같게.
+    var hp = RULES && RULES.hipassCards ? RULES.hipassCards(items.concat(opt.known || [])) : null;
+    items.forEach(function (o) { o.owner_mismatch = !!(me && o.owner_name && norm(o.owner_name) !== me && !(hp && RULES.onHipass(o, hp))); });
     var mis = items.filter(function (o) { return o.owner_mismatch; }).length;
     // ── ERP 합계 대조: 「합계」 줄(N) 승인금액 = 승인 합 − 취소 합 ──
     var fileTotal = null;

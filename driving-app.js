@@ -899,7 +899,7 @@
         var cfg = (out[7] || [])[0];
         if (cfg) setQuarterBounds(cfg.quarter_bounds);
         var rulesNew = !!(cfg && CR.set(cfg.cycle_rules));      // 서버 기간 설정이 바뀌었나(2026-10-20 연말 마감)
-        APPR = out[8] || [];
+        APPR = out[8] || []; APPR_GEN++;
         PEOPLE = {}; (out[9] || []).forEach(function (p) { PEOPLE[p.username] = p; });
         ORG = out[10] || [];
         setLineOv(out[11]);
@@ -3689,7 +3689,7 @@
         (why ? ' 적던 사유는 다시 열면 그대로 있어요.' : ''), true);
     };
     (kd ? Promise.resolve(kd.reload ? kd.reload() : null)
-      : fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc').then(function (rows) { APPR = rows || []; }))
+      : fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc').then(function (rows) { APPR = rows || []; APPR_GEN++; }))
       .then(function () { paintPills(); render(); say(true); }, function (e) {
         if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return; }
         say(false);
@@ -3744,7 +3744,10 @@
           // 상신 뒤 유류단가가 바뀜 — 이대로 승인할지 반려할지 승인 창에서 묻는다
           if (ej.error === 'RATE_CHANGED' && payload && payload.action === 'approve' && !payload.ack_rate_change &&
             apprRateAsk(payload, okMsg, ej)) return 'ask';
-          toast(apiErrText(ej, res.st) || '처리하지 못했어요.', true); return false;
+          toast(apiErrText(ej, res.st) || '처리하지 못했어요.', true);
+          // 그 사이 다른 처리가 있었다(409 「결재 중인 건이 아니에요」·403 「지금은 … 님 차례예요」 등) — 결재 건을 바로 새로 받아 창·결재함을 맞춘다(2026-11-02)
+          if (payload && payload.id && (res.st === 409 || res.st === 403)) apprCheckOpen(payload.action, +payload.id, payload.kind || '', 0);
+          return false;
         }
         // 방금 결재한 건(승인·반려·승인 취소)은 결재함 「그 밖의 건」 기간 거르기와 상관없이 보이게 — 9월분을 10월분 화면에서
         //   승인하면 카드가 사라져 「승인 취소·반려」를 못 찾았다(2026-10-19 로봇)
@@ -3770,7 +3773,7 @@
         // 처리는 이미 끝났다. 뒤이은 목록 재조회가 실패해도 '연결 실패' 로 오인시키지 않는다 —
         // 그러면 사용자가 상신을 다시 눌러 헷갈린다. 전체를 다시 불러오게 한다.
         return fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc')
-          .then(function (rows) { APPR = rows || []; paintPills(); render(); return true; })
+          .then(function (rows) { APPR = rows || []; APPR_GEN++; paintPills(); render(); return true; })
           .catch(function (e) {
             if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return true; }
             toast('처리는 됐어요. 목록을 다시 불러올게요.'); loadAll(); return true;
@@ -3778,13 +3781,157 @@
       }).catch(function () { toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true); return false; });
   }
 
+  /* ── 결재 건만 새로 받기(2026-11-02 사용자 「결재할 것이 새로 생기거나 바뀌면 새로 고침 없이 결재함에서 바로 보여야」) ──
+     결재 건(운행일지 APPR · 개인경비·법인카드 모듈의 목록)은 들어올 때(loadAll)와 내가 결재한 뒤(callAppr)에만 받았다 —
+     다른 분이 상신·승인·회수한 것은 페이지를 새로 열어야 보였고, 회수된 문서도 「내 차례」에 남아 승인하면 「결재 중인 건이 아니에요」만 떴다.
+     이제 결재함에 들어올 때 · 탭·창으로 돌아올 때 · 알림(종)·결재 창·문서 보기를 열 때 결재 건만 다시 받는다.
+       · 운행·영수증·사람 목록은 받지 않는다(loadAll 처럼 화면을 뼈대로 바꾸지 않는다). 개인경비·법인카드는 모듈의 load(soft) —
+         soft 면 결재 건만 새로 받고 내역은 받아 둔 것을 쓴다(drv-expense.js·drv-card.js loadWith).
+       · opt.max = 받은 지 이만큼(ms) 안이면 다시 받지 않는다(기본 10초). 받는 중이면 그 약속을 같이 쓴다. 실패해도 받아 둔 목록 그대로.
+       · 바뀐 것이 있을 때만 다시 그린다(숫자 딱지·종은 늘). 결재함이 아니거나 창이 열렸거나 칸에 쓰는 중이면 그리지 않고
+         표시만 해 두었다가(APPR_DIRTY) 창을 닫을 때 그린다. 다시 그릴 때 보던 카드·누르던 단추는 그 자리 그대로(apprRepaint). */
+  // APPR_GEN — 운행일지 결재 건(APPR)을 새로 넣을 때마다 +1(loadAll·callAppr·apprStale·apprRefresh). apprRefresh 는 출발 때 값과 다르면
+  //   (그 사이 더 새 목록이 들어왔으면) 늦게 끝난 자기 결과로 덮지 않는다 — 승인한 문서가 「내 차례」로 되살아나던 것(2026-11-02 검증 로봇 M3).
+  var APPR_AT = 0, APPR_BUSY = null, APPR_DIRTY = false, APPR_GEN = 0;
+  function apprSig() { return allAppr().map(function (a) { return apvKey(kindOf(a), a); }).sort().join('|'); }
+  /** 지금 결재함을 다시 그리면 안 되는가 — 옆 창이 열렸거나 「⋯」 메뉴가 펼쳐졌거나 칸에 쓰는 중(한글 조합 포함). */
+  function apprHold() {
+    if ($('panel').classList.contains('open') || IME || document.querySelector('#inner details.kmenu[open]')) return true;
+    var ae = document.activeElement;
+    return !!(ae && ae !== document.body && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable));
+  }
+  /** 결재함을 다시 그린다 — 내려 보던 중이면 화면 맨 위 카드가 같은 높이에 있게, 누르던 카드 단추에는 초점을 돌려준다. */
+  function apprRepaint() {
+    var inner = $('inner'), hd = document.querySelector('header.top'), hb = hd ? Math.max(0, hd.getBoundingClientRect().bottom) : 0;
+    var top = null, cards = window.scrollY > 40 ? inner.querySelectorAll('.acard[data-akey]') : [];
+    for (var i = 0; i < cards.length; i++) { var r0 = cards[i].getBoundingClientRect(); if (r0.bottom > hb) { top = { k: cards[i].getAttribute('data-akey'), y: r0.top }; break; } }
+    var ae = document.activeElement, fc = null;
+    if (ae && ae !== document.body && inner.contains(ae)) {
+      var an = ['data-appr', 'data-apvtog', 'data-adet', 'data-fixgo', 'data-inboxf', 'data-ibcyc', 'data-inboxmode'].filter(function (n) { return ae.hasAttribute(n); })[0];
+      var ac = ae.closest('.acard');
+      if (an) fc = { k: ac ? ac.getAttribute('data-akey') : '', n: an, v: ae.getAttribute(an) };
+    }
+    render();
+    var c = top && inner.querySelector('.acard[data-akey="' + top.k + '"]');
+    if (c) { var d = c.getBoundingClientRect().top - top.y; if (Math.abs(d) > 1) window.scrollBy(0, d); }
+    var root = fc && (fc.k ? inner.querySelector('.acard[data-akey="' + fc.k + '"]') : inner);
+    var el = root && Array.prototype.filter.call(root.querySelectorAll('[' + fc.n + '="' + fc.v + '"]'), function (b) { return b.offsetParent !== null; })[0];
+    if (el) { try { el.focus({ preventScroll: true }); } catch (e) { } }
+  }
+  /** 받은 결재 건을 화면에 — 숫자 딱지·종(열려 있으면 알림 목록도, 누르던 줄 초점 그대로)은 늘, 결재함은 다시 그려도 될 때만. */
+  function apprShow() {
+    var ae = document.activeElement, nf = NOTE.open && ae && ae.getAttribute ? ae.getAttribute('data-note') : null;
+    paintPills();
+    var nb = nf && document.querySelector('#notePop [data-note="' + nf + '"]');
+    if (nb) { try { nb.focus({ preventScroll: true }); } catch (e) { } }
+    // 결재 창이 열려 있으면 그 창이 그린 문서가 지금도 같은지 바로 본다(다시 받지 않고) — 회수된 문서 창은 [승인] 전에 닫힌다(M1)
+    if ($('panel').classList.contains('open') && $('btnApprGo')) apprCheckDialog();
+    if (VIEW !== 'inbox' || !LOADED || LOADING) return;
+    if (apprHold()) { APPR_DIRTY = true; return; }
+    APPR_DIRTY = false;
+    apprRepaint();
+  }
+  /** 창을 닫은 뒤(closePanel) — 창이 열린 동안 결재 건이 바뀌었으면 이제 결재함을 다시 그린다. */
+  function apprFlush() {
+    if (APPR_DIRTY) setTimeout(function () { if (APPR_DIRTY) apprShow(); }, 0);
+  }
+  // 칸에서 초점을 떼거나 한글 조합이 끝나거나 「⋯」 메뉴를 닫을 때도 미뤄 둔 다시 그리기를 푼다 — 예전엔 창을 닫을 때만 풀려
+  //   상신자 이름 칸에 초점을 둔 채 다녀오면 옛 카드가 그대로 남았다(2026-11-02 검증 로봇 M2). toggle 은 거품이 없어 capture 로.
+  //   단, 누르고 있는 동안(pointerdown~up)은 풀지 않는다 — 누르는 순간 focusout 으로 다시 그리면 그 클릭이 사라졌다(재검토 N1).
+  //   손을 뗀 뒤에 풀면 click 이 먼저 옛 카드에 닿고(openApprAct 가 지금 자료로 다시 확인), 다시 그리기는 그 뒤에.
+  var APPR_PTR = false;
+  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); }, 0); }
+  function apprPtrUp() { APPR_PTR = false; apprUnhold(); }
+  document.addEventListener('pointerdown', function () { APPR_PTR = true; }, true);
+  document.addEventListener('pointerup', apprPtrUp, true);
+  document.addEventListener('pointercancel', apprPtrUp, true);
+  document.addEventListener('focusout', apprUnhold, true);
+  document.addEventListener('compositionend', apprUnhold, true);
+  document.addEventListener('toggle', apprUnhold, true);
+  function apprRefresh(opt) {
+    var max = opt && opt.max != null ? opt.max : 10000;
+    if (!ME || !LOADED || LOADING) return Promise.resolve(false);
+    // 「바로」(max 0 — 409·403 뒤)인데 앞서 출발한 받기가 도는 중이면, 그것이 끝난 뒤 한 번 더 받는다(앞 받기는 바뀌기 전 자료일 수 있다, 재검토 R1)
+    if (APPR_BUSY) return max === 0 ? APPR_BUSY.then(function () { return apprRefresh(opt); }) : APPR_BUSY;
+    if (Date.now() - Math.max(APPR_AT, STATIC_AT) < max) return Promise.resolve(false);
+    var who = myName(), sig0 = apprSig(), g0 = APPR_GEN;
+    APPR_AT = Date.now();                  // 실패해도 바로 다시 묻지 않게(창을 오갈 때마다)
+    APPR_BUSY = Promise.all([
+      fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc'),
+      // 개인경비·법인카드 — soft: 결재 건만 새로 받는다(실패는 모듈 안에서 삼키고 받아 둔 목록을 그대로 둔다)
+      Promise.all(EXT.load.map(function (fn) { try { return Promise.resolve(fn(true)).catch(function () { }); } catch (e) { return null; } }))
+    ]).then(function (res) {
+      APPR_BUSY = null;
+      if (myName() !== who) return false;
+      if (APPR_GEN === g0) { APPR = res[0] || []; APPR_GEN++; }      // 그 사이 다른 길로 더 새 목록이 들어왔으면 덮지 않는다(M3)
+      APPR_AT = Date.now();
+      var changed = apprSig() !== sig0;
+      if (changed) apprShow();
+      return changed;
+    }, function (e) {
+      APPR_BUSY = null;
+      if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); }
+      return false;                        // 403·5xx·연결 끊김 — 받아 둔 목록 그대로(다음에 들어올 때 다시 받는다)
+    });
+    return APPR_BUSY;
+  }
+  /** 다른 탭·앱에서 돌아오면 — 결재함이면 10초, 다른 화면이면 1분 안에 받았을 때만 건너뛴다(메뉴 숫자·종이 맞게). */
+  function apprWake() { if (!document.hidden) apprRefresh({ max: VIEW === 'inbox' ? 10000 : 60000 }); }
+  document.addEventListener('visibilitychange', apprWake);
+  window.addEventListener('focus', apprWake);
+  window.addEventListener('pageshow', function (e) { if (e.persisted) apprWake(); });
+  /** 결재 창을 연 그 문서가 지금도 같은가 — 창을 연 뒤 결재 건을 다시 받아(max ms 안에 받았으면 그대로, 기본 3초) 바뀌었으면
+   *  새 자료로 창을 다시 그린다(적던 의견·사유는 그대로). 그 동작을 더 할 수 없게 됐으면(회수·반려·다른 분이 처리) 창을 닫고 알린다.
+   *  보내는 중(단추 잠김)·유류단가 되묻는 중·다른 창으로 바뀌었으면 건드리지 않는다. 서버도 상신 시각으로 낡은 화면을 막는다(STALE). */
+  /** 그 동작을 지금 자료(a)로 아직 할 수 있는가 — 승인·반려 = 아직 내 차례 · 승인 취소 = canRecall · 회수 = 내 문서·결재 중·아무도 처리 안 함
+   *  · 정정 = canReopen · 관리자 반려 = 결재 중. */
+  function apprStill(act, a) {
+    return !!a && (act === 'approve' || act === 'reject' ? inbox().indexOf(a) >= 0
+      : act === 'recall_reject' ? canRecall(a)
+      : act === 'withdraw' ? a.username === myName() && a.status === 'submitted' && !(a.steps || []).some(function (x) { return x.result; })
+      : act === 'reopen' ? canReopen(a)
+      : act === 'force_reject' ? a.status === 'submitted' : true);
+  }
+  /** 할 수 없게 된 결재를 알리고 결재함을 다시 그린다(창이 열려 있으면 닫는다). */
+  function apprGone() {
+    APPR_DIRTY = false;                    // 아래에서 바로 그린다(closePanel → apprFlush 와 두 번 그리지 않게)
+    if ($('panel').classList.contains('open')) closePanel();
+    toast('그 사이 문서가 바뀌어 이 결재를 할 수 없어요. 결재함을 새로 불러왔어요.', true);
+    setTimeout(function () { if (!apprHold()) apprRepaint(); else APPR_DIRTY = true; }, 0);
+  }
+  /** 열린 결재 창이 그린 문서(단추의 data-akey)가 지금 목록과 다르면 — 그 동작을 할 수 없게 됐으면 닫고 알리고, 아직 할 수 있으면
+   *  새 자료로 다시 연다(적던 의견·사유·초점 그대로). 기준은 창이 그린 자료라 다른 길로 먼저 새로 받았어도 놓치지 않는다(M1).
+   *  보내는 중(단추 잠김)·유류단가 되묻는 중이면 건드리지 않는다. 서버도 상신 시각으로 낡은 화면을 막는다(STALE). */
+  function apprCheckDialog() {
+    var g = $('btnApprGo');
+    if (!g || g.disabled || RATE_ASK || !$('panel').classList.contains('open')) return;
+    var act = g.dataset.act, id = +g.dataset.id, kind = g.dataset.kind || '';
+    var a1 = apprFind(id, kind);
+    if (a1 && apvKey(kind, a1) === (g.dataset.akey || '')) return;
+    if (!apprStill(act, a1)) { apprGone(); return; }
+    var wEl = $('apprWhy'), w = wEl ? wEl.value : '', wF = !!wEl && document.activeElement === wEl;
+    openApprAct(act, id, kind, true);
+    if ($('apprWhy')) { $('apprWhy').value = w; if (wF) { try { $('apprWhy').focus(); } catch (e) { } } }    // 적던 칸·초점 그대로
+    toast('그 사이 문서가 바뀌어 새 내용으로 다시 열었어요. 확인한 뒤 결재해 주세요.', true);
+  }
+  /** 결재 창을 연 뒤(또는 409·403 뒤) — 결재 건을 다시 받아(max ms 안에 받았으면 그대로, 기본 3초) 열린 창을 맞춘다. */
+  function apprCheckOpen(act, id, kind, max) {
+    apprRefresh({ max: max == null ? 3000 : max }).then(function () {
+      var g = $('btnApprGo');
+      if (!g || g.dataset.act !== act || +g.dataset.id !== +id || (g.dataset.kind || '') !== (kind || '')) return;
+      apprCheckDialog();
+    });
+  }
+
   /**
    * 승인·반려·회수 확인 창. 결재자는 여기서 금액 요약·검증 결과를 보고, 결재 문서(PDF)를 열어 본 뒤 누른다.
    * 예전에는 카드의 [승인]이 한 번 클릭으로 확정됐고 내역을 볼 길이 없었다.
    */
-  function openApprAct(act, id, kind) {
+  function openApprAct(act, id, kind, checked) {
     var a = apprFind(id, kind), kd = kindDef(kind);
     if (!a) { toast('결재 건을 찾지 못했어요. 새로고침해 주세요.', true); return; }
+    // 연 순간 그 동작을 지금 자료로 아직 할 수 있는지 — 옛 카드 단추를 눌렀어도(목록은 뒤에서 이미 새로 받았을 수 있다) 창을 열지 않고 알린다(M2)
+    if (!checked && !apprStill(act, a)) { apprGone(); return; }
     var s = a.snapshot || {};
     var cname = keyName(a.cycle, a.cycle);
     if (kd && kd.cycName) cname = kd.cycName(a);
@@ -3810,7 +3957,7 @@
       var g = $('btnApprGo');
       if (!g || !$('panel').classList.contains('open') || g.dataset.act !== act || +g.dataset.id !== +id) return;
       var w = $('apprWhy') ? $('apprWhy').value : '';
-      openApprAct(act, id, kind);
+      openApprAct(act, id, kind, true);          // 받아 둔 요약으로 다시 그리기만 — 확인을 또 걸지 않는다
       if ($('apprWhy')) $('apprWhy').value = w;
     });
     var title = act === 'approve' ? '승인' : act === 'reject' ? '반려' : act === 'force_reject' ? '관리자 반려'
@@ -3856,11 +4003,15 @@
       //   DOM 차례가 곧 Tab 차례(의견 칸 → 동작 → 취소). 높이·색·Esc(닫기)는 그대로.
       // data-sub — 이 창을 그린 결재 행의 상신 시각(submitted_at 글자 그대로). 보낼 때 실어 서버가 낡은 화면인지 본다(2026-10-20 STALE)
       '<span style="flex:1"></span><button class="btn pri" id="btnApprGo" data-act="' + esc(act) + '" data-id="' + a.id + '"' + (kd ? ' data-kind="' + esc(kind) + '"' : '') +
-      (a.submitted_at ? ' data-sub="' + esc(a.submitted_at) + '"' : '') + '>' +
+      (a.submitted_at ? ' data-sub="' + esc(a.submitted_at) + '"' : '') +
+      // data-akey — 이 창이 그린 결재 행의 열쇠. 뒤에서 받은 목록과 견줘 바뀌었으면 창을 맞춘다(apprCheckDialog, 2026-11-02 M1)
+      ' data-akey="' + esc(apvKey(kind, a)) + '">' +
       (act === 'approve' ? '승인' : act === 'withdraw' ? '회수' : act === 'reopen' ? '정정으로 열기' : act === 'recall_reject' ? '승인 취소하고 반려' : '반려') + '</button>' +
       // 승인 취소·반려 창에서는 창 닫기를 「닫기」로 — 「취소」가 옆 단추(승인 취소)와 헷갈렸다(2026-10-19 로봇)
       '<button class="btn" data-close>' + (act === 'recall_reject' ? '닫기' : '취소') + '</button>');
     if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
+    // 연 문서가 지금 것인지 — 결재 건을 다시 받아 바뀌었으면 창을 새 자료로 다시 그리거나 닫는다(2026-11-02, checked = 방금 그렇게 다시 연 창)
+    if (!checked) apprCheckOpen(act, id, kind);
   }
 
   /* ── 결재함 ── */
@@ -3948,7 +4099,7 @@
           '<button class="' + (!INBOX_ALLCYC ? 'on' : '') + '" aria-pressed="' + (!INBOX_ALLCYC) + '" data-ibcyc="0">' + esc(cycleName(CYC)) + '</button>' +
           '<button class="' + (INBOX_ALLCYC ? 'on' : '') + '" aria-pressed="' + (!!INBOX_ALLCYC) + '" data-ibcyc="1">전체 기간</button></div>' +
         '<label class="field">' + ic('search', 14) +
-          '<input id="ibQ" aria-label="상신자 이름" placeholder="상신자 이름" value="' + esc(INBOX_Q) + '"></label>' +
+          '<input id="ibQ" data-fk="ibQ" aria-label="상신자 이름" placeholder="상신자 이름" value="' + esc(INBOX_Q) + '"></label>' +
         '<label class="field ibdate"><span class="dim">상신일</span>' +
           '<input type="date" id="ibD1" aria-label="상신일 시작" value="' + esc(INBOX_D1) + '">' +
           '<span class="dim">~</span><input type="date" id="ibD2" aria-label="상신일 끝" value="' + esc(INBOX_D2) + '"></label>' +
@@ -4249,7 +4400,7 @@
   function openNotePop(on) {
     var pop = $('notePop'); if (!pop) return;
     if (on === undefined) on = pop.hidden;
-    if (on) { noteLoad(); openCyclePop(false); }
+    if (on) { noteLoad(); openCyclePop(false); apprRefresh(); }      // 알림은 결재 건에서 만든다 — 열 때 새로 받는다(2026-11-02)
     NOTE.open = !!on;
     pop.hidden = !on;
     var bb = $('bellBtn'), ub = $('uBtn');
@@ -4285,7 +4436,7 @@
     INBOX_F = 'all';
     INBOX_ALLCYC = true;   // 알림 문서가 다른 달 것이어도 결재함에 보이게(2026-10-14 기간 거르기)
     NOTE.focus = (e.kind || 'd') + ':' + e.id; NOTE.focusUntil = Date.now() + 2500;
-    if (VIEW === 'inbox') render(); else go('inbox');
+    if (VIEW === 'inbox') { render(); apprRefresh(); } else go('inbox');
     paintBell();
     noteFocusCard();
   }
@@ -4626,7 +4777,11 @@
         }).then(function (bytes) {
           job.bytes = bytes;
           return apvRender(bytes, cssW);
-        }).then(function (pages) { job.pages = pages; }, function (e) { job.err = (e && e.message) || 'fail'; })
+        }).then(function (pages) { job.pages = pages; }, function (e) {
+          job.err = (e && e.message) || 'fail';
+          // 운행일지 고정본의 상신 시각이 목록과 다르다(drv-verify fetchFrozen STALE) — 목록이 옛것이다. 결재 건을 새로 받으면 열쇠가 바뀌어 다시 그린다(2026-11-02)
+          if (e && e.stale) setTimeout(function () { apprRefresh({ max: 0 }); }, 0);
+        })
           .then(function () { job.task = null; ok(job); apvDone(key); });
       };
       if (front) APV.q.unshift(job.task); else APV.q.push(job.task);
@@ -4711,7 +4866,7 @@
       if (box) box.hidden = !open;
       var opsBox = el.querySelector('.apvops'); if (opsBox) opsBox.hidden = !open;      // 의견도 같이 펴고 접는다(2026-10-21)
       try { sessionStorage.setItem(apvSsKey(el.dataset.apvk, el.dataset.apvid), open ? '1' : '0'); } catch (er) { }
-      if (open) apvPaint(el);
+      if (open) { apvPaint(el); apprRefresh(); }        // 펼 때 결재 건도 새로 받는다 — 바뀌었으면 새 열쇠로 다시 그린다(2026-11-02)
       return;
     }
     apvBig(el, t.hasAttribute('data-apvpg') ? +t.dataset.apvpg : 0);
@@ -10550,6 +10705,7 @@ window.EduGuard = {
     // 안 돌려주면 포커스가 <body> 로 떨어져 키보드로 쓰던 자리를 잃는다.
     if (PANEL_FROM && document.contains(PANEL_FROM)) { try { PANEL_FROM.focus(); } catch (e) {} }
     PANEL_FROM = null;
+    apprFlush();                   // 창이 열린 동안 결재 건이 바뀌었으면 이제 결재함을 다시 그린다(2026-11-02)
   }
   /* ── 창을 열면 포커스를 창 안으로 ──
      창은 여러 곳에서 열린다(openPanel 을 거치지 않는 창이 더 많다). 그래서 여는 쪽을 하나하나 고치지 않고
@@ -10922,6 +11078,7 @@ window.EduGuard = {
     if (LOADED && isAll() && !LOADED_ALL) { loadAll({ soft: true }); window.scrollTo({ top: 0 }); return; }
     render();
     window.scrollTo({ top: 0 });
+    if (v === 'inbox') apprRefresh();     // 결재함에 들어올 때마다 결재 건을 새로 받는다(10초 안이면 그대로, 2026-11-02)
   }
   /** 좁혀 둔 것을 전부 푼다(사람·차량·목적·검색·점검 칩·날짜·증빙 구분·나눠 보기). */
   function clearFilters() {
@@ -10988,6 +11145,7 @@ window.EduGuard = {
     applyScope();
     if (LOADED && isAll() && !LOADED_ALL) { loadAll({ soft: true }); return; }
     render();
+    if (VIEW === 'inbox') apprRefresh();  // 뒤로·앞으로 가기로 결재함에 와도(2026-11-02)
   });
 
   // 새로고침·탭 닫기 — 쳐 놓은 것이 있으면 브라우저가 한 번 묻게 한다.
@@ -11014,7 +11172,7 @@ window.EduGuard = {
     if (NOTE.open && !e.target.closest('#noteBox')) openNotePop(false);
     if ((el = e.target.closest('[data-inboxmode]'))) {
       NAV_MODE = MODE_NAME[el.dataset.inboxmode] ? el.dataset.inboxmode : 'd'; INBOX_F = 'all';
-      if (VIEW === 'inbox') render(); else go('inbox');
+      if (VIEW === 'inbox') { render(); apprRefresh(); } else go('inbox');
       window.scrollTo({ top: 0 }); return;
     }
     if (e.target.closest('#btnKeep')) {
@@ -13015,6 +13173,7 @@ window.EduGuard = {
       // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
       fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
+      apprRefresh: apprRefresh,      // 결재 건만 새로 받기(2026-11-02) — 모듈이 낡은 목록을 알아챘을 때(loadAll 대신) 부를 수 있다
       markJust: markJust, markGone: markGone,   // 움직임 ②③(2026-10-28) — 개인경비·법인카드도 같은 줄 칠·흐림
       // 의견 모아 보기(2026-10-21) — 담당 상신 의견 → 결재자 승인 의견. 개인경비·법인카드 결재 띠도 같은 조각
       opinions: opinionsHtml,
