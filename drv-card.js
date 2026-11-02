@@ -114,12 +114,23 @@
   function itemKey(all, cyc) { return (all ? 'all' : 'me') + '|' + cyc; }
   function cmpS(a, b) { a = String(a == null ? '' : a); b = String(b == null ? '' : b); return a < b ? -1 : a > b ? 1 : 0; }
   function byDate(a, b) { return cmpS(a.appr_date, b.appr_date) || cmpS(a.appr_time, b.appr_time) || (a.id || 0) - (b.id || 0); }
+  // 쪽 서명과 함께 받기(본체 C.fetchAllSig, 2026-11-02 nav-refresh 고침 1차 N3) — 조용히 새로 받기가 넣어 둔 것과 같은 글인지 본다(JSON 으로 견주지 않는다).
+  //   memo — 넣어 둔 자료를 받을 때의 쪽 서명: 그대로면 { same: true }. 서명이 없는 본체(옛 driving-app.js)면 fetchAll 그대로(늘 넣는다)
+  function sigAll(path, signal, memo) {
+    if (C.fetchAllSig) return C.fetchAllSig(path, { signal: signal, memo: memo || null });
+    return C.fetchAll(path).then(function (rows) { return { rows: rows }; });
+  }
+  function itemsUrl(cyc, all, u) {
+    return '/rest/v1/card_items?select=*&cycle=eq.' + encodeURIComponent(cyc) +
+      (all ? '' : '&username=eq.' + encodeURIComponent(u || me())) + '&order=appr_date.asc,appr_time.asc,id.asc';
+  }
+  var APPR_URL = '/rest/v1/card_approvals?select=*&order=submitted_at.desc,id.desc';     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
   function loadItems(cyc, all, force) {
     var k = itemKey(all, cyc);
     if (!force && ITEMS[k] && (ITEMS[k].rows || ITEMS[k].wait)) return ITEMS[k].wait || Promise.resolve(ITEMS[k].rows);
-    var p = C.fetchAll('/rest/v1/card_items?select=*&cycle=eq.' + encodeURIComponent(cyc) +
-      (all ? '' : '&username=eq.' + encodeURIComponent(me())) + '&order=appr_date.asc,appr_time.asc,id.asc')
-      .then(function (rows) { ITEMS[k] = { rows: (rows || []).sort(byDate) }; if (!all) pruneFailed(cyc); return ITEMS[k].rows; })
+    // pages — 받은 글의 쪽 서명(조용히 새로 받기가 견준다, N3)
+    var p = sigAll(itemsUrl(cyc, all))
+      .then(function (x) { ITEMS[k] = { rows: (x.rows || []).sort(byDate), pages: x.pages }; if (!all) pruneFailed(cyc); return ITEMS[k].rows; })
       .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료됐어요.' : (e && e.noPerm) ? '법인카드 내역을 볼 권한이 없어요.' : '법인카드 내역을 불러오지 못했어요.' }; return null; });
     ITEMS[k] = { wait: p };
     if (!all) {
@@ -129,11 +140,17 @@
     return p;
   }
   // 늦게 출발한 받기가 이긴다 — 먼저 출발해 늦게 끝난 받기(결재함 새로 받기)가 결재 뒤 받은 새 목록을 덮지 않게(2026-11-02 검증 로봇 M3)
-  var LA_SEQ = 0;
+  //   loadAppr 는 출발할 때 표(LA_SEQ)를 올린다 · 조용히 새로 받기(loadQuiet)는 올리지 않고 출발 때의 표만 기억해 넣을 때 그대로면 올리고 넣는다(고침 1차 N1).
+  //   CAPPR_SIG — 지금 CAPPR 를 만든 받은 글의 쪽 서명(그 목록 객체와 함께 — 다른 길이 목록을 바꿨으면 무효)
+  var LA_SEQ = 0, CAPPR_SIG = null;
   function loadAppr() {
     var seq = ++LA_SEQ;
-    return C.fetchAll('/rest/v1/card_approvals?select=*&order=submitted_at.desc,id.desc')     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
-      .then(function (rows) { if (seq !== LA_SEQ) return; CAPPR = (rows || []).map(function (a) { a._kind = 'card'; return a; }); })
+    return sigAll(APPR_URL)
+      .then(function (x) {
+        if (seq !== LA_SEQ) return;
+        CAPPR = (x.rows || []).map(function (a) { a._kind = 'card'; return a; });
+        CAPPR_SIG = { pages: x.pages, obj: CAPPR };
+      })
       .catch(function () { if (!CAPPR) CAPPR = []; });
   }
   /** 칸에 쓰는 중이면 다시 그리지 않는다(커서가 튄다). */
@@ -147,10 +164,51 @@
     return HIST_ASK;
   }
   function dropItems(cyc) { delete ITEMS[itemKey(false, cyc)]; delete ITEMS[itemKey(true, cyc)]; }
-  /** 운행일지 적재(loadAll)와 같이 돈다 — 결재 건과 지금 기간의 내 카드 내역. */
-  function loadWith(soft) {
+  /** 조용히 다시 받기(2026-11-02 docs/nav-refresh/SPEC.md — 본체가 화면을 옮길 때·탭으로 돌아올 때 loadWith(true, { silent: true, signal, noAppr })).
+   *  받는 동안 ITEMS·CAPPR 를 건드리지 않는다(뼈대 없이) — 다 받으면 { busy, commit } 을 돌려주고 넣을 때는 본체가 고른다.
+   *  busy = 칸 저장이 기다리거나 보내는 중 · 파일을 올리는 중(그 칸을 저장 전 값으로 되돌리지 않게). commit() 은 그 사이 그 칸을 다시 받았거나 받는 중이면 덮지 않는다.
+   *  결재 건은 출발 뒤 다른 받기가 출발하지도(LA_SEQ) 넣지도(CAPPR 객체) 않았을 때만 넣고 그때 표를 올린다 — 그 사이 따로 받기 시작했거나 넣었으면
+   *  (결재·상신 뒤 다시 받기) 그것이 이긴다(고침 1차 N1). 그래서 「같은 글」(same)은 출발 때 목록과 같다는 뜻 그대로다.
+   *  받은 글이 넣어 둔 것과 같으면(쪽 서명) 읽지도 넣지도 않는다(N3) · 받는 중인 칸은 받지 않는다. opt.signal — 멈추기 · opt.noAppr — 결재 건은 빼고(N8).
+   *  ※ 칸 저장은 줄 객체를 그 자리에서 고친다(it[f]) — 저장이 되면 서버 글이 달라져 다음 받기에 새로 넣고, 안 되면 되돌려 받은 글과 같다. */
+  function loadQuiet(S, opt) {
+    opt = opt || {};
+    var cyc = S.CYCKEY, u = me(), all = isAdmin() && ADMIN_C.indexOf(S.VIEW) >= 0, a0 = LA_SEQ, sg = opt.signal;
+    var km = itemKey(false, cyc), ka = itemKey(true, cyc), xm = ITEMS[km], xa = ITEMS[ka];
+    var ap0 = CAPPR, am = CAPPR_SIG && CAPPR_SIG.obj === CAPPR ? CAPPR_SIG.pages : null;
+    var q = function (a, x0) { return x0 && x0.wait ? null : sigAll(itemsUrl(cyc, a, u), sg, x0 && x0.rows ? x0.pages : null); };
+    return Promise.all([
+      opt.noAppr ? null : sigAll(APPR_URL, sg, am),
+      q(false, xm), all ? q(true, xa) : null,
+      rest('/rest/v1/rpc/card_cycle_locked', { method: 'POST', body: JSON.stringify({ p_username: u, p_cycle: cyc }), signal: sg }).catch(function () { return null; })
+    ]).then(function (o) {
+      var put = function (k, x0, x) {
+        if (!x || x.same || ITEMS[k] !== x0 || (x0 && x0.wait)) return false;   // 같은 글 · 그 사이 다시 받았거나 받는 중(그것이 더 새것)
+        ITEMS[k] = { rows: (x.rows || []).slice().sort(byDate), pages: x.pages }; return true;
+      };
+      return {
+        busy: function () { return pending() || C_SENDING; },
+        commit: function () {
+          if (me() !== u || C.state().CYCKEY !== cyc || pending() || C_SENDING) return false;
+          var ch = false;
+          if (o[0] && LA_SEQ === a0 && CAPPR === ap0) {                        // 출발 뒤 다른 받기가 출발하지도 넣지도 않았다 — 넣고 표를 올린다(M3 · N1)
+            LA_SEQ++;
+            if (!o[0].same) { CAPPR = (o[0].rows || []).map(function (a) { a._kind = 'card'; return a; }); ch = true; }
+            CAPPR_SIG = { pages: o[0].pages, obj: CAPPR };
+          }
+          if (put(km, xm, o[1])) { ch = true; pruneFailed(cyc); }
+          if (all && put(ka, xa, o[2])) ch = true;
+          if (o[3] === true || o[3] === false) CLOCK[u + '|' + cyc] = o[3];
+          return ch;
+        }
+      };
+    });
+  }
+  /** 운행일지 적재(loadAll)와 같이 돈다 — 결재 건과 지금 기간의 내 카드 내역. opt.silent = 조용히 다시 받기(loadQuiet — opt 를 그대로 넘긴다). */
+  function loadWith(soft, opt) {
     var S = C.state();
     if (!S.ME) return null;
+    if (opt && opt.silent) return loadQuiet(S, opt);
     if (!soft) { ITEMS = {}; HIST = null; }
     var ps = [loadAppr(), loadItems(S.CYCKEY, false, !soft)];
     if (isAdmin() && ADMIN_C.indexOf(S.VIEW) >= 0) ps.push(loadItems(S.CYCKEY, true, !soft));

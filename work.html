@@ -878,7 +878,7 @@ footer .wrap{font-size:13px}
       var sks = []; for (var i = 0; i < sessionStorage.length; i++) sks.push(sessionStorage.key(i));
       sks.forEach(function (sk) { if (sk && (sk.indexOf('apv.') === 0 || sk.indexOf('drv.evsub.') === 0)) sessionStorage.removeItem(sk); });
     } catch (e) { }
-    LIVE = null; STEPQ = null; document.body.removeAttribute('data-live');   // 로그인 직후 읽은 결재 상태(V3 B1)도
+    LIVE = null; STEPQ = null; LIVE_Q = null; document.body.removeAttribute('data-live');   // 로그인 직후 읽은 결재 상태(V3 B1)도 · 조용히 읽는 중인 것도(2026-11-02)
     ['mineD', 'mineX', 'mineC'].forEach(function (id) { var e = $(id); if (e) { e.hidden = true; e.textContent = ''; } });
     // 오늘 할 일·마감 일정·단계 막대(2026-10-20)도 비운다 — 다음 사람에게 남기지 않는다
     ['todoList', 'schList', 'todoN'].forEach(function (id) { var e = $(id); if (e) e.textContent = ''; });
@@ -909,13 +909,22 @@ footer .wrap{font-size:13px}
        ⑤ 이번 기간 자료가 있나(limit=1, 지난 기간과 같은 표·조건)를 읽는다. 지난 기간은 반려·회수일 때도 자료를 센다.
        표시를 못 읽거나(표가 아직 없는 서버 포함) 자료를 못 읽으면 「표시 없음」과 같다 — data-live 는 결재 상태 읽기만 본다. */
   var LIVE = null, STEPQ = null;
+  // 탭으로 돌아올 때 조용히 다시 읽기(2026-11-02 docs/nav-refresh/SPEC.md §7) — LIVE_AT 마지막으로 읽기 시작한 시각 · LIVE_Q 조용히 읽는 중인 것(다 읽기 전에는 LIVE 로 그린다)
+  var LIVE_AT = 0, LIVE_Q = null;
   var APPR_T = { d: 'driving_approvals', x: 'expense_approvals', c: 'card_approvals' };
-  function liveRead(m) {
+  /** quiet — 탭으로 돌아와 다시 읽기(liveWake): 「읽는 중」 화면으로 바꾸지 않고 읽어 둔 것(LIVE)으로 그리다가, 다 읽으면 바뀐 것이 있을 때만 다시 그린다.
+   *  읽은 것은 새것, 못 읽은 것은 읽어 둔 것(갈래마다 · 같은 기간일 때만, 콘솔 경고만 — 2026-11-02 고침 1차 N4: 예전엔 하나만 못 읽어도 통째로 버려
+   *  「내역 없음」 표가 없는 동안 결재할 건수가 한 번도 바뀌지 않았다). 표시(approval_none)를 못 읽으면 읽어 둔 표시 그대로(같은 기간 열쇠들일 때, 재검토 R1),
+   *  읽어 둔 표시가 없으면(첫 읽기도 못 읽음 · 표가 없는 서버) 첫 읽기처럼 표시 없음(SPEC §9). */
+  function liveRead(m, quiet) {
     var at = ss(K_AT), who = m && m.username;
     if (!at || !who) return;
     // has 이번 기간 자료 있음 · pv 지난 기간(남길지는 다 읽은 뒤 liveNone) · nm 표시('driving|2026-11') · none 효력 · key 읽은 이번 기간 열쇠
-    var now = Date.now(), R = deadlines(now), L = LIVE = { u: who, done: false, bad: {}, st: {}, ro: {}, inbox: {}, prev: {}, has: {}, pv: {}, nm: {}, none: {}, key: {} };
-    document.body.removeAttribute('data-live');
+    //   hasMiss 이번 기간 자료를 못 읽은 갈래(조용히 읽기는 읽어 둔 값을 쓴다)
+    var now = Date.now(), R = deadlines(now), L = { u: who, done: false, bad: {}, st: {}, ro: {}, inbox: {}, prev: {}, has: {}, pv: {}, nm: {}, none: {}, key: {}, hasMiss: {} };
+    LIVE_AT = now;
+    if (quiet) LIVE_Q = L;
+    else { LIVE = L; LIVE_Q = null; document.body.removeAttribute('data-live'); }
     var hdr = { apikey: KEY, Authorization: 'Bearer ' + at }, wq = encodeURIComponent(who);
     var get = function (path) {
       return fetch(SB + '/rest/v1/' + path, { headers: hdr }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
@@ -934,7 +943,7 @@ footer .wrap{font-size:13px}
       keys.forEach(function (y) { if (allKeys.indexOf(y) < 0) allKeys.push(y); });
       L.key[k] = x.key;
       // 이번 기간 자료 — 결재 상태와 나란히 읽는다(기다리는 시간이 늘지 않게). 못 읽으면 모름(「내역 없음」 단추·효력 없음)
-      if (P) jobs.push(get(dataQ(k, P)).then(function (r2) { L.has[k] = !!(r2 && r2.length); }, function () { }));
+      if (P) jobs.push(get(dataQ(k, P)).then(function (r2) { L.has[k] = !!(r2 && r2.length); }, function () { L.hasMiss[k] = 1; }));
       // steps 도 받는다 — 관리자가 정정으로 다시 연 건(상태는 rejected, 칸에 reopened_by)을 「반려됨」이 아니라 「정정 중」으로(2026-10-21 매뉴얼 로봇,
       //   운행일지 화면 apprStatusText·reopenInfo 와 같은 판정)
       jobs.push(get(t + '?select=cycle,status,submitted_at,steps&username=eq.' + wq + '&cycle=in.(' + keys.map(encodeURIComponent).join(',') + ')&order=submitted_at.desc')
@@ -949,7 +958,7 @@ footer .wrap{font-size:13px}
           // 상신 전·반려·회수 — 그 기간 자료를 센다. 상신 전은 자료가 있을 때만 남기고(운행일지 화면 prevPending 과 같은 생각),
           //   반려·회수는 자료와 상관없이 남기되 0건이면 「내역 없음」 단추를 붙인다(2026-11-02). 남길지는 표시까지 다 읽은 뒤(liveNone)
           var p = L.pv[k] = { key: pv.key, st: ps, hi: pv.hi, ro: reopened(rowOf(pv.key)) };
-          return get(dataQ(k, pv)).then(function (r2) { p.has = !!(r2 && r2.length); }, function () { });
+          return get(dataQ(k, pv)).then(function (r2) { p.has = !!(r2 && r2.length); }, function () { p.miss = 1; });
         }).catch(function () { L.bad[k] = 1; delete L.st[k]; delete L.ro[k]; delete L.pv[k]; }));
       // 지금 내 차례인 결재 건(결재선의 지금 칸 = 나) — 운행일지 결재함 inbox() 와 같은 판정
       jobs.push(get(t + '?select=cur_seq,steps&status=eq.submitted').then(function (rows) {
@@ -958,18 +967,60 @@ footer .wrap{font-size:13px}
     });
     // ④ 내 「내역 없음」 표시 — 이번·지난 기간 열쇠를 한 번에(RLS 는 본인 것, 관리자는 전부를 주므로 내 아이디로 거른다).
     //   못 읽으면(표가 없는 옛 서버·되돌린 뒤·일시 오류) 표시 없음과 같고 「내역 없음」 단추도 없다 — 예전 화면 그대로(SPEC §9, 2026-11-02 검토 L5).
-    //   L.bad 에는 넣지 않는다(data-live 는 결재 상태 읽기만 본다). nmRead = 표시를 읽었다
+    //   L.bad 에는 넣지 않는다(data-live 는 결재 상태 읽기만 본다). nmRead = 표시를 읽었다 · nmKeys = 읽은 기간 열쇠들(탭 복귀 다시 읽기가 읽어 둔 표시를 이어 쓸 때 견준다)
+    //   탭 복귀 다시 읽기에서 잠깐 못 읽으면 읽어 둔 표시를 그대로 쓴다(아래 합치기 — 2026-11-02 재검토 R1)
+    L.nmKeys = allKeys.join(',');
     jobs.push(get('approval_none?select=kind,cycle&username=eq.' + wq + '&cycle=in.(' + allKeys.map(encodeURIComponent).join(',') + ')')
-      .then(function (rows) { L.nmRead = true; (rows || []).forEach(function (r) { if (r && r.kind && r.cycle) L.nm[r.kind + '|' + r.cycle] = 1; }); }, function () { }));
+      .then(function (rows) { L.nmRead = true; (rows || []).forEach(function (r) { if (r && r.kind && r.cycle) L.nm[r.kind + '|' + r.cycle] = 1; }); },
+        function () { if (quiet) console.warn('[새로 읽기] 내역 없음 표시를 읽지 못했어요'); }));
     Promise.all(jobs).then(function () {
-      if (LIVE !== L) return;
+      if (quiet ? LIVE_Q !== L : LIVE !== L) return;
+      var old = LIVE;
+      if (quiet) {
+        LIVE_Q = null;
+        if (!old || old.u !== who) return;                // 그 사이 나갔다 들어왔다 — 들어올 때 읽은 것이 그린다
+        // 갈래마다 못 읽은 것(결재 상태·결재할 건수·자료 있나)은 읽어 둔 것으로 — 같은 기간일 때만(기간이 바뀌었으면 모름 그대로, 「들어가서 확인」).
+        //   일시 오류로 상태 글이 「들어가서 확인」으로 바뀌지 않게 · 나머지 읽은 것(다른 갈래·결재할 건수)은 그대로 넣는다(N4)
+        var held = [];
+        Object.keys(L.bad).forEach(function (k) {
+          if (old.key[k] !== L.key[k]) return;
+          var ok = true;
+          if (!(k in L.st)) { if (k in old.st) { L.st[k] = old.st[k]; L.ro[k] = old.ro[k]; if (old.pv[k]) L.pv[k] = old.pv[k]; } else ok = false; }
+          if (!(k in L.inbox)) { if (k in old.inbox) L.inbox[k] = old.inbox[k]; else ok = false; }
+          if (ok) { delete L.bad[k]; held.push(k); }
+        });
+        Object.keys(L.hasMiss).forEach(function (k) { if (old.key[k] === L.key[k] && old.has[k] !== undefined) { L.has[k] = old.has[k]; held.push(k); } });
+        Object.keys(L.pv).forEach(function (k) {
+          var p = L.pv[k], q = old.pv[k];
+          if (p.miss && q && q.key === p.key && q.has !== undefined) { p.has = q.has; delete p.miss; held.push(k); }
+        });
+        // 「내역 없음」 표시를 잠깐 못 읽었으면(일시 오류) 읽어 둔 표시 그대로 — 같은 기간 열쇠들을 읽었을 때만(2026-11-02 재검토 R1 — 그 한 번
+        //   표시가 없는 것으로 그려 마감 D-day·할 일 줄이 다시 보였다). 읽어 둔 표시가 없으면(첫 읽기도 못 읽음 · 표가 없는 서버) 표시 없음 그대로
+        if (!L.nmRead && old.nmRead && old.nmKeys === L.nmKeys) { L.nm = old.nm; L.nmRead = true; held.push('none'); }
+        if (held.length) console.warn('[새로 읽기] 일부를 읽지 못해 그 갈래는 읽어 둔 것 그대로', held.join(','));
+      }
       liveNone(L, R);
       L.done = true;
+      if (quiet) {
+        LIVE = L;
+        if (liveSig(L) === liveSig(old)) return;           // 바뀐 것 없음 — 다시 그리지 않는다(깜빡임 없음)
+      }
       var m2 = me();
       if (!m2 || m2.username !== who || !document.body.classList.contains('in')) return;
       paintMine(m2);
       document.body.setAttribute('data-live', Object.keys(L.bad).length ? 'part' : 'ok');
     });
+  }
+  /** 읽은 것의 지문 — 조용히 다시 읽은 것이 앞과 같으면 다시 그리지 않는다. */
+  function liveSig(L) { return JSON.stringify([L.st, L.ro, L.inbox, L.prev, L.has, L.nm, L.nmRead, L.none, L.key]); }
+  /** 탭으로 돌아오면(visibilitychange · 앞뒤 이동 캐시 pageshow) — 마지막으로 읽은 지 30초가 넘었으면 조용히 다시 읽는다(2026-11-02).
+   *  읽는 중·로그인 전·창(로그인·「내역 없음」 확인 등)이 열려 있으면 하지 않는다. 시험은 window.__NAV_REFRESH_MS 로 30초를 줄인다. */
+  function liveWake() {
+    var m = me(), v = window.__NAV_REFRESH_MS, ms = typeof v === 'number' && isFinite(v) && v >= 0 ? v : 30000;
+    if (document.hidden || !m || !document.body.classList.contains('in') || LIVE_Q) return;
+    if (!LIVE || LIVE.u !== m.username || !LIVE.done) return;      // 읽은 적 없거나 읽는 중 — 그 읽기가 끝나면 그린다
+    if (Date.now() - LIVE_AT < ms || document.querySelector('.veil.open')) return;
+    liveRead(m, true);
   }
   /** 다 읽은 뒤(2026-11-02) — 「내역 없음」 효력과 지난 기간 줄. 효력 = 표시 && 결재 중·완료가 아님 && 그 기간 자료 0건(SPEC §1 —
    *  자료를 못 읽었으면 효력 없음, 자료가 생기면 표시는 그대로 두고 무시한다). 지난 기간이 효력이면 「오늘 할 일」 맨 위에 남기지 않는다. */
@@ -1486,8 +1537,9 @@ footer .wrap{font-size:13px}
     $('dlNewsT').textContent = newsOn ? NEWS : ''; $('dlNews').hidden = !newsOn;
   }
   renderDeadlines();
-  // 탭을 켜 둔 채 날이 바뀌어도 돌아오면 다시 센다
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) renderDeadlines(); });
+  // 탭을 켜 둔 채 날이 바뀌어도 돌아오면 다시 센다 — 내 결재 상태·결재할 건수·「내역 없음」 표시도 읽은 지 30초가 넘었으면 조용히 다시 읽는다(2026-11-02 liveWake)
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { renderDeadlines(); liveWake(); } });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) { renderDeadlines(); liveWake(); } });
   boot();
 })();
 </script>

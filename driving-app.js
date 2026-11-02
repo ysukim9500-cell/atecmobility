@@ -132,6 +132,21 @@
   }
 
   /* ══════════════════ 통신 ══════════════════ */
+  /* 이 탭의 쓰기 세기(2026-11-02 docs/nav-refresh/SPEC.md) — 화면을 옮길 때 조용히 새로 받기(navRefresh)는 받는 사이 이 탭에서 쓰기가
+     있었으면(보내는 중이거나 끝남) 받아 온 것을 넣지 않는다: 쓰기 전에 읽은 목록이 늦게 와서 방금 저장한 칸(법인카드 구분 등)·확정한 통행료를
+     되돌리지 않게. WRITE_N = 보내는 중인 쓰기 수 · WRITE_GEN = 쓰기를 보낼 때·끝날 때마다 +1.
+     읽기만 하는 POST(잠금 묻기·출력 기록 요약·검증 계산·길찾기·내 계정 묻기)는 쓰기로 치지 않는다 — 모르는 POST 는 쓰기로 친다(덮는 것보다 한 번 더 받는 편이 안전). */
+  var WRITE_N = 0, WRITE_GEN = 0;
+  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
+  function isWrite(path, opt) {
+    var m = String((opt && opt.method) || 'GET').toUpperCase(), p = String(path || '');
+    if (m === 'GET' || m === 'HEAD' || READ_POST.test(p)) return false;
+    return !(/^\/functions\/v1\/driving-account(\?|$)/.test(p) && /"action"\s*:\s*"(whoami|signups)"/.test(String((opt && opt.body) || '')));
+  }
+  function writeDone() {
+    WRITE_N = Math.max(0, WRITE_N - 1); WRITE_GEN++;
+    if (!WRITE_N && (NAV_PEND || NAV_RETRY)) setTimeout(navKick, 0);   // 맡아 둔 받기를 버리고 다시 받을 때(쓰기가 다 끝난 뒤)
+  }
   function api(path, opt) {
     opt = opt || {};
     var h = opt.headers || {};
@@ -147,7 +162,11 @@
     h.Authorization = 'Bearer ' + at;
     if (opt.body && !h['Content-Type']) h['Content-Type'] = 'application/json';
     opt.headers = h;
-    return fetch(SB + path, opt);
+    var w = isWrite(path, opt), p;
+    if (w) { WRITE_N++; WRITE_GEN++; }
+    try { p = fetch(SB + path, opt); } catch (e) { if (w) writeDone(); throw e; }
+    if (w) p.then(writeDone, writeDone);
+    return p;
   }
   /** 401 이면 토큰을 한 번 갱신하고 다시 시도한다.
    *  ★ 403 은 다시 보내지 않는다(2026-09-29 검증로봇). 만료된 토큰은 PostgREST·함수 게이트웨이
@@ -201,6 +220,51 @@
         });
     }
     return page(0);
+  }
+  /** 받은 글 해시(FNV-1a 32비트) — 표가 바뀌었는지 글로 본다(2026-11-02 nav-refresh N3: 예전엔 넣기 전·뒤 자료 전부를 JSON 으로 두 번 만들어 견줬다). */
+  function fnvText(s) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return h >>> 0;
+  }
+  function abortErr() { var e = new Error('aborted'); e.name = 'AbortError'; return e; }
+  /** fetchAll 과 같은 읽기(같은 쪽 나누기·같은 오류) + 쪽마다 받은 글의 서명 { n 행 수, len 글 길이, h 해시 } (2026-11-02 N3).
+   *  opt.signal — 멈추기(AbortController, 더 새 받기·적재가 출발하면) · opt.memo — 지금 화면에 넣어 둔 자료를 받을 때의 쪽 서명:
+   *  쪽 글이 그대로면 그 쪽은 읽지(JSON.parse) 않고, 모든 쪽이 그대로이고 쪽 수도 같으면 { same: true, pages } — 넣을 것도 다시 그릴 것도 없다.
+   *  하나라도 다르면 { rows, pages }(그대로였던 쪽도 그때 읽는다). memo 가 없으면 늘 { rows, pages }. */
+  function fetchAllSig(path, opt) {
+    opt = opt || {};
+    var sg = opt.signal, memo = opt.memo || null, parts = [], pages = [];
+    function done() {
+      if (memo && memo.length === pages.length && parts.every(function (x) { return x.t != null; })) return { same: true, pages: pages };
+      var rows = [];
+      parts.forEach(function (x) { var a = x.a || JSON.parse(x.t); if (Array.isArray(a)) rows = rows.concat(a); });
+      return { rows: rows, pages: pages };
+    }
+    function page(off, i) {
+      if (sg && sg.aborted) return Promise.reject(abortErr());
+      return apiRetry(path + (path.indexOf('?') < 0 ? '?' : '&') + 'offset=' + off + '&limit=1000', sg ? { signal: sg } : undefined)
+        .then(function (r) {
+          if (r.status === 401) throw new AuthGone();
+          if (r.status === 403) throw new NoPerm();
+          if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + path.split('?')[0]);
+          return r.text();
+        })
+        .then(function (t) {
+          if (sg && sg.aborted) throw abortErr();
+          var h = fnvText(t), m = memo && memo[i], n;
+          if (m && m.h === h && m.len === t.length) { n = m.n; parts.push({ t: t }); }     // 지난번과 같은 쪽 — 행 수는 지난번 것
+          else {
+            var a = JSON.parse(t);
+            if (!Array.isArray(a)) { parts.push({ a: [] }); pages.push({ n: 0, len: t.length, h: h }); return done(); }   // fetchAll 처럼 거기서 멈춤
+            n = a.length; parts.push({ a: a });
+          }
+          pages.push({ n: n, len: t.length, h: h });
+          if (n < 1000 || off > 40000) return done();
+          return page(off + 1000, i + 1);
+        });
+    }
+    return page(0, 0);
   }
 
   /* ══════════════════ 마감주기 ══════════════════
@@ -369,7 +433,9 @@
   var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [],
     // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
     // 2026-10-09 법인카드 — 기간 규칙이 둘이 되어 목록으로(개인경비 20~19일 'x' · 법인카드 1일~말일 'c'). 규칙마다 mode.
-    kinds: {}, periods: [], load: [], orgUsers: null };
+    // loadMode — load 마다 그 모듈의 갈래('x'·'c', 2026-11-02 조용히 새로 받기는 지금 갈래 모듈 것만 받는다)
+    // loadAdmin — load 마다 그 모듈의 관리 화면(그 화면에서는 전 직원 줄까지 받는다 — 조용히 새로 받기의 범위 열쇠, 고침 1차 N3)
+    kinds: {}, periods: [], load: [], loadMode: [], loadAdmin: [], orgUsers: null };
   /** 그 화면의 기간 규칙(확장 모듈) — 없으면 null(운행일지 21~20일). */
   function periodOf(v) {
     for (var i = 0; i < EXT.periods.length; i++) if (EXT.periods[i].views.indexOf(v) >= 0) return EXT.periods[i];
@@ -820,14 +886,148 @@
      · 저장·올리기 뒤에 부르는 loadAll() 은 늘 전부 새로 받는다(캐시를 버린다).                */
   var TRIP_CACHE = {};                   // 'scope|lo|hi' → { rows, at }
   var STATIC_AT = 0, CACHE_MS = 180000;
+  // LOAD_APPR_AT — 적재가 13조각을 받은 때(그 적재는 개인경비·법인카드 결재 건도 같이 받는다). 결재함 받기(apprRefresh)의 「방금 받았음」은 이것으로 본다 —
+  //   조용히 새로 받기도 STATIC_AT 을 올리지만 지금 갈래 모듈 것만 받으므로 그것으로 결재함 받기를 건너뛰면 다른 갈래 결재 건이 낡는다(2026-11-02 고침 1차 N3)
+  var LOAD_APPR_AT = 0;
   var LOADED_ALL = false;                // 지금 운행 목록이 전 직원 것인가(관리자가 여러 주기를 볼 때는 본인 것만 받는다)
   var ONLOAD = [];   // loadAll 이 다 받아 그린 뒤 한 번 부를 것(움직임 ② 등)
+  var TRIP_COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
+    'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
+    // toll_hipass: 하이패스 이용내역 PDF 로 맞춘 금액(금액 규칙 v3 하이패스 몫 — 운행 금액을 고쳐도 남는다, 2026-10-17)
+    'toll_cost,toll_status,toll_source,toll_revision,toll_hipass,parking_cost,is_manual,' +
+    'overspeed_count,rapid_accel_count,rapid_decel_count,max_speed_kmh,' +
+    // ★ 이 셋이 빠지면 점수가 실제보다 높게 나온다(앱 SafetyScore 와 갈린다).
+    'school_zone_overspeed_count,sustained_overspeed_count,harsh_corner_count';
+  /** 운행을 전 직원 것으로 받는가 — 관리자가 개인 화면에서 여러 주기를 보면 본인 것만 받는다. 전 직원 1년치는 수만 건이다. */
+  function tripsAll() { return !(ME && ME.is_admin && isMulti() && !isAll()); }
+  /** 조회 범위 r 의 운행 읽기 주소 — 적재(loadAll)와 조용히 새로 받기(navRefresh)가 같은 것을 받는다. */
+  function tripsUrl(wantAll, r) {
+    return '/rest/v1/trips?select=' + TRIP_COLS + '&deleted_at=is.null' +
+      (wantAll ? '' : '&username=eq.' + encodeURIComponent(myName())) +
+      // id 를 둘째 정렬 키로 — 출발시각이 같은 운행(수기 기본 09:00)이 1000행 경계에 걸리면
+      // 한 건이 빠지거나 두 번 들어왔다. 서버(approval-act)도 같은 이유로 id 를 넣어 두었다.
+      '&start_time=gte.' + r.lo + '&start_time=lt.' + r.hi + '&order=start_time.desc,id.desc';
+  }
+  /* 기간과 무관한 것들(사람·차량·영수증·교육 셋·단가·설정·결재·사람 목록·조직도·결재선 지정·「내역 없음」 표시) — 13조각, putStatic 이 같은 차례로 넣는다.
+     ★ 1000행씩 나눠 받는 읽기는 모두 겹치지 않는 열쇠로 정렬한다(2026-10-20 AU2 #16) — 정렬이 없거나 같은 값이 있으면
+       페이지 경계에서 한 줄이 빠지거나 두 번 들어올 수 있다(지금은 1000행 미만이라 안 났다).
+     null = 따로 받는 조각(7 app_config · 11 결재선 지정).
+     조각마다 넣은 때의 받은 글 서명(STATIC_MEMO — fetchAllSig 쪽 서명 · 설정은 글 · 결재선 지정은 JSON)을 그 상태 객체와 함께 둔다(2026-11-02 N3) —
+     조용히 새로 받기는 그 객체가 지금도 화면의 것일 때만 견준다(다른 길 — 결재함 받기·교육 다시 받기·조직도 고치기 — 이 바꿨으면 서명은 무효). */
+  var STATIC_PATHS = [
+    '/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status,uses_driving&order=username.asc',
+    '/rest/v1/app_vehicles?select=*&order=id.asc',
+    '/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path,trip_id&order=id.asc',
+    '/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc',
+    '/rest/v1/edu_progress?select=*&order=username.asc,video_id.asc',
+    '/rest/v1/edu_targets?select=*&order=month.asc,username.asc',
+    '/rest/v1/fuel_rates?select=year,quarter,region,price&order=year.asc,quarter.asc,region.asc',
+    // 분기 경계 + 기간 설정(cycle_rules, 2026-10-20) — select=*: 칸 하나가 없는 서버여도 분기 경계까지 못 받는 일이 없게
+    null,
+    // RLS 가 걸러 준다 — 본인 것 · 내가 결재자인 것 · 관리자는 전부.
+    '/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc',
+    // ※ 부서별 결재선(driving_approval_lines)은 더 읽지 않는다 — 결재선은 상신자가 직접 고른다(2026-10-02).
+    // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
+    '/rest/v1/v_driving_people?select=*&order=name.asc,username.asc',
+    // 조직도(사람 명단 — 관리 화면). 내려간 사람(active=false)은 받지 않는다.
+    '/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc',
+    // 관리자가 지정한 결재선(2026-10-14). 표가 아직 없거나 못 받아도 화면은 멈추지 않는다(자동 결재선만 쓴다).
+    null,
+    // 「이번 기간 내역 없음」 표시(2026-11-02) — 못 받거나 표가 없으면(404) 빈 목록 = 표시 없음. 적재를 막지 않는다(SPEC §4·§9)
+    '/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc'
+  ];
+  var APPR_PATH = STATIC_PATHS[8], NONE_PATH = STATIC_PATHS[12];
+  var STATIC_OBJ = [function () { return USERS; }, function () { return VEHICLES; }, function () { return ALL_EVID; }, function () { return EDUV; },
+    function () { return EDUP; }, function () { return EDUT; }, function () { return RATES; }, function () { return QBOUNDS; }, function () { return APPR; },
+    function () { return PEOPLE; }, function () { return ORG; }, function () { return LINE_OV; }, function () { return NONE; }];
+  var STATIC_MEMO = [];
+  function staticMemo(i) { var m = STATIC_MEMO[i]; return m && m.obj === STATIC_OBJ[i]() ? m : null; }
+  /** 13조각을 받는 약속 — 조각마다 { v: 값, pages | text | json: 서명 } · 조용히 받기(quiet)에서 넣어 둔 것과 같으면 { same: true } · 건너뜀(o.noAppr — 같은 때
+   *  결재함 받기(apprRefresh)가 결재 건·표시를 받는 중, N8) { skip: true }. 표시를 못 받으면 quiet 는 v null(받아 둔 표시 그대로), 적재는 빈 목록(표시 없음, SPEC §9). */
+  function staticReqs(quiet, o) {
+    o = o || {};
+    var sg = o.signal;
+    return STATIC_PATHS.map(function (path, i) {
+      if (o.noAppr && (i === 8 || i === 12)) return Promise.resolve({ skip: true });
+      var m = quiet ? staticMemo(i) : null;
+      if (i === 7) {
+        return apiRetry('/rest/v1/app_config?id=eq.1&select=*', sg ? { signal: sg } : undefined)
+          .then(function (x) { return x.ok ? x.text() : null; })
+          .then(function (t) {
+            if (t == null) return { v: [] };                    // 못 읽음 — 예전처럼 분기 경계·기간 설정을 건드리지 않는다
+            if (m && m.text === t) return { same: true, text: t };
+            var a = []; try { a = JSON.parse(t); } catch (e) { }
+            return { v: Array.isArray(a) ? a : [], text: t };
+          });
+      }
+      if (i === 11) {
+        return fetchLineOv(sg).then(function (rows) {
+          var j = rows === undefined ? null : JSON.stringify(rows);
+          return rows !== undefined && m && m.json === j ? { same: true, json: j } : { v: rows, json: j };
+        });
+      }
+      var p = fetchAllSig(path, { signal: sg, memo: m ? m.pages : null })
+        .then(function (x) { return x.same ? { same: true, pages: x.pages } : { v: x.rows, pages: x.pages }; });
+      return i === 12 ? p.catch(function (e) { if (e && e.name === 'AbortError') throw e; return { v: quiet ? null : [] }; }) : p;
+    });
+  }
+  /** staticReqs 로 받은 것을 넣는다 — 적재와 조용히 새로 받기(navCommit)가 같이 쓴다. { rulesNew: 서버 기간 설정이 바뀌었나, changed: 넣은 조각이 있나 }.
+   *  same(넣어 둔 것과 같음)·skip 조각은 그대로 둔다(상태 객체도 그대로 — 다시 그릴 일이 없다).
+   *  g0 — 받기를 출발할 때의 APPR_GEN(null 이면 늘 넣는다 = 적재): 그 사이 다른 길로 더 새 결재 목록이 들어왔으면 결재 건은 덮지 않는다.
+   *  ng0 — 출발 때의 NONE_GEN: 그 사이 이 탭에서 표시하기·되살리기를 했거나 다른 받기가 더 새 표시 목록을 넣었으면 덮지 않는다(2026-11-02 검토 L5 · N6).
+   *  결재 건·표시는 넣을 때(같아도) 세대를 올린다 — 먼저 출발해 늦게 온 옛 목록이 덮지 못하게. at — 받은 시각(없으면 지금).
+   *  objs0 — 조용히 새로 받기가 출발할 때의 조각별 상태 객체(STATIC_OBJ): 그 사이 다른 길(교육 다시 받기·조직도 고치기 등)이 그 조각을 바꿨으면
+   *  그 조각은 넣지 않는다(그쪽이 더 새것 · 「같은 글」은 출발 때 객체와 같다는 뜻이라). */
+  function putStatic(out, g0, ng0, at, objs0) {
+    var ch = false, rulesNew = false;
+    var mv = objs0 ? STATIC_OBJ.map(function (f, i) { return f() !== objs0[i]; }) : [];   // 넣기 전에 본다(넣으면 객체가 바뀐다)
+    var moved = function (i) { return !!mv[i]; };
+    var take = function (i) { var x = out[i]; return x && !x.same && !x.skip && !moved(i) ? x : null; };
+    var keep = function (i) { var x = out[i]; if (x && !x.skip && !moved(i)) STATIC_MEMO[i] = { pages: x.pages, text: x.text, json: x.json, obj: STATIC_OBJ[i]() }; };
+    var x;
+    // 업무 결재 포털 가입 대기·거절 계정은 직원으로 치지 않는다(가입 신청은 「권한 관리」에 따로 나온다).
+    if ((x = take(0))) { USERS = {}; (x.v || []).forEach(function (u) { if (!u.signup_status || u.signup_status === 'active') USERS[u.username] = u; }); ch = true; }
+    keep(0);
+    if ((x = take(1))) { VEHICLES = x.v || []; ch = true; } keep(1);
+    if ((x = take(2))) { ALL_EVID = x.v || []; ch = true; } keep(2);
+    if ((x = take(3))) { EDUV = x.v || []; ch = true; } keep(3);
+    if ((x = take(4))) { EDUP = x.v || []; ch = true; } keep(4);
+    if ((x = take(5))) { EDUT = x.v || []; ch = true; } keep(5);
+    if ((x = take(6))) { RATES = {}; (x.v || []).forEach(function (y) { RATES[y.year + '-' + y.quarter + '-' + y.region] = Number(y.price); }); ch = true; }
+    keep(6);
+    if ((x = take(7))) {
+      var cfg = (x.v || [])[0];
+      if (cfg) { setQuarterBounds(cfg.quarter_bounds); rulesNew = !!CR.set(cfg.cycle_rules); ch = true; }   // 서버 기간 설정이 바뀌었나(2026-10-20 연말 마감)
+    }
+    if (out[7] && out[7].text != null) keep(7);
+    x = out[8];
+    if (x && !x.skip && (g0 == null || APPR_GEN === g0)) {
+      if (!x.same) { APPR = x.v || []; ch = true; }
+      APPR_GEN++; keep(8);
+    }
+    if ((x = take(9))) { PEOPLE = {}; (x.v || []).forEach(function (p) { PEOPLE[p.username] = p; }); ch = true; }
+    keep(9);
+    if ((x = take(10))) { ORG = x.v || []; ch = true; } keep(10);
+    if ((x = take(11))) { var lov0 = LINE_OV; setLineOv(x.v); if (LINE_OV !== lov0) ch = true; }
+    if (out[11] && out[11].json != null) keep(11);
+    x = out[12];
+    if (x && !x.skip && NONE_GEN === ng0 && (x.same || x.v)) {            // v null = 못 받음(조용히 새로 받기) — 받아 둔 표시 그대로
+      if (!x.same) { setNone(x.v); ch = true; }
+      NONE_GEN++; keep(12);
+    }
+    STATIC_AT = at || Date.now();
+    return { rulesNew: rulesNew, changed: ch };
+  }
   function loadAll(opt) {
     // ★ 예전에는 로딩 중이면 그냥 돌아갔다. 주기를 빠르게 두 번 바꾸면 두 번째
     //   요청이 버려져 옛 주기 데이터가 새 주기 이름으로 그려졌다. 이제는 표를
     //   달아 두고, 늦게 도착한 응답을 버린다.
     var soft = !!(opt && opt.soft);
     var seq = ++LOAD_SEQ, ng0 = NONE_GEN;     // ng0 — 받는 사이 표시하기·되살리기를 했으면 받아 온 표시 목록으로 덮지 않는다(2026-11-02 검토 L5)
+    // 조용히 새로 받기(navRefresh, 2026-11-02) — 돌던 것은 멈추고(N3) 맡아 둔 것은 버린다(이 적재가 대신한다).
+    //   다 받으면 그 범위의 「받은 시각」을 남긴다 — soft 는 운행·사람·결재 목록 중 가장 오래된 조각의 받은 시각(받은 지 3분 안의 것을 그대로 쓰기 때문, N8)
+    var nk = navCoreKey(), t0 = Date.now(), st0 = STATIC_AT;
+    navAbort(); NAV_SEQ++; NAV_PEND = null; NAV_RETRY = false;
     LOADING = true; LOADED = false; AUDIT = null; LOAD_ERR = '';
     if (!soft) { TRIP_CACHE = {}; STATIC_AT = 0; }
     render();
@@ -843,56 +1043,23 @@
     if (MYSIGN === undefined) loadMySign();
     loadStep();
     var r = viewRange();
-    var COLS = 'id,username,plate_no,start_time,end_time,distance_km,purpose,' +
-      'start_address,end_address,visit_place,start_odometer,end_odometer,start_lat,start_lng,' +
-      // toll_hipass: 하이패스 이용내역 PDF 로 맞춘 금액(금액 규칙 v3 하이패스 몫 — 운행 금액을 고쳐도 남는다, 2026-10-17)
-      'toll_cost,toll_status,toll_source,toll_revision,toll_hipass,parking_cost,is_manual,' +
-      'overspeed_count,rapid_accel_count,rapid_decel_count,max_speed_kmh,' +
-      // ★ 이 셋이 빠지면 점수가 실제보다 높게 나온다(앱 SafetyScore 와 갈린다).
-      'school_zone_overspeed_count,sustained_overspeed_count,harsh_corner_count';
 
-    // 관리자가 개인 화면에서 여러 주기를 보면 본인 것만 받는다. 전 직원 1년치는 수만 건이다.
-    var wantAll = !(ME && ME.is_admin && isMulti() && !isAll());
+    // 관리자가 개인 화면에서 여러 주기를 보면 본인 것만 받는다(tripsAll).
+    var wantAll = tripsAll();
     var ck = (wantAll ? 'all' : 'me') + '|' + r.lo + '|' + r.hi;
-    var hit = TRIP_CACHE[ck];
-    var tripsP = (soft && hit && Date.now() - hit.at < CACHE_MS)
+    var hit = TRIP_CACHE[ck], useHit = !!(soft && hit && Date.now() - hit.at < CACHE_MS);
+    // 받은 글 서명(pages)도 맡아 둔다 — 조용히 새로 받기가 운행이 그대로인지 글로 본다(2026-11-02 N3)
+    var tripsP = useHit
       ? Promise.resolve(hit.rows)
-      : fetchAll('/rest/v1/trips?select=' + COLS + '&deleted_at=is.null' +
-        (wantAll ? '' : '&username=eq.' + encodeURIComponent(myName())) +
-        // id 를 둘째 정렬 키로 — 출발시각이 같은 운행(수기 기본 09:00)이 1000행 경계에 걸리면
-        // 한 건이 빠지거나 두 번 들어왔다. 서버(approval-act)도 같은 이유로 id 를 넣어 두었다.
-        '&start_time=gte.' + r.lo + '&start_time=lt.' + r.hi + '&order=start_time.desc,id.desc')
-        .then(function (rows) { TRIP_CACHE[ck] = { rows: rows || [], at: Date.now() }; return rows; });
+      : fetchAllSig(tripsUrl(wantAll, r))
+        .then(function (x) { TRIP_CACHE[ck] = { rows: x.rows || [], at: Date.now(), pages: x.pages }; return TRIP_CACHE[ck].rows; });
 
     // 확장 모듈(개인경비)이 같이 받을 것 — 실패해도 운행일지 적재는 그대로 끝나게 모듈 안에서 삼킨다.
     var extP = Promise.all(EXT.load.map(function (fn) {
       try { return Promise.resolve(fn(soft)).catch(function (e) { console.error(e); }); } catch (e) { return null; }
     }));
     var fresh = soft && STATIC_AT && Date.now() - STATIC_AT < CACHE_MS;
-    // ★ 1000행씩 나눠 받는 읽기는 모두 겹치지 않는 열쇠로 정렬한다(2026-10-20 AU2 #16) — 정렬이 없거나 같은 값이 있으면
-    //   페이지 경계에서 한 줄이 빠지거나 두 번 들어올 수 있다(지금은 1000행 미만이라 안 났다).
-    var staticP = fresh ? Promise.resolve(null) : Promise.all([
-      fetchAll('/rest/v1/app_users?select=username,name,dept,position,is_admin,plate_no,company_name,vehicle_type,signup_status,uses_driving&order=username.asc'),
-      fetchAll('/rest/v1/app_vehicles?select=*&order=id.asc'),
-      fetchAll('/rest/v1/evidences?select=id,username,vehicle_plate,date_millis,category,amount,memo,photo_path,scan_path,trip_id&order=id.asc'),
-      fetchAll('/rest/v1/edu_videos?deleted=eq.false&select=*&order=month.desc,id.asc'),
-      fetchAll('/rest/v1/edu_progress?select=*&order=username.asc,video_id.asc'),
-      fetchAll('/rest/v1/edu_targets?select=*&order=month.asc,username.asc'),
-      fetchAll('/rest/v1/fuel_rates?select=year,quarter,region,price&order=year.asc,quarter.asc,region.asc'),
-      // 분기 경계 + 기간 설정(cycle_rules, 2026-10-20) — select=*: 칸 하나가 없는 서버여도 분기 경계까지 못 받는 일이 없게
-      apiRetry('/rest/v1/app_config?id=eq.1&select=*').then(function (x) { return x.ok ? x.json() : []; }),
-      // RLS 가 걸러 준다 — 본인 것 · 내가 결재자인 것 · 관리자는 전부.
-      fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc'),
-      // ※ 부서별 결재선(driving_approval_lines)은 더 읽지 않는다 — 결재선은 상신자가 직접 고른다(2026-10-02).
-      // 결재자를 고르려면 사람 목록이 필요하다. app_users 는 본인만 보이므로 뷰를 쓴다.
-      fetchAll('/rest/v1/v_driving_people?select=*&order=name.asc,username.asc'),
-      // 조직도(사람 명단 — 관리 화면). 내려간 사람(active=false)은 받지 않는다.
-      fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc'),
-      // 관리자가 지정한 결재선(2026-10-14). 표가 아직 없거나 못 받아도 화면은 멈추지 않는다(자동 결재선만 쓴다).
-      fetchLineOv(),
-      // 「이번 기간 내역 없음」 표시(2026-11-02) — 못 받거나 표가 없으면(404) 빈 목록 = 표시 없음. 적재를 막지 않는다(SPEC §4·§9)
-      fetchAll('/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc').catch(function () { return []; })
-    ]);
+    var staticP = fresh ? Promise.resolve(null) : Promise.all(staticReqs(false));
 
     Promise.all([tripsP, staticP, extP]).then(function (both) {
       // ★ 반드시 아무것도 대입하기 전에 버린다. 예전에는 아래 대입이 전부 끝난 뒤에
@@ -905,28 +1072,16 @@
       LOADED_ALL = wantAll;
       // fetchAll 은 41,000행에서 멈춘다. 닿았으면 잘렸다는 것을 숨기지 않는다.
       if (ALL_TRIPS.length >= 41000) toast('운행이 너무 많아 일부만 불러왔어요. 기간을 줄여 주세요.', true);
-      if (out) {
-        // 업무 결재 포털 가입 대기·거절 계정은 직원으로 치지 않는다(가입 신청은 「권한 관리」에 따로 나온다).
-        USERS = {}; (out[0] || []).forEach(function (u) { if (!u.signup_status || u.signup_status === 'active') USERS[u.username] = u; });
-        VEHICLES = out[1] || [];
-        ALL_EVID = out[2] || [];
-        EDUV = out[3] || []; EDUP = out[4] || []; EDUT = out[5] || [];
-        RATES = {};
-        (out[6] || []).forEach(function (x) { RATES[x.year + '-' + x.quarter + '-' + x.region] = Number(x.price); });
-        var cfg = (out[7] || [])[0];
-        if (cfg) setQuarterBounds(cfg.quarter_bounds);
-        var rulesNew = !!(cfg && CR.set(cfg.cycle_rules));      // 서버 기간 설정이 바뀌었나(2026-10-20 연말 마감)
-        APPR = out[8] || []; APPR_GEN++;
-        PEOPLE = {}; (out[9] || []).forEach(function (p) { PEOPLE[p.username] = p; });
-        ORG = out[10] || [];
-        setLineOv(out[11]);
-        if (NONE_GEN === ng0) setNone(out[12]);
-        STATIC_AT = Date.now();
-      }
+      var rulesNew = out ? putStatic(out, null, ng0).rulesNew : false;
+      if (out) LOAD_APPR_AT = STATIC_AT;
       RATE_MISS = {};
       // 기간 설정이 바뀌었으면 이 응답의 운행은 옛 범위다 — 기간을 확인하고 새 범위로 한 번 더 받는다(늦게 온 이 응답은 LOAD_SEQ 가 버린다)
       if (rulesNew) { rulesChanged(); return; }
       LOADED = true; LOADING = false; AUDIT = null;
+      // 받은 시각(navRefresh 30초) — 공통 자료는 범위마다 하나(갈래와 상관없다). soft 는 가장 오래된 조각의 시각,
+      //   갈래 자료(개인경비·법인카드 줄)는 soft 가 받아 둔 줄을 그대로 쓰므로 전부 새로 받았을 때만
+      NAV_AT[nk] = soft ? Math.min(useHit ? hit.at : t0, fresh ? st0 : t0) : t0; delete NAV_FAIL[nk];
+      if (!soft) EXT.loadMode.forEach(function (m, i) { if (m) navModStamp(navModKey(i), t0); });
       // 받는 사이에 관리 화면으로 옮겨 갔는데 본인 것만 받아 왔으면, 전 직원 것으로 다시 받는다.
       if (isAll() && !LOADED_ALL) { loadAll({ soft: true }); return; }
       applyScope();
@@ -3121,11 +3276,12 @@
   /** 지정 결재선 받기 — 1000줄씩 끝까지(서버 기본 상한에 말없이 잘리지 않게, 2026-10-14 검증로봇).
    *  표가 아직 없으면(404) null = 기능 숨김. 그 밖의 실패(5xx·네트워크)는 undefined = 받아 둔 목록을 그대로 둔다
    *  — 한 번 실패로 관리자 지정이 사라지고 자동 결재선이 대신 채워지던 것. */
-  function fetchLineOv() {
+  function fetchLineOv(signal) {
     var acc = [];
     function page(off) {
+      // signal — 조용히 새로 받기를 멈출 때(2026-11-02 N3). 멈추면 「받지 못함」(undefined) — 받아 둔 목록 그대로
       return apiRetry('/rest/v1/driving_line_override?select=username,boxes,updated_by,updated_at&order=username.asc&offset=' +
-        off + '&limit=1000').then(function (r) {
+        off + '&limit=1000', signal ? { signal: signal } : undefined).then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) return undefined;
         return r.json().then(function (a) {
@@ -3862,7 +4018,8 @@
   //   단, 누르고 있는 동안(pointerdown~up)은 풀지 않는다 — 누르는 순간 focusout 으로 다시 그리면 그 클릭이 사라졌다(재검토 N1).
   //   손을 뗀 뒤에 풀면 click 이 먼저 옛 카드에 닿고(openApprAct 가 지금 자료로 다시 확인), 다시 그리기는 그 뒤에.
   var APPR_PTR = false;
-  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); }, 0); }
+  //   화면을 옮길 때 조용히 받아 맡아 둔 것(NAV_PEND, 2026-11-02 navKick)도 같은 때 넣는다.
+  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); navKick(); }, 0); }
   function apprPtrUp() { APPR_PTR = false; apprUnhold(); }
   document.addEventListener('pointerdown', function () { APPR_PTR = true; }, true);
   document.addEventListener('pointerup', apprPtrUp, true);
@@ -3875,28 +4032,31 @@
     if (!ME || !LOADED || LOADING) return Promise.resolve(false);
     // 「바로」(max 0 — 409·403 뒤)인데 앞서 출발한 받기가 도는 중이면, 그것이 끝난 뒤 한 번 더 받는다(앞 받기는 바뀌기 전 자료일 수 있다, 재검토 R1)
     if (APPR_BUSY) return max === 0 ? APPR_BUSY.then(function () { return apprRefresh(opt); }) : APPR_BUSY;
-    if (Date.now() - Math.max(APPR_AT, STATIC_AT) < max) return Promise.resolve(false);
+    if (Date.now() - Math.max(APPR_AT, LOAD_APPR_AT) < max) return Promise.resolve(false);
     var who = myName(), sig0 = apprSig(), g0 = APPR_GEN, ng0 = NONE_GEN;
     APPR_AT = Date.now();                  // 실패해도 바로 다시 묻지 않게(창을 오갈 때마다)
+    // 받은 글 서명(fetchAllSig)도 맡아 둔다 — 조용히 새로 받기(navRefresh)가 결재 건·표시가 그대로인지 글로 본다(2026-11-02 N3, 받는 것은 같다)
     APPR_BUSY = Promise.all([
-      fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc'),
+      fetchAllSig(APPR_PATH),
       // 개인경비·법인카드 — soft: 결재 건만 새로 받는다(실패는 모듈 안에서 삼키고 받아 둔 목록을 그대로 둔다)
       Promise.all(EXT.load.map(function (fn) { try { return Promise.resolve(fn(true)).catch(function () { }); } catch (e) { return null; } })),
       // 「이번 기간 내역 없음」 표시도 다시 받는다 — 포털(다른 탭)에서 표시·되살리기하고 돌아오면 그 탭이 다음 전체 적재까지 옛 표시로
       //   빨간 마감 띠·깜빡임을 보였다(2026-11-02 검토 L5). 못 받으면(표 없음·실패) null = 받아 둔 표시 그대로 — 새로 받기를 막지 않는다.
-      fetchAll('/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc').catch(function () { return null; })
+      fetchAllSig(NONE_PATH).catch(function () { return null; })
     ]).then(function (res) {
       APPR_BUSY = null;
       if (myName() !== who) return false;
-      if (APPR_GEN === g0) { APPR = res[0] || []; APPR_GEN++; }      // 그 사이 다른 길로 더 새 목록이 들어왔으면 덮지 않는다(M3)
+      if (APPR_GEN === g0) { APPR = res[0].rows || []; APPR_GEN++; STATIC_MEMO[8] = { pages: res[0].pages, obj: APPR }; }   // 그 사이 다른 길로 더 새 목록이 들어왔으면 덮지 않는다(M3)
       var ns0 = noneSig();
-      if (Array.isArray(res[2]) && NONE_GEN === ng0) setNone(res[2]);  // 그 사이 이 탭에서 표시·되살리기를 했으면 덮지 않는다(L5)
+      // 그 사이 이 탭에서 표시·되살리기를 했거나 다른 받기가 더 새 목록을 넣었으면 덮지 않는다(L5) — 넣으면 세대를 올린다(늦게 온·맡아 둔 옛 목록이 덮지 못하게, N6)
+      if (res[2] && Array.isArray(res[2].rows) && NONE_GEN === ng0) { setNone(res[2].rows); NONE_GEN++; STATIC_MEMO[12] = { pages: res[2].pages, obj: NONE }; }
       var noneCh = noneSig() !== ns0;
       APPR_AT = Date.now();
       var changed = apprSig() !== sig0;
       if (changed) apprShow();
-      // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니고 다시 그려도 될 때만(창이 열렸거나 칸에 쓰는 중이면 다음에 그릴 때 보인다)
-      if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox' && LOADED && !LOADING && !apprHold()) render(); }
+      // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니고 다시 그려도 될 때만(창이 열렸거나 칸에 쓰는 중이면 다음에 그릴 때 보인다 ·
+      //   창 밖 칸에 적어 둔 글이 있어도 — navDirty, N5)
+      if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox' && LOADED && !LOADING && !apprHold() && !navDirty()) render(); }
       return changed;
     }, function (e) {
       APPR_BUSY = null;
@@ -3906,10 +4066,17 @@
     return APPR_BUSY;
   }
   /** 다른 탭·앱에서 돌아오면 — 결재함이면 10초, 다른 화면이면 1분 안에 받았을 때만 건너뛴다(메뉴 숫자·종이 맞게). */
-  function apprWake() { if (!document.hidden) apprRefresh({ max: VIEW === 'inbox' ? 10000 : 60000 }); }
+  //   2026-11-02: 결재 건 받기(예전 그대로)에 더해 지금 화면 자료를 조용히 새로 받는다(navMove — 받은 지 30초가 넘었을 때만).
+  //   결재 건 받기가 출발했으면 조용히 받기는 결재 건·표시를 빼고 받는다(같은 것을 두 번 받지 않게, N8 — 결재 건은 예전처럼 바로 넣는다: 칸에 쓰는 중이어도 숫자 딱지·종).
+  //   창 focus(파일 고르기 창을 닫음 · 다른 출처 iframe·개발자 도구에서 돌아옴)에는 결재 건만 — 탭 복귀(visibilitychange · pageshow)에만 전부(N8).
+  function apprWake(e) {
+    if (document.hidden) return;
+    apprRefresh({ max: VIEW === 'inbox' ? 10000 : 60000 });
+    if (!e || e.type !== 'focus') navMove({ noAppr: !!APPR_BUSY });
+  }
   document.addEventListener('visibilitychange', apprWake);
   window.addEventListener('focus', apprWake);
-  window.addEventListener('pageshow', function (e) { if (e.persisted) apprWake(); });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) apprWake(e); });
   /** 결재 창을 연 그 문서가 지금도 같은가 — 창을 연 뒤 결재 건을 다시 받아(max ms 안에 받았으면 그대로, 기본 3초) 바뀌었으면
    *  새 자료로 창을 다시 그린다(적던 의견·사유는 그대로). 그 동작을 더 할 수 없게 됐으면(회수·반려·다른 분이 처리) 창을 닫고 알린다.
    *  보내는 중(단추 잠김)·유류단가 되묻는 중·다른 창으로 바뀌었으면 건드리지 않는다. 서버도 상신 시각으로 낡은 화면을 막는다(STALE). */
@@ -3951,6 +4118,273 @@
       if (!g || g.dataset.act !== act || +g.dataset.id !== +id || (g.dataset.kind || '') !== (kind || '')) return;
       apprCheckDialog();
     });
+  }
+
+  /* ── 화면을 옮길 때 조용히 새로 받기(2026-11-02 사용자 「창들을 눌러서 넘어갈 때 새로고침 형태로 해서 넘어가면 업데이트된 상태로 보여지는 거 아닌가?」 —
+        결정: 뒤에서 조용히 최신 자료를 받는다 · 깜빡임 없이 · 30초 안이면 건너뜀 · 입력 중이면 끝난 뒤. docs/nav-refresh/SPEC.md) ──
+     예전엔 자료를 들어올 때(loadAll)·기간을 바꿀 때·저장한 뒤·결재함 결재 건(apprRefresh)만 다시 받았다 — 화면을 옮겨도(go·주소) 받아 둔 자료로 다시 그리기만 해서
+     다른 분이 바꾼 운행·영수증·결재 상태·「내역 없음」 표시·개인경비·법인카드 줄은 페이지를 새로 열어야 보였다.
+       · 언제: 화면을 옮긴 뒤(go · 주소 뒤로·앞으로 · 결재함 갈래 단추 · 알림) · 탭으로 돌아올 때(apprWake — visibilitychange·pageshow).
+       · 무엇을 · 30초(고침 1차 N3): 공통 자료(운행 · staticReqs 13조각 — 운행·영수증·사람·결재·「내역 없음」…)는 범위(navCoreKey = 사람 · 본인/전 직원 · 조회 범위)마다
+         하나 — 갈래·관리 화면을 오가도 같은 것을 다시 받지 않는다. 갈래 자료(개인경비·법인카드 결재 건·줄 — 모듈 EXT.load(true, { silent: true }))는
+         지금 갈래 것만, 갈래·기간·관리 화면(전 직원 줄)마다(navModKey). 각각 받은 지 navMs()(30초) 안이면 받지 않는다(NAV_AT).
+       · 싸게(N3): 쪽마다 받은 글의 서명(fetchAllSig)을 넣어 둔 것과 견줘 같은 조각은 읽지도(JSON.parse) 넣지도 않는다 — 다 같으면 다시 그리지 않는다.
+         더 새 받기·적재가 출발하면 앞 받기는 멈춘다(AbortController).
+       · 넣기(navCommit): 다 오면 한 번에 바꿔 넣고, 바뀐 조각이 있을 때만 다시 그린다(navRepaint — 화면 위쪽에 보이던 줄·안쪽 스크롤 상자·펼친 접기·초점 그대로,
+         결재함은 apprRepaint). 다시 그릴 때는 저절로 하는 일(영수증 금액 적기 autoFillEv 등 — 쓰기·알림·창)을 하지 않는다(NAV_QUIET, N7).
+       · 쓰는 중이면(navHold — 칸에 초점·한글 조합·창·⋯ 메뉴·기간 고르기·알림 창·통행료 채우기에 쳐 둔 값·하이패스 대조·영수증 올리는 중·여러 줄 고름·
+         누르는 중·도는 검증·창 밖 칸에 적어 두고 저장하지 않은 글(navDirty, N5)) 넣지도 그리지도 않고 맡아 둔다(NAV_PEND).
+         초점을 떼거나·한글 조합이 끝나거나·창·⋯ 메뉴를 닫거나·손을 떼거나·쓰기가 끝나거나·화면을 옮기면(navKick) 그때 넣는다.
+         맡아 둔 지(받은 뒤로) 30초가 넘었으면 넣지 않고 새로 받는다(N6).
+       · 버리기: 그 사이 사람·범위가 바뀌었거나(navCoreKey) · 적재가 출발했거나(LOAD_SEQ) · 더 새 조용한 받기가 출발했으면(NAV_SEQ) 넣지 않는다.
+         이 탭에서 쓰기가 있었으면(WRITE_GEN — 저장한 칸·확정한 통행료를 쓰기 전 목록으로 되돌리지 않게) 버리고, 쓰기가 끝나고 쓰는 중이 아닐 때 한 번 더 받는다(NAV_RETRY).
+         결재 건(APPR_GEN)·「내역 없음」 표시(NONE_GEN)는 세대로 그 부분만 넘긴다 — 넣을 때마다 세대가 오르므로 먼저 출발한 옛 목록이 더 새 목록을 덮지 못한다(N6).
+         모듈 결재 건은 출발 때의 LA_SEQ·결재 건 목록이 그대로일 때만 넣는다 — 그 뒤 따로 받기 시작했거나 넣었으면(결재·상신 뒤 다시 받기) 그것이 이긴다(N1).
+         공통 13조각도 그 사이 다른 길(교육 다시 받기·조직도 고치기 등)이 바꾼 조각은 넣지 않는다(putStatic objs0).
+       · 못 받으면 조용히(콘솔 경고만) 받아 둔 화면 그대로 — 알림·뼈대·새 움직임 없음. 그 조각은 30초 쉬고, 실패가 이어지면 2분까지 늘려 쉰다(N2).
+       · 시험은 window.__NAV_REFRESH_MS 로 30초를 줄인다(수 하나 또는 { core, mod } — 하네스 plans/nav-refresh.mjs). */
+  var NAV_MS = 30000, NAV_MAXWAIT = 120000;
+  /** 몇 ms 안이면 다시 받지 않나 — kind 'core'(공통 자료) · 'mod'(갈래 자료). */
+  function navMs(kind) {
+    var v = window.__NAV_REFRESH_MS;
+    if (v && typeof v === 'object') v = v[kind || 'core'];
+    return typeof v === 'number' && isFinite(v) && v >= 0 ? v : NAV_MS;
+  }
+  var NAV_AT = {}, NAV_FAIL = {}, NAV_SEQ = 0, NAV_BUSY = null, NAV_PEND = null, NAV_RETRY = false, NAV_T = 0, NAV_QUIET = false;
+  /** 그 열쇠를 다시 받기까지 쉴 시간 — 실패가 이어지면 30초 → 1분 → 2분(그 위로는 2분, N2). */
+  function navWait(key, kind) {
+    var b = navMs(kind), n = NAV_FAIL[key] || 0;
+    return n ? Math.min(b * Math.pow(2, n - 1), Math.max(b, NAV_MAXWAIT)) : b;
+  }
+  /** 공통 자료의 범위 — 사람 · 운행을 전 직원 것으로 받나 · 조회 범위(갈래·관리 화면과 상관없다, N3). */
+  function navCoreKey() { var r = viewRange(); return 'core|' + myName() + '|' + (tripsAll() ? 'all' : 'me') + '|' + r.lo + '|' + r.hi; }
+  /** 갈래 자료(모듈 i)의 범위 — 갈래 · 사람 · 기간 · 그 모듈의 관리 화면(전 직원 줄까지 받는다)인가. */
+  function navModKey(i) {
+    return EXT.loadMode[i] + '|' + myName() + '|' + CYCKEY() + '|' + ((EXT.loadAdmin[i] || []).indexOf(VIEW) >= 0 ? 'A' : 'P');
+  }
+  /** 갈래 자료를 받은 시각을 남긴다 — 관리 화면 것(A)을 받을 때는 결재 건·내 줄도 같이 받으니 개인 화면 것(P)도 같이. */
+  function navModStamp(mk, t) {
+    [mk, mk.replace(/\|A$/, '|P')].forEach(function (k) { NAV_AT[k] = t; delete NAV_FAIL[k]; });
+  }
+  /** 지금 받을 것 — { ck, core: 공통 자료를 받나, mods: [{ i: 모듈 차례, mk }] }. force = 시각과 상관없이(쓰기 때문에 버린 받기를 다시). */
+  function navNeed(force) {
+    var now = Date.now(), ck = navCoreKey(), mode = navModeOf(VIEW), need = { ck: ck, core: false, mods: [] };
+    need.core = !!force || now - (NAV_AT[ck] || 0) >= navWait(ck, 'core');
+    EXT.load.forEach(function (fn, i) {
+      if (!mode || EXT.loadMode[i] !== mode) return;
+      var mk = navModKey(i);
+      if (force || now - (NAV_AT[mk] || 0) >= navWait(mk, 'mod')) need.mods.push({ i: i, mk: mk });
+    });
+    return need;
+  }
+  /** X(받는 중·맡아 둔 받기)가 need 를 다 덮는가. */
+  function navCovers(X, need) {
+    return (!need.core || (X.core && X.ck === need.ck)) && need.mods.every(function (m) { return X.mods.some(function (y) { return y.mk === m.mk; }); });
+  }
+  /** 받는 중인 조용한 받기를 멈춘다(더 새 받기·적재가 출발할 때 — 끝까지 내려받고 버리지 않게, N3). */
+  function navAbort() {
+    var B = NAV_BUSY;
+    NAV_BUSY = null;
+    if (B && B.ctl) { try { B.ctl.abort(); } catch (e) { } }
+  }
+  /** 창 밖 칸에 사람이 적어 두고 저장하지 않은 글이 있나(N5 — 「내 계정」 비밀번호 칸 등. 다시 그리면 지워진다).
+   *  적을 때 표시해 두고(아래 input 듣기), 그 칸이 아직 화면에 있고 처음 그린 값과 다르면 「적는 중」. 저장·지움·다른 화면으로 옮김이면 풀린다.
+   *  상태에 바로 적히는 칸(찾기·거르기·법인카드 칸·통행료 채우기·마감 기간 설정 — 다시 그려도 상태에서 그 값으로 그린다)은 셈하지 않는다. */
+  var NAV_DIRTY = [];
+  var NAV_MIRROR = '.cin,#qBox,#ibQ,[data-finq],[data-tfamt],#permQ,#orgQ,[data-cysf],#cysNote,#dfFrom,#dfTo,#ibD1,#ibD2';
+  document.addEventListener('input', function (e) {
+    var t = e.target, inner = $('inner');
+    if (!t || !t.matches || !inner || !inner.contains(t) || !t.matches('input,textarea') || /^(file|checkbox|radio|hidden|button|submit)$/.test(t.type || '')) return;
+    if (t.matches(NAV_MIRROR) || NAV_DIRTY.indexOf(t) >= 0) return;
+    NAV_DIRTY.push(t);
+  }, true);
+  function navDirty() {
+    var inner = $('inner');
+    NAV_DIRTY = NAV_DIRTY.filter(function (el) { return !!inner && inner.contains(el); });
+    return NAV_DIRTY.some(function (el) { return String(el.value) !== String(el.defaultValue); });
+  }
+  /** 여러 줄 골라 둔 표가 화면에 있나 · 결재 완료 출력에서 고른 것이 있나 · 묶는 중인가. */
+  function navPicking() {
+    var ms = Object.keys(MSEL).some(function (g) { var x = MSEL[g]; return x.busy || (Object.keys(x.ids).length > 0 && mselBoxes(g).length > 0); });
+    return ms || Object.keys(FINK).some(function (k) {
+      var d = FINK[k], s = d.sel && d.sel();
+      return !!(d.busy && d.busy()) || !!(s && Object.keys(s).length && document.querySelector('#inner table[data-fin="' + k + '"]'));
+    });
+  }
+  /** 지금 넣고 다시 그리면 안 되는가 — 결재함 apprHold 에 더해 화면 전체에서 쓰는 중인 것들. */
+  function navHold() {
+    if (apprHold() || APPR_PTR) return true;
+    var cp = $('cycPop');
+    if ((cp && !cp.hidden) || NOTE.open) return true;
+    // 통행료 채우기 — 저장하지 않은 금액·못 읽는 글이 든 칸(다시 그리면 줄 차례가 바뀌거나 못 읽는 글이 사라진다)
+    if (VIEW === 'tollfill' && (unsavedFills() || Array.prototype.some.call(document.querySelectorAll('#inner [data-tfamt]'), function (el) {
+      var v = numIn(el.value); return typeof v === 'number' && isNaN(v);
+    }))) return true;
+    if (HP.busy || (HP.groups && HP.groups.length) || EV_SENDING || EVUP.busy) return true;
+    if (navPicking() || navDirty()) return true;
+    return !!document.querySelector('#inner [aria-busy="true"]');           // 도는 검증(AI 검증 모션)·받는 중인 요약
+  }
+  function navValid(P) {
+    return P.seq === NAV_SEQ && P.ls === LOAD_SEQ && P.who === myName() && LOADED && !LOADING && !LOAD_ERR && (!P.core || P.ck === navCoreKey());
+  }
+  /** 다시 받아야 하는 받기 — 그 조각들의 받은 시각을 지운다(곧 NAV_RETRY 로 새로 받는다). */
+  function navForget(P) { if (P.core) NAV_AT[P.ck] = 0; P.mods.forEach(function (m) { NAV_AT[m.mk] = 0; }); }
+  /** 맡아 둔 것을 넣을 수 있으면 넣고, 쓰기 때문에·오래돼서 버린 받기는 한 번 더 받는다(쓰기가 다 끝났고 쓰는 중이 아닐 때). 넣었으면 true. */
+  function navKick() {
+    var P = NAV_PEND, done = false;
+    if (P) {
+      var extBusy = function () { return P.modData.some(function (x) { try { return !!(x.o && typeof x.o.busy === 'function' && x.o.busy()); } catch (e) { return false; } }); };
+      if (!navValid(P)) NAV_PEND = null;
+      else if (P.w0 !== WRITE_GEN || WRITE_N > 0) { NAV_PEND = null; navForget(P); NAV_RETRY = true; }
+      // 맡아 둔 지(받은 뒤로) 30초가 넘었으면 넣지 않는다 — 그 사이 다른 길로 들어온 더 새 것을 덮거나, 넣은 바로 뒤 새로 받아 두 번 다시 그리게 된다(N6).
+      //   받는 데 걸린 시간은 세지 않는다(P.at — 받기가 느리면 받자마자 버리고 다시 받기를 되풀이했다)
+      else if (Date.now() - P.at >= navMs('core')) { NAV_PEND = null; navForget(P); NAV_RETRY = true; }
+      else if (!navHold()) {
+        // 모듈만 바쁘면(법인카드 칸 저장이 막 끝나는 중 등) 잠깐 뒤 다시 본다 — 그 끝을 알려 주는 일(초점·창)이 따로 없다
+        if (extBusy()) { if (!NAV_T) NAV_T = setTimeout(function () { NAV_T = 0; navKick(); }, 300); }
+        else { NAV_PEND = null; navCommit(P); done = true; }
+      }
+    }
+    if (NAV_RETRY && !NAV_PEND && !NAV_BUSY && !WRITE_N && !navHold()) { NAV_RETRY = false; navRefresh({ force: true }); }
+    return done;
+  }
+  /** 못 받은 조각 — 그 시도의 시각을 남기고 실패 횟수를 센다(이어지면 2분까지 늘려 쉼, N2). 멈춘 것(AbortError)은 실패가 아니다. */
+  function navFailed(key, t0, e) {
+    if (e && e.name === 'AbortError') return;
+    NAV_AT[key] = t0; NAV_FAIL[key] = (NAV_FAIL[key] || 0) + 1;
+    console.warn('[새로 받기] 받지 못해 받아 둔 화면 그대로', e && (e.message || e));
+  }
+  /** 받을 때가 됐으면(force 면 바로) 조용히 다시 받는다. 받는 중이거나 아직 넣지 못한 새 것이 그것을 덮으면 true.
+   *  opt.noAppr — 같은 때 결재함 받기(apprRefresh)가 결재 건·표시를 받는 중: 그것은 빼고 받는다(N8). */
+  function navRefresh(opt) {
+    if (!ME || !LOADED || LOADING || LOAD_ERR) return false;
+    var need = navNeed(opt && opt.force), now = Date.now(), noAppr = !!(opt && opt.noAppr);
+    if (!need.core && !need.mods.length) return false;
+    if (NAV_BUSY && navCovers(NAV_BUSY, need)) return true;
+    if (NAV_PEND && navCovers(NAV_PEND, need) && now - NAV_PEND.at < navMs('core')) return true;
+    if (WRITE_N > 0) { NAV_RETRY = true; return false; }                // 쓰는 중 — 끝나면(writeDone → navKick) 받는다
+    navAbort();
+    var r = viewRange(), wantAll = tripsAll(), seq = ++NAV_SEQ;
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null, sg = ctl ? ctl.signal : undefined;
+    var P = { seq: seq, t0: now, ls: LOAD_SEQ, w0: WRITE_GEN, g0: APPR_GEN, ng0: NONE_GEN, who: myName(), ck: need.ck, core: need.core, mods: need.mods,
+      wantAll: wantAll, tck: (wantAll ? 'all' : 'me') + '|' + r.lo + '|' + r.hi, noAppr: noAppr, coreData: null, modData: [],
+      objs: STATIC_OBJ.map(function (f) { return f(); }) };              // 출발 때 조각별 상태 객체 — 그 사이 다른 길이 바꾼 조각은 넣지 않는다(putStatic objs0)
+    NAV_PEND = null; NAV_RETRY = false; NAV_BUSY = { seq: seq, ck: P.ck, core: P.core, mods: P.mods, ctl: ctl };
+    var hit = TRIP_CACHE[P.tck], tmemo = hit && hit.rows === ALL_TRIPS && hit.pages ? hit.pages : null;
+    var coreP = !P.core ? Promise.resolve(null) : Promise.all([
+      fetchAllSig(tripsUrl(wantAll, r), { signal: sg, memo: tmemo }),
+      Promise.all(staticReqs(true, { signal: sg, noAppr: noAppr }))
+    ]).then(function (x) { return { trips: x[0], out: x[1] }; }, function (e) { return { fail: e }; });
+    // 모듈(개인경비·법인카드) — 받는 동안 자기 상태를 건드리지 않고 { busy, commit } 을 돌려준다
+    var modP = Promise.all(P.mods.map(function (m) {
+      try {
+        return Promise.resolve(EXT.load[m.i](true, { silent: true, signal: sg, noAppr: noAppr }))
+          .then(function (o) { return { m: m, o: o }; }, function (e) { return { m: m, fail: e }; });
+      } catch (e) { return { m: m, fail: e }; }
+    }));
+    Promise.all([coreP, modP]).then(function (res) {
+      if (NAV_BUSY && NAV_BUSY.seq === seq) NAV_BUSY = null;
+      if (seq !== NAV_SEQ) return;                                        // 더 새 받기·적재가 출발했다(이 받기는 멈췄거나 버린다)
+      var core = res[0];
+      // 공통 자료는 한 덩어리 — 한 조각이라도 못 받으면 넣지 않는다(새 운행에 옛 영수증처럼 섞이지 않게). 갈래 자료는 따로
+      if (core && core.fail) navFailed(P.ck, P.t0, core.fail); else P.coreData = core;
+      res[1].forEach(function (x) { if (x.fail) navFailed(x.m.mk, P.t0, x.fail); else if (x.o) P.modData.push(x); });
+      if (!P.coreData && !P.modData.length) return;
+      P.at = Date.now(); NAV_PEND = P;                                    // at — 받은 때(맡아 둔 나이는 여기부터)
+      navKick();
+    });
+    return true;
+  }
+  /** 화면을 옮긴 뒤(go · 주소 · 결재함 갈래 · 알림) · 탭으로 돌아올 때 — 맡아 둔 것이 있으면 넣고, 받을 때가 됐으면 조용히 받는다. */
+  function navMove(opt) { navKick(); return navRefresh(opt); }
+  /** 받아 온 것을 한 번에 넣는다(navKick 이 부른다 — 늦은 것·쓰는 중인 것은 이미 걸렀다). 바뀐 조각이 있을 때만 다시 그린다.
+   *  받은 글이 넣어 둔 것과 같은 조각은 그대로 둔다(fetchAllSig same) — JSON 으로 견주지 않는다(N3). 넣은 뒤 저절로 하는 일은 없다(N7). */
+  function navCommit(P) {
+    var ch = false, rulesNew = false;
+    if (P.coreData) {
+      var T = P.coreData.trips;
+      // 「같은 글」은 출발 때 운행 목록(= 지금 목록 — 목록을 바꾸는 적재는 위에서 걸렀다)과 같다는 뜻
+      if (!T.same) {
+        ALL_TRIPS = T.rows || []; ch = true;
+        if (ALL_TRIPS.length >= 41000) console.warn('[새로 받기] 운행이 41,000건에 닿아 일부만 받았어요');   // 알림은 적재(loadAll)에만 — 조용히
+      }
+      if (LOADED_ALL !== P.wantAll) { LOADED_ALL = P.wantAll; ch = true; }
+      TRIP_CACHE[P.tck] = { rows: ALL_TRIPS, at: P.t0, pages: T.pages };
+      var put = putStatic(P.coreData.out, P.g0, P.ng0, P.t0, P.objs);
+      rulesNew = put.rulesNew; if (put.changed) ch = true;
+      NAV_AT[P.ck] = P.t0; delete NAV_FAIL[P.ck];
+      // 결재함 받기의 「방금 받았음」은 세 결재 건(운행일지 + 모듈 모두)을 다 받았을 때만 — 지금 갈래 모듈 것만 받았으면 다른 갈래 결재 건이 낡는다
+      var allAppr = !P.noAppr && EXT.load.every(function (fn, i) { return P.modData.some(function (x) { return x.m.i === i; }); });
+      if (allAppr) APPR_AT = Math.max(APPR_AT, P.t0);
+    }
+    P.modData.forEach(function (x) {
+      try { if (x.o && typeof x.o.commit === 'function' && x.o.commit()) ch = true; } catch (e) { console.warn('[새로 받기] 모듈 넣기', e && (e.message || e)); }
+      navModStamp(x.m.mk, P.t0);
+    });
+    // 서버 기간 설정이 바뀌었으면 받은 운행은 옛 범위다 — 적재처럼 기간을 확인하고 새 범위로 받는다(드문 일 — 그때는 뼈대가 잠깐 보인다)
+    if (rulesNew) { rulesChanged(); return; }
+    if (!ch) return;                                                       // 바뀐 것 없음 — 그리지 않는다(깜빡임·움직임 없음)
+    RATE_MISS = {}; AUDIT = null; applyScope();
+    paintPills(); paintCycle();
+    navRepaint();
+  }
+  /** 다시 그린 뒤 위치를 맞출 줄 — 화면 위쪽(머리띠 아래)에 처음 보이는 「열쇠가 있는 줄」(운행·영수증·경비·카드·사람·차량·결재 완료 줄, N9). */
+  var NAV_ANCHOR = ['data-trip', 'data-evrow', 'data-xrow', 'data-crow', 'data-person', 'data-xperson', 'data-cperson', 'data-car', 'data-cyc', 'data-frow', 'data-eduvrow', 'data-fol'];
+  function navAnchor(inner) {
+    if (window.scrollY < 8) return null;
+    var hd = document.querySelector('header.top'), top = hd ? Math.max(0, hd.getBoundingClientRect().bottom) : 0;
+    var els = inner.querySelectorAll(NAV_ANCHOR.map(function (n) { return '[' + n + ']'; }).join(','));
+    for (var i = 0; i < els.length; i++) {
+      var r0 = els[i].getBoundingClientRect();
+      if (!r0.height || r0.bottom <= top) continue;
+      for (var j = 0; j < NAV_ANCHOR.length; j++) {
+        var v = els[i].getAttribute(NAV_ANCHOR[j]);
+        if (v) return { n: NAV_ANCHOR[j], v: v, tag: els[i].tagName, y: r0.top };
+      }
+    }
+    return null;
+  }
+  /** 펼친 접기(details)를 짝짓는 열쇠 — id · data- 표시 · 아니면 접기 제목 글과 같은 제목 사이의 차례(N9). */
+  function navDetKeys(inner) {
+    var seen = {};
+    return Array.prototype.map.call(inner.querySelectorAll('details'), function (d) {
+      if (d.id) return { d: d, k: '#' + d.id };
+      for (var i = 0; i < d.attributes.length; i++) if (/^data-/.test(d.attributes[i].name)) return { d: d, k: d.attributes[i].name + '=' + d.attributes[i].value };
+      var s = d.querySelector('summary'), t = s ? s.textContent.replace(/\s+/g, ' ').trim() : '';
+      seen[t] = (seen[t] || 0) + 1;
+      return { d: d, k: 's:' + t + '#' + seen[t] };
+    });
+  }
+  /** 조용히 받은 것으로 다시 그린다 — 결재함은 apprRepaint(보던 카드·누르던 단추 그대로), 다른 화면은 위쪽에 보이던 줄의 자리(없으면 창 스크롤)·
+   *  안쪽 스크롤 상자·펼친 접기·초점 그대로. 그리는 동안 NAV_QUIET — 화면이 저절로 하는 일(영수증 금액 적기)을 하지 않는다(N7). */
+  function navRepaint() {
+    NAV_QUIET = true;
+    try {
+      if (VIEW === 'inbox') { APPR_DIRTY = false; apprRepaint(); return; }
+      var inner = $('inner'), x = window.scrollX, y = window.scrollY, an = navAnchor(inner);
+      var sc = Array.prototype.map.call(inner.querySelectorAll('.scroll'), function (b) { return [b.scrollTop, b.scrollLeft]; });
+      var dt = {}; navDetKeys(inner).forEach(function (o) { dt[o.k] = o.d.open; });
+      var ae = document.activeElement, fk = null;
+      if (ae && ae !== document.body && inner.contains(ae)) {
+        if (ae.id) fk = { id: ae.id };
+        else for (var i = 0; i < ae.attributes.length && !fk; i++) { var at = ae.attributes[i]; if (/^data-/.test(at.name)) fk = { n: at.name, v: at.value }; }
+      }
+      render();
+      var sc2 = inner.querySelectorAll('.scroll');
+      if (sc2.length === sc.length) Array.prototype.forEach.call(sc2, function (b, j) { if (b.scrollTop !== sc[j][0]) b.scrollTop = sc[j][0]; if (b.scrollLeft !== sc[j][1]) b.scrollLeft = sc[j][1]; });
+      navDetKeys(inner).forEach(function (o) { if (o.k in dt && o.d.open !== dt[o.k]) o.d.open = dt[o.k]; });
+      if (Math.abs(window.scrollY - y) > 1 || Math.abs(window.scrollX - x) > 1) window.scrollTo(x, y);
+      // 위쪽에 보이던 줄이 그대로 있으면 그 줄이 같은 높이에 오게(남의 줄이 위에 끼어들어도 보던 줄이 밀리지 않게)
+      if (an) {
+        var el2 = Array.prototype.filter.call(inner.querySelectorAll('[' + an.n + ']'), function (e) { return e.getAttribute(an.n) === an.v && e.tagName === an.tag && e.getClientRects().length; })[0];
+        if (el2) { var d = el2.getBoundingClientRect().top - an.y; if (Math.abs(d) > 1) window.scrollBy(0, d); }
+      }
+      var now = document.activeElement;
+      if (fk && (!now || now === document.body)) {
+        var el = fk.id ? $(fk.id) : Array.prototype.filter.call(inner.querySelectorAll('[' + fk.n + ']'), function (e) { return e.getAttribute(fk.n) === fk.v && e.offsetParent !== null; })[0];
+        if (el && inner.contains(el)) { try { el.focus({ preventScroll: true }); } catch (e) { } }
+      }
+    } finally { NAV_QUIET = false; }
   }
 
   /**
@@ -4466,7 +4900,8 @@
     INBOX_F = 'all';
     INBOX_ALLCYC = true;   // 알림 문서가 다른 달 것이어도 결재함에 보이게(2026-10-14 기간 거르기)
     NOTE.focus = (e.kind || 'd') + ':' + e.id; NOTE.focusUntil = Date.now() + 2500;
-    if (VIEW === 'inbox') { render(); apprRefresh(); } else go('inbox');
+    // 결재함 안에서 알림으로 갈래가 바뀌어도 그 갈래 자료를 조용히 새로 받는다(2026-11-02 N8 — 결재함 갈래 단추와 같게)
+    if (VIEW === 'inbox') { render(); apprRefresh(); navMove({ noAppr: !!APPR_BUSY }); } else go('inbox');
     paintBell();
     noteFocusCard();
   }
@@ -6086,7 +6521,8 @@
     (rows || []).forEach(function (x) { if (x && x.kind && x.username && x.cycle) NONE[x.kind + '|' + x.username + '|' + x.cycle] = 1; });
   }
   /** NONE_GEN — 이 탭에서 표시하기·되살리기가 성공할 때마다 +1. 적재(loadAll)·결재 건 새로 받기(apprRefresh)는 출발 때 값과 다르면
-   *  받아 온 표시 목록으로 덮지 않는다 — 쓰기 전에 읽은 목록이 늦게 와서 방금 한 표시·되살리기를 되돌리던 것(2026-11-02 검토 L5, APPR_GEN 과 같은 꼴). */
+   *  받아 온 표시 목록으로 덮지 않는다 — 쓰기 전에 읽은 목록이 늦게 와서 방금 한 표시·되살리기를 되돌리던 것(2026-11-02 검토 L5, APPR_GEN 과 같은 꼴).
+   *  받아 넣을 때(적재·결재 건 새로 받기·조용히 새로 받기)도 +1 — 먼저 출발해 오래 맡아 둔 옛 목록이 더 새 목록을 덮지 못하게(nav-refresh 고침 1차 N6). */
   var NONE_GEN = 0;
   function noneSig() { return Object.keys(NONE).sort().join(','); }
   /** 상태 글 끝의 「고친 뒤 다시 상신하세요.」(정정 중)를 뗀다 — 「내역 없음」 효력인 기간에는 다시 상신을 시키지 않는다(2026-11-02 검토 M1). */
@@ -6753,7 +7189,10 @@
     if (stepMode && !EVF.touched) EVF.cat = EV_SUBS[evSub()];
     if (stepMode) {
       h += evSubHtml(byAll, unkMine);
-      setTimeout(autoFillEv, 0);           // 영수증으로 채운 금액을 운행 기록에도 적는다(v3 — 그린 뒤에, 한 번씩만)
+      // 영수증으로 채운 금액을 운행 기록에도 적는다(v3 — 그린 뒤에, 한 번씩만)
+      // 조용히 새로 받아 다시 그릴 때는 적지 않는다(2026-11-02 N7 — 뒤에서 받은 것이 저장·뼈대·알림을 부르지 않게. 사람이 이 화면을 다시 열거나 고칠 때 적는다)
+      var evQuiet = NAV_QUIET;
+      setTimeout(function () { if (!evQuiet) autoFillEv(); }, 0);
     }
 
     // 스캐너로 뜬 영수증을 올리는 자리. 잠긴 주기는 서버가 막으므로
@@ -10911,6 +11350,7 @@ window.EduGuard = {
     if (PANEL_FROM && document.contains(PANEL_FROM)) { try { PANEL_FROM.focus(); } catch (e) {} }
     PANEL_FROM = null;
     apprFlush();                   // 창이 열린 동안 결재 건이 바뀌었으면 이제 결재함을 다시 그린다(2026-11-02)
+    setTimeout(navKick, 0);        // 창이 열린 동안 조용히 받아 맡아 둔 것도(navRefresh — 닫고 난 뒤 그 자리에서 할 일이 먼저)
   }
   /* ── 창을 열면 포커스를 창 안으로 ──
      창은 여러 곳에서 열린다(openPanel 을 거치지 않는 창이 더 많다). 그래서 여는 쪽을 하나하나 고치지 않고
@@ -11245,6 +11685,8 @@ window.EduGuard = {
       SORT_FOCUS = '';
       if (sf) { try { sf.focus(); } catch (e) { } }
     }
+    // 조용히 받아 맡아 둔 것(navRefresh)이 있으면 — 그리기가 끝난 뒤 넣을 수 있는지 다시 본다(도는 검증이 끝나 다시 그렸을 때 등, 2026-11-02)
+    if (NAV_PEND || NAV_RETRY) setTimeout(navKick, 0);
   }
   function go(v) {
     v = OLD_VIEWS[v] || v;
@@ -11295,6 +11737,8 @@ window.EduGuard = {
     render();
     window.scrollTo({ top: 0 });
     if (v === 'inbox') apprRefresh();     // 결재함에 들어올 때마다 결재 건을 새로 받는다(10초 안이면 그대로, 2026-11-02)
+    // 받을 때가 됐으면 이 화면 자료를 조용히 새로 받는다(뼈대 없이, 2026-11-02 navRefresh) — 결재 건 받기가 도는 중이면 결재 건·표시는 빼고(N8)
+    navMove({ noAppr: !!APPR_BUSY });
   }
   /** 좁혀 둔 것을 전부 푼다(사람·차량·목적·검색·점검 칩·날짜·증빙 구분·나눠 보기). */
   function clearFilters() {
@@ -11362,6 +11806,7 @@ window.EduGuard = {
     if (LOADED && isAll() && !LOADED_ALL) { loadAll({ soft: true }); return; }
     render();
     if (VIEW === 'inbox') apprRefresh();  // 뒤로·앞으로 가기로 결재함에 와도(2026-11-02)
+    navMove({ noAppr: !!APPR_BUSY });     // 뒤로·앞으로 가기로 옮겨 와도 조용히 새로 받기(2026-11-02 — 결재 건 받기가 도는 중이면 그것은 빼고, N8)
   });
 
   // 새로고침·탭 닫기 — 쳐 놓은 것이 있으면 브라우저가 한 번 묻게 한다.
@@ -11388,7 +11833,8 @@ window.EduGuard = {
     if (NOTE.open && !e.target.closest('#noteBox')) openNotePop(false);
     if ((el = e.target.closest('[data-inboxmode]'))) {
       NAV_MODE = MODE_NAME[el.dataset.inboxmode] ? el.dataset.inboxmode : 'd'; INBOX_F = 'all';
-      if (VIEW === 'inbox') { render(); apprRefresh(); } else go('inbox');
+      // 갈래를 바꿔도(운행일지·개인경비·법인카드 결재함) 받은 지 30초가 넘었으면 조용히 새로 받는다(2026-11-02)
+      if (VIEW === 'inbox') { render(); apprRefresh(); navMove({ noAppr: !!APPR_BUSY }); } else go('inbox');
       window.scrollTo({ top: 0 }); return;
     }
     if (e.target.closest('#btnKeep')) {
@@ -13349,6 +13795,8 @@ window.EduGuard = {
     var C = {
       $: $, SB: SB, esc: esc, ic: ic, n0: n0, won: won, km: km, pad: pad, md: md, hm: hm, ymd: ymd, snapTrips: snapTrips,
       toast: toast, toastOk: toastOk, apiRetry: apiRetry, fetchAll: fetchAll,
+      // 쪽마다 짧은 지문을 함께 돌려주는 fetchAll(2026-11-02 N3) — 조용히 새로 받기가 지난 지문과 같으면 읽지 않고 { same: true }
+      fetchAllSig: fetchAllSig,
       // 숫자 칸 엄격하게 읽기(2026-10-20 AU2 #9) — 개인경비 금액 칸도 같은 규칙
       numIn: numIn, numMark: numMark, numStop: numStop, NUM_BAD: NUM_BAD,
       head: head, sect: sect, blank: blank, skeleton: skeleton,
@@ -13423,7 +13871,7 @@ window.EduGuard = {
       // 개인경비(2026-10-07): 결재 문서 종류 · 기간 규칙 · 같이 받을 자료 · 「보는 범위」를 얹을 관리 화면
       Object.keys(x.kinds || {}).forEach(function (k) { EXT.kinds[k] = x.kinds[k]; });
       if (x.period) EXT.periods.push(x.period);            // 기간 규칙은 모듈마다(개인경비 'x' · 법인카드 'c')
-      if (x.load) EXT.load.push(x.load);
+      if (x.load) { EXT.load.push(x.load); EXT.loadMode.push((x.period && x.period.mode) || ''); EXT.loadAdmin.push(x.admin || []); }
       // 「보는 범위」 사람 — 모듈마다 자기 관리 화면에서만 값을 낸다(아니면 null). 앞의 것이 null 이면 다음 것.
       if (x.orgUsers) (function (prev, next) { EXT.orgUsers = prev ? function (v) { return prev(v) || next(v); } : next; })(EXT.orgUsers, x.orgUsers);
       (x.orgbar || []).forEach(function (k) { if (ORGBAR_VIEWS.indexOf(k) < 0) ORGBAR_VIEWS.push(k); });

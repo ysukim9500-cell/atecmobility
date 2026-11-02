@@ -150,13 +150,25 @@
         Number(a.date_millis) - Number(b.date_millis) || (a.id || 0) - (b.id || 0);
     });
   }
+  // 쪽 서명과 함께 받기(본체 C.fetchAllSig, 2026-11-02 nav-refresh 고침 1차 N3) — 조용히 새로 받기가 넣어 둔 것과 같은 글인지 본다(JSON 으로 견주지 않는다).
+  //   memo — 넣어 둔 자료를 받을 때의 쪽 서명: 그대로면 { same: true }. 서명이 없는 본체(옛 driving-app.js)면 fetchAll 그대로(늘 넣는다)
+  function sigAll(path, signal, memo) {
+    if (C.fetchAllSig) return C.fetchAllSig(path, { signal: signal, memo: memo || null });
+    return C.fetchAll(path).then(function (rows) { return { rows: rows }; });
+  }
+  function itemsUrl(cyc, all, u) {
+    var r = xRangeKey(cyc);
+    return '/rest/v1/expense_items?select=*&date_millis=gte.' + r.lo + '&date_millis=lt.' + r.hi +
+      (all ? '' : '&username=eq.' + encodeURIComponent(u || me())) + '&order=date_millis.asc,id.asc';
+  }
+  var APPR_URL = '/rest/v1/expense_approvals?select=*&order=submitted_at.desc,id.desc';     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
   function loadItems(cyc, all, force) {
     var k = itemKey(all, cyc);
     if (!force && ITEMS[k] && (ITEMS[k].rows || ITEMS[k].wait)) return ITEMS[k].wait || Promise.resolve(ITEMS[k].rows);
     var r = xRangeKey(cyc);
-    var p = C.fetchAll('/rest/v1/expense_items?select=*&date_millis=gte.' + r.lo + '&date_millis=lt.' + r.hi +
-      (all ? '' : '&username=eq.' + encodeURIComponent(me())) + '&order=date_millis.asc,id.asc')
-      .then(function (rows) { ITEMS[k] = { rows: sortItems(rows || []) }; return ITEMS[k].rows; })
+    // pages — 받은 글의 쪽 서명(조용히 새로 받기가 견준다, N3). 줄을 고치면 늘 dropItems 로 새로 받으니 서명은 그 줄들과 같이 간다
+    var p = sigAll(itemsUrl(cyc, all))
+      .then(function (x) { ITEMS[k] = { rows: sortItems(x.rows || []), pages: x.pages }; return ITEMS[k].rows; })
       .catch(function (e) { ITEMS[k] = { err: (e && e.authGone) ? '로그인이 만료됐어요.' : (e && e.noPerm) ? '개인경비를 볼 권한이 없어요.' : '개인경비를 불러오지 못했어요.' }; return null; });
     ITEMS[k] = { wait: p };
     if (!all) {
@@ -167,20 +179,65 @@
     return p;
   }
   // 늦게 출발한 받기가 이긴다 — 먼저 출발해 늦게 끝난 받기(결재함 새로 받기)가 결재 뒤 받은 새 목록을 덮지 않게(2026-11-02 검증 로봇 M3)
-  var LA_SEQ = 0;
+  //   loadAppr 는 출발할 때 표(LA_SEQ)를 올린다 · 조용히 새로 받기(loadQuiet)는 올리지 않고 출발 때의 표만 기억해 넣을 때 그대로면 올리고 넣는다
+  //   (고침 1차 N1 — 예전엔 조용한 받기가 출발할 때 올려서, 결재·상신 뒤 다시 받은 새 목록이 버려지고 결재한 문서가 「내 차례」에 남았다).
+  //   XAPPR_SIG — 지금 XAPPR 를 만든 받은 글의 쪽 서명(그 목록 객체와 함께 — 다른 길이 목록을 바꿨으면 무효)
+  var LA_SEQ = 0, XAPPR_SIG = null;
   function loadAppr() {
     var seq = ++LA_SEQ;
-    return C.fetchAll('/rest/v1/expense_approvals?select=*&order=submitted_at.desc,id.desc')     // id 둘째 열쇠 — 나눠 받을 때 겹침·빠짐 없게(2026-10-20)
-      .then(function (rows) {
+    return sigAll(APPR_URL)
+      .then(function (x) {
         if (seq !== LA_SEQ) return;
-        XAPPR = (rows || []).map(function (a) { a._kind = 'expense'; return a; });
+        XAPPR = (x.rows || []).map(function (a) { a._kind = 'expense'; return a; });
+        XAPPR_SIG = { pages: x.pages, obj: XAPPR };
       }).catch(function () { if (!XAPPR) XAPPR = []; });
   }
   function dropItems(cyc) { delete ITEMS[itemKey(false, cyc)]; delete ITEMS[itemKey(true, cyc)]; }
-  /** 운행일지 적재(loadAll)와 같이 돈다 — 결재 건과 지금 기간의 내 경비. */
-  function loadWith(soft) {
+  /** 조용히 다시 받기(2026-11-02 docs/nav-refresh/SPEC.md — 본체가 화면을 옮길 때·탭으로 돌아올 때 loadWith(true, { silent: true, signal, noAppr })).
+   *  받는 동안 ITEMS·XAPPR 를 건드리지 않는다(화면이 뼈대로 바뀌지 않게) — 다 받으면 { busy, commit } 을 돌려주고, 넣을 때는 본체가 고른다(쓰는 중이면 끝난 뒤).
+   *  결재 건은 출발 뒤 다른 받기가 출발하지도(LA_SEQ) 넣지도(XAPPR 객체) 않았을 때만 넣고 그때 표를 올린다 — 그 사이 따로 받기 시작했거나 넣었으면
+   *  (결재·상신 뒤 다시 받기) 그것이 이긴다(N1). 그래서 「같은 글」(same)은 출발 때 목록과 같다는 뜻 그대로다.
+   *  받은 글이 넣어 둔 것과 같으면(쪽 서명) 읽지도 넣지도 않는다(N3) · 받는 중인 칸은 받지 않는다(그것이 더 새것).
+   *  opt.signal — 본체가 더 새 받기를 출발하면 멈춘다 · opt.noAppr — 같은 때 결재함 받기가 결재 건을 받는 중이라 빼고 받는다(N8).
+   *  commit() 은 그 사이 다른 길(올리기·고치기·지우기·결재 뒤 다시 받기)로 그 칸을 다시 받았거나 받는 중이면 그 칸을 덮지 않는다 — 바뀐 것이 있으면 true. */
+  function loadQuiet(S, opt) {
+    opt = opt || {};
+    var cyc = S.CYCKEY, u = me(), all = isAdmin() && ADMIN_X.indexOf(S.VIEW) >= 0, a0 = LA_SEQ, r = xRangeKey(cyc), sg = opt.signal;
+    var km = itemKey(false, cyc), ka = itemKey(true, cyc), xm = ITEMS[km], xa = ITEMS[ka];
+    var ap0 = XAPPR, am = XAPPR_SIG && XAPPR_SIG.obj === XAPPR ? XAPPR_SIG.pages : null;
+    var q = function (a, x0) { return x0 && x0.wait ? null : sigAll(itemsUrl(cyc, a, u), sg, x0 && x0.rows ? x0.pages : null); };
+    return Promise.all([
+      opt.noAppr ? null : sigAll(APPR_URL, sg, am),
+      q(false, xm), all ? q(true, xa) : null,
+      rest('/rest/v1/rpc/expense_cycle_locked', { method: 'POST', body: JSON.stringify({ p_username: u, p_ms: r.lo }), signal: sg }).catch(function () { return null; })
+    ]).then(function (o) {
+      var put = function (k, x0, x) {
+        if (!x || x.same || ITEMS[k] !== x0 || (x0 && x0.wait)) return false;   // 같은 글 · 그 사이 다시 받았거나 받는 중(그것이 더 새것)
+        ITEMS[k] = { rows: sortItems(x.rows || []), pages: x.pages }; return true;
+      };
+      return {
+        busy: function () { return false; },
+        commit: function () {
+          if (me() !== u || C.state().CYCKEY !== cyc) return false;
+          var ch = false;
+          if (o[0] && LA_SEQ === a0 && XAPPR === ap0) {                        // 출발 뒤 다른 받기가 출발하지도 넣지도 않았다 — 넣고 표를 올린다(M3 · N1)
+            LA_SEQ++;
+            if (!o[0].same) { XAPPR = (o[0].rows || []).map(function (a) { a._kind = 'expense'; return a; }); ch = true; }
+            XAPPR_SIG = { pages: o[0].pages, obj: XAPPR };
+          }
+          if (put(km, xm, o[1])) ch = true;
+          if (all && put(ka, xa, o[2])) ch = true;
+          if (o[3] === true || o[3] === false) XLOCK[u + '|' + cyc] = o[3];
+          return ch;
+        }
+      };
+    });
+  }
+  /** 운행일지 적재(loadAll)와 같이 돈다 — 결재 건과 지금 기간의 내 경비. opt.silent = 조용히 다시 받기(loadQuiet — opt 를 그대로 넘긴다). */
+  function loadWith(soft, opt) {
     var S = C.state();
     if (!S.ME) return null;
+    if (opt && opt.silent) return loadQuiet(S, opt);
     if (!soft) ITEMS = {};
     var ps = [loadAppr(), loadItems(S.CYCKEY, false, !soft)];
     if (isAdmin() && ADMIN_X.indexOf(S.VIEW) >= 0) ps.push(loadItems(S.CYCKEY, true, !soft));
