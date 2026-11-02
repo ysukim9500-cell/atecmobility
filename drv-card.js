@@ -151,6 +151,15 @@
     return u === me() && CLOCK[u + '|' + cyc] === true && !(a && (a.status === 'rejected' || a.status === 'withdrawn'));
   }
   function apprById(id) { return (CAPPR || []).filter(function (a) { return String(a.id) === String(id); })[0] || null; }
+  /** 「이번 기간 내역 없음」 효력(2026-11-02 docs/none-mark/SPEC.md §5) — 내 그 기간: 표시 + 결재 중·완료 아님 + 그 기간 카드 줄 0건.
+   *  ★ 이 모듈은 보고 있는 기간의 줄만 받는다 — 줄(또는 결재 목록)을 아직 받지 않은 기간은 null = 모름(효력 없음으로 친다 — 0건으로 치면 가짜 「내역 없음」이 뜬다).
+   *    포털 hint 는 null 이면 같은 기간에 알던 값을 그대로 둔다(검토 L6). 화면은 === true 로만 본다. */
+  function noneOn(k) {
+    var x = ITEMS[itemKey(false, k)];
+    if (!C.noneEffective || CAPPR === null || !x || !x.rows) return null;
+    var a = myC(k);
+    return C.noneEffective('card', me(), k, x.rows.length, a ? a.status : '');
+  }
   function mineRows(cyc) { var x = ITEMS[itemKey(false, cyc)]; return ((x && x.rows) || []).filter(function (it) { return it.username === me(); }); }
   function findMine(id) { return mineRows(C.state().CYCKEY).filter(function (it) { return String(it.id) === String(id); })[0] || null; }
   /** 구분 추천의 「전에 쓴 구분」 — 이번 달에 이미 적은 줄(최근 순) + 지난 줄. */
@@ -193,6 +202,8 @@
       '<button class="btn sm" data-cyc="' + cur.y + '-' + cur.m + (cur.x || '') + '">이번 기간(' + esc(CR.short(cur)) + ' ' + esc(cSpan(cur)) + ')으로 →</button></div>';
   }
   function tag(key) {
+    // 「내역 없음」 효력이면 그 딱지(2026-11-02 — 결재 상태 딱지와 같은 꼴, 색 없음). 줄을 받지 않은 기간은 모름 = 딱지 없음
+    if (noneOn(key) === true) return '<span class="st dim">내역 없음</span>';
     var a = myC(key);
     if (!a) return '';
     var m = { approved: ['결재 완료', 'ok'], submitted: ['결재 중', 'warn'], rejected: ['반려', 'bad'], withdrawn: ['회수', 'dim'] }[a.status];
@@ -229,6 +240,10 @@
    *  ★ 2026-10-15: 본인 화면에서는 결재자용 요약 표(brief)를 빼고 검증 딱지 · PDF·엑셀 단추만(개인경비와 같게). 결재함 카드는 그대로. */
   function apprStrip(a) {
     var st = C.apprStatusText(a);
+    // 「이번 기간 내역 없음」 효력이면 회수·반려 건이어도 「다시 상신하세요」·「수정 후 다시 상신 →」을 두지 않는다 — 빈 상신은 서버가 막아
+    //   따라갈 수도 없는 일이었다(2026-11-02 검토 M1). 상태 딱지·진행 줄·의견은 그대로(정정 중 글의 「고친 뒤 다시 상신하세요.」 꼬리만 뗀다).
+    var nn = noneOn(C.state().CYCKEY) === true;
+    if (nn && C.noResubmit) st = { t: C.noResubmit(st.t), cls: st.cls };
     var canWithdraw = a && a.status === 'submitted' && !(a.steps || []).some(function (x) { return x.result; });
     var btn = canWithdraw ? '<button class="btn sm" data-appr="withdraw" data-kind="card" data-id="' + a.id + '">회수</button>' : '';
     if (a && (a.status === 'submitted' || a.status === 'approved')) wantSums([a.id]);
@@ -240,7 +255,7 @@
       (a && a.status === 'submitted' ? '<div class="anote">결재 중에는 이 기간의 카드 내역을 고칠 수 없어요. ' +
         (canWithdraw ? '고치려면 회수한 뒤 다시 상신하세요.' : '이미 승인한 결재자가 있어 회수할 수 없어요. 고치려면 지금 차례인 결재자에게 반려를 요청하세요.') + '</div>' : '') +
       // 반려·회수 뒤 — 어디서 다시 상신하는지(운행일지 띠와 같게, 2026-10-16 3차). 검증·상신 화면이 아니면 그리 가는 길도.
-      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote afix">고친 뒤 ‘검증·상신’에서 다시 상신하세요.' +
+      (a && (a.status === 'rejected' || a.status === 'withdrawn') && !nn ? '<div class="anote afix">고친 뒤 ‘검증·상신’에서 다시 상신하세요.' +
         (C.state().VIEW !== 'c_verify' ? ' <button class="btn pri sm" data-v="c_verify">수정 후 다시 상신 →</button>' : '') + '</div>' : '') +
       '</div></section>';
   }
@@ -279,13 +294,20 @@
     // 결재 중 안내는 위 결재 띠에 이미 있다 — 여기서는 결재가 끝난 기간만(2026-10-15, 같은 안내 두 번)
     if (locked && a && a.status === 'approved') h += '<div class="hpnote">' + ic('check', 16) + '<span><b>결재가 끝난 기간이라 카드 내역을 올리거나 고칠 수 없어요.</b> ' +
       '고칠 것이 있으면 관리자에게 정정을 요청하세요.</span></div>';
+    // 「이번 기간 내역 없음」(2026-11-02 docs/none-mark/SPEC.md §5) — 빈 기간 자리에 보조 단추, 효력이 있으면 표시 블록 + 「되살리기」(운행일지 월 마감과 같은 글)
+    var NM = C.noneUi ? C.noneUi('card', cyc, rows.length, a ? a.status : '') : { on: false, can: false };
     h += C.sect('내역', '<span id="cSectN">' + sectN(rows) + '</span>', '',
       rows.length ? (locked ? '' : saveLineHtml(rows)) + tableHtml(rows, locked, hist)
-        : '<div class="panel"><div class="blank"><div class="ico">' + ic('card', 21) + '</div><div class="t">' +
-          '이 기간에 올린 카드 내역이 없어요.</div>' +
-          // 파일 형식은 줄에서 갈리지 않게 묶는다(2026-11-02 화면 로봇)
-          (locked ? '' : '<div class="d">ERP에서 내 법인카드 승인내역을 <span style="white-space:nowrap">엑셀(.xls, .xlsx)로</span> 다운로드해서 올려 주세요. 0원·취소 줄은 자동으로 빠져요.<br>' +
-            '법인카드를 쓰지 않았으면 할 일이 없어요.</div>') +
+        : '<div class="panel"><div class="blank"' + (NM.on ? ' data-nonemark' : '') + '><div class="ico">' + ic('card', 21) + '</div>' + (NM.on
+          ? '<div class="t">' + C.noneTitle(cyc) + '</div><div class="d">' + esc(C.noneSaid) + '</div>' + C.noneBtn('card', cyc, true)
+          : '<div class="t">이 기간에 올린 카드 내역이 없어요.</div>' +
+            // 파일 형식은 줄에서 갈리지 않게 묶는다(2026-11-02 화면 로봇)
+            (locked ? '' : '<div class="d">ERP에서 내 법인카드 승인내역을 <span style="white-space:nowrap">엑셀(.xls, .xlsx)로</span> 다운로드해서 올려 주세요. 0원·취소 줄은 자동으로 빠져요.<br>' +
+              // 따옴표 낱말 + 토씨는 한 덩이로(크롬이 「없음’ / 을」로 가를 수 있다 — 아래 「‘추천 구분 채우기’로」와 같은 방법).
+              //   두 문장 사이는 줄을 바꾸고(<br>), 짝말(눌러 주세요 · 마감 안내)은 &nbsp; 로 붙인다(2026-11-02 화면 검토 L5)
+              (NM.can ? '법인카드를 쓰지 않았으면 <span style="white-space:nowrap">‘이번 기간 내역 없음’을</span> 눌러&nbsp;주세요.<br>마감&nbsp;안내가 멈춰요.'
+                : '법인카드를 쓰지 않았으면 할 일이 없어요.') + '</div>') +
+            (NM.can ? C.noneBtn('card', cyc, false) : '')) +
           '</div></div>');
     // 줄이 없는 기간에는 빈칸 안내가 할 일이 아니다(2026-11-02 화면 로봇)
     if (!locked && rows.length) h += '<div class="anote"><b>구분·사용목적이 빈 줄이 있으면 상신할 수 없어요.</b> 구분 칸의 점선 버튼은 <b>추천</b>이라 ' +
@@ -1327,6 +1349,8 @@
       var lastC = {};
       rows.forEach(function (it) { var ms = Date.parse(it.updated_at || it.created_at || '') || 0; if (ms > (lastC[it.username] || 0)) lastC[it.username] = ms; });
       h += '<div class="d2grid">' + C.follow('card', S.CYCKEY, list.filter(function (x) {
+        // 「이번 기간 내역 없음」 효력이 있는 사람은 회수·반려여도 뺀다(2026-11-02 SPEC §5 — 서버 remind 도 「이 기간 자료 없음」으로 건너뛴다)
+        if (C.noneEffective && C.noneEffective('card', x.u, S.CYCKEY, x.n, x.a ? x.a.status : '')) return false;
         return (!x.a && x.n > 0) || (x.a && (x.a.status === 'rejected' || x.a.status === 'withdrawn'));
       }).map(function (x) {
         var a = x.a, st = !a ? 'none' : a.status, rs = st === 'rejected' ? (a.steps || []).filter(function (s) { return s && s.result === 'rejected'; })[0] : null;
@@ -1386,20 +1410,27 @@
     rows.forEach(function (it) { if (C.orgMatch(it.username)) (mine[it.username] = mine[it.username] || []).push(it); });
     Object.keys(mine).forEach(function (u) { if (users.indexOf(u) < 0) users.push(u); });
     var list = users.map(function (u) { var r = mine[u] || [], t = R.totals(r); return { u: u, n: t.n, sum: t.cost, blank: R.blankRows(r), a: cApprOf(u, S.CYCKEY) }; });
-    var none = list.filter(function (x) { return !x.n; }).length;
+    // 「이번 기간 내역 없음」(2026-11-02 SPEC §5 — 운행일지 직원 현황과 같은 나눔): 자료 기준 이름 「내역 있음·내역 없음」은 그대로 두고,
+    //   카드 줄 0건이고 효력이 있는 사람은 「없음 표시」로 따로 센다(「내역 없음」 = 줄도 표시도 없는 사람만)
+    var marked = function (x) { return !x.n && !!C.noneEffective && C.noneEffective('card', x.u, S.CYCKEY, x.n, x.a ? x.a.status : ''); };
+    var mk = list.filter(marked).length, has = list.filter(function (x) { return x.n; }).length, none = list.length - has - mk;
     var h = head('직원 현황', n0(list.length) + '명');
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 기간 법인카드</div>' +
-      '<p class="verdict">' + (list.length - none ? '<em>' + n0(list.length - none) + '명</em>이 카드 내역을 올렸어요' : '<em>아직 올린 카드 내역이 없어요</em>') + '</p>' +
-      '<div class="facts">' + fact('등록 인원', n0(list.length) + '<small>명</small>') + fact('내역 있음', n0(list.length - none) + '<small>명</small>') + fact('내역 없음', n0(none) + '<small>명</small>') + '</div></div>';
+      '<p class="verdict">' + (has ? '<em>' + n0(has) + '명</em>이 카드 내역을 올렸어요' : '<em>아직 올린 카드 내역이 없어요</em>') + '</p>' +
+      // 칸 넷(f4) — 태블릿(601~900)에서도 한 줄(2026-11-02 화면 검토 L3, 운행일지 직원 현황과 같다)
+      '<div class="facts f4">' + fact('등록 인원', n0(list.length) + '<small>명</small>') + fact('내역 있음', n0(has) + '<small>명</small>') + fact('내역 없음', n0(none) + '<small>명</small>') +
+      fact('없음 표시', n0(mk) + '<small>명</small>') + '</div></div>';
     list.sort(function (x, y) { return y.sum - x.sum; });
     h += C.sect('명단', n0(list.length) + '명', '', list.length ? '<div class="panel"><div class="scroll" data-rows><table><thead><tr><th>파트·센터</th><th>이름</th><th>직급</th>' +
-      '<th class="n">건수</th><th class="n">합계</th><th>빈칸</th><th>결재</th></tr></thead><tbody>' +
+      // 건수 칸은 폭을 정해 둔다(nmcol) — 「없음 표시」 딱지가 생겨도 표 칸 너비가 다시 나뉘지 않게(2026-11-02 화면 검토 L5)
+      '<th class="n nmcol">건수</th><th class="n">합계</th><th>빈칸</th><th>결재</th></tr></thead><tbody>' +
       C.orgGroups(list, function (x) { return x.u; }, true).map(function (g) {
-        return C.orgGroupRow(g, 7, '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
-          var u = S.USERS[x.u] || {};
+        var gm = g.list.filter(marked).length;
+        return C.orgGroupRow(g, 7, (gm ? '없음 표시 ' + n0(gm) + '명 · ' : '') + '합계 <b>' + won(g.list.reduce(function (s, x) { return s + x.sum; }, 0)) + '</b>') + g.list.map(function (x) {
+          var u = S.USERS[x.u] || {}, nm = marked(x);                   // 건수 칸 — 효력이 있으면 0 대신 딱지
           return '<tr' + (x.n ? ' class="clk" tabindex="0" data-cperson="' + esc(x.u) + '"' : '') + '>' + C.orgCell(x.u, true) +
             '<td><span class="lead">' + esc(C.nameOf(x.u)) + '</span></td><td class="dim">' + esc(u.position || '—') + '</td>' +
-            '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td><td class="n total">' + (x.sum ? n0(x.sum) : '—') + '</td>' +
+            '<td class="n' + (x.n || nm ? '' : ' dim') + '">' + (nm ? '<span class="st dim" data-nonechip>없음 표시</span>' : n0(x.n)) + '</td><td class="n total">' + (x.sum ? n0(x.sum) : '—') + '</td>' +
             '<td>' + (x.blank ? '<span class="st bad">' + n0(x.blank) + '줄</span>' : '<span class="dim">—</span>') + '</td>' +
             '<td>' + (x.a ? stChip(x.a) : (x.n ? '<span class="st warn">상신 전</span>' : '<span class="dim">—</span>')) + '</td></tr>';
         }).join('');
@@ -1760,6 +1791,8 @@
     // range·status: 마감 뒤 며칠(GRACE_DAYS) 동안 처음 보일 기간·마감 띠(driving-app.js defCyc·graceBand, 2026-10-20)
     period: { mode: 'c', views: CVIEWS, current: cCurrent, span: cSpan, band: band, tag: tag, range: cRange,
       status: function (k) { var a = myC(k); return a ? a.status : ''; },
+      // 「이번 기간 내역 없음」 효력(2026-11-02) — 마감 띠(graceBand)·포털 hint 가 쓴다. true·false = 안다 · null = 그 기간 줄을 받지 않아 모름(효력 없음으로 친다)
+      none: function (k) { return noneOn(k); },
       row: function (k) { return myC(k) || null; } },          // 포털 한 줄이 정정 열기를 「정정 중」으로 가른다(2026-10-21)
     load: loadWith,
     onGo: function (v, prev) {

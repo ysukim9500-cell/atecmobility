@@ -362,6 +362,9 @@
   var ORG = [];                             // 조직도(driving_org) — 결재선을 짜는 사람 목록
   // 관리자가 사람마다 지정한 결재선(driving_line_override, 2026-10-14) — { 상신자 아이디: 행 }. 표가 없으면 LINE_OV_OK = false.
   var LINE_OV = {}, LINE_OV_OK = false;
+  // 「이번 기간 내역 없음」 표시(approval_none, 2026-11-02 docs/none-mark/SPEC.md) — { 'kind|아이디|기간': 1 }. RLS 가 본인 것(관리자는 전부)만 준다.
+  //   표가 없거나(배포 차례) 못 읽으면 빈 것 = 표시 없음(SPEC §9).
+  var NONE = {};
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
   var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [],
     // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
@@ -623,6 +626,16 @@
   function graceBand() {
     var P = pv(), cur = curCyc(), key = cycKey(CYC);
     var r = cycleRange(CYC, kindOfView()), span = cycleSpan(CYC, kindOfView());
+    // 「이번 기간 내역 없음」 효력(2026-11-02 SPEC §4) — 본인 화면이면 마감 안내 대신 표시했다는 말만(빨강·「지금 상신해 주세요」 없이, 「… 보기 →」는 그대로).
+    //   개인경비·법인카드는 모듈이 알려 준다(period.none — 그 기간 줄을 받지 않았으면 false)
+    var nn = !isAll() && (P ? !!(P.none && P.none(key)) : noneOnD(key));
+    if (nn) {
+      // 굵은 기간 이름은 한 덩이(CSS .cycband.nonem b — nowrap). 폰(≤600)에서는 뒷말을 다음 줄로 내리고 「·」는 숨긴다(.nmsep·.nmtail) —
+      //   예전에는 「2026년 10월분 / (09.21~10.20) · …」처럼 이름이 찢겼다(2026-11-02 화면 검토 M2). 「·」는 앞말에 붙여(&nbsp;) 줄 처음에 오지 않게.
+      return '<div class="cycband nonem" data-graceband data-nonemark><span>' + ic('cal', 15) + '<b>' + cycleName(CYC) + ' (' + esc(span) + ')</b>' +
+        '<span class="nmsep">&nbsp;· </span><span class="nmtail">' + nowrapQ('‘내역 없음’으로') + ' 표시했어요.</span></span>' +
+        '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + ' 보기 →</button></div>';
+    }
     var st = isAll() ? '' : P ? (P.status ? P.status(key) : '') : ((myAppr(key) || {}).status || '');
     var say = isAll() ? '아직 상신하지 않은 사람은 지금 상신하면 돼요.'
       : st === 'approved' ? '결재가 끝났어요.' : st === 'submitted' ? '결재 중이에요.'
@@ -634,6 +647,8 @@
   }
   /** 내 결재 상태 한 마디(주기 목록에 붙인다). */
   function myApprTag(key) {
+    // 「내역 없음」 효력이면 그 딱지(2026-11-02 — 개인경비·법인카드 기간 딱지와 같은 꼴, 색 없음). 운행을 받아 둔 지금 기간만 안다(다른 기간은 모름 = 딱지 없음)
+    if (noneOnD(key)) return '<span class="st dim">내역 없음</span>';
     var a = myAppr(key);
     if (!a) return '';
     var m = { approved: ['결재 완료', 'ok'], submitted: ['결재 중', 'warn'], rejected: ['반려', 'bad'], withdrawn: ['회수', 'dim'] }[a.status];
@@ -812,7 +827,7 @@
     //   요청이 버려져 옛 주기 데이터가 새 주기 이름으로 그려졌다. 이제는 표를
     //   달아 두고, 늦게 도착한 응답을 버린다.
     var soft = !!(opt && opt.soft);
-    var seq = ++LOAD_SEQ;
+    var seq = ++LOAD_SEQ, ng0 = NONE_GEN;     // ng0 — 받는 사이 표시하기·되살리기를 했으면 받아 온 표시 목록으로 덮지 않는다(2026-11-02 검토 L5)
     LOADING = true; LOADED = false; AUDIT = null; LOAD_ERR = '';
     if (!soft) { TRIP_CACHE = {}; STATIC_AT = 0; }
     render();
@@ -874,7 +889,9 @@
       // 조직도(사람 명단 — 관리 화면). 내려간 사람(active=false)은 받지 않는다.
       fetchAll('/rest/v1/driving_org?select=*&active=eq.true&order=sort.asc,id.asc'),
       // 관리자가 지정한 결재선(2026-10-14). 표가 아직 없거나 못 받아도 화면은 멈추지 않는다(자동 결재선만 쓴다).
-      fetchLineOv()
+      fetchLineOv(),
+      // 「이번 기간 내역 없음」 표시(2026-11-02) — 못 받거나 표가 없으면(404) 빈 목록 = 표시 없음. 적재를 막지 않는다(SPEC §4·§9)
+      fetchAll('/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc').catch(function () { return []; })
     ]);
 
     Promise.all([tripsP, staticP, extP]).then(function (both) {
@@ -903,6 +920,7 @@
         PEOPLE = {}; (out[9] || []).forEach(function (p) { PEOPLE[p.username] = p; });
         ORG = out[10] || [];
         setLineOv(out[11]);
+        if (NONE_GEN === ng0) setNone(out[12]);
         STATIC_AT = Date.now();
       }
       RATE_MISS = {};
@@ -1692,6 +1710,8 @@
     var noPhoto = ev.filter(function (e) { return Number(e.amount) > 0 && !e.photo_path; }).length;
     var a = myAppr(), st = a ? a.status : '';
     var sent = st === 'submitted' || st === 'approved';
+    // 「이번 기간 내역 없음」 효력(2026-11-02 SPEC §4) — 지금 할 단계(now)를 두지 않는다: 메뉴 단계 깜빡임·「지금 할 일」이 멈춘다
+    var none = LOADED && !isMulti() && noneEffective('driving', mine, CYCKEY(), my.length, st);
     var steps = [
       { v: 'trips', t: '운행 기록', n: fixBad,
         sub: !my.length ? '운행 없음' : fixBad ? '고칠 것 ' + n0(fixBad) + '건'
@@ -1700,7 +1720,8 @@
       { v: 'evid', t: '영수증·통행료', n: unk,
         sub: (ev.length ? '영수증 ' + n0(ev.length) + '장' : '영수증 없음') + (unk ? ' · 통행료 미확정 ' + n0(unk) : '') },
       { v: 'verify', t: '검증·상신', n: 0,
-        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '상신함' : st === 'rejected' ? '반려됨 · 다시 상신' : '아직 안 함' },
+        // 「내역 없음」 효력이면 반려 건이어도 「다시 상신」을 붙이지 않는다(2026-11-02 검토 M1)
+        sub: st === 'approved' ? '결재 완료' : st === 'submitted' ? '상신함' : st === 'rejected' ? (none ? '반려됨' : '반려됨 · 다시 상신') : '아직 안 함' },
       { v: 'settle', t: '정산·엑셀', n: 0, sub: st === 'approved' ? '받을 수 있음' : '결재 후' }
     ];
     var cur = -1;
@@ -1709,9 +1730,9 @@
     } else {
       // 사람이 진행한 위치를 따른다(① 부터). 상신 전에는 ④ 검증·상신까지만.
       cur = Math.min(stepNow(), 3) - 1;
-      steps.forEach(function (x, j) { x.state = j < cur ? 'done' : j === cur ? 'now' : 'todo'; });
+      steps.forEach(function (x, j) { x.state = j < cur ? 'done' : j === cur && !none ? 'now' : 'todo'; });
     }
-    return { steps: steps, cur: cur, sent: sent, status: st, trips: my, ev: ev, unk: unk, fix: fix, fixBad: fixBad, noPhoto: noPhoto };
+    return { steps: steps, cur: cur, sent: sent, status: st, trips: my, ev: ev, unk: unk, fix: fix, fixBad: fixBad, noPhoto: noPhoto, none: none };
   }
   function paintPills() {
     var S = stepInfo();
@@ -3854,19 +3875,27 @@
     // 「바로」(max 0 — 409·403 뒤)인데 앞서 출발한 받기가 도는 중이면, 그것이 끝난 뒤 한 번 더 받는다(앞 받기는 바뀌기 전 자료일 수 있다, 재검토 R1)
     if (APPR_BUSY) return max === 0 ? APPR_BUSY.then(function () { return apprRefresh(opt); }) : APPR_BUSY;
     if (Date.now() - Math.max(APPR_AT, STATIC_AT) < max) return Promise.resolve(false);
-    var who = myName(), sig0 = apprSig(), g0 = APPR_GEN;
+    var who = myName(), sig0 = apprSig(), g0 = APPR_GEN, ng0 = NONE_GEN;
     APPR_AT = Date.now();                  // 실패해도 바로 다시 묻지 않게(창을 오갈 때마다)
     APPR_BUSY = Promise.all([
       fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc'),
       // 개인경비·법인카드 — soft: 결재 건만 새로 받는다(실패는 모듈 안에서 삼키고 받아 둔 목록을 그대로 둔다)
-      Promise.all(EXT.load.map(function (fn) { try { return Promise.resolve(fn(true)).catch(function () { }); } catch (e) { return null; } }))
+      Promise.all(EXT.load.map(function (fn) { try { return Promise.resolve(fn(true)).catch(function () { }); } catch (e) { return null; } })),
+      // 「이번 기간 내역 없음」 표시도 다시 받는다 — 포털(다른 탭)에서 표시·되살리기하고 돌아오면 그 탭이 다음 전체 적재까지 옛 표시로
+      //   빨간 마감 띠·깜빡임을 보였다(2026-11-02 검토 L5). 못 받으면(표 없음·실패) null = 받아 둔 표시 그대로 — 새로 받기를 막지 않는다.
+      fetchAll('/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc').catch(function () { return null; })
     ]).then(function (res) {
       APPR_BUSY = null;
       if (myName() !== who) return false;
       if (APPR_GEN === g0) { APPR = res[0] || []; APPR_GEN++; }      // 그 사이 다른 길로 더 새 목록이 들어왔으면 덮지 않는다(M3)
+      var ns0 = noneSig();
+      if (Array.isArray(res[2]) && NONE_GEN === ng0) setNone(res[2]);  // 그 사이 이 탭에서 표시·되살리기를 했으면 덮지 않는다(L5)
+      var noneCh = noneSig() !== ns0;
       APPR_AT = Date.now();
       var changed = apprSig() !== sig0;
       if (changed) apprShow();
+      // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니고 다시 그려도 될 때만(창이 열렸거나 칸에 쓰는 중이면 다음에 그릴 때 보인다)
+      if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox' && LOADED && !LOADING && !apprHold()) render(); }
       return changed;
     }, function (e) {
       APPR_BUSY = null;
@@ -5178,11 +5207,13 @@
     return plates.filter(function (p) { return !shots.some(function (e) { return plateOf(e) === p; }); });
   }
 
-  /** 이번 달 마감 맨 위 반려 사유 띠 — 반려된 기간에만(정정 열기 포함). 3단계 검증 화면의 띠와 같은 모양. */
-  function rejBandHtml() {
+  /** 이번 달 마감 맨 위 반려 사유 띠 — 반려된 기간에만(정정 열기 포함). 3단계 검증 화면의 띠와 같은 모양.
+   *  none = 그 기간 「내역 없음」 효력 — 반려 정보(누가·사유)는 그대로 두고 「다시 상신하세요」만 뺀다(2026-11-02 검토 M1 — 마감 안내 멈춤). */
+  function rejBandHtml(none) {
     var a = myAppr();
     if (!a || a.status !== 'rejected') return '';
     var rsx = apprStatusText(a);
+    if (none) return '<div class="hpnote warn" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(endDot(noResubmit(rsx.t))) + '</b></span></div>';
     // 상태 글(반려 사유로 끝남)과 할 일 사이에 마침표 한 번(2026-10-24 검수 — 줄표를 뺀 자리에서 두 글이 붙어 읽혔다)
     return '<div class="hpnote warn" data-rejband>' + ic('alert', 16) + '<span><b>' + esc(/다시 상신/.test(rsx.t) ? rsx.t : endDot(rsx.t)) + '</b>' +
       (/다시 상신/.test(rsx.t) ? '' : ' 고친 뒤 ‘검증·상신’ 단계에서 다시 상신하세요.') + '</span></div>';
@@ -5224,8 +5255,8 @@
         : '전체 직원 ' + Object.keys(USERS).filter(function (u) { return USERS[u].uses_driving !== false; }).length + '명');
 
     // 공지 띠 「통행료·주차비 영수증 필수」(2026-10-15 2차 — 닫으면 이 브라우저에 기억)
-    // 반려된 기간이면 반려 사유가 맨 위(공지·계기판 안내보다 먼저, 2026-10-16 3차)
-    if (!isAll()) h += rejBandHtml();
+    // 반려된 기간이면 반려 사유가 맨 위(공지·계기판 안내보다 먼저, 2026-10-16 3차) — 「내역 없음」 효력이면 「다시 상신하세요」 없이(2026-11-02)
+    if (!isAll()) h += rejBandHtml(noneOnD(CYCKEY()));
     if (!isAll()) h += noticeBand();
     // 21일이 지나 들어오면 새 주기가 먼저 뜬다. 지난달분을 아직 안 올렸으면 그것부터 알려 준다.
     var pp = prevPending();
@@ -5308,7 +5339,8 @@
   /** 지금 단계 — 제목 줄 오른쪽 단추·남은 일 맨 위 한 줄·폰 「다음 할 일」(남은 일이 없을 때). 상신한 기간·빈 기간은 null. */
   function closeStep(S, closed) {
     var cur = S.cur;
-    if (S.sent || (cur === 0 && !S.trips.length && !S.ev.length)) return null;
+    // 「내역 없음」 효력이면 지금 단계 단추(빨강·깜빡임)도 없다(2026-11-02)
+    if (S.sent || S.none || (cur === 0 && !S.trips.length && !S.ev.length)) return null;
     if (cur === 0) {
       // 「2 영수증·통행료 →」 단추는 이 화면이 아니라 운행 기록·기록 점검 화면 맨 아래에 있다 — 그 화면을 말한다(2026-10-20 V3 U2)
       if (S.fixBad) return { n: 1, t: '운행 기록 ' + n0(S.fixBad) + '건을 먼저 고치세요',
@@ -5506,6 +5538,9 @@
   function homeA(T, A, badN, approved, closed, days, bands) {
     var S = stepInfo(), st = S.status, cur = S.cur, sentNow = st === 'submitted' || st === 'approved';
     var empty = !sentNow && cur === 0 && !S.trips.length && !S.ev.length;
+    // 「이번 기간 내역 없음」(2026-11-02 SPEC §4) — 자료 = 이 기간 내 운행(지운 것 빼고, 서버 remindCounts 와 같다). 단추는 empty(영수증·저장된 단계까지 보는
+    //   더 좁은 조건)로 정하지 않는다 — 운행 0건인데 단추가 없는 때가 생겨 포털·서버와 어긋난다(11/2 설계 확인 로봇)
+    var NM = noneUi('driving', CYCKEY(), S.trips.length, st), nbtn = '';
     var step = closeStep(S, closed), when = dueText(cycleRange(CYC), Date.now());
     var title = cmpCycle(CYC, currentCycle()) === 0 ? '월 마감' : cycleName(CYC) + ' 마감';
     // 제목 줄 — 오른쪽에 지금 단계 단추 하나(빨간 단추는 화면에 하나, 폰에서는 아래 「다음 할 일」이 대신한다).
@@ -5522,15 +5557,23 @@
       verdict = '<em>결재 중이에요</em>'; clean = ' wait';
       // 2026-10-19 웹 사용성 1차: 「결재 중」을 세 번 말하던 것 → 큰 제목 + 고치는 방법 한 줄(결재 띠 아래 같은 안내는 뺐다)
       desc = fixHowPlain(myAppr());
+    } else if (NM.on) {
+      // 「내역 없음」으로 표시한 기간 — 같은 자리에 표시 블록 + 보조 단추 「되살리기」
+      verdict = noneTitle(CYCKEY()); clean = ' clean'; desc = NONE_SAID; nbtn = noneBtn('driving', CYCKEY(), true);
     } else if (empty) {
       verdict = '아직 기록된 운행이 없어요'; clean = ' clean'; desc = '앱에서 운행을 기록하면 여기에 모여요.';
     } else if (st === 'rejected') {
       // 반려된 기간(2026-10-16 3차) — 사유 띠는 viewClose 가 맨 위에(rejBandHtml)
       // 관리자가 「정정 열기」로 다시 연 기간이면 「정정 중」(위 띠·포털·결재함과 같은 말, 2026-10-25 교육 자료 로봇)
       verdict = (reopenInfo(myAppr()) ? '정정 중이에요' : '반려됐어요') + '. 고쳐서 <em>다시 상신</em>하세요'; desc = step ? step.d : '';
+    } else if (NM.can) {
+      // 운행은 0건인데 영수증만 있거나 단계를 넘겨 둔 기간 — 빈 기간과 같은 말(아래 단추를 둘 자리)
+      verdict = '아직 기록된 운행이 없어요'; clean = ' clean'; desc = '앱에서 운행을 기록하면 여기에 모여요.';
     }
-    // 마감일 당일·마감 뒤 며칠은 빨강·굵게(AU6-L7) — 상신한 뒤에는 빨갛게 하지 않는다(AU6-M1 과 같은 원칙)
-    var hot = !sentNow && /오늘 마감|지남/.test(when);
+    // 그 아래 보조 단추 「이번 기간 내역 없음」(본인 화면 · 기간 시작 · 결재 중·완료 아님 · 운행 0건)
+    if (NM.can) nbtn = noneBtn('driving', CYCKEY(), false);
+    // 마감일 당일·마감 뒤 며칠은 빨강·굵게(AU6-L7) — 상신한 뒤에는 빨갛게 하지 않는다(AU6-M1 과 같은 원칙). 「내역 없음」 효력이어도 빨갛게 하지 않는다(마감 안내 멈춤)
+    var hot = !sentNow && !NM.on && /오늘 마감|지남/.test(when);
     h += '<div class="hero fade cstep"><div class="eyebrow"><span class="dot' + (st === 'approved' ? ' ok' : '') + '"></span>' +
       esc(cycleName(CYC)) + ' · ' + esc(cycleSpan(CYC)) + ' · <b class="due' + (hot ? ' hot' : '') + '">' + esc(when) + '</b></div>' +
       '<div class="steps">' + S.steps.map(function (x, i) {
@@ -5539,7 +5582,8 @@
         return '<button class="stp ' + x.state + '" data-v="' + x.v + '"' + (x.state === 'now' ? ' aria-current="step"' : '') +
           '><i></i><b>' + esc((i + 1) + ' ' + x.t) + (tail ? '<em>' + esc(tail) + '</em>' : '') + '</b><span>' + esc(x.sub) + '</span></button>';
       }).join('') + '</div>' +
-      (verdict ? '<div class="nowrow"><div style="flex:1;min-width:0"><p class="verdict' + clean + '">' + verdict + '</p>' + (desc ? '<div class="nd">' + esc(desc) + '</div>' : '') + '</div></div>' : '') +
+      (verdict ? '<div class="nowrow"' + (NM.on ? ' data-nonemark' : '') + '><div style="flex:1;min-width:0"><p class="verdict' + clean + '">' + verdict + '</p>' +
+        (desc ? '<div class="nd">' + esc(desc) + '</div>' : '') + nbtn + '</div></div>' : '') +
       '</div>';
 
     // 운행일지 첫 화면 — 결재함 갈래 나누기(2026-10-08)에 맞춰 운행일지 결재 건만 센다(「결재함 열기」가 여는 것과 같게).
@@ -5563,14 +5607,16 @@
       list: TK ? TK.list.slice(0, 6).map(function (x) { return { k: x.k, sev: x.sev, t: x.t, d: x.d }; }) : [], n: TK ? TK.list.length : 0 };
 
     // 「아직 상신하지 않았습니다」 띠는 3단계(검증·상신)일 때만(2026-10-19). 상신한 적이 있으면(결재 중·완료·반려·회수) 진행 줄을 보여야 하므로 그대로 단다.
-    if (cur === 2 || myAppr()) h += apprStrip(cur === 2, true);
+    //   「내역 없음」 효력이면 상신하라는 띠는 달지 않고(결재 건이 없을 때), 회수·반려 건의 띠에서도 「다시 상신하세요」를 뺀다(2026-11-02 검토 M1)
+    if ((cur === 2 && !NM.on) || myAppr()) h += apprStrip(cur === 2, true, NM.on);
     h += sect('최근 운행', n0(TRIPS.length) + '건', '<button class="btn sm" data-v="trips">운행 기록 전체 ' + ic('chev', 13) + '</button>',
       closeTripTable(TRIPS.slice(0, 6), TK ? TK.M : moneyOf(myName(), cycleRange(CYC), ALL_TRIPS, ALL_EVID)));
     // 폰 아래 고정 「다음 할 일」 — 첫 남은 일(없으면 지금 단계). 빨간 단추는 이것 하나(제목 줄 단추는 폰에서 숨긴다)
     //   1단계(운행 기록 확인) 차례면 위 안내와 같은 일 = 지금 단계 단추(2026-10-20 V3 U2 — 위는 「운행 기록 확인」인데 아래 띠는 「사진 올리기」였다).
     //   폰에서 이 화면의 깜빡이는 단추 하나(cta, V3 U1)
     var nx = TK && TK.list.length && !(step && step.n === 1) ? TK.list[0] : null, nb = (nx && (nx.b1 || nx.b2)) || (step && step.b) || null;
-    if (nb) h += '<div class="cnext-sp" aria-hidden="true"></div><div class="cnext" role="region" aria-label="다음 할 일"><span class="cnn">' +
+    // 「내역 없음」 효력이면 깜빡이는 「다음 할 일」도 두지 않는다(영수증만 있는 빈 기간 — 마감 안내 멈춤, 2026-11-02)
+    if (nb && !NM.on) h += '<div class="cnext-sp" aria-hidden="true"></div><div class="cnext" role="region" aria-label="다음 할 일"><span class="cnn">' +
       (nx ? '다음 할 일 1 / ' + n0(TK.list.length) + ' · ' + esc(nx.nx || nx.t) : '지금 할 일 · ' + esc(step.t)) + '</span>' + ctBtn(nb, 'pri cta') + '</div>';
     return h;
   }
@@ -5602,9 +5648,11 @@
     return PREV_HAS[k] ? { cyc: pv, a: a, key: k } : null;
   }
 
-  /** 마감 현황의 결재 띠. 상태에 따라 버튼이 달라진다. */
-  function apprStrip(nowVerify, inHome) {
+  /** 마감 현황의 결재 띠. 상태에 따라 버튼이 달라진다.
+   *  none = 그 기간 「내역 없음」 효력 — 회수·반려 건이어도 「다시 상신하세요」(정정 중 상태 글의 꼬리 포함)는 뺀다(2026-11-02 검토 M1). */
+  function apprStrip(nowVerify, inHome, none) {
     var a = myAppr(), st = apprStatusText(a);
+    if (none) st = { t: noResubmit(st.t), cls: st.cls };
     var canWithdraw = a && a.status === 'submitted' &&
       !(a.steps || []).some(function (x) { return x.result; });
     // 단계마다 '지금 받을 수 있는 문서'가 다르다.
@@ -5632,7 +5680,7 @@
       // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
       (a && a.status === 'submitted' && !inHome ? '<div class="anote">결재 중에는 이 기간의 운행·영수증을 고칠 수 없어요. ' +
         withdrawHow(a) + '</div>' : '') +
-      (a && (a.status === 'rejected' || a.status === 'withdrawn') ? '<div class="anote">고친 뒤 ‘검증·상신’ 단계에서 다시 상신하세요.</div>' : '') +
+      (a && (a.status === 'rejected' || a.status === 'withdrawn') && !none ? '<div class="anote">고친 뒤 ‘검증·상신’ 단계에서 다시 상신하세요.</div>' : '') +
       '</div></section>';
   }
 
@@ -5828,7 +5876,12 @@
     var put = function (u, ms) { ms = Number(ms) || 0; if (ms > (last[u] || 0)) last[u] = ms; };
     TRIPS.forEach(function (t) { if (t.start_time >= r.lo && t.start_time < r.hi) put(t.username, t.start_time); });
     evidOfCycle().forEach(function (e) { put(e.username, e.date_millis); });
-    return rows.filter(function (x) { return (!x.st && x.n > 0) || x.st === 'withdrawn' || x.st === 'rejected'; }).map(function (x) {
+    var key = CYCKEY();
+    return rows.filter(function (x) {
+      // 「이번 기간 내역 없음」 효력이 있는 사람은 회수·반려여도 뺀다(2026-11-02 SPEC §4 — 서버 remind 도 「이 기간 자료 없음」으로 건너뛴다)
+      if (!isMulti() && noneEffective('driving', x.u, key, x.n, x.st)) return false;
+      return (!x.st && x.n > 0) || x.st === 'withdrawn' || x.st === 'rejected';
+    }).map(function (x) {
       var a = x.a, st = !a ? 'none' : a.status, left;
       if (a) put(x.u, Date.parse(a.closed_at || a.updated_at || a.submitted_at || '') || 0);
       if (st === 'rejected') {
@@ -6019,6 +6072,145 @@
     }
     var v = String(t.getAttribute('data-remind') || ''), i = v.indexOf('|');
     if (i > 0) openRemind(v.slice(0, i), [v.slice(i + 1)]);
+  });
+
+  /* ══════════════════ 「이번 기간 내역 없음」 표시(2026-11-02 사용자 「내역이 없으면 선택해서 없다라고 할 수 있게」 — docs/none-mark/SPEC.md) ══════════════════
+     자료가 없는 기간에 본인이 「없음」으로 표시하면 결재 문서 없이 그 기간 마감 안내(마감 띠·단계 깜빡임·포털 할 일)가 멈춘다. 세 시스템이 같다.
+       · 효력 = 표시가 있고 + 그 기간 결재 건이 결재 중·완료가 아니고 + 그 기간 자료 0건(SPEC §1). 자료가 생기면 표시는 지우지 않고 무시한다(읽을 때마다 센다).
+       · 자료 = 서버 remindCounts 와 같은 기준 — 운행일지 = 그 기간 내 운행(지운 것 빼고) · 개인경비·법인카드 = 모듈이 받은 그 기간 내 줄.
+         줄을 받지 않은 기간은 모름 = 효력 없음(0건으로 치면 가짜 「내역 없음」이 뜬다 — 11/2 설계 확인 로봇).
+       · 표시하기·되살리기 = 서버 approval-act none_set · none_clear(본인만, 결재 문서·결재 알림·팀즈 없음). 관리자는 보기만 한다(남의 것을 대신 누르지 않는다). */
+  function setNone(rows) {
+    NONE = {};
+    (rows || []).forEach(function (x) { if (x && x.kind && x.username && x.cycle) NONE[x.kind + '|' + x.username + '|' + x.cycle] = 1; });
+  }
+  /** NONE_GEN — 이 탭에서 표시하기·되살리기가 성공할 때마다 +1. 적재(loadAll)·결재 건 새로 받기(apprRefresh)는 출발 때 값과 다르면
+   *  받아 온 표시 목록으로 덮지 않는다 — 쓰기 전에 읽은 목록이 늦게 와서 방금 한 표시·되살리기를 되돌리던 것(2026-11-02 검토 L5, APPR_GEN 과 같은 꼴). */
+  var NONE_GEN = 0;
+  function noneSig() { return Object.keys(NONE).sort().join(','); }
+  /** 상태 글 끝의 「고친 뒤 다시 상신하세요.」(정정 중)를 뗀다 — 「내역 없음」 효력인 기간에는 다시 상신을 시키지 않는다(2026-11-02 검토 M1). */
+  function noResubmit(t) { return String(t == null ? '' : t).replace(/[.\s]*고친 뒤 다시 상신하세요\.?\s*$/, ''); }
+  /** 표시하기를 받는 가장 오랜 기간 — 시작한 지 이 날수보다 오래되면 서버가 「너무 지난 기간이에요」로 막는다(approval-act none.ts NONE_MAX_AGE_DAYS 와 같은 값, 2026-11-02 검토 L2). */
+  var NONE_MAX_AGE_DAYS = 400;
+  /** 표시가 있나(효력과 다르다 — 자료·결재 상태는 보지 않는다). */
+  function noneMarked(kind, u, cyc) { return !!NONE[kind + '|' + u + '|' + cyc]; }
+  /** 효력 — n = 그 기간 자료 수(숫자가 아니면 모름 = false), status = 그 기간 결재 건 상태(없으면 ''). */
+  function noneEffective(kind, u, cyc, n, status) {
+    return noneMarked(kind, u, cyc) && status !== 'submitted' && status !== 'approved' && n === 0;
+  }
+  /** 운행일지 — 내 그 기간 효력. 받아 둔 운행이 그 기간 것일 때(지금 보는 한 기간)만 안다 — 아니면 false. */
+  function noneOnD(key) {
+    if (!LOADED || !ME || isMulti() || key !== CYCKEY()) return false;
+    var me = myName(), n = 0;
+    ALL_TRIPS.forEach(function (t) { if (t.username === me) n++; });
+    return noneEffective('driving', me, key, n, (myAppr(key) || {}).status || '');
+  }
+  /** 빈 기간 자리에 보일 것 — on: 효력이 있어 표시 블록 + 「되살리기」 · can: 「이번 기간 내역 없음」 단추.
+   *  본인 화면만(관리 화면·여러 기간이면 둘 다 false). 단추는 그 기간이 시작됐고 · 시작한 지 NONE_MAX_AGE_DAYS 일 안이고 · 결재 중·완료가 아니고 ·
+   *  자료 0건일 때(서버 none_set 과 같은 검사). 이미 한 표시의 효력(on)은 기간이 오래돼도 그대로 본다. */
+  function noneUi(kind, cyc, n, status) {
+    var o = { on: false, can: false };
+    if (!ME || !myName() || isAll() || isMulti() || typeof n !== 'number' || !CR.isKey(String(cyc || ''))) return o;
+    o.on = noneEffective(kind, myName(), cyc, n, status);
+    var r = keyRange(kind, cyc), now = Date.now();
+    o.can = !o.on && n === 0 && status !== 'submitted' && status !== 'approved' && isFinite(r.lo) && r.lo <= now &&
+      now - r.lo <= NONE_MAX_AGE_DAYS * 86400e3;
+    return o;
+  }
+  var NONE_SAID = '결재 문서는 만들지 않아요. 내역이 생기면 평소처럼 올리고 상신하면 돼요.';
+  /** 따옴표 낱말 + 토씨(「‘내역 없음’으로」)는 한 덩이로(HTML) — 크롬은 한글 사이 따옴표 앞뒤에서도 줄을 바꿔 「없음’ / 으로」로 갈랐다
+   *  (2026-11-02 화면 시험 390 — drv-card.js 「‘추천 구분 채우기’로」와 같은 방법). */
+  function nowrapQ(s) { return '<span style="white-space:nowrap">' + esc(s) + '</span>'; }
+  /** 「11월분은 ‘내역 없음’으로 표시했어요」(HTML) — 추가 기간(「12월분 2차」)은 받침이 없어 「는」.
+   *  서술어까지 한 덩이 — 폰(360·390)에서 끝줄에 「표시했어요」 한 낱말만 남던 것(2026-11-02 화면 검토 L5): 「11월분은 / ‘내역 없음’으로 표시했어요」 */
+  function noneTitle(cyc) {
+    var k = String(cyc || ''), c = CR.parse(k);
+    return esc(keyShort(k, k) + (c && c.x ? '는' : '은')) + ' ' + nowrapQ('‘내역 없음’으로 표시했어요');
+  }
+  /** 보조 단추 줄 — 「이번 기간 내역 없음」(on 이 아니면) · 「되살리기」(on). 빈 기간 자리 글 아래(blankAct 와 같은 12px 위 여백). */
+  function noneBtn(kind, cyc, on) {
+    return '<div class="bact" data-nonebar style="margin-top:12px"><button type="button" class="btn" ' + (on ? 'data-noneclear' : 'data-noneset') + '="' + esc(kind + '|' + cyc) + '">' +
+      (on ? '되살리기' : '이번 기간 내역 없음') + '</button></div>';
+  }
+  var NONE_BUSY = false;
+  /** 다시 그린 뒤 초점을 바뀐 단추(되살리기 ↔ 이번 기간 내역 없음)로 — 누른 단추가 다시 그리기로 없어져 초점이 body 로 떨어지지 않게(키보드로 쓰던 자리). */
+  function noneRefocus(attr, kind, cyc) {
+    var b = document.querySelector('#inner [' + attr + '="' + kind + '|' + cyc + '"]');
+    if (b) { try { b.focus({ preventScroll: true }); } catch (e) { } }
+  }
+  /** 표시하기 — 확인 창(웹 창 단추 [동작][취소]) → 「표시하기」를 누르면 noneGo.
+   *  본문의 단추 이름은 ‘되살리기’(작은따옴표) — 화면 글에 낫표를 쓰지 않는다(2026-10-24 말투 규칙, test/copy-style.test.js).
+   *  짝말(결재 문서 · 마감 안내 · 되돌릴 수 있어요)은 &nbsp; 로 붙인다 — 줄 끝에서 갈리던 것(2026-11-02 화면 검토 L5). */
+  function noneSet(kind, cyc) {
+    if (NONE_BUSY || !KIND_TAG[kind]) return;
+    openPanel('‘내역 없음’으로 표시할까요?', KIND_TAG[kind] + ' · ' + keyName(cyc, cyc),
+      '<div class="anote" style="margin-top:0" data-noneask>' + esc(KIND_TAG[kind] + ' ' + keyShort(cyc, cyc)) + '에 올릴 내역이 없다고 표시해요. ' +
+        '결재&nbsp;문서는 만들지 않고 마감&nbsp;안내가 멈춰요. 나중에 ' + nowrapQ('‘되살리기’로') + ' 되돌릴&nbsp;수&nbsp;있어요.</div>',
+      '<span style="flex:1"></span><button class="btn pri" id="btnNoneGo" data-nonego="' + esc(kind + '|' + cyc) + '">표시하기</button>' +
+      '<button class="btn" data-close>취소</button>');
+  }
+  /** 응답이 온 뒤 — 이 확인 창이 아직 열려 있을 때만 닫는다. 보내는 사이 [취소]로 닫고 다른 창(영수증 올리기 등)을 열었으면 그 창은 그대로(2026-11-02 검토 L1). */
+  function noneClose(kind, cyc) {
+    var g = $('btnNoneGo');
+    if (g && $('panel').classList.contains('open') && g.getAttribute('data-nonego') === kind + '|' + cyc) closePanel();
+  }
+  function noneGo(kind, cyc) {
+    if (NONE_BUSY) return;
+    var b = $('btnNoneGo'), who = myName();
+    NONE_BUSY = true;
+    if (b) { b.disabled = true; b.textContent = '표시하는 중…'; }
+    remindCall({ action: 'none_set', kind: kind, cycle: cyc }).then(function (res) {
+      NONE_BUSY = false;
+      noneClose(kind, cyc);
+      if (myName() !== who) return;
+      if (res.ok) {
+        NONE_GEN++;                        // 늦게 온 옛 표시 목록이 이 표시를 덮지 않게(L5)
+        NONE[kind + '|' + who + '|' + cyc] = 1;
+        toast('‘내역 없음’으로 표시했어요');
+        paintPills(); render(); noneRefocus('data-noneclear', kind, cyc);
+        return;
+      }
+      toast(apiErrText(res.j, res.status) || '표시하지 못했어요. 잠시 후 다시 해 주세요.', true);
+      // 그 사이 상신했거나 자료가 생겼다(409 SUBMITTED·APPROVED·HAS_DATA) — 결재 상태·표시·자료를 모두 새로 받는다.
+      //   soft 는 받은 지 3분 안이면 결재 표·표시 읽기(staticP)를 건너뛰어 옛 상태가 남는다 — 그래서 loadAll()(soft 아님, 11/2 설계 확인 로봇)
+      if (res.status === 409) loadAll();
+    }).catch(function () {
+      NONE_BUSY = false; noneClose(kind, cyc);
+      toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true);
+    });
+  }
+  /** 되살리기 — 묻지 않고 none_clear(표시가 없어도 서버는 성공). btn = 누른 단추(보내는 동안 잠근다). */
+  function noneClear(kind, cyc, btn) {
+    if (NONE_BUSY || !KIND_TAG[kind]) return;
+    var who = myName();
+    NONE_BUSY = true;
+    if (btn) { btn.disabled = true; btn.textContent = '되살리는 중…'; }
+    var back = function () { if (btn && document.contains(btn)) { btn.disabled = false; btn.textContent = '되살리기'; } };
+    remindCall({ action: 'none_clear', kind: kind, cycle: cyc }).then(function (res) {
+      NONE_BUSY = false;
+      if (myName() !== who) return;
+      if (res.ok) {
+        NONE_GEN++;                        // 늦게 온 옛 표시 목록이 이 되살리기를 덮지 않게(L5)
+        delete NONE[kind + '|' + who + '|' + cyc];
+        toast('되살렸어요. 마감 안내가 다시 보여요');
+        paintPills(); render(); noneRefocus('data-noneset', kind, cyc);
+        return;
+      }
+      back();
+      toast(apiErrText(res.j, res.status) || '되살리지 못했어요. 잠시 후 다시 해 주세요.', true);
+    }).catch(function () { NONE_BUSY = false; back(); toast('서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.', true); });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-noneset],[data-noneclear],#btnNoneGo');
+    if (!t || t.disabled) return;
+    var v = String(t.getAttribute('data-noneset') || t.getAttribute('data-noneclear') || t.getAttribute('data-nonego') || ''), i = v.indexOf('|');
+    if (i <= 0) return;
+    var kind = v.slice(0, i), cyc = v.slice(i + 1);
+    if (t.id === 'btnNoneGo') { noneGo(kind, cyc); return; }
+    if (t.hasAttribute('data-noneclear')) { noneClear(kind, cyc, t); return; }
+    // 창을 닫으면 이 단추로 초점을 돌려준다(아래 공통 처리기는 창이 이미 열린 뒤에 돈다)
+    if (!$('panel').classList.contains('open')) PANEL_FROM = t;
+    noneSet(kind, cyc);
   });
   function viewStatus() {
     if (!LOADED) return head('현황') + skeleton();
@@ -9187,35 +9379,47 @@ window.EduGuard = {
       });
     var byU = {};
     TRIPS.forEach(function (t) { (byU[t.username] = byU[t.username] || []).push(t); });
-    var idle = list.filter(function (u) { return !(byU[u.username] || []).length; }).length;
+    // 「이번 기간 내역 없음」(2026-11-02 SPEC §4) — 운행 0건이고 효력이 있는 사람은 「없음 표시」로 따로 센다. 「기록 없음」(빨강) = 기록도 표시도 없는 사람만.
+    //   여러 기간을 볼 때는 기간마다 갈려 효력을 가리지 않는다(모두 「기록 없음」 그대로)
+    var nkey = isMulti() ? '' : CYCKEY();
+    var marked = function (u) { return !!nkey && noneEffective('driving', u.username, nkey, (byU[u.username] || []).length, (apprOf(u.username, nkey) || {}).status || ''); };
+    var noRec = function (u) { return !(byU[u.username] || []).length; };
+    var mk = list.filter(function (u) { return noRec(u) && marked(u); }).length;
+    var idle = list.filter(noRec).length - mk;
 
     var h = head('직원 현황', list.length + '명 · ' + esc(viewName()));
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot"></span>이번 기간</div>' +
-      '<p class="verdict">' + (idle ? '<em>' + idle + '명</em>이 한 건도 기록하지 않았어요' : '<em>전원 기록</em>했어요') + '</p>' +
-      '<div class="facts">' +
+      '<p class="verdict">' + (idle ? '<em>' + idle + '명</em>이 한 건도 기록하지 않았어요' + (mk ? '&nbsp;·&nbsp;없음 표시 ' + n0(mk) + '명' : '')
+        : mk ? '<em>전원</em> 기록했거나 ' + nowrapQ('‘없음’으로') + ' 표시했어요' : '<em>전원 기록</em>했어요') + '</p>' +
+      // 칸 넷(f4) — 태블릿(601~900)에서도 한 줄(두 줄 격자로 바뀌어 위 상자가 커지던 것, 2026-11-02 화면 검토 L3)
+      '<div class="facts f4">' +
       '<div class="fact"><div class="k">등록 인원</div><div class="v">' + list.length + '<small>명</small></div></div>' +
-      '<div class="fact"><div class="k">기록 있음</div><div class="v">' + (list.length - idle) + '<small>명</small></div></div>' +
-      '<div class="fact"><div class="k">기록 없음</div><div class="v' + (idle ? ' alert' : '') + '">' + idle + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">기록 있음</div><div class="v">' + (list.length - idle - mk) + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">기록 없음</div><div class="v' + (idle ? ' alert' : '') + '" data-k="idle">' + idle + '<small>명</small></div></div>' +
+      '<div class="fact"><div class="k">없음 표시</div><div class="v" data-k="nonemark">' + mk + '<small>명</small></div></div>' +
       '</div></div>';
 
     h += sect('명단', list.length + '명', '', '<div class="panel"><div class="scroll" data-rows><table><thead><tr>' +
-      '<th>파트·센터</th><th>이름</th><th>직급</th><th>차량</th><th class="n">운행</th>' +
+      // 운행 칸은 폭을 정해 둔다(nmcol) — 「없음 표시」 딱지가 생겨도 표 칸 너비가 다시 나뉘지 않게(2026-11-02 화면 검토 L5)
+      '<th>파트·센터</th><th>이름</th><th>직급</th><th>차량</th><th class="n nmcol">운행</th>' +
       '<th class="n">거리</th><th class="n">비용</th></tr></thead><tbody>' +
       orgGroups(list, function (u) { return u.username; }, true).map(function (g) {
-        var gi = g.list.filter(function (u) { return !(byU[u.username] || []).length; }).length;
-        return orgGroupRow(g, 7, gi ? '<span class="unk">기록 없음 ' + n0(gi) + '명</span>' : '전원 기록') + g.list.map(peopleRow).join('');
+        var gm = g.list.filter(function (u) { return noRec(u) && marked(u); }).length, gi = g.list.filter(noRec).length - gm;
+        var gl = [gi ? '<span class="unk">기록 없음 ' + n0(gi) + '명</span>' : '', gm ? '없음 표시 ' + n0(gm) + '명' : ''].filter(Boolean).join(' · ');
+        return orgGroupRow(g, 7, gl || '전원 기록') + g.list.map(peopleRow).join('');
       }).join('') + '</tbody></table></div></div>');
     return h;
     function peopleRow(u) {
       return (function () {
         var x = totals(byU[u.username] || [], { who: u.username });   // 영수증만 있는 사람도 금액이 나온다(다른 화면과 같은 기준)
+        var nm = !x.n && marked(u);                                    // 운행 칸 — 효력이 있으면 0 대신 딱지
         return '<tr class="clk" tabindex="0" data-person="' + esc(u.username) + '">' + orgCell(u.username, true) +
           // 「관리자」는 맨 끝 빈 칸이 아니라 이름 옆 딱지(2026-10-19 웹 사용성 1차)
           '<td><span class="lead">' + esc(u.name || u.username) + '</span>' + (u.is_admin ? ' <span class="admtag">관리자</span>' : '') +
           '<div class="dim" style="font-size:12px">' + esc(u.username) + '</div></td>' +
           '<td class="dim">' + esc(u.position || '—') + '</td>' +
           '<td class="dim">' + esc(u.plate_no || '—') + '</td>' +
-          '<td class="n' + (x.n ? '' : ' dim') + '">' + n0(x.n) + '</td>' +
+          '<td class="n' + (x.n || nm ? '' : ' dim') + '">' + (nm ? '<span class="st dim" data-nonechip>없음 표시</span>' : n0(x.n)) + '</td>' +
           '<td class="n">' + (x.km ? km(x.km) : '—') + '</td>' +
           '<td class="n total">' + (x.cost ? n0(x.cost) : '—') + '</td></tr>';
       })();
@@ -10810,6 +11014,8 @@ window.EduGuard = {
     if (sn && sn <= 3 && !isAll() && !isMulti() && !cycleLocked(myName())) {
       var S = stepInfo(), p = Math.min(stepNow(), 3);
       var here = S.steps[sn - 1];
+      // 「이번 기간 내역 없음」 효력이면 아래 띠 단추도 깜빡이지 않는다(cta 없음 — 마감 안내 멈춤, 2026-11-02 검토 L3)
+      var blink = S.none ? '' : ' cta';
       // 3단계(검증·상신)에는 맨 아래 「다음 단계」 단추가 없다 — 위 ①②③ 으로 상신하면 끝난다고 말한다(2026-10-20 V3 다듬기: 없는 단추를 가리켰다)
       var back = sn > 1 ? ' 잘못 넘어왔으면 앞 단계로 돌아가도 돼요.' : '';
       var note = sn < p ? '<b>이미 지난 단계</b>예요. 고친 뒤 다음 단계로 다시 넘어가세요.'
@@ -10820,7 +11026,7 @@ window.EduGuard = {
         : '이 단계를 마쳤으면 <b>다음 단계</b>로 넘어가세요.' + back;
       html += '<div class="nextstep"><span class="stepbadge">' + sn + '</span><span class="t">' + note + '</span>' +
         // 아직 오지 않은 단계에서는 건너뛰지 못하게 — 지금 단계로 가는 버튼 하나만. 이 화면에서 깜빡이는 하나(마감 뒤 5일에 1·2단계인 사람 등, 2026-10-20 V3 U1)
-        (sn > p ? '<button class="btn pri cta" data-v="' + STEP_VIEW[p - 1] + '">' + p + '단계로 가기 →</button>' : '') +
+        (sn > p ? '<button class="btn pri' + blink + '" data-v="' + STEP_VIEW[p - 1] + '">' + p + '단계로 가기 →</button>' : '') +
         (sn > p ? '' : sn > 1 ? '<button class="btn" data-stepmove="-1" data-from="' + sn + '">← ' + (sn - 1) + ' ' + esc(STEP_NAMES[sn - 2]) + '</button>' : '') +
         // ★ 2단계(영수증·통행료)는 주차 → 통행료 → 주유 → 계기판 차례를 끝까지 지나야 3단계로 넘어간다(2026-10-07 사용자).
         //   맨 아래 버튼으로 바로 건너뛸 수 있어 헷갈렸다. 이미 지난 단계(sn < p)에서 돌아와 고치는 중이면 막지 않는다.
@@ -10829,7 +11035,7 @@ window.EduGuard = {
           // 계기판 차례에서는 카드의 「다음: 3 검증·상신 →」 하나만(같은 단추가 카드와 띠에 둘이었다 — 2026-10-15 2차)
           : sn === 2 && sn === p && VIEW === 'evid' && evSub() === 3 ? ''
           // 영수증 화면은 카드 안의 단추(올리기·「다음」)가 깜빡이는 하나 — 띠 단추는 빨강만(깜빡임 둘이 되지 않게, V3 U1)
-          : sn < 3 && sn <= p ?'<button class="btn pri' + (sn === p && VIEW !== 'evid' ? ' cta' : '') + '" data-stepmove="1" data-from="' + sn + '">' +
+          : sn < 3 && sn <= p ?'<button class="btn pri' + (sn === p && VIEW !== 'evid' ? blink : '') + '" data-stepmove="1" data-from="' + sn + '">' +
             (sn + 1) + ' ' + esc(STEP_NAMES[sn]) + ' →</button>' : '') + '</div>';
     }
     // 단계를 옮겨 온 직후면 그 방향으로 밀려 들어오는 효과
@@ -10938,9 +11144,18 @@ window.EduGuard = {
       };
       // 포털 「오늘 할 일」(2026-10-20 디자인 v2) — 마감 화면이 그릴 때 센 남은 일(그때 시각 at 과 함께). 이 기간 것이 없으면 지난번 것을 그대로 둔다.
       var todo = CLOSE_TODO && CLOSE_TODO.cyc === cur ? CLOSE_TODO : (old.todo && old.todo.cyc === cur ? old.todo : null);
+      // 「이번 기간 내역 없음」 효력(2026-11-02 — PLAN 작업 2 ↔ 3 약속): d = cyc 기간 · x = xs.cyc 기간 · c = cs.cyc 기간. 포털은 직접 읽지 못했을 때만 쓴다.
+      //   그 기간 자료를 받아 두었을 때만 새로 센다 — 운행일지는 지금 보는 기간이 cyc 일 때, 개인경비·법인카드는 그 모듈이 그 기간 줄을 받았을 때
+      //   (period.none 이 null = 모름). 모르면 같은 기간에 알던 값을 그대로 둔다 — 다른 기간을 보는 중이라고 알던 true 를 지우지 않는다(검토 L6). 알던 값도 없으면 false.
+      var xs = mod('x'), cs = mod('c'), on0 = old.none || {};
+      var nd = LOADED && !isMulti() && CYCKEY() === cur ? noneOnD(cur) : !!(old.cyc === cur && on0.d);
+      var nmod = function (mode, m, om) {
+        var p = periodOfMode(mode), v = m && p && p.none ? p.none(m.cyc) : null;
+        return v === true || v === false ? v : !!(m && om && om.cyc === m.cyc && on0[mode]);
+      };
       var h = { u: myName(), at: Date.now(), cyc: cur, st: a ? a.status : '', ro: !!(a && a.status === 'rejected' && reopenInfo(a)), inbox: { d: n.d, x: n.x, c: n.c },
         step: CYCKEY() === cur ? Math.min(stepNow(), 4) : (old.cyc === cur ? old.step : null), drv: usesDriving(myName()),
-        xs: mod('x'), cs: mod('c'), todo: todo };
+        xs: xs, cs: cs, todo: todo, none: { d: nd, x: nmod('x', xs, old.xs), c: nmod('c', cs, old.cs) } };
       sessionStorage.setItem('drv_portal_hint', JSON.stringify(h));
     } catch (e) { }
   }
@@ -13185,6 +13400,9 @@ window.EduGuard = {
       apvSlot: apvSlot, teamBars: teamBars, kmenu: kmenu,
       // 관리 현황 「챙길 사람」 + 팀즈 알림 보내기(2026-10-20 D2) — 개인경비·법인카드 현황도 같은 조각
       follow: followCard,
+      // 「이번 기간 내역 없음」 표시(2026-11-02 docs/none-mark/SPEC.md §4·§5) — 표시·효력 판정 · 빈 기간 자리의 단추·블록 글 · 표시하기(확인 창)·되살리기
+      noneMarked: noneMarked, noneEffective: noneEffective, noneUi: noneUi, noneTitle: noneTitle, noneSaid: NONE_SAID, noneBtn: noneBtn,
+      noneSet: noneSet, noneClear: noneClear, noResubmit: noResubmit,
       // 여러 줄 골라 지우기(2026-10-19) — 개인경비·법인카드 내역 표도 같은 모양·같은 확인 창
       mselDef: mselDef, mselAll: mselAll, mselAllLine: mselAllLine, mselBox: mselBox, mselBar: mselBar, mselSync: mselSync,
       // 결재 완료 출력 고르기·팀 고르기·이름 찾기(2026-10-23) — 세 화면이 같은 칸·같은 규칙(다시 그리지 않고 그 자리에서)

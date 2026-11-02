@@ -354,7 +354,11 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cycband{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border-radius:var(--r-sm);
   border:1px solid #F0E2C4;background:var(--warn-50);color:var(--warn);font-size:13px}
 .cycband b{font-weight:800}
-.cycband.multi{border-color:var(--ink-300);background:var(--ink-50);color:var(--ink-700,#3A4146)}
+/* 「이번 기간 내역 없음」으로 표시한 마감 뒤 며칠 띠(2026-11-02, .nonem)는 여러 기간 띠와 같은 회색 — 빨강 없이 */
+.cycband.multi,.cycband.nonem{border-color:var(--ink-300);background:var(--ink-50);color:var(--ink-700,#3A4146)}
+/* 굵은 기간 이름은 한 덩이 — 폰에서는 뒷말을 다음 줄로 내리고 「·」는 숨긴다(2026-11-02 화면 검토 M2: 「2026년 10월분 / (09.21~10.20)」으로 찢겼다. 띠 높이는 빨간 띠와 같다) */
+.cycband.nonem b{white-space:nowrap}
+@media (max-width:600px){.cycband.nonem .nmsep{display:none}.cycband.nonem .nmtail{display:block}}
 .cycband .btn{margin-left:auto}
 /* 달력 그림은 글(span) 안 첫 글자 — 글 첫 줄에 붙는다. 예전에는 따로 서 있어 폰에서는 혼자 한 줄, 두 줄 띠에서는 두 줄 사이에 떠 있었다(2026-10-28 로봇) */
 .cycband > span > svg:first-child{display:inline-block;vertical-align:-2px;margin-right:8px}
@@ -383,6 +387,11 @@ tbody tr.clk:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .cpi.on{background:var(--red-50)}
 .cpi.on b{color:var(--red)}
 .cpi:focus-visible,.cpq:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+/* 기간 줄에 딱지(「내역 없음」·「결재 완료」)가 붙어 줄이 모자라면 — 이름·날짜·「이번」은 낱자로 꺾이지 않게 한 덩이, 딱지는 둘째 줄 오른쪽으로
+   (2026-11-02 화면 검토 M1: 360 에서 「11.2 / 0」「이 / 번」으로 깨졌고, 연말 「12월분 2차」는 PC 에서도) */
+.cpi{flex-wrap:wrap;row-gap:2px}
+.cpi > b,.cpi > .dim,.cpi > .kind{white-space:nowrap}
+.cpi > .st{margin-left:auto}
 .cp-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
 .cp-range select{height:30px;border:1px solid var(--ink-200);border-radius:var(--r-xs);background:var(--surface);
   font:inherit;font-size:12px;color:var(--ink-900);padding:0 6px}
@@ -1093,6 +1102,9 @@ thead th{position:sticky;top:0;z-index:2;background:var(--surface);
   text-align:left;font-weight:500;font-size:12px;color:var(--ink-600);letter-spacing:0;
   padding:12px 15px;border-bottom:1px solid var(--ink-200);white-space:nowrap}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+/* 「없음 표시」 딱지가 들어가는 숫자 칸(직원 현황 운행·건수) — 폭을 정해 둔다(딱지 57px + 안쪽 여백 32px 이 들어감). 딱지가 생겨도
+   표 칸 너비가 다시 나뉘지 않게(2026-11-02 화면 검토 L5 — 1280 에서 운행 칸 95 → 155px, 다른 칸이 밀렸다) */
+th.nmcol{width:96px}
 tbody td{padding:11px 15px;border-bottom:1px solid var(--ink-100);white-space:nowrap;
   color:var(--ink-700);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
@@ -2989,6 +3001,8 @@ table.mday td.mact .mlinkb{margin-top:0}
   .xtopact{width:100%}
   .xtopact .btn{width:100%;justify-content:center;min-height:44px}
   .xdropc .btn{min-height:44px;flex:1 1 100%;justify-content:center}
+  /* 빈칸의 「이번 기간 내역 없음」·「되살리기」도 바로 위 「영수증 올리기」와 같은 높이(2026-11-02 화면 검토 L4 — 768 에서 40 대 44) */
+  .xlistw .blank [data-nonebar] .btn{min-height:44px}
 }
 @media screen and (max-width:820px){
   .d2pad{padding:16px}
@@ -3206,6 +3220,8 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   .facts:has(> .fact:nth-child(5):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}
   .facts:has(> .fact:nth-child(5):last-child) > .fact{grid-column:span 2}
   .facts:has(> .fact:nth-child(5):last-child) > .fact:nth-child(n+4){grid-column:span 3}
+  /* 직원 현황 칸 넷(.f4 — 「없음 표시」가 넷째, 2026-11-02 화면 검토 L3) — 2×2 로 바뀌어 위 상자가 64px 커지던 것 → 한 줄(옛 세 칸 상자와 같은 높이) */
+  .facts.f4{grid-template-columns:repeat(4,minmax(0,1fr))}
   /* R6-18 결재함 거르기 — 줄 끝이 417·383 으로 들쭉 → 찾기 칸과 상신일 칸이 남는 폭을 가져 두 줄 오른쪽 끝을 맞춘다 */
   .ibflt > label.field{flex:1 1 200px}
   .ibflt .ibdate input{flex:0 1 auto;min-width:0}   /* 날짜 칸은 제 폭 — 늘리면 두 칸이 330px 씩 벌어졌다 */
