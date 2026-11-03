@@ -141,6 +141,8 @@
   function isWrite(path, opt) {
     var m = String((opt && opt.method) || 'GET').toUpperCase(), p = String(path || '');
     if (m === 'GET' || m === 'HEAD' || READ_POST.test(p)) return false;
+    // expense-ai op status(1순위 AI 엔진·안 읽은 사진 묻기)도 읽기만 한다(2026-11-03 — AI 엔진 표시가 검증·올리기 화면에서 미리 묻는다)
+    if (/^\/functions\/v1\/expense-ai(\?|$)/.test(p) && /^\{"op":"status"[,}]/.test(String((opt && opt.body) || ''))) return false;
     return !(/^\/functions\/v1\/driving-account(\?|$)/.test(p) && /"action"\s*:\s*"(whoami|signups)"/.test(String((opt && opt.body) || '')));
   }
   function writeDone() {
@@ -5522,6 +5524,7 @@
   }) : null;
   /** 화면을 그린 뒤 늘 하는 일(전체·부분 그리기 공통). */
   function afterPaint() {
+    aiFitAll();                             // 단추 안 AI 표시가 단추보다 길면 이름만(좁은 단계 카드 — aiBusyFit)
     var cf = $('btnClearFilt');
     // 빈 표의 「전체 보기」·「출퇴근 등 N건 보기」 — 목적까지 비운다(「조건 지우기」와 같게, 2026-10-20 AU6-M5: 예전엔 목적이 일반업무로 돌아가 헛단추)
     if (cf) cf.addEventListener('click', function () { clearFilters(); FILT.purp = ''; render(); });
@@ -7447,6 +7450,271 @@
   }
 
 
+  /* ══════════════════ AI 엔진 표시 — Claude 먼저, 안 되면 Gemini(2026-11-03 사용자 승인 샘플) ══════════════════
+     서버(expense-ai · driving-verify)는 요청 칸 engine 을 받는다 — "claude" = 클로드만(실패·크레딧 소진·시간 모자람이면 HTTP 503 + code
+     AI_FALLBACK + ticket) · "gemini" = Gemini 만(받은 ticket 을 같이 보내면 하루 AI 횟수를 다시 세지 않는다) · 없으면 auto(옛 앱·옛 웹).
+     웹은 두 단계로 부른다(aiFetch) — 지금 읽는 엔진을 그때그때 보이려고(「Claude가 영수증을 읽고 있어요」 → 안 되면 「Claude가 응답하지 않아요 ·
+     Gemini로 넘겨요」 → 「Gemini가 영수증을 읽고 있어요」).
+       · 처음 엔진 = status 가 알려 준 1순위(크레딧 소진·차단기면 gemini — 쓸데없는 503 없이, 1분 기억) · Claude 가 넘긴 뒤 3분은 처음부터 Gemini
+         (Claude 가 멈췄을 때 장마다 Claude 몫 시간을 다시 기다리지 않게)
+       · 503 AI_FALLBACK 이 아닌 답은 부르는 쪽에 그대로 — 지금 오류 글·다시 하기 그대로
+     마크·상태 줄·단추 안 표시·끝난 줄은 여기 한 곳에서 만들고 세 시스템(운행일지·개인경비·법인카드)이 C.ai 로 같이 쓴다.
+     색은 엔진 색 두 가지(:root --cl·--gm, 샘플 값)만 — 평소 화면(✦AI 딱지·끌어 놓기 상자)은 그대로 둔다. */
+  var AI_NAME = { claude: 'Claude', gemini: 'Gemini' };
+  var AI_STATE = {};                          // 함수 이름 → { at, ai, eng } — status 로 받은 1순위 엔진(1분 동안 쓴다)
+  var AI_FB_AT = 0;                           // Claude 가 마지막으로 넘긴 때 — 3분 동안은 처음부터 Gemini
+  var AI_STATE_MS = 60e3, AI_FB_MS = 3 * 60e3, AI_SWAP_MS = 800;
+  /** status 답(검증 status 포함)을 기억한다 — engine 칸이 없으면(옛 서버) 아무것도 하지 않는다. */
+  function aiKeep(fn, j) {
+    if (!j || typeof j !== 'object' || !('engine' in j)) return;
+    AI_STATE[fn] = { at: Date.now(), ai: j.ai !== false, eng: j.engine === 'gemini' || j.engine === 'claude' ? j.engine : null };
+  }
+  /** 묻지 않고 아는 대로 처음 엔진 — 모르면 claude, AI 가 꺼진 서버면 null(엔진 칸 없이 보낸다 — 예전과 같다). */
+  function aiGuess(fn) {
+    var s = AI_STATE[fn];
+    if (s && !s.ai) return null;
+    if (Date.now() - AI_FB_AT < AI_FB_MS) return 'gemini';
+    return s && s.eng ? s.eng : 'claude';
+  }
+  /** 처음 엔진 — status 를 1분에 한 번만 묻는다(같이 묻는 중이면 그 답을 기다림 · 못 물었거나 엔진 칸이 없으면 1분 동안 claude 로). */
+  var AI_ASK = {};
+  function aiEngine(fn) {
+    var s = AI_STATE[fn];
+    if (s && Date.now() - s.at < AI_STATE_MS) return Promise.resolve(aiGuess(fn));
+    if (AI_ASK[fn]) return AI_ASK[fn];
+    var t0 = Date.now();
+    var p = AI_ASK[fn] = apiRetry('/functions/v1/' + fn, { method: 'POST', body: JSON.stringify({ op: 'status' }) })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { aiKeep(fn, j); return j; }, function () { return null; })
+      .then(function (j) {
+        if (AI_ASK[fn] === p) delete AI_ASK[fn];
+        if (!AI_STATE[fn] || AI_STATE[fn].at < t0) AI_STATE[fn] = { at: Date.now(), ai: !(j && j.ai === false), eng: null };
+        return aiGuess(fn);
+      });
+    return p;
+  }
+  /**
+   * 「클로드만」 요청을 웹이 기다리는 시간(ms) — **올리기 scan 둘만**: scan(개인경비 올리기) · dscan(운행일지 올리기). 지금 auto 의 Claude 몫
+   * (_shared/ai.ts AI_JOBS.claudeMs 18 · 40초) + 2초(오가는 시간·로그인 확인). 서버의 claude 모드는 더 오래 기다린다(claudeOnlyMs 60 · 90초) —
+   * Claude 가 실패가 아니라 멈추면 웹이 먼저 끊고(AbortController) 503 과 똑같이 Gemini 로 넘긴다(2026-11-03). 시험은 C.ai.limits 를 줄여 쓴다.
+   * ★ scan 만인 까닭(11/3 검토 M1): 끊긴 요청을 서버가 알아채(req.signal) Claude 를 멈추는 것은 scan 뿐이다(expense-ai · driving-verify — scan 은
+   *   저장하는 것도 없다). 판독(read · page · dread · dpage)과 법인카드 검증(card_review)은 웹이 끊어도 서버의 Claude 가 끝까지 돌아 나중에 결과를
+   *   저장한다 — 판독은 그사이 Gemini 가 읽어 저장한 것을 덮어쓰고(upsert), 법인카드는 검증 기록이 한 줄 더 생겨, 상신해 굳는 문서가 직원이 본
+   *   화면(Gemini)과 달라질 수 있다. 그래서 그 셋은 끊지 않고 서버가 주는 503 AI_FALLBACK(+ ticket — 하루 횟수 한 번)을 기다린다(Claude 가 멈추면
+   *   claudeOnlyMs 90~110초). 나중에 서버가 저장하기 직전에 req.signal(끊김)을 보고 저장하지 않게 되면 그 셋도 여기에 시간을 넣을 수 있다.
+   */
+  var AI_CLAUDE_MS = { scan: 20e3, dscan: 42e3 };
+  /** 웹이 끊는 일의 이름(위 AI_CLAUDE_MS) — 올리기 scan 만, 그 밖(판독·법인카드 검증)은 '' = 끊지 않음 */
+  function aiJobOf(fn, body) {
+    if (!body || body.op !== 'scan') return '';
+    return fn === 'driving-verify' ? 'dscan' : fn === 'expense-ai' ? 'scan' : '';
+  }
+  /**
+   * AI 를 부르는 요청 하나(scan · read · card_review) — 두 단계. 돌려주는 것은 apiRetry 와 같은 Response(부르는 쪽의 읽기·오류 처리는 그대로).
+   * on(엔진, 때) — 'start' 처음 엔진으로 보낼 때(엔진 null = AI 꺼짐·모름) · 'swap' Claude 가 넘겨 Gemini 로 다시 보낼 때. 화면이 글·마크를 바꾼다.
+   * Claude 를 넘기는 때 둘: ① 서버 503 AI_FALLBACK → 받은 ticket 과 함께 Gemini(하루 횟수 한 번) ② (올리기 scan 만) 웹이 기다리는 시간
+   *   (AI_CLAUDE_MS)이 지남 → 요청을 끊고(AbortController) ticket 없이 Gemini. ★ ②는 ticket 이 없어 그 사람 하루 AI 횟수를 한 번 더 센다
+   *   (Claude 요청 1 + Gemini 1 — 알고 받아들인 몫, 11/3 결정). 둘 다 「넘긴 뒤 3분은 처음부터 Gemini」에 든다.
+   */
+  function aiFetch(fn, body, on) {
+    var tell = function (e, w) { if (on) { try { on(e, w); } catch (x) { console.warn('AI 표시:', x && x.message); } } };
+    var send = function (eng, ticket, limit) {
+      var b = {};
+      Object.keys(body || {}).forEach(function (k) { b[k] = body[k]; });
+      if (eng) b.engine = eng;
+      if (ticket) b.ticket = ticket;
+      var req = { method: 'POST', body: JSON.stringify(b) };
+      if (!(limit > 0) || typeof AbortController !== 'function') return apiRetry('/functions/v1/' + fn, req);
+      var ac = new AbortController(), late = false;
+      var tm = setTimeout(function () { late = true; ac.abort(); }, limit);
+      req.signal = ac.signal;
+      var lateErr = function () { var x = new Error('AI 응답이 늦어요'); x.aiLate = true; return x; };   // 아래에서 Gemini 로(부르는 쪽에 가지 않는다)
+      return apiRetry('/functions/v1/' + fn, req).then(function (r) {
+        clearTimeout(tm);
+        // 끊긴 뒤에 답이 오는 길은 하나 — 토큰이 만료돼 apiRetry 가 새로 받아 다시 보낸 요청이 끊기면, apiRetry 가 끊김을 삼키고 처음 401 을 돌려준다
+        //   (11/3 검토 참고 2). 그것도 시간이 지난 것으로 보고 Gemini 로(새 토큰은 이미 받아 두었다 — Gemini 요청도 apiRetry 라 보통 길처럼 다시 받는다).
+        if (late) throw lateErr();
+        return r;
+      }, function (e) {
+        clearTimeout(tm);
+        if (late) throw lateErr();
+        throw e;
+      });
+    };
+    var toGemini = function (ticket) { AI_FB_AT = Date.now(); tell('gemini', 'swap'); return send('gemini', ticket); };
+    return aiEngine(fn).then(function (eng) {
+      tell(eng, 'start');
+      return send(eng, '', eng === 'claude' ? AI_CLAUDE_MS[aiJobOf(fn, body)] : 0).then(function (r) {
+        if (eng !== 'claude' || r.status !== 503) return r;
+        return r.clone().json().catch(function () { return null; }).then(function (j) {
+          if (!j || j.code !== 'AI_FALLBACK') return r;          // 다른 503(키 없음·기간 설정 등)은 그대로 — 지금 오류 글
+          return toGemini(typeof j.ticket === 'string' ? j.ticket : '');
+        });
+      }, function (e) {
+        if (e && e.aiLate) return toGemini('');                   // 올리기 scan 의 기다리는 시간이 지남 — ticket 없이(위 ★)
+        throw e;                                                   // 그 밖의 실패(연결 등)는 지금처럼 부르는 쪽이
+      });
+    });
+  }
+  function aiCalm() { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
+  /** ★ 엔진 마크 — 한 곳. Claude = 주황 빛살 · Gemini = 파랑·보라 네 갈래 반짝임(승인한 샘플의 그림 그대로 — 회사 로고 파일이 아니라 같은 느낌의 그림).
+   *  상표 문제로 모양을 바꿔야 하면 이 함수 하나만 고친다 — 새 표시는 aiSpark 로, 예전부터 있던 ✦AI 반짝임(gemSvg — AI 딱지·「AI가 읽어 드려요」 칩·
+   *  놓는 곳 동그라미·읽는 중 줄·올리기 단추, drv-verify 검증 딱지·검증 단추)도 이 Gemini 마크를 그린다(11/3 검토 참고 3). 움직임은 CSS(.ai-mk —
+   *  움직임 줄이기면 멈춤). cls — 예전 반짝임 자리의 클래스: 주면 움직임 클래스(ai-mk) 없이 그 클래스로, 둘레를 1.5 씩 비워(viewBox "-1.5 -1.5 27 27" —
+   *  예전 반짝임과 거의 같은 크기) 그린다. */
+  var AIMK_N = 0;
+  function aiMark(eng, size, cls) {
+    var s = size || 22, svg = '<svg class="' + (cls || 'ai-mk ' + (eng === 'gemini' ? 'm-gm' : 'm-cl')) + '" width="' + s + '" height="' + s +
+      '" viewBox="' + (cls ? '-1.5 -1.5 27 27' : '0 0 24 24') + '" aria-hidden="true" focusable="false">';
+    if (eng === 'gemini') {
+      var id = 'aigm' + (++AIMK_N);          // 그라데이션 id 는 부를 때마다 새로(한 화면에 여럿 · 다시 그려도 색이 빠지지 않게)
+      return svg + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1C7DFF"/><stop offset=".52" stop-color="#7B6AE0"/>' +
+        '<stop offset="1" stop-color="#C46DC2"/></linearGradient></defs>' +
+        '<path d="M12 0C12 6.6 17.4 12 24 12C17.4 12 12 17.4 12 24C12 17.4 6.6 12 0 12C6.6 12 12 6.6 12 0Z" fill="url(#' + id + ')"/></svg>';
+    }
+    return svg + '<g class="ray" stroke="#D97757" stroke-width="2.4" stroke-linecap="round">' +
+      '<line x1="12.00" y1="10.60" x2="12.00" y2="1.60"/><line x1="12.68" y1="10.78" x2="16.41" y2="4.04"/><line x1="13.19" y1="11.26" x2="21.07" y2="6.33"/>' +
+      '<line x1="13.40" y1="12.00" x2="20.70" y2="12.00"/><line x1="13.20" y1="12.72" x2="20.83" y2="17.30"/><line x1="12.70" y1="13.21" x2="16.70" y2="20.14"/>' +
+      '<line x1="11.98" y1="13.40" x2="11.82" y2="22.60"/><line x1="11.28" y1="13.20" x2="7.42" y2="19.63"/><line x1="10.79" y1="12.70" x2="2.91" y2="17.25"/>' +
+      '<line x1="10.60" y1="12.02" x2="2.80" y2="12.16"/><line x1="10.78" y1="11.32" x2="2.55" y2="6.76"/><line x1="11.30" y1="10.79" x2="7.50" y2="4.21"/></g></svg>';
+  }
+  /** 마크 상자 — 두 마크를 다 넣고 조상 칸(.ai-claude · .ai-gemini)이 고른 것만 보인다(바뀌는 순간에 다시 그리지 않고 색·마크가 바뀌게). sm = 단추 안 */
+  function aiSpark(sm) { return '<span class="ai-sp' + (sm ? ' sm' : '') + '" aria-hidden="true">' + aiMark('claude', sm ? 16 : 22) + aiMark('gemini', sm ? 16 : 22) + '</span>'; }
+  var AI_DOTS = '<span class="ai-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function aiWho(eng) { return '<span class="ai-who">' + (AI_NAME[eng] || 'AI') + '</span>'; }
+  /** 상태 줄의 굵은 글 — st: { eng, phase: 'run'|'swap'|'wait', what: '영수증을 읽고' | '카드 내역을 검증하고' }.
+   *  마지막 낱말과 점 셋은 한 덩이(좁은 폭에서 점만 다음 줄로 가지 않게). */
+  function aiHead(st) {
+    if (st.phase === 'swap') return aiWho('claude') + '가 응답하지 <span class="ai-nw">않아요' + AI_DOTS + '</span>';
+    if (st.phase === 'wait') return aiWho(st.eng) + '가 곧 읽어요';
+    return aiWho(st.eng) + '가 ' + esc(st.what || '영수증을 읽고') + ' <span class="ai-nw">있어요' + AI_DOTS + '</span>';
+  }
+  /** 상태 줄의 작은 글(HTML) — 바뀌는 순간 · 차례 기다림 · Gemini 가 대신 읽을 때(read) · 그 밖은 sub */
+  function aiSub(st, sub) {
+    if (st.phase === 'swap') return 'Gemini로 넘겨요';
+    if (st.phase === 'wait') return '앞 장을 읽는 중';
+    if (st.eng === 'gemini' && st.read) return 'Claude가 응답하지 않아 대신 읽어요';
+    return sub || '';
+  }
+  /** 상태 줄(마크 + 굵은 글 + 점 셋 + 작은 글) — 영수증 올리기 줄이 쓴다. attrs = 바깥 칸에 더할 속성.
+   *  keep = 지금 읽는 줄 — Claude · Gemini · 바뀌는 순간 글(굵은 글 + 작은 글)을 보이지 않게 같은 칸에 겹쳐(.ai-gh) 가장 긴 글만큼 높이를 잡는다.
+   *  폰(360)에서 2줄 → 1줄 → 2줄+2줄로 바뀌며 창·표가 위아래로 움직이지 않게(11/3 화면 검사). 넓은 폭은 모두 한 줄씩이라 높이 그대로. */
+  function aiLine(st, sub, attrs, keep) {
+    var gh = keep ? [{ eng: 'claude', phase: 'run' }, { eng: 'gemini', phase: 'run' }, { eng: 'claude', phase: 'swap' }].map(function (g) {
+      var s = { eng: g.eng, phase: g.phase, what: st.what, read: st.read };
+      return '<span class="ai-gh" aria-hidden="true"><b>' + aiHead(s) + '</b><small>' + aiSub(s, sub) + '</small></span>';
+    }).join('') : '';
+    return '<div class="ai-st ai-' + st.eng + (st.phase === 'swap' ? ' swap' : st.phase === 'wait' ? ' wait' : '') + '"' + (attrs || '') + '>' + aiSpark() +
+      '<span class="ai-tx"><b>' + aiHead(st) + '</b><small>' + aiSub(st, sub) + '</small>' + gh + '</span></div>';
+  }
+  /** 그려 둔 상태 줄을 그 자리에서 바꾼다 — 다시 그리면 바뀌는 순간의 흐림·마크 바탕 색 바뀜이 보이지 않는다. */
+  function aiPaint(el, st, sub) {
+    if (!el) return;
+    el.classList.toggle('ai-claude', st.eng === 'claude'); el.classList.toggle('ai-gemini', st.eng === 'gemini');
+    el.classList.toggle('swap', st.phase === 'swap'); el.classList.toggle('wait', st.phase === 'wait');
+    var b = el.querySelector('.ai-tx > b'), s = el.querySelector('.ai-tx > small');
+    if (b) b.innerHTML = aiHead(st);
+    if (s && sub !== null) s.innerHTML = aiSub(st, sub);
+  }
+  /** 바뀌는 순간(샘플 그대로) — 「Claude가 응답하지 않아요 · Gemini로 넘겨요」를 0.8초 보인 뒤 next()(Gemini 글로). */
+  function aiSwapLater(next) { setTimeout(next, AI_SWAP_MS); }
+  var AI_CHECK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  /** 끝난 줄 — 「✓ Claude가 읽었어요 · 3.2초」(둘 다 읽었으면 「Claude와 Gemini가 …」). used = { claude, gemini } · ms = AI 가 읽은 시간. 안 읽었으면 빈 글. */
+  function aiDone(used, ms) {
+    var c = used && used.claude, g = used && used.gemini;
+    if (!c && !g) return '';
+    var who = c && g ? 'Claude와 Gemini' : c ? 'Claude' : 'Gemini';
+    return '<span class="ai-done">' + AI_CHECK + dnJoin([who + '가 읽었어요', (Math.max(0, ms || 0) / 1000).toFixed(1) + '초']) + '</span>';
+  }
+  /** 단추 안 작은 표시 — 「Claude 검증 중」·「Gemini가 읽는 중…」. 바깥 단추에 ai-busy · ai-<엔진> 을 단다(부르는 쪽).
+   *  이름 뒤 글(.ai-rest)은 단추가 좁으면 숨는다(aiBusyFit). */
+  function aiBusy(eng, rest) { return aiSpark(true) + '<span class="gl">' + aiWho(eng) + (rest ? '<span class="ai-rest">' + esc(rest) + '</span>' : '') + '</span>'; }
+  /** 그려 둔 단추를 그 자리에서 — 엔진이 바뀌면(넘김) 마크·이름만. */
+  function aiBusyPaint(btn, eng, rest) {
+    if (!btn || !eng) return;
+    btn.classList.add('ai-busy'); btn.classList.toggle('ai-claude', eng === 'claude'); btn.classList.toggle('ai-gemini', eng === 'gemini');
+    btn.innerHTML = aiBusy(eng, rest);
+    aiBusyFit(btn);
+  }
+  /** 단추 안 표시가 단추 안쪽(좌우 여백 뺀 폭)보다 길면 — 좁은 단계 카드(폭 901~975 의 검증 단추 「✦ Claude 검증 중」이 15px 넘쳤다, 11/3 화면 검사) —
+   *  이름만 보인다(「✦ Claude」, 승인 샘플의 「좁은 곳은 작은 반짝임과 이름만」). 전체 글은 aria-label · title 로. 단추 높이·폭·줄 자리는 그대로.
+   *  그린 뒤(afterPaint · aiBusyPaint) · 창 크기가 바뀔 때 · 글꼴이 실린 뒤 다시 잰다. 보이지 않는 단추(폭 0)는 건너뛴다. */
+  function aiBusyFit(btn) {
+    var rest = btn && btn.querySelector('.ai-rest'), gl = rest && rest.parentNode;
+    if (!gl) return;
+    btn.classList.remove('ai-short');
+    var cs = getComputedStyle(btn), room = btn.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if (!(room > 0)) return;
+    var need = 0, n = 0;
+    Array.prototype.forEach.call(btn.children, function (c) { var w = c.getBoundingClientRect().width; if (w > 0) { need += w; n++; } });
+    need += Math.max(0, n - 1) * (parseFloat(cs.columnGap) || 0);
+    if (need > room + 0.5) {
+      var full = gl.textContent.replace(/\s+/g, ' ').trim();
+      btn.classList.add('ai-short'); btn.setAttribute('aria-label', full); btn.title = full; btn.setAttribute('data-aifit', '');
+    } else if (btn.hasAttribute('data-aifit')) { btn.removeAttribute('aria-label'); btn.removeAttribute('title'); btn.removeAttribute('data-aifit'); }
+  }
+  function aiFitAll() { Array.prototype.forEach.call(document.querySelectorAll('.btn.ai-busy'), aiBusyFit); }
+  var AI_FIT_RAF = 0;
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('resize', function () { if (!AI_FIT_RAF) AI_FIT_RAF = requestAnimationFrame(function () { AI_FIT_RAF = 0; aiFitAll(); }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(aiFitAll, function () { });
+  }
+  /* ── 영수증 올리기 창의 AI 읽기 표시(운행일지 EVUP · 개인경비 XUP 같은 모양) ──
+     창(세션)마다 u = aiUp(함수, 읽는 것, 작은 글) 한 벌 — 장은 한 장씩 읽으므로 지금 엔진·바뀌는 때는 하나다.
+       지금 읽는 장 = 그 줄 사진 위 훑는 빛 + 상태 줄(「Claude가 영수증을 읽고 있어요」 + 작은 글)
+       뒤에 줄 선 장 = 「Claude가 곧 읽어요 · 앞 장을 읽는 중」(마크·점 움직임 없이)
+       표 아랫줄 오른쪽 = 「Claude가 2장을 읽는 중」 → 다 읽으면 「✓ Claude가 읽었어요 · 3.2초」 · 올리기 단추 = 「Claude가 읽는 중…」 */
+  function aiUp(fn, what, sub) { return { fn: fn, what: what, sub: sub, eng: aiGuess(fn) || 'claude', es: 'run', used: {}, ms: 0, t0: 0 }; }
+  /** C.ai.fetch 의 on — live() 가 거짓이면(창을 닫음·그 장을 직접 입력) 아무것도 안 한다. paint() = 그 자리에서 다시 칠하기. */
+  function aiUpOn(u, live, paint) {
+    return function (eng, w) {
+      if (!live()) return;
+      if (w === 'start') { u.t0 = Date.now(); if (eng && u.es !== 'swap') { u.eng = eng; paint(); } return; }
+      u.es = 'swap'; paint();
+      aiSwapLater(function () { if (live() && u.es === 'swap') { u.es = 'run'; u.eng = 'gemini'; paint(); } });
+    };
+  }
+  /** 한 장을 다 읽었다(답을 받음) — 누가 읽었는지(답의 engine, 없으면 지금 엔진)·걸린 시간을 더한다. */
+  function aiUpRead(u, j) {
+    var e = j && (j.engine === 'claude' || j.engine === 'gemini') ? j.engine : u.eng;
+    u.used[e] = true;
+    if (u.t0) u.ms += Date.now() - u.t0;
+    u.t0 = 0;
+  }
+  /** 읽는 줄의 상태 줄 — on = 지금 읽는 장(아니면 차례를 기다리는 장) */
+  function aiUpLine(u, on) { return aiLine({ eng: u.eng, phase: on ? u.es : 'wait', what: u.what, read: true }, u.sub, ' data-aiup="' + (on ? 'on' : 'wait') + '"', on); }
+  /** 읽는 줄 사진 칸 <a> 에 더할 속성 — 지금 읽는 장이면 훑는 빛 */
+  function aiUpSweep(u, on) { return on ? ' class="ai-sweep ai-' + u.eng + '" data-aiup="sw"' : ''; }
+  /** 표 아랫줄 오른쪽 — 읽는 중이면 「Claude가 2장을 읽는 중」, 다 읽었으면 끝난 줄, 아니면 빈 글(그때는 아랫줄을 예전 그대로 그린다) */
+  function aiUpFoot(u, running) {
+    if (running) return '<b class="ai-run ai-' + u.eng + '" data-aiup="foot" data-n="' + running + '">' + AI_NAME[u.eng] + '가 ' + n0(running) + '장을 읽는 중</b>';
+    return aiDone(u.used, u.ms);
+  }
+  /** 올리기 단추 — 읽는 중이면 단추 안 작은 표시, 아니면 엔진 표시를 뗀다(글은 부르는 쪽이 넣는다). */
+  function aiUpBtn(u, b, running) {
+    if (!b) return;
+    if (running) aiBusyPaint(b, u.eng, '가 읽는 중…');
+    else b.classList.remove('ai-busy', 'ai-claude', 'ai-gemini');
+  }
+  /** 그 자리에서 다시 칠하기 — box = 올리기 표 상자, btn = 올리기 단추. 다시 그리지 않아 바뀌는 순간의 흐림·색 바뀜이 보인다. */
+  function aiUpPaint(u, box, btn) {
+    if (box) {
+      Array.prototype.forEach.call(box.querySelectorAll('.ai-st[data-aiup]'), function (el) {
+        aiPaint(el, { eng: u.eng, phase: el.getAttribute('data-aiup') === 'on' ? u.es : 'wait', what: u.what, read: true }, u.sub);
+      });
+      Array.prototype.forEach.call(box.querySelectorAll('[data-aiup="sw"],[data-aiup="foot"]'), function (el) {
+        el.classList.toggle('ai-claude', u.eng === 'claude'); el.classList.toggle('ai-gemini', u.eng === 'gemini');
+        if (el.getAttribute('data-aiup') === 'foot') el.textContent = AI_NAME[u.eng] + '가 ' + n0(+el.getAttribute('data-n') || 0) + '장을 읽는 중';
+      });
+    }
+    if (btn && btn.classList.contains('ai-busy')) aiBusyPaint(btn, u.eng, '가 읽는 중…');
+  }
+  /** 내어 주는 것(모듈은 C.ai) */
+  var AI_API = { fetch: aiFetch, engine: aiEngine, guess: aiGuess, keep: aiKeep, name: AI_NAME, limits: AI_CLAUDE_MS, mark: aiMark, spark: aiSpark, head: aiHead, sub: aiSub,
+    line: aiLine, paint: aiPaint, swapLater: aiSwapLater, done: aiDone, busy: aiBusy, busyPaint: aiBusyPaint, calm: aiCalm,
+    up: aiUp, upOn: aiUpOn, upRead: aiUpRead, upLine: aiUpLine, upSweep: aiUpSweep, upFoot: aiUpFoot, upBtn: aiUpBtn, upPaint: aiUpPaint };
+
+
   /* ══════════════════ 증빙 올리기 ══════════════════
      스캐너가 뱉는 것은 대개 PDF 인데, 영수증은 결재 서류에 <img> 로 그대로
      박히므로 PDF 를 그냥 저장하면 그 자리가 빈다. 그래서 **올리는 시점에
@@ -7468,7 +7736,7 @@
     if (AI_ON != null) return Promise.resolve(AI_ON);
     return apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify({ op: 'status' }) })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { AI_ON = !!(j && j.ai); return AI_ON; })
+      .then(function (j) { AI_ON = !!(j && j.ai); aiKeep('driving-verify', j); return AI_ON; })   // 1순위 엔진도 기억(2026-11-03 — 처음 글을 Claude·Gemini 로)
       .catch(function () { return false; });
   }
   function evFreeUrls() {
@@ -7477,15 +7745,9 @@
     evCropReset();                         // 오리느라 풀어 둔 마지막 장 그림도 놓는다
   }
 
-  /** Gemini 반짝임(같은 색감의 모양 — 공식 로고 파일 아님). 그라데이션 id 는 부를 때마다 새로. */
-  var GEMSVG_N = 0;
-  function gemSvg(size, cls) {
-    var id = 'gsv' + (++GEMSVG_N);
-    return '<svg class="gemico' + (cls ? ' ' + cls : '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true">' +
-      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4C8DF6"/>' +
-      '<stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs>' +
-      '<path fill="url(#' + id + ')" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>';
-  }
+  /** ✦AI 반짝임(같은 색감의 모양 — 공식 로고 파일 아님) — 그림은 aiMark 의 Gemini 마크 한 곳에서(11/3 검토 참고 3 — 예전에는 여기와 drv-verify 에
+   *  따로 그렸다). 클래스 gemico(돌기·흰색 CSS)와 크기는 예전 그대로. 그라데이션 id 는 aiMark 가 부를 때마다 새로. */
+  function gemSvg(size, cls) { return aiMark('gemini', size, 'gemico' + (cls ? ' ' + cls : '')); }
   function gemTag(t) { return '<span class="gem">' + gemSvg(12) + esc(t || 'AI') + '</span>'; }
   function openEvUpload(defCat) {
     if (isMulti()) { toast('영수증은 한 기간씩 올려요. 기간을 하나 골라 주세요.', true); return; }
@@ -8043,6 +8305,12 @@
    */
   function evScanPages(idxs) {
     var session = EVUP;            // 창을 닫았다 다시 열면 EVUP 이 새 객체가 된다 — 옛 응답은 버린다
+    // AI 엔진 표시(2026-11-03 승인 샘플) — 창마다 한 벌: 지금 읽는 엔진·바뀌는 순간·누가 몇 초 읽었나. 계기판 창이면 km 를 읽는다
+    var odo = session.defCat === '계기판';
+    if (!session.ai) session.ai = aiUp('driving-verify', odo ? '계기판 사진을 읽고' : '영수증을 읽고', odo ? '계기판 km를 찾는 중' : dnJoin(['구분', '날짜', '금액을 찾는 중']));
+    var U = session.ai;
+    if (U.es !== 'swap') U.eng = aiGuess('driving-verify') || 'claude';
+    var paintAi = function () { if (EVUP === session) aiUpPaint(U, $('evList'), $('btnEvGo')); };
     idxs.forEach(function (pi) { if (EVUP.pages[pi]) EVUP.pages[pi].ai = 'run'; });
     evRead(); paintEvList();
     var stop = false, swapped = false;
@@ -8051,8 +8319,10 @@
         var pg = session.pages[pi];
         if (EVUP !== session || !pg || pg.ai !== 'run') return;
         if (stop) { pg.ai = ''; return; }
+        var live = function () { return EVUP === session && pg.ai === 'run'; };
         return blobToB64(pg.blob).then(function (b64) {
-          return apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify({ op: 'scan', image: b64 }) });
+          // 두 단계(Claude 먼저 → 503 AI_FALLBACK 이나 웹이 기다리는 시간(dscan)이 지나면 Gemini) — 답 읽기·오류 처리는 예전 그대로
+          return aiFetch('driving-verify', { op: 'scan', image: b64 }, aiUpOn(U, live, paintAi));
         }).then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) {
             if (!r.ok || !j || j.error) {
@@ -8060,6 +8330,7 @@
               if (r.status === 429) stop = true;
               throw new Error((j && j.error) || ('HTTP ' + r.status));
             }
+            if (live()) aiUpRead(U, j);          // 누가 읽었나·몇 초(끝난 줄 「✓ Claude가 읽었어요 · 3.2초」)
             return j.receipts || [];
           });
         }).then(function (recs) {
@@ -8197,6 +8468,15 @@
       hintHtml + '</td>';
   }
 
+  /** 올리기 표 아랫줄 — 「N장 · 영수증 N건」. AI 가 읽었거나 읽는 중이면(2026-11-03) 오른쪽에 「Claude가 2장을 읽는 중」 → 「✓ Claude가 읽었어요 · 3.2초」
+   *  (셈 글과 따로 한 덩이 — 좁은 폭에서 줄이 바뀌어도 「·」로 끝나지 않는다). AI 를 안 썼으면 예전 줄 그대로. */
+  function evFootHtml(perPage, n, nOdo, running) {
+    var cnt = n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · ' +
+      (nOdo < n ? '영수증 ' + n0(n - nOdo) + '건' + (nOdo ? ' · ' : '') : '') + (nOdo ? '계기판 사진 ' + n0(nOdo) + '건' : '');
+    var aiF = EVUP.ai ? aiUpFoot(EVUP.ai, running) : '';
+    if (aiF) return '<div class="ai-foot" style="padding:10px 14px;font-size:12px;color:var(--ink-3)"><span>' + cnt + '</span>' + aiF + '</div>';
+    return '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' + cnt + (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div>';
+  }
   function paintEvList() {
     var box = $('evList'); if (!box) return;
     var n = EVUP.items.length;
@@ -8207,10 +8487,13 @@
       box.innerHTML = '';
       // 영수증 줄을 다 지우고 하이패스 이용내역만 남았으면 그 화면으로 가는 단추(runEvUpload → evHipassGo, 2026-10-29)
       var hpOnly = (EVUP.hp || []).length > 0;
-      if (b) { b.disabled = !hpOnly; b.classList.remove('gembtn', 'running'); b.textContent = hpOnly ? '하이패스 확인하기' : '올리기'; }
+      if (b) { b.disabled = !hpOnly; b.classList.remove('gembtn', 'running', 'ai-busy', 'ai-claude', 'ai-gemini'); b.textContent = hpOnly ? '하이패스 확인하기' : '올리기'; }
       if (f) f.hidden = true;
       return;
     }
+    // 지금 AI 가 읽는 장 = 앞에서 첫 「읽는 중」 장(장은 한 장씩 차례로 읽는다) — 그 줄만 사진 위 빛·움직이는 상태 줄(2026-11-03)
+    var actPg = -1;
+    EVUP.pages.some(function (p, pi) { if (p.ai === 'run') { actPg = pi; return true; } return false; });
     // 장마다 몇 번째 장인지(①②…) — 같은 장에서 나온 줄이 한눈에 묶여 보이게.
     var perPage = {};
     EVUP.items.forEach(function (it) { perPage[it.page] = (perPage[it.page] || 0) + 1; });
@@ -8232,9 +8515,13 @@
           '<img src="' + src + '" alt=""></a>' +
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
-          return '<tr data-evrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
-            '<td colspan="4" class="evg"><div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">AI</b>가 이 장에서 영수증을 읽는 중…</span>' +
-            '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
+          // AI 엔진 표시(2026-11-03 승인 샘플) — 지금 읽는 장은 사진 위 훑는 빛 + 「Claude가 영수증을 읽고 있어요」, 뒤 장은 「Claude가 곧 읽어요」.
+          //   .gemread 는 「AI 가 이 장을 읽는 중」 칸이라는 표시로 그대로 둔다(모양은 상태 줄 — CSS .gemread.ai-read)
+          var U = EVUP.ai, on = it.page === actPg;
+          return '<tr data-evrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + (U ? thumb.replace('<a ', '<a' + aiUpSweep(U, on) + ' ') : thumb) + '</td>' +
+            '<td colspan="4" class="evg">' + (U ? '<div class="gemread ai-read">' + aiUpLine(U, on) + '</div>'
+              : '<div class="gemread">' + gemSvg(16, 'spinning') + '<span><b class="gemtxt">AI</b>가 이 장에서 영수증을 읽는 중…</span>' +
+                '<i class="gemshim"></i><i class="gemshim s2"></i></div>') + '</td>' +
             '<td class="n evx"><button class="btn sm" data-evskip="' + it.page + '">직접 입력</button></td></tr>';
         }
         // 사진 정보로 넣은 날짜 안내는 Gemini 딱지 없이(Gemini 가 한 일이 아니다) — 그것이 있으면 「가 채웠습니다」 줄은 내지 않는다(안내 줄이 셋이 되지 않게)
@@ -8260,17 +8547,18 @@
           '<td class="n evx" style="white-space:nowrap">' +
           '<button class="btn sm" data-evadd="' + i + '" title="이 장에 영수증이 더 있으면 줄을 늘려요" aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-evrm="' + i + '">제외</button></td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' +
-      n0(EVUP.pages.filter(function (p, pi) { return perPage[pi]; }).length) + '장 · ' +
-      (nOdo < n ? '영수증 ' + n0(n - nOdo) + '건' + (nOdo ? ' · ' : '') : '') + (nOdo ? '계기판 사진 ' + n0(nOdo) + '건' : '') +
-      (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
+      }).join('') + '</tbody></table></div>' + evFootHtml(perPage, n, nOdo, running) + '</div>';
     evHpNotes();
     if (b) {
       b.disabled = running > 0;
       // 읽는 동안은 Gemini 색으로 돌며 빛이 지나간다(검증 버튼과 같은 모양).
       b.classList.toggle('gembtn', running > 0); b.classList.toggle('running', running > 0);
-      b.innerHTML = running ? gemSvg(16) + '<span class="gl">AI가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
+      // AI 엔진 표시(2026-11-03) — 읽는 동안 단추 안 작은 표시 「Claude가 읽는 중…」
+      if (running && EVUP.ai) aiUpBtn(EVUP.ai, b, true);
+      else {
+        if (EVUP.ai) aiUpBtn(EVUP.ai, b, false);
+        b.innerHTML = running ? gemSvg(16) + '<span class="gl">AI가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
+      }
     }
     // 채울 빈 칸이 있을 때만 보인다.
     if (f) f.hidden = n < 2 || running > 0 || !EVUP.items.some(function (x, i) { return i && (!x.cat || (!x.date && !x.ai)); });
@@ -13965,6 +14253,8 @@ window.EduGuard = {
       aiReset: function () { AIR = {}; AIR_ASKED = {}; },
       // 2026-10-07 개인경비(drv-expense.js)가 같이 쓰는 것 — 영수증 올리기·결재·기간
       fileToJpegs: fileToJpegs, evCrop: evCrop, evCropReset: evCropReset, bindDrop: bindDrop, gemSvg: gemSvg, gemTag: gemTag,
+      // AI 엔진 표시(2026-11-03) — 두 단계 부르기(Claude → Gemini)·마크·상태 줄·단추 안 표시·올리기 창 표시. 세 시스템이 같이 쓴다
+      ai: AI_API,
       apprTrack: apprTrack, stepText: stepText, apprStatusText: apprStatusText, callAppr: callAppr, canReopen: canReopen,
       apprRefresh: apprRefresh,      // 결재 건만 새로 받기(2026-11-02) — 모듈이 낡은 목록을 알아챘을 때(loadAll 대신) 부를 수 있다
       // 지금 다시 그리면 안 되는가(칸에 초점·한글 조합·창·⋯ 메뉴·적어 두고 저장하지 않은 글 … — 조용히 새로 받기의 navHold 그대로, 읽기만).

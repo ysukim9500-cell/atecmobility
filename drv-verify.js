@@ -24,8 +24,11 @@
   }
 
   /* ══════════════════ 서버 ══════════════════ */
-  function call(body) {
-    return C.apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify(body) })
+  /** onEng(엔진, 때) — AI 를 부르는 op(read)는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
+   *  화면이 지금 읽는 엔진을 바꿔 보인다. 답 읽기·오류 글은 그대로. */
+  function call(body, onEng) {
+    var ai = body && body.op === 'read' && C.ai;
+    return (ai ? C.ai.fetch('driving-verify', body, onEng) : C.apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify(body) }))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok || !j || j.error) throw new Error((j && j.error) || ('HTTP ' + r.status));
@@ -122,7 +125,8 @@
    */
   /** 마지막 검증의 사진 판독 경고(사람|기간 → 글) — 부른 쪽이 마지막 알림(「검증했습니다 — …」)에 이어 붙이고 ① 카드 문구에 쓴다(2026-10-20 V3 B6). */
   var WARN = {};
-  function runVerify(u, cyc, onNote, quiet) {
+  /** onEng(엔진, 때) — 사진 판독(read)마다 지금 읽는 엔진(C.ai.fetch, 2026-11-03). 판·단추가 「Claude가 …」·「Gemini가 …」로 바꿔 보인다. */
+  function runVerify(u, cyc, onNote, quiet, onEng) {
     var say = onNote || function () { };
     var wk = u + '|' + cyc;
     WARN[wk] = '';
@@ -138,7 +142,7 @@
       say(label(0, unread.length), { phase: 'read', n: 0, N: unread.length, cur: unread[0] });
       return pool(unread, 3, function (id) {
         if (stop) return Promise.reject(new Error(stop));
-        return call({ op: 'read', evidence_id: id }).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
+        return call({ op: 'read', evidence_id: id }, onEng).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
           // 하루 상한에 닿았으면 남은 것은 더 보내지 않는다.
           if (/횟수|한도/.test(String(e && e.message))) stop = e.message;
           throw e;
@@ -191,26 +195,24 @@
   /** AI(Gemini)가 사진을 읽어 낸 항목인가 — 코드가 A 로 시작한다(A00 은 '읽지 않음' 안내 · A10 은 원본 파일이 없어 대조를 생략했다는 참고라 뺀다).
    *  A11 = 원본 장(한 장에 여러 영수증)에서 찾지 못한 영수증(2026-10-21). */
   function isAi(it) { return /^A(0[1-9]|11)/.test(String(it && it.code || '')); }
-  /** Gemini 표시. 구글 공식 로고 파일이 아니라, 같은 색감의 반짝임 모양 + 이름이다. */
+  /** Gemini 표시. 구글 공식 로고 파일이 아니라, 같은 색감의 반짝임 모양 + 이름이다. 그림은 마크 한 곳(C.ai.mark = driving-app.js aiMark, 11/3 검토
+   *  참고 3 — 예전에는 여기에 따로 그렸다). 클래스 gemmk — 검증 단추 아이콘(gemico)의 CSS(단계 카드 안 흰색·돌기)를 받지 않게(예전 딱지 그림도 클래스 없음). */
   function gemBadge(label) {
-    return '<span class="gem" title="AI가 사진을 읽어 찾은 항목">' +
-      '<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1">' +
-      '<stop offset="0" stop-color="#4C8DF6"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs>' +
-      '<path fill="url(#gemg)" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>' +
-      (label || 'AI') + '</span>';
+    return '<span class="gem" title="AI가 사진을 읽어 찾은 항목">' + (C.ai ? C.ai.mark('gemini', 12, 'gemmk') : '') + (label || 'AI') + '</span>';
   }
-  /** Gemini 반짝임 아이콘(버튼용). 그라데이션 id 가 겹치면 두 번째부터 색이 빠질 수 있어 부를 때마다 새 id. */
-  var GEM_N = 0;
-  function gemIcon(size) {
-    var id = 'gemi' + (++GEM_N);
-    return '<svg class="gemico" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="' + id +
-      '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4C8DF6"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/>' +
-      '</linearGradient></defs><path fill="url(#' + id + ')" d="M12 1.5c.6 5.6 4.9 9.9 10.5 10.5-5.6.6-9.9 4.9-10.5 10.5C11.4 16.9 7.1 12.6 1.5 12 7.1 11.4 11.4 7.1 12 1.5z"/></svg>';
-  }
-  /** 검증 버튼 — 도는 동안(running) 아이콘이 돌고 빛이 지나가며 진행 글자를 보여 준다. */
-  function gemBtn(attrs, label, running, extraCls) {
+  /** Gemini 반짝임 아이콘(버튼용) — 그림은 C.gemSvg(= aiMark 한 곳 · 클래스 gemico · 그라데이션 id 는 부를 때마다 새로). */
+  function gemIcon(size) { return C.gemSvg(size); }
+  /** 검증 버튼 — 도는 동안(running) 아이콘이 돌고 빛이 지나가며 진행 글자를 보여 준다.
+   *  eng(2026-11-03) — 도는 동안 지금 읽는 엔진을 알면 단추 안 작은 표시(마크 + 「Claude 검증 중」·「Gemini 검증 중」, 승인한 샘플)로.
+   *  작은 단추(sm — 관리 현황 표의 고정 자리 84px)는 샘플의 「좁은 곳은 작은 반짝임과 이름만」대로 마크 + 이름(전체 글은 title·aria-label). */
+  function gemBtn(attrs, label, running, extraCls, eng) {
     // 도는 동안은 빨간 기본 버튼 모양을 빼고 Gemini 색으로만 보인다.
     var cls = running ? String(extraCls || '').replace(' pri', '') : (extraCls || '');
+    if (running && eng && C.ai) {
+      var small = / sm\b/.test(cls), full = C.ai.name[eng] + ' 검증 중';
+      return '<button class="btn gembtn' + cls + ' running ai-busy ai-' + eng + '" ' + attrs + ' aria-busy="true"' + (small ? ' title="' + full + '" aria-label="' + full + '"' : '') + '>' +
+        C.ai.busy(eng, small ? '' : ' 검증 중') + '</button>';
+    }
     return '<button class="btn gembtn' + cls + (running ? ' running' : '') + '" ' + attrs +
       (running ? ' aria-busy="true"' : '') + '>' + gemIcon(running ? 16 : 15) + '<span class="gl">' + esc(label) + '</span></button>';
   }
@@ -372,6 +374,8 @@
     // 결재 중·결재 완료(2026-10-19 사용성 2차 #5) — 개인경비처럼 상신 때 굳힌 검증 결과를 먼저 보인다
     //   (예전: 「검증 전 · 아직 검증하지 않았습니다」 + 「다시 검증하기」 + 없는 「위 ① 검증하기」 안내).
     if (locked) return lockedVerify(a, cyc);
+    // 1순위 AI 엔진을 미리 물어 둔다(1분 기억 — 「검증하기」를 누르면 처음 글부터 Claude·Gemini 가 맞게, 2026-11-03)
+    if (C.ai && !busy) C.ai.engine('driving-verify');
     // 반려·회수 뒤(2026-10-15 2차) — 3단계에도 반려 사유 띠. 무엇을 고쳐야 하는지 여기서 바로 보인다.
     if (a && (a.status === 'rejected' || a.status === 'withdrawn')) {
       var stx = C.apprStatusText(a);
@@ -408,7 +412,7 @@
           : 'AI가 영수증과 계기판 사진을 읽고 운행 기록과 맞는지 확인해요.',
         gemBtn('data-vrun' + (RUN.busy ? ' disabled' : ''),
           busy ? (aimShort('d:' + k) || RUN.note || 'AI가 읽는 중…') : RUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
-          busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''))) +
+          busy, ' big' + (stage === 1 ? ' pri' + (busy ? '' : ' cta') : ''), busy ? aimEng('d:' + k) : null)) +
       card(2, 'PDF 미리보기',
         row && fresh ? '결재자에게 갈 문서를 미리 확인해요.' : '먼저 검증해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-pdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' +
@@ -521,9 +525,10 @@
       var st = C.state(), v = document.querySelector('.hero .verdict .vnote');
       if (v && st.VIEW === 'verify' && st.CYCKEY === cyc && !C.isMulti()) {
         v.textContent = t;
-        var gl = document.querySelector('[data-vrun] .gl'); if (gl) gl.textContent = aimShort(mk) || t;   // 단추에는 짧게(「읽는 중… 3 / 9」)
+        // 단추에는 짧게(「읽는 중… 3 / 9」) — 엔진 표시 단추(「Claude 검증 중」, 2026-11-03)는 그대로 둔다
+        var gl = document.querySelector('[data-vrun] .gl'); if (gl && !gl.closest('.ai-busy')) gl.textContent = aimShort(mk) || t;
       }
-    });
+    }, false, function (eng, w) { aimEngine(mk, eng, w); });
     RUN.p = p;
     p.then(function (row) {
       ROWS[k] = row || null;
@@ -589,7 +594,7 @@
       act: function (u) {
         var r = by[u], busy = RUN.busy && RUN.who === keyOf(u, cyc);
         // 결과 보기는 검증 칸의 딱지가 한다 — 여기는 늘 단추 하나(자리가 줄마다 같다)
-        return gemBtn('data-vrunfor="' + esc(u) + '"' + (RUN.busy ? ' disabled' : ''), busy ? '읽는 중…' : r ? '다시 검증' : '검증', busy, ' sm');
+        return gemBtn('data-vrunfor="' + esc(u) + '"' + (RUN.busy ? ' disabled' : ''), busy ? '읽는 중…' : r ? '다시 검증' : '검증', busy, ' sm', busy ? RUN.eng : null);
       }
     };
   }
@@ -1263,8 +1268,20 @@
     if ((el = e.target.closest('[data-vrunfor]'))) {
       var u = el.dataset.vrunfor, S = C.state(), k = keyOf(u, S.CYCKEY);
       if (RUN.busy) return;
-      RUN = { busy: true, note: '', who: k }; C.render();
-      runVerify(u, S.CYCKEY).then(function (row) {
+      // 관리 현황 「대신 검증」 단추도 지금 읽는 엔진(2026-11-03 — 표의 좁은 자리라 「✦ Claude」, 전체 글 「Claude 검증 중」은 aria-label) — 넘기면 0.8초 뒤 Gemini 로
+      RUN = { busy: true, note: '', who: k, eng: C.ai ? C.ai.guess('driving-verify') : null }; C.render();
+      var run0 = RUN, btnPaint = function () {
+        var b = document.querySelector('[data-vrunfor="' + (window.CSS && CSS.escape ? CSS.escape(u) : u) + '"]');
+        if (!b || !b.classList.contains('ai-busy') || !run0.eng) return;
+        // 표의 고정 자리(84px) 단추 — 마크 + 이름만, 전체 글은 title·aria-label(gemBtn 과 같게)
+        var full = C.ai.name[run0.eng] + ' 검증 중';
+        C.ai.busyPaint(b, run0.eng, ''); b.title = full; b.setAttribute('aria-label', full);
+      };
+      runVerify(u, S.CYCKEY, null, false, function (eng, w) {
+        if (RUN !== run0 || !eng) return;
+        if (w === 'start') { if (run0.eng !== 'gemini') { run0.eng = eng; btnPaint(); } return; }
+        C.ai.swapLater(function () { if (RUN === run0) { run0.eng = 'gemini'; btnPaint(); } });
+      }).then(function (row) {
         ROWS[k] = row || null; ALLROWS.list = null;
         var w = WARN[u + '|' + S.CYCKEY] || '';   // 사진 판독 경고는 이 알림에 이어 붙인다(V3 B6)
         C.toast(C.nameOf(u) + ' 님 운행일지를 검증했어요' + (row ? '(' + sumText(row.summary) + ')' : '') + '.' + (w ? ' ' + C.endDot(w) : ''), !!w);
@@ -1635,13 +1652,17 @@
   var AIM = null, AIM_T = null;
   var AIM_KIND = { '통행료': '통행료 영수증', '주차': '주차 영수증', '주유': '주유 영수증', '계기판': '계기판 사진' };
   function aimReduce() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
-  /** o: { title, cols:[머리 넷], rows:[{ id, date, place, amt }], photos:[{ id, src, kind }], N(추정 사진 수), paper('receipt'|'sheet') } */
+  /** o: { title, cols:[머리 넷], rows:[{ id, date, place, amt }], photos:[{ id, src, kind }], N(추정 사진 수), paper('receipt'|'sheet'),
+   *       eng(지금 아는 처음 엔진 — 2026-11-03, 없으면 예전 판), what(상태 줄 「Claude가 ○○ 있어요」의 ○○), fbNote(Gemini 가 대신할 때 한 줄) } */
   function aimBegin(k, o) {
     clearInterval(AIM_T);
     AIM = { k: k, t0: Date.now(), phase: 'check', n: 0, N: o.N || 0, cur: null, tp: 0, tm: 0, pct: 4, pi: 0, ps: 0, done: false, chips: {}, pop: null,
       title: o.title || 'AI가 영수증을 읽고 있어요', cols: o.cols || ['날짜', '운행', '금액(원)', '비교'], rows: (o.rows || []).slice(0, 6),
       more: o.more != null ? o.more : Math.max(0, (o.rows || []).length - 6),
-      photos: o.photos || [], paper: o.paper || 'receipt' };
+      photos: o.photos || [], paper: o.paper || 'receipt',
+      // AI 엔진 표시(2026-11-03 승인 샘플) — eng = 지금 읽는 엔진 · es = 'run' | 'swap'(바뀌는 순간) · hl = 줄 빛이 선 줄(-1 = 숨음)
+      eng: o.eng === 'claude' || o.eng === 'gemini' ? o.eng : null, es: 'run', what: o.what || '영수증을 읽고',
+      fbNote: o.fbNote || 'Claude가 응답하지 않아 Gemini가 대신 읽어요.', hl: -1 };
     AIM_T = setInterval(aimTick, 250);
     // 폰에서는 단계 카드 셋이 위아래로 쌓여 판이 화면 아래에 있다 — 판의 머리가 보이게 내려 준다(그린 뒤에)
     setTimeout(function () {
@@ -1697,14 +1718,32 @@
     return doc + (ph ? '<img alt="" src="' + esc(ph.src) + '">' : '') + '<span class="aimo-scan"></span>' + (ph ? '<span class="aimo-tag">' + esc(ph.kind || '영수증') + '</span>' : '');
   }
   function aimChip(c) { return '<span class="dchip ' + (c ? c[1] : 'wait') + '">' + esc(c ? c[0] : '확인 중') + '</span>'; }
-  /** 판 — viewVerify 의 결과 자리(.hero). verdictHtml = 지금 진행 글(각 화면의 노트 칸 — 바뀌면 각 화면이 그 칸만 고친다). */
+  /** 판 — viewVerify 의 결과 자리(.hero). verdictHtml = 지금 진행 글(각 화면의 노트 칸 — 바뀌면 각 화면이 그 칸만 고친다).
+   *  2026-11-03 지금 읽는 엔진을 알면 머리가 상태 줄(마크 · 「Claude가 영수증을 읽고 있어요」 · 점 셋 + 아래 진행 글, 승인한 샘플)이고
+   *  막대·사진 빛·흐름 점·줄 빛이 엔진 색. 진행 글 앞 ✦AI 딱지(.gemrun)는 마크가 대신하므로 그 머리에서는 숨긴다(CSS — 글·자리는 그대로).
+   *  엔진을 모르면(AI 꺼진 서버) 예전 판 그대로. */
+  /** 굵은 글 자리 잡기 — Claude · Gemini · 바뀌는 순간 글을 보이지 않게 같은 칸에 겹쳐(CSS .aimo-top > .ai-gh) 가장 긴 글만큼 높이를 잡는다
+   *  (11/3 화면 검사 — 폰 360 에서 머리가 2줄 → 1줄 → 2줄로 바뀌며 판 아래가 22.5px 움직였다). 넓은 폭은 모두 한 줄이라 그대로. */
+  function aimGhosts() {
+    return [{ eng: 'claude', phase: 'run' }, { eng: 'gemini', phase: 'run' }, { eng: 'claude', phase: 'swap' }].map(function (g) {
+      return '<span class="ai-hd ai-gh" aria-hidden="true">' + C.ai.head({ eng: g.eng, phase: g.phase, what: AIM.what }) + '</span>';
+    }).join('');
+  }
   function aimHtml(k, verdictHtml) {
     if (!aimOn(k)) return '';
     var ph = aimPhoto(), el = Math.floor((Date.now() - AIM.t0) / 1000), long = el >= 60;
     AIM.pct = aimPctCalc();
-    return '<section class="hero aimo" data-aimo aria-busy="true" aria-label="AI 검증 중">' +
-      '<div class="aimo-hd"><h2>' + esc(AIM.title) + '</h2><span class="aimo-el" data-aimo-el>' + el + '초 지남</span></div>' +
-      '<div class="aimo-st"><p class="verdict" role="status" aria-live="polite">' + verdictHtml + '</p><b class="aimo-cnt" data-aimo-cnt>' + aimCount() + '</b></div>' +
+    var eng = AIM.eng && C.ai ? AIM.eng : null;
+    return '<section class="hero aimo' + (eng ? ' ai-' + eng + (AIM.es === 'swap' ? ' swap' : '') : '') + '" data-aimo aria-busy="true" aria-label="AI 검증 중">' +
+      (eng
+        // 머리 = 상태 줄 — 마크 · 굵은 글(엔진) · 작은 글(진행 글 — 바뀌는 순간에는 「Gemini로 넘겨요」) | 오른쪽 지난 초 · 셈
+        ? '<div class="aimo-top">' + C.ai.spark() +
+          '<h2 class="ai-hd" data-aimo-hd aria-live="polite">' + C.ai.head({ eng: eng, phase: AIM.es, what: AIM.what }) + '</h2>' + aimGhosts() +
+          '<span class="aimo-el" data-aimo-el>' + el + '초 지남</span>' +
+          '<p class="verdict" role="status" aria-live="polite"><span class="ai-nt">' + verdictHtml + '</span>' + (AIM.es === 'swap' ? AIM_SWN : '') + '</p>' +
+          '<b class="aimo-cnt" data-aimo-cnt>' + aimCount() + '</b></div>'
+        : '<div class="aimo-hd"><h2>' + esc(AIM.title) + '</h2><span class="aimo-el" data-aimo-el>' + el + '초 지남</span></div>' +
+          '<div class="aimo-st"><p class="verdict" role="status" aria-live="polite">' + verdictHtml + '</p><b class="aimo-cnt" data-aimo-cnt>' + aimCount() + '</b></div>') +
       '<span class="aimo-bar" aria-hidden="true"><i data-aimo-bar style="width:' + AIM.pct + '%"></i></span>' +
       '<div class="aimo-stage" aria-hidden="true">' +
         '<div class="aimo-pile"><span class="pp"></span><span class="pp p2"></span><div class="aimo-frame" data-aimo-frame data-pid="' + esc(ph ? String(ph.id) : '') + '">' +
@@ -1712,15 +1751,55 @@
         '<div class="aimo-flow"><i></i><i></i><i></i></div>' +
         '<div class="aimo-side"><div class="aimo-pop" data-aimo-pop' + (AIM.pop ? '' : ' hidden') + '>' + (AIM.pop ? '<span>' + esc(AIM.pop.kind) + ' 읽음</span><b>' + esc(AIM.pop.value) + '</b>' : '') + '</div>' +
           // 머리 칸에도 줄 칸과 같은 이름(pl·am·ac) — 폰에서 금액 칸을 숨길 때 머리 「금액(원)」도 같이 숨는다(2026-10-20 V3 B11: 머리만 남아 「맞춰 보기」가 아랫줄로 밀렸다)
-          '<div class="aimo-rows"><div class="ar hd">' + AIM.cols.map(function (c, i) { return '<span' + ([' class="dt"', ' class="pl"', ' class="am"', ' class="ac"'][i] || '') + '>' + esc(c) + '</span>'; }).join('') + '</div>' +
+          '<div class="aimo-rows">' +
+          // 줄 확인 빛(2026-11-03 승인 샘플) — 엔진 색 띠가 줄 위로 차례로 지나간다(aimPaint). 다시 그려도 지금 자리에서 시작
+          (eng ? '<i class="ai-hl" data-aimo-hl aria-hidden="true"' + (AIM.hl >= 0 && AIM.hlH ? ' style="opacity:1;transform:translateY(' + AIM.hlY + 'px);height:' + AIM.hlH + 'px"' : '') + '></i>' : '') +
+          '<div class="ar hd">' + AIM.cols.map(function (c, i) { return '<span' + ([' class="dt"', ' class="pl"', ' class="am"', ' class="ac"'][i] || '') + '>' + esc(c) + '</span>'; }).join('') + '</div>' +
           (AIM.rows.length ? AIM.rows.map(function (r) {
             return '<div class="ar" data-aimo-row="' + esc(String(r.id)) + '"><b>' + esc(r.date) + '</b><span class="pl">' + esc(r.place || '—') + '</span>' +
               '<span class="am">' + esc(r.amt == null ? '—' : r.amt) + '</span><span class="ac">' + aimChip(AIM.chips[String(r.id)]) + '</span></div>';
           }).join('') : '<div class="aimo-more">이번 기간에 비교할 줄이 없어요</div>') +
           (AIM.more ? '<div class="aimo-more">외 ' + n0(AIM.more) + '줄도 함께 확인해요</div>' : '') + '</div></div>' +
       '</div>' +
+      // Gemini 가 대신할 때 한 줄(승인한 샘플의 Gemini 카드 아래 줄)
+      (eng === 'gemini' ? '<p class="ai-note" data-aimo-fb>' + esc(AIM.fbNote) + '</p>' : '') +
       '<p class="aimo-note' + (long ? ' long' : '') + '" data-aimo-note>' + (long ? '평소보다 오래 걸리고 있어요. 이 화면에서 기다려 주세요.' : '보통 10~30초 걸려요. 다 읽을 때까지 이 화면에서 기다려 주세요.') + '</p></section>';
   }
+  /** 지금 읽는 엔진이 정해지거나 바뀌었다(C.ai.fetch 의 on, 2026-11-03) — 'start' 처음 엔진 · 'swap' Claude 가 넘김(샘플 「바뀌는 순간」:
+   *  「Claude가 응답하지 않아요 · Gemini로 넘겨요」를 0.8초 흐리게 보인 뒤 Gemini 로). 여러 장을 같이 읽다 둘이 넘겨도 한 번만 바뀐다. */
+  function aimEngine(k, eng, w) {
+    if (!aimOn(k) || AIM.done) return;
+    if (w === 'start') {
+      if (!eng) { if (AIM.eng) { AIM.eng = null; C.render(); } return; }      // AI 꺼진 서버 — 예전 판으로
+      if (eng === AIM.eng || AIM.es === 'swap' || AIM.fb) return;
+      var re = !AIM.eng;                                                       // 예전 판에서 상태 줄 판으로는 다시 그린다
+      AIM.eng = eng;
+      if (re) C.render(); else aimEngPaint();
+      return;
+    }
+    if (AIM.es === 'swap' || AIM.eng === 'gemini') return;
+    AIM.es = 'swap'; aimEngPaint();
+    C.ai.swapLater(function () { if (aimOn(k) && AIM.es === 'swap') { AIM.es = 'run'; AIM.eng = 'gemini'; AIM.fb = true; aimEngPaint(); } });
+  }
+  /** 바뀌는 순간 작은 글(샘플 그대로) — 그동안 진행 글(.ai-nt)은 숨는다(CSS .aimo.swap) */
+  var AIM_SWN = '<span class="ai-swn">Gemini로 넘겨요</span>';
+  /** 엔진이 바뀐 곳만 그 자리에서 — 판 색·머리 글·Gemini 한 줄·단추 안 표시(다시 그리지 않아 흐림·마크 바탕 색 바뀜이 보인다). */
+  function aimEngPaint() {
+    if (!AIM || !AIM.eng || !C.ai) return;
+    var root = document.querySelector('[data-aimo]');
+    if (root && root.querySelector('[data-aimo-hd]')) {
+      root.classList.toggle('ai-claude', AIM.eng === 'claude'); root.classList.toggle('ai-gemini', AIM.eng === 'gemini'); root.classList.toggle('swap', AIM.es === 'swap');
+      root.querySelector('[data-aimo-hd]').innerHTML = C.ai.head({ eng: AIM.eng, phase: AIM.es, what: AIM.what });
+      var vd = root.querySelector('.aimo-top > .verdict'), sw = vd && vd.querySelector('.ai-swn');
+      if (vd && AIM.es === 'swap' && !sw) vd.insertAdjacentHTML('beforeend', AIM_SWN);
+      if (sw && AIM.es !== 'swap') sw.remove();
+      var nt = root.querySelector('[data-aimo-note]');
+      if (AIM.eng === 'gemini' && !root.querySelector('[data-aimo-fb]') && nt) nt.insertAdjacentHTML('beforebegin', '<p class="ai-note" data-aimo-fb>' + esc(AIM.fbNote) + '</p>');
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.gembtn.running.ai-busy'), function (b) { C.ai.busyPaint(b, AIM.eng, ' 검증 중'); });
+  }
+  /** 단추 안 표시에 쓸 엔진 — 그 판이 돌고 있고 엔진을 알 때만(아니면 null — 예전 단추). */
+  function aimEng(k) { return aimOn(k) && C.ai ? AIM.eng : null; }
   /** 시계·진행 알림 때 판의 바뀐 곳만 고친다(화면 전체를 다시 그리지 않는다). */
   function aimPaint(force) {
     if (!AIM) return;
@@ -1742,6 +1821,22 @@
     if (img && !img.__aimo) { img.__aimo = 1; img.addEventListener('error', function () { img.style.display = 'none'; }); }
     var pop = root.querySelector('[data-aimo-pop]');
     if (pop && AIM.pop && force) { pop.hidden = false; pop.innerHTML = '<span>' + esc(AIM.pop.kind) + ' 읽음</span><b>' + esc(AIM.pop.value) + '</b>'; pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
+    // 줄 확인 빛(2026-11-03 승인 샘플) — 서버는 한 번에 답한다: 기다리는 동안 표 줄 위로 0.95초마다 차례로 지나가고(다 지나면 두 번 쉬고 처음부터),
+    //   응답이 오면(done) 숨고 실제 결과 딱지가 찍힌다. 자리는 줄의 실제 위치·높이(줄 높이가 달라도 맞는다)
+    var hl = root.querySelector('[data-aimo-hl]');
+    if (hl) {
+      var rs = root.querySelectorAll('[data-aimo-row]'), n = rs.length, i = AIM.done || !n ? -1 : Math.floor((Date.now() - AIM.t0) / 950) % (n + 2);
+      if (i >= n) i = -1;
+      if (i !== AIM.hl || (i >= 0 && hl.style.opacity !== '1')) {
+        AIM.hl = i;
+        if (i < 0) hl.style.opacity = '0';
+        else {
+          var rr = rs[i];
+          AIM.hlY = rr.offsetTop; AIM.hlH = rr.offsetHeight;
+          hl.style.transform = 'translateY(' + AIM.hlY + 'px)'; hl.style.height = AIM.hlH + 'px'; hl.style.opacity = '1';
+        }
+      }
+    }
   }
   function aimTick() { if (!AIM || AIM.done) { clearInterval(AIM_T); AIM_T = null; return; } aimPaint(false); }
   /** 응답이 왔다 — 실제 결과로 줄마다 딱지를 찍는다(80ms 간격, 움직임 줄이기면 한 번에). res = { byId: { 줄 id: [글, 색] }, fallback: [글, 색] } */
@@ -1783,7 +1878,9 @@
     return { byId: out, fallback: ['맞음', 'ok'] };
   }
   var AIMO = { begin: aimBegin, step: aimStep, finish: aimFinish, end: aimEnd, html: aimHtml, on: aimOn, short: aimShort, chipsFrom: aimChipsFrom, kind: AIM_KIND,
-    pct: function () { return AIM ? AIM.pct : 0; } };
+    pct: function () { return AIM ? AIM.pct : 0; },
+    // 지금 읽는 엔진(2026-11-03) — eng(판 열쇠, 엔진, 'start'|'swap') = C.ai.fetch 의 on 에 그대로 · engOf(판 열쇠) = 단추 안 표시에 쓸 엔진
+    eng: aimEngine, engOf: aimEng };
   /** 운행일지 판 재료 — 이번 기간 업무 운행 줄(금액 있는 운행 먼저 여섯, 날짜순)과 사진 있는 영수증. */
   function drvMotion(u, cyc) {
     // 기간 범위는 엔진 열쇠로(2026-10-20 V3 — 연말 추가 기간 '2026-12b' 를 달 숫자로 나눠 NaN 범위가 되어 판에 운행·사진이 0줄이었다)
@@ -1796,6 +1893,8 @@
     var ev = (S.ALL_EVID || []).filter(function (e) { var d = Number(e.date_millis); return e.username === u && e.photo_path && d >= r.lo && d < r.hi; })
       .sort(function (a, b) { return a.date_millis - b.date_millis; });
     return { title: 'AI가 영수증을 읽고 있어요', cols: ['날짜', '운행', '금액(원)', '비교'], N: ev.length,
+      // 지금 아는 처음 엔진(2026-11-03 — 상태 줄 「Claude가 영수증을 읽고 있어요」, 사진을 읽을 때 정해지면 바뀐다)
+      eng: C.ai ? C.ai.guess('driving-verify') : null, what: '영수증을 읽고',
       rows: pick.map(function (t) { return { id: t.id, date: C.md(t.start_time), place: t.visit_place || short(t.end_address) || '방문처 없음', amt: amt(t) ? n0(amt(t)) : '—' }; }),
       more: Math.max(0, biz.length - 6),
       photos: ev.map(function (e) { return { id: e.id, src: C.photoUrl(e.photo_path), kind: AIM_KIND[e.category] || ((e.category || '') + ' 영수증') }; }) };

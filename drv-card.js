@@ -1461,8 +1461,11 @@
      같은 자료면 서버가 보관해 둔 Gemini 결과를 쓴다. 서버·Gemini 를 못 쓰면 브라우저 규칙만 + 「AI 검증을 하지 못해 규칙으로만 검증했어요」(AI_FAIL). */
   var VRUN = { busy: false, note: '', k: '', t0: 0 }, VTICK = null, EXP = {};
   var AI_FAIL = 'AI 검증을 하지 못해 규칙으로만 검증했어요';   // 서버 expense-ai card_review FAIL_NOTE 와 같은 글자(2026-10-24 4단계 해요체)
-  function cai(body) {
-    return C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) })
+  /** onEng(엔진, 때) — op card_review 는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
+   *  화면(AI 판·단추)이 지금 검증하는 엔진을 바꿔 보인다. 답 읽기·오류 처리는 그대로. */
+  function cai(body, onEng) {
+    var ai = C.ai && body && body.op === 'card_review';
+    return (ai ? C.ai.fetch('expense-ai', body, onEng) : C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) }))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok || !j || j.error) { var e = new Error((j && j.error) || ('HTTP ' + r.status)); e.status = r.status; e.code = (j && j.code) || ''; throw e; }
@@ -1486,12 +1489,15 @@
     var M = C.vx.aiMotion, mk = 'c:' + VRUN.k;
     if (M) M.step(mk, { phase: 'run' });
     var v = document.querySelector('.hero .verdict .cvnote'); if (v) v.textContent = t;
-    var gl = document.querySelector('[data-cvrun] .gl'); if (gl) gl.textContent = (M && M.short(mk)) || t;   // 단추에는 짧게(2026-10-20)
+    // 단추에는 짧게(2026-10-20) — 엔진 표시 단추(「Claude 검증 중」, 2026-11-03)는 그대로 둔다
+    var gl = document.querySelector('[data-cvrun] .gl'); if (gl && !gl.closest('.ai-busy')) gl.textContent = (M && M.short(mk)) || t;
   }
   /** AI 검증 모션 재료(2026-10-20) — 검증하는 대상 줄(날짜·가맹점·금액, 여섯 줄). 사진이 없으니 종이(카드 내역) 그림. */
   function cMotion(t) {
     var rows = tItems(t);
     return { title: 'AI가 카드 내역을 읽고 있어요', cols: ['날짜', '가맹점', '금액(원)', '비교'], N: 0, paper: 'sheet', more: Math.max(0, rows.length - 6),
+      // 지금 아는 처음 엔진(2026-11-03 승인 샘플 — 「Claude가 카드 내역을 검증하고 있어요」, 부를 때 정해지면 바뀐다)
+      eng: C.ai ? C.ai.guess('expense-ai') : null, what: '카드 내역을 검증하고', fbNote: 'Claude가 응답하지 않아 Gemini가 대신 검증해요.',
       rows: rows.slice(0, 6).map(function (it) { return { id: it.id, date: String(it.appr_date || '').slice(5).replace('-', '.'), place: it.merchant || '—', amt: n0(it.amount) }; }),
       photos: [] };
   }
@@ -1509,7 +1515,8 @@
       var tick = function () { if (VRUN.busy && VRUN.k === k) sayRun('카드 ' + n0(n) + '줄을 읽는 중…' + (M && M.on(mk) ? '' : ' ' + Math.round((Date.now() - VRUN.t0) / 1000) + '초')); };
       tick(); clearInterval(VTICK); VTICK = setInterval(tick, 1000);
       // 대상(2026-11-03 PLAN K3) — 카드 키(여러 카드 문서면 null) · 다시 상신할 문서 번호(새 문서면 null). 서버가 card_doc_plan 으로 같은 줄을 정한다
-      return cai({ op: 'card_review', cycle: cyc, card_no: t.card_no == null ? null : t.card_no, approval_id: t.approval_id == null ? null : t.approval_id })
+      return cai({ op: 'card_review', cycle: cyc, card_no: t.card_no == null ? null : t.card_no, approval_id: t.approval_id == null ? null : t.approval_id },
+        function (eng, w) { if (M && M.eng) M.eng(mk, eng, w); })
         .then(function (j) { return { j: j }; }, function (e) { return { e: e }; });
     }).then(function (x) {
       clearInterval(VTICK); VTICK = null;
@@ -1613,6 +1620,8 @@
     var v = VR[k], dataFresh = !!(v && v.sig === sig(u, cyc, tid)), fresh = dataFresh && !!CFRESH[k], s = v ? v.res.summary : {}, items = v ? v.res.items : [];
     var seen = previewOk(k), blocked = !!(v && fresh && s.block);
     var busy = VRUN.busy && VRUN.k === k;
+    // 1순위 AI 엔진을 미리 물어 둔다(1분 기억 — 「검증하기」를 누르면 처음 글부터 Claude·Gemini 가 맞게, 2026-11-03)
+    if (C.ai && !VRUN.busy && its.length) C.ai.engine('expense-ai');
     // 도는 동안은 ① 도는 중 · ②③ 아직(2026-10-20 V3 B2). 빈 칸이 있으면 지금 할 일은 ③ 「빈 칸으로 가기」(V3 B5 — ② PDF 가 깜빡이고 ③ 이 회색이었다)
     var locked = false, stage = busy || !v || !fresh ? 1 : blocked ? 3 : !seen ? 2 : 3;
     var canSubmit = true;                  // 대상이 있으면 늘 상신할 수 있다(살아 있는 문서는 대상이 아니다)
@@ -1637,7 +1646,7 @@
         : v && dataFresh ? '먼저 지금 자료로 검증해 주세요. 지금 보이는 건 지난 검증(' + esc(C.vx.whenText(new Date(v.at).toISOString())) + ') 결과예요.'
         : '규칙으로 빈칸, 중복, 기간 밖 줄을 보고 AI가 구분과 사용목적을 봐요.',
         C.vx.gemBtn('data-cvrun' + (busy || none ? ' disabled' : ''), busy ? ((AM && AM.short(mk)) || VRUN.note || 'AI가 읽는 중…') : v && fresh ? '다시 검증하기' : '검증하기',
-          busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
+          busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''), busy && AM && AM.engOf ? AM.engOf(mk) : null)) +
       card(2, 'PDF 미리보기', v && fresh ? '결재자에게 갈 지출결의서(가로 A4)를 열어 확인하세요.' : '검증을 먼저 해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-cpdf=""' + (v && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>',
         blocked && !seen ? 'todo' : undefined) +

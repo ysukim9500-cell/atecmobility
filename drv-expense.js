@@ -111,8 +111,12 @@
       });
     });
   }
-  function xai(body) {
-    return C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) })
+  /** onEng(엔진, 때) — AI 를 부르는 op(scan · read)는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
+   *  올리기 scan 만 웹이 기다리는 시간(20초)이 지나도 끊고 Gemini — read 는 끊지 않는다(까닭은 driving-app.js AI_CLAUDE_MS).
+   *  화면이 지금 읽는 엔진을 바꿔 보인다. 답 읽기·오류 글은 그대로. */
+  function xai(body, onEng) {
+    var ai = C.ai && body && (body.op === 'scan' || body.op === 'read');
+    return (ai ? C.ai.fetch('expense-ai', body, onEng) : C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) }))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok || !j || j.error) { var e = new Error((j && j.error) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
@@ -605,6 +609,7 @@
       '날짜는 ' + esc(xSpanKey(S.CYCKEY)) + ' 안이어야 해요.</div>',
       '<span style="flex:1"></span><button class="btn" data-close>취소</button><button class="btn pri" id="btnXUpGo" disabled>올리기</button>', true);
     C.bindDrop($('xDrop'), addFiles);
+    if (C.ai) C.ai.engine('expense-ai');      // 1순위 AI 엔진을 미리 물어 둔다(읽는 줄의 처음 글부터 Claude·Gemini 가 맞게, 2026-11-03)
   }
   /** 빈 줄 하나 — 날짜는 달력에서 고른 날, 아니면 오늘. 오늘이 보는 기간 밖이면 비워 두고 고르게 한다(2026-10-20 AU2 —
    *  예전엔 기간 끝날로 당겨 넣어, 마감 뒤 5일 동안 지난 기간 화면에서 올린 오늘 영수증이 10.19 로 조용히 들어갔다). */
@@ -657,7 +662,12 @@
   }
   /** 새 장들을 Gemini 에게 한 장씩 — 찾은 영수증마다 줄. 못 읽으면 그 장은 손으로 넣는 줄로 남는다. */
   function scanPages(idxs) {
-    var session = XUP, stop = false;
+    var session = XUP, stop = false, A = C.ai;
+    // AI 엔진 표시(2026-11-03 승인 샘플) — 창마다 한 벌(운행일지 올리기와 같은 모양): 지금 읽는 엔진·바뀌는 순간·누가 몇 초 읽었나
+    if (A && !session.ai) session.ai = A.up('expense-ai', '영수증을 읽고', C.dnJoin ? C.dnJoin(['날짜', '금액', '사용처를 찾는 중']) : '날짜 · 금액 · 사용처를 찾는 중');
+    var U = session.ai || null;
+    if (U && U.es !== 'swap') U.eng = A.guess('expense-ai') || 'claude';
+    var paintAi = function () { if (XUP === session && U) A.upPaint(U, $('xList'), $('btnXUpGo')); };
     idxs.forEach(function (pi) { if (XUP.pages[pi]) XUP.pages[pi].ai = 'run'; });
     readRows(); paintList();
     return idxs.reduce(function (chain, pi) {
@@ -665,9 +675,12 @@
         var pg = session.pages[pi], swapped = false;
         if (XUP !== session || !pg || pg.ai !== 'run') return;
         if (stop) { pg.ai = ''; return; }
-        return blobToDataUrl(pg.blob).then(function (url) { return xai({ op: 'scan', image: url }); })
+        var live = function () { return XUP === session && pg.ai === 'run'; };
+        // 두 단계(Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket) — 답 읽기·오류 처리는 예전 그대로
+        return blobToDataUrl(pg.blob).then(function (url) { return xai({ op: 'scan', image: url }, U ? A.upOn(U, live, paintAi) : null); })
           .then(function (j) {
             if (j.ai === false) { stop = true; pg.ai = 'off'; return; }
+            if (U && live()) A.upRead(U, j);          // 누가 읽었나·몇 초(끝난 줄 「✓ Claude가 읽었어요 · 3.2초」)
             var recs = (j.receipts || []).filter(function (x, i, all) { return x && (x.kind !== 'unreadable' || all.length === 1); });
             if (XUP !== session || pg.ai !== 'run') return;
             if (!recs.length) { pg.ai = 'none'; return; }
@@ -744,7 +757,10 @@
     var box = $('xList'); if (!box) return;
     var n = XUP.items.length, running = XUP.pages.filter(function (p) { return p.ai === 'run'; }).length;
     var b = $('btnXUpGo');
-    if (!n) { box.innerHTML = ''; if (b) { b.disabled = true; b.classList.remove('gembtn', 'running'); b.textContent = '올리기'; } return; }
+    if (!n) { box.innerHTML = ''; if (b) { b.disabled = true; b.classList.remove('gembtn', 'running', 'ai-busy', 'ai-claude', 'ai-gemini'); b.textContent = '올리기'; } return; }
+    // 지금 AI 가 읽는 장 = 앞에서 첫 「읽는 중」 장 — 그 줄만 사진 위 빛·움직이는 상태 줄(2026-11-03)
+    var U = C.ai ? XUP.ai : null, actPg = -1;
+    XUP.pages.some(function (p, pi) { if (p.ai === 'run') { actPg = pi; return true; } return false; });
     var perPage = {}, pageNo = {}, seq = 0, prev = -1;
     XUP.items.forEach(function (it) { perPage[it.page] = (perPage[it.page] || 0) + 1; if (pageNo[it.page] == null) pageNo[it.page] = ++seq; });
     var opts = function (cur) { return '<option value="">구분 고르기</option>' + CATS.map(function (c) { return '<option value="' + c + '"' + (cur === c ? ' selected' : '') + '>' + c + '</option>'; }).join(''); };
@@ -756,9 +772,13 @@
         var thumb = '<a href="' + src + '" target="_blank" rel="noopener" aria-label="' + (i + 1) + '번째 줄 사진 크게"><img src="' + src + '" alt=""></a>' +
           (perPage[it.page] > 1 ? '<span class="pgno" title="같은 장에서 나온 영수증">' + pageNo[it.page] + '장</span>' : '');
         if (pg.ai === 'run') {
-          return '<tr data-xrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + thumb + '</td>' +
-            '<td colspan="3"><div class="gemread">' + C.gemSvg(16, 'spinning') + '<span><b class="gemtxt">AI</b>가 영수증을 읽는 중…</span>' +
-            '<i class="gemshim"></i><i class="gemshim s2"></i></div></td>' +
+          // AI 엔진 표시(2026-11-03 승인 샘플) — 지금 읽는 장은 사진 위 훑는 빛 + 「Claude가 영수증을 읽고 있어요」, 뒤 장은 「Claude가 곧 읽어요」
+          //   (.gemread 는 「AI 가 이 장을 읽는 중」 칸 표시로 그대로 — 모양은 상태 줄)
+          var on = it.page === actPg;
+          return '<tr data-xrow="' + i + '" class="evwait' + (first ? ' pgfirst' : '') + '"><td class="evth">' + (U ? thumb.replace('<a ', '<a' + C.ai.upSweep(U, on) + ' ') : thumb) + '</td>' +
+            '<td colspan="3">' + (U ? '<div class="gemread ai-read">' + C.ai.upLine(U, on) + '</div>'
+              : '<div class="gemread">' + C.gemSvg(16, 'spinning') + '<span><b class="gemtxt">AI</b>가 영수증을 읽는 중…</span>' +
+                '<i class="gemshim"></i><i class="gemshim s2"></i></div>') + '</td>' +
             '<td class="n"><button class="btn sm" data-xskip="' + it.page + '">직접 입력</button></td></tr>';
         }
         var lab = function (t) { return ' aria-label="' + (i + 1) + '번째 ' + t + '"'; };
@@ -775,14 +795,24 @@
           mealHintBox('xmh' + i, { category: it.cat, amount: it.amt, usage: it.usage, note: it.note }) + '</td>' +
           '<td class="n" style="white-space:nowrap"><button class="btn sm" data-xaddrow="' + i + '" title="이 장에 영수증이 더 있으면 줄을 추가하세요." aria-label="같은 장에 줄 추가">＋</button> ' +
           '<button class="btn sm" data-xrm="' + i + '">제외</button></td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' + n0(Object.keys(perPage).length) + '장 · 영수증 ' + n0(n) + '건' +
-      (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div></div>';
+      }).join('') + '</tbody></table></div>' + xFootHtml(U, Object.keys(perPage).length, n, running) + '</div>';
     if (b) {
       b.disabled = running > 0;
       b.classList.toggle('gembtn', running > 0); b.classList.toggle('running', running > 0);
-      b.innerHTML = running ? C.gemSvg(16) + '<span class="gl">AI가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
+      // AI 엔진 표시(2026-11-03) — 읽는 동안 단추 안 작은 표시 「Claude가 읽는 중…」
+      if (running && U) C.ai.upBtn(U, b, true);
+      else {
+        if (U) C.ai.upBtn(U, b, false);
+        b.innerHTML = running ? C.gemSvg(16) + '<span class="gl">AI가 읽는 중…</span>' : esc(n0(n) + '건 올리기');
+      }
     }
+  }
+  /** 올리기 표 아랫줄 — 「N장 · 영수증 N건」. AI 가 읽었거나 읽는 중이면(2026-11-03) 오른쪽에 「Claude가 2장을 읽는 중」 → 「✓ Claude가 읽었어요 · 3.2초」
+   *  (셈 글과 따로 한 덩이). AI 를 안 썼으면 예전 줄 그대로. */
+  function xFootHtml(U, nPages, n, running) {
+    var cnt = n0(nPages) + '장 · 영수증 ' + n0(n) + '건', aiF = U ? C.ai.upFoot(U, running) : '';
+    if (aiF) return '<div class="ai-foot" style="padding:10px 14px;font-size:12px;color:var(--ink-3)"><span>' + cnt + '</span>' + aiF + '</div>';
+    return '<div style="padding:10px 14px;font-size:12px;color:var(--ink-3)">' + cnt + (running ? ' · <b class="gemtxt">AI가 ' + n0(running) + '장을 읽는 중</b>' : '') + '</div>';
   }
   function runUpload() {
     if (XUP.busy) { C.toast('아직 파일을 읽는 중이에요. 잠시만 기다려 주세요.'); return; }
@@ -1052,8 +1082,9 @@
   }
   /** 마지막 검증의 사진 판독 경고(사람|기간 → 글, 2026-10-20 V3 B6) — startRun 이 마지막 알림에 이어 붙이고 ① 카드 문구에 쓴다. */
   var XWARN = {};
-  /** 한 번 검증 — 안 읽은 사진을 읽힌 뒤 규칙 검증. say(글) 로 진행을 알린다. */
-  function runVerify(u, cyc, say, quiet) {
+  /** 한 번 검증 — 안 읽은 사진을 읽힌 뒤 규칙 검증. say(글) 로 진행을 알린다.
+   *  onEng(엔진, 때) — 지금 읽는 엔진(2026-11-03): status 가 알려 준 1순위로 한 번, 사진 판독(read)마다 C.ai.fetch 가 다시(넘기면 'swap'). */
+  function runVerify(u, cyc, say, quiet, onEng) {
     say = say || function () { };
     var admin = u !== me();
     XWARN[u + '|' + cyc] = '';
@@ -1061,6 +1092,8 @@
     say('사진을 살피는 중…', { phase: 'check' });
     var body = { cycle: cyc }; if (admin) body.username = u;
     return xai({ op: 'status', cycle: cyc, username: admin ? u : undefined }).catch(function () { return {}; }).then(function (st) {
+      // 1순위 엔진을 기억하고 판에 알린다(크레딧 소진·차단기면 처음부터 Gemini — 2026-11-03)
+      if (C.ai && st && 'engine' in st) { C.ai.keep('expense-ai', st); if (onEng) onEng(C.ai.guess('expense-ai'), 'start'); }
       var unread = Array.isArray(st.unread) ? st.unread : [];
       var total = unread.length, stop = '', last = null, byId = {};
       if (st.ai === false || !total) return { fail: 0 };
@@ -1070,7 +1103,7 @@
       say(label(0), { phase: 'read', n: 0, N: total, cur: unread[0] });
       return C.vx.pool(unread, 2, function (id) {
         if (stop) return Promise.reject(new Error(stop));
-        return xai({ op: 'read', item_id: id }).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
+        return xai({ op: 'read', item_id: id }, onEng).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
           if (/횟수|한도|429/.test(String(e && e.message)) || (e && e.status === 429)) stop = e.message;
           throw e;
         });
@@ -1092,9 +1125,13 @@
     var rows = ((ITEMS[itemKey(false, cyc)] || {}).rows || []).slice().sort(function (a, b) { return a.date_millis - b.date_millis; });
     var ph = rows.filter(function (it) { return it.photo_path; });
     return { title: 'AI가 영수증을 읽고 있어요', cols: ['날짜', '사용처', '금액(원)', '비교'], N: ph.length, more: Math.max(0, rows.length - 6),
+      // 지금 아는 처음 엔진(2026-11-03 — 상태 줄 「Claude가 영수증을 읽고 있어요」, status·사진 판독 때 정해지면 바뀐다)
+      eng: C.ai ? C.ai.guess('expense-ai') : null, what: '영수증을 읽고',
       rows: rows.slice(0, 6).map(function (it) { return { id: it.id, date: C.md(it.date_millis), place: it.merchant || it.usage || it.category || '—', amt: n0(it.amount) }; }),
       photos: ph.map(function (it) { return { id: it.id, src: C.photoUrl(it.photo_path), kind: (it.category || '') + ' 영수증' }; }) };
   }
+  /** 진행 글(「사진 1 / 3 읽는 중 · 주차 영수증」) — 「 · 」 조각 사이에서만 줄이 바뀌게(C.dn, 폰에서 줄 끝·처음 「·」 없음 — 2026-11-03 AI 상태 줄 작은 글). 글자는 그대로 */
+  function xvNoteH(t) { return / · /.test(String(t)) && C.dn ? C.dn(t) : esc(t); }
   function startRun(u) {
     var S = C.state(), cyc = S.CYCKEY, k = vkey(u, cyc), mk = 'x:' + k, M = C.vx.aiMotion;
     if (VRUN.busy) return;
@@ -1106,10 +1143,11 @@
       if (M) M.step(mk, info);
       var st = C.state();
       if (st.VIEW === 'x_verify' && st.CYCKEY === cyc) {
-        var v = document.querySelector('.hero .verdict .xvnote'); if (v) v.textContent = t;
-        var gl = document.querySelector('[data-xvrun] .gl'); if (gl) gl.textContent = (M && M.short(mk)) || t;   // 단추에는 짧게
+        var v = document.querySelector('.hero .verdict .xvnote'); if (v) v.innerHTML = xvNoteH(t);
+        // 단추에는 짧게 — 엔진 표시 단추(「Claude 검증 중」, 2026-11-03)는 그대로 둔다
+        var gl = document.querySelector('[data-xvrun] .gl'); if (gl && !gl.closest('.ai-busy')) gl.textContent = (M && M.short(mk)) || t;
       }
-    });
+    }, false, function (eng, w) { if (M && M.eng) M.eng(mk, eng, w); });
     VRUN.p = p;
     p.then(function (row) {
       VROWS[k] = row || null; FRESH[k] = sig(u, cyc); setPreviewed(k, false);
@@ -1164,8 +1202,10 @@
     var row = VROWS[k], busy = VRUN.busy && VRUN.who === k;
     var s = (row && row.summary) || {}, items = (row && row.result && row.result.items) || [];
     VITEMS = [];
+    // 1순위 AI 엔진을 미리 물어 둔다(1분 기억 — 「검증하기」를 누르면 처음 글부터 Claude·Gemini 가 맞게, 2026-11-03)
+    if (C.ai && !VRUN.busy) C.ai.engine('expense-ai');
     var verdict, clean = '';
-    if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('AI') + '</span><span class="xvnote">' + esc(VRUN.note || '검증하는 중…') + '</span>';
+    if (busy) verdict = '<span class="gemrun">' + C.vx.gemBadge('AI') + '</span><span class="xvnote">' + xvNoteH(VRUN.note || '검증하는 중…') + '</span>';
     else if (!row) verdict = '아직 검증하지 않았어요';
     else if (s.bad) verdict = '맞지 않는 곳이 <em>' + n0(s.bad) + '건</em> 있어요';
     else if (s.warn) { verdict = '확인할 것이 <em>' + n0(s.warn) + '건</em> 있어요'; clean = ' wait'; }
@@ -1186,7 +1226,7 @@
           : 'AI가 영수증 사진을 읽어 금액, 날짜, 사용처가 입력과 맞는지, 같은 영수증을 두 번 올리지 않았는지 확인해요.',
         C.vx.gemBtn('data-xvrun' + (VRUN.busy || none ? ' disabled' : ''),
           busy ? ((AM && AM.short(mk)) || VRUN.note || 'AI가 읽는 중…') : VRUN.busy ? '다른 검증이 도는 중…' : row && fresh ? '다시 검증하기' : '검증하기',
-          busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''))) +
+          busy, ' big' + (stage === 1 && !none ? ' pri' + (busy ? '' : ' cta') : ''), busy && AM && AM.engOf ? AM.engOf(mk) : null)) +
       card(2, 'PDF 미리보기', row && fresh ? '결재자에게 갈 지출 명세와 영수증을 미리 확인하세요.' : '먼저 검증해 주세요.',
         '<button class="btn big' + (stage === 2 ? ' pri cta' : '') + '" data-xpdf=""' + (row && fresh && !busy ? '' : ' disabled') + '>' + ic('dl', 16) + 'PDF 미리보기</button>') +
       card(3, '상신', !canSubmit ? '이미 상신했어요.' : stage === 3 ? '결재선을 고르고 상신하세요.' : 'PDF 미리보기를 먼저 확인해 주세요.',

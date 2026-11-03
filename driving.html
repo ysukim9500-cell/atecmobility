@@ -91,6 +91,10 @@
   --ok:#0C7A57; --ok-50:#EAF6F1;
   --warn:#96620A; --warn-50:#FCF5E9;
 
+  /* ── AI 엔진 색(2026-11-03 사용자 승인 샘플) — AI 가 읽거나 검증하는 동안의 상태 줄·마크·빛에만. 평소 화면은 쓰지 않는다 ── */
+  --cl:#B9542F; --cl-soft:#F7E7DF; --cl-glow:rgba(217,119,87,.45);
+  --gm:#2A62C9; --gm-soft:#E4ECFB; --gm-glow:rgba(66,133,244,.42); --gm-ink:#24427F;
+
   --rail:248px; --head:58px;
   --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px;
   /* driving-app.js 가 쓰는 별칭. 정의가 없으면 색은 부모색, 선은 currentColor(진한 선)가 된다. */
@@ -2673,6 +2677,97 @@ table.ctrip td.cday .dim{margin-left:1px}
   /* 글자 진행만 — 사진·스캐너·줄 딱지 움직임 없이 지난 초·「사진 i / N 읽는 중」만 */
   .aimo-stage,.aimo .aimo-bar{display:none}
   .aimo-frame.slide,.aimo-rows .ar.hit,.aimo-pop{animation:none}
+}
+
+/* ── AI 엔진 표시(2026-11-03 사용자 승인 샘플 — driving-app.js aiMark·aiLine·aiFetch, 모듈은 C.ai) ──
+   AI 가 영수증을 읽거나 검증하는 동안만 엔진 색(Claude 주황 · Gemini 파랑)으로 움직인다. 평소 화면(✦AI 딱지·끌어 놓기 상자·결과)은 그대로.
+   상태 줄 = 마크 상자 36px + 굵은 글 15px + 점 셋 + 작은 글 13px · 영수증 사진 위 훑는 빛 · 검증 판 표 줄 위로 차례로 지나가는 빛 · 단추 안 작은 표시 ·
+   바뀌는 순간(Claude → Gemini)은 글이 0.8초 흐려졌다가 Gemini 글로 · 끝난 줄 「✓ Claude가 읽었어요 · 3.2초」. 움직임 줄이기면 마크·글만(흐림 없음). */
+.ai-claude{--e:var(--cl);--e-soft:var(--cl-soft);--e-glow:var(--cl-glow)}
+.ai-gemini{--e:var(--gm);--e-soft:var(--gm-soft);--e-glow:var(--gm-glow);--e-ink:var(--gm-ink)}
+.ai-st{display:flex;align-items:center;gap:10px;min-width:0}
+/* 글 칸 — 굵은 글(1행)·작은 글(2행). 지금 읽는 줄은 Claude · 바뀌는 순간 · Gemini 글을 보이지 않게 같은 칸에 겹쳐 두어(.ai-gh) 가장 긴 글만큼
+   높이를 미리 잡는다 — 폰(360)에서 글 줄 수가 바뀌어도 칸·창이 위아래로 움직이지 않게(11/3 화면 검사). 보이는 두 줄은 붙어서 칸 가운데 */
+.ai-tx{display:grid;grid-template-columns:minmax(0,1fr);min-width:0}
+.ai-tx > b{grid-row:1;grid-column:1;align-self:end}
+.ai-tx > small{grid-row:2;grid-column:1;align-self:start}
+.ai-tx > .ai-gh{grid-row:1 / span 2;grid-column:1;display:flex;flex-direction:column;visibility:hidden;pointer-events:none}
+.ai-gh .ai-dots i{animation:none}
+.ai-tx > small,.ai-gh > small{text-wrap:balance}   /* 두 줄이면 고르게(360 「…대신 / 읽어요」처럼 끝 낱말만 남지 않게) */
+.ai-tx > b,.ai-gh > b,.aimo-top > .ai-hd{font-size:15px;font-weight:700;line-height:1.5;letter-spacing:0;color:var(--ink-900);word-break:keep-all;text-wrap:balance;transition:opacity .25s var(--ease)}
+.ai-tx > small,.ai-gh > small,.aimo-top > .verdict{font-size:13px;font-weight:400;line-height:1.5;letter-spacing:0;color:var(--ink-600);word-break:keep-all;transition:opacity .25s var(--ease)}
+.ai-who{color:var(--e)}
+.ai-nw{white-space:nowrap}
+.ai-dots{display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle}
+.ai-dots i{width:4px;height:4px;border-radius:50%;background:var(--e);opacity:.25;animation:aidot 1.2s infinite var(--ease)}
+.ai-dots i:nth-child(2){animation-delay:.15s}
+.ai-dots i:nth-child(3){animation-delay:.3s}
+@keyframes aidot{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+.ai-sp{position:relative;width:36px;height:36px;flex:none;border-radius:10px;background:var(--e-soft);display:grid;place-items:center;transition:background .3s var(--ease)}
+.ai-sp .ai-mk{grid-area:1 / 1;width:22px;height:22px;overflow:visible}
+.ai-claude .ai-mk.m-gm,.ai-gemini .ai-mk.m-cl{display:none}
+.ai-mk.m-cl .ray{transform-origin:12px 12px;animation:aiturn 7s linear infinite,aibreathe 1.8s ease-in-out infinite}
+.ai-mk.m-gm path{transform-origin:12px 12px;animation:aiturn 6s linear infinite,aitwinkle 1.8s ease-in-out infinite}
+@keyframes aiturn{to{rotate:360deg}}
+@keyframes aibreathe{0%,100%{scale:.84;filter:drop-shadow(0 0 0 var(--e-glow))}50%{scale:1.04;filter:drop-shadow(0 0 4px var(--e-glow))}}
+@keyframes aitwinkle{0%,100%{scale:.8;filter:drop-shadow(0 0 0 var(--e-glow))}50%{scale:1.06;filter:drop-shadow(0 0 5px var(--e-glow))}}
+.ai-sp.sm{width:20px;height:20px;border-radius:6px;background:transparent}
+.ai-sp.sm .ai-mk{width:16px;height:16px}
+.ai-st.wait .ai-mk .ray,.ai-st.wait .ai-mk path{animation:none}      /* 차례를 기다리는 장 — 마크는 멈춘 채 */
+@media (prefers-reduced-motion:no-preference){.ai-st.swap .ai-tx > b,.ai-st.swap .ai-tx > small,.aimo.swap .aimo-top > .ai-hd,.aimo.swap .aimo-top > .verdict{opacity:.15}}
+/* 올리기 줄 「AI 가 이 장을 읽는 중」 칸(.gemread) — 안이 상태 줄이면 예전 보라 글·반짝 막대 모양은 쓰지 않는다 */
+.gemread.ai-read{display:block;min-height:0;padding:0;color:inherit;font-size:inherit}
+/* 영수증 사진 위 훑는 빛(올리기 줄의 지금 읽는 장 사진) */
+.ai-sweep{position:relative;display:block;width:fit-content;overflow:hidden;border-radius:var(--r-sm)}
+.ai-sweep::after,.aimo.ai-claude .aimo-scan,.aimo.ai-gemini .aimo-scan{content:"";position:absolute;left:-10%;right:-10%;top:-34%;height:34%;border:0;pointer-events:none;
+  background:linear-gradient(180deg,transparent 0%,var(--e-glow) 70%,var(--e) 72%,transparent 74%);opacity:.55;mix-blend-mode:multiply;
+  animation:aisweep 2.2s cubic-bezier(.45,.05,.4,1) infinite}
+@keyframes aisweep{0%{top:-34%}100%{top:100%}}
+/* 표 아랫줄 — 읽는 중(엔진 색) · 끝난 줄(초록 ✓). 셈 글과는 따로 한 덩이(줄이 바뀌어도 「·」로 끝나지 않게) */
+.ai-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:12px;row-gap:4px}
+.ai-run{font-weight:700;color:var(--e)}
+.ai-done{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--ok)}
+.ai-done svg{width:16px;height:16px}
+/* 단추 안 작은 표시(「Claude 검증 중」) — 단계 카드 안 진한 빨강 단추 규칙보다 앞선다 */
+.btn.gembtn.running.ai-busy,.btn.ai-busy{cursor:default;color:var(--ink-900);border-color:var(--e);background:var(--e-soft)}
+.vstep.work .btn.gembtn.running.ai-busy{border:1px solid var(--e);background:var(--e-soft);color:var(--ink-900)}
+.btn.ai-busy .ai-who{color:var(--e)}
+.btn.ai-busy .gl{position:relative;z-index:1}
+.btn.ai-busy.ai-short .ai-rest{display:none}   /* 단추보다 글이 길면(좁은 단계 카드 901~975 등) 「✦ Claude」만 — 전체 글은 aria-label(aiBusyFit) */
+.stable .sslot .btn.ai-busy .ai-sp.sm{width:16px}     /* 관리 현황 표 고정 자리(84px) — 마크 + 이름이 칸 안에 */
+/* AI 검증 판(.aimo)에 엔진이 정해지면 — 머리 = 상태 줄(마크 · 「Claude가 … 있어요」 · 진행 글) + 오른쪽 지난 초·셈, 막대·사진 빛·흐름 점·줄 빛은 엔진 색 */
+.aimo-top{display:grid;grid-template-columns:36px minmax(0,1fr) auto;column-gap:10px;row-gap:0;align-items:baseline}
+.aimo-top > .ai-sp{grid-column:1;grid-row:1 / span 2;align-self:center}
+.aimo-top > .ai-hd{grid-column:2;grid-row:1;margin:0;min-width:0}
+.aimo-top > .verdict{grid-column:2;grid-row:2;margin:0;min-width:0}
+.aimo-top > .aimo-el{grid-column:3;grid-row:1;justify-self:end;padding-left:2px}
+.aimo-top > .aimo-cnt{grid-column:3;grid-row:2;justify-self:end;font-size:13px;font-weight:700;color:var(--ink-600);font-variant-numeric:tabular-nums}
+.aimo-top .gemrun{display:none}               /* 진행 글 앞 ✦AI 딱지 — 이 머리에서는 마크가 대신한다 */
+/* 바뀌는 순간 — 진행 글 대신 「Gemini로 넘겨요」. 진행 글은 자리만 남기고(보이지 않게) 그 위에 겹친다 — 줄 수가 달라도 머리 높이 그대로(11/3 화면 검사) */
+.aimo-top > .verdict{position:relative}
+.aimo.swap .aimo-top .ai-nt{visibility:hidden}
+.aimo-top .ai-swn{position:absolute;left:0;top:0;right:0}
+/* 굵은 글 자리 — Claude · Gemini · 바뀌는 순간 글을 보이지 않게 겹쳐(.ai-gh) 가장 긴 글만큼 높이를 잡는다(폰 360 에서 2줄 → 1줄 → 2줄로 판이 움직이지 않게) */
+.aimo-top > .ai-gh{visibility:hidden;pointer-events:none}      /* 자리는 .ai-hd 그대로(PC 2칸 · 폰 2 ~ 끝) */
+/* 폰 — 굵은 글은 한 줄 전체(오른쪽 칸 몫만큼 줄이 갈리지 않게), 지난 초는 진행 글 줄 오른쪽, 셈은 진행 글에 이미 있어(「1 / 6」) 숨긴다.
+   굵은 글이 잡아 둔 자리보다 짧으면(바뀌는 순간 1줄) 그 자리 가운데 */
+@media (max-width:600px){
+  .aimo-top > .ai-hd{grid-column:2 / -1}
+  .aimo-top > .ai-hd:not(.ai-gh){align-self:center}
+  .aimo-top > .aimo-el{grid-row:2}
+  .aimo-top > .aimo-cnt{display:none}
+}
+.aimo.ai-claude .aimo-bar i,.aimo.ai-gemini .aimo-bar i,.aimo.ai-claude .aimo-flow i,.aimo.ai-gemini .aimo-flow i{background:var(--e)}
+.aimo-rows{position:relative}
+.aimo .ai-hl{position:absolute;left:0;right:0;top:0;height:44px;z-index:1;pointer-events:none;opacity:0;mix-blend-mode:multiply;
+  background:linear-gradient(90deg,transparent,var(--e-soft) 18%,var(--e-soft) 82%,transparent);border-left:3px solid var(--e);
+  transition:transform .55s var(--ease),height .3s var(--ease),opacity .3s}
+.ai-note{margin:14px 0 0;padding:8px 12px;border-radius:var(--r-sm);background:var(--e-soft);color:var(--e-ink,var(--e));font-size:13px;line-height:1.5}   /* Gemini 글 색 = 샘플 짙은 남색(--gm-ink) */
+@media (prefers-reduced-motion:reduce){
+  .ai-mk.m-cl .ray,.ai-mk.m-gm path,.ai-dots i{animation:none}
+  .ai-dots i{opacity:.6}
+  .ai-sweep::after,.aimo .ai-hl{display:none}
+  .ai-sp,.ai-tx > b,.ai-tx > small,.aimo-top > .ai-hd,.aimo-top > .verdict{transition:none}
 }
 
 /* ── 영수증·통행료(P_Evid · M_Evid) — 차례는 상태가 보이는 탭(✓ / 확인 N), 차례 카드는 왼쪽 날짜별 확인 · 오른쪽 「올리기」 카드 ──
