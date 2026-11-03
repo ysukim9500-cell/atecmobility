@@ -68,6 +68,8 @@
   var MEAL_HINT_COUNT = '‘외 N명’이나 인원수 대신 함께한 분 이름을 모두 적어 주세요.';
   // 올리기 줄·고치기 창에서 13,000원 넘는 식비 줄의 비고를 다 적었을 때 같은 자리에 남기는 회색 글(2026-11-02 고침 2차 — 적는 순간 칸·창이 튀지 않게)
   var MEAL_HINT_OK = '비고에 이름·사유를 적었어요.';
+  // 좁은 PC 표(901~1279)의 이번 달 표 줄 딱지 — 법인카드 표 비고 칸의 자리 글과 같은 말(전체 안내는 딱지 title, 2026-11-03 화면 다듬기 P1)
+  var MEAL_TAG = '이름·사유';
   /** 비고 안내 글 — 안내가 필요 없는 줄이면 ''. it = { category, amount, usage, note }(올리기 줄은 cat·amt 를 바꿔 넣어 부른다). */
   function mealHint(it) {
     if (!it || !mealNeedsNote(it)) return '';
@@ -559,7 +561,9 @@
             (it.usage ? esc(it.usage) : '<span class="st warn">비어 있음</span>') + (it.note ? '<span class="xnote">비고: ' + esc(it.note) + '</span>' : '') +
             // 식비 13,000원 비고 안내는 사용내역·비고 아래 — 금액 칸에 두면 좁은 칸을 넘어 옆 「AI 확인」을 덮었다(2026-10-20)
             (mh ? '<span class="xmeal2">' + hintHtml(mh) + '</span>' : '') + '</td>' +
-          '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span></td>' +
+          // 좁은 PC 표(901~1279 — 사용내역 칸 글 자리가 44~140px 라 위 안내가 아홉 줄로 꺾이고 낱말이 갈렸다, 2026-11-03 화면 다듬기 P1)에서는 위 긴 안내 대신
+          //   금액 아래 짧은 주황 점선 딱지 「이름·사유」(법인카드 PC 표 비고 칸과 같은 모양·말) — 전체 안내는 딱지 title. 어느 폭에 무엇을 보일지는 CSS(.xmeal3)
+          '<td class="n total"><span class="xamt">' + n0(it.amount) + '</span>' + (mh ? '<span class="xmeal3" title="' + esc(mh) + '">' + MEAL_TAG + '</span>' : '') + '</td>' +
           '<td class="xai" data-l="AI 확인">' + aiCell(it) + '</td>' +
           // 줄 단추는 예전 그대로 사진(원본) · 고치기 · 지우기(2026-10-20 D2 — 시안은 사진만이지만 있던 단추는 없애지 않는다)
           '<td class="n xact">' + photoLink(it) + (can ? ' <button class="btn sm" data-xedit="' + it.id + '">수정</button> <button class="btn sm" data-xdel="' + it.id + '">삭제</button>' : '') + '</td></tr>';
@@ -1130,7 +1134,8 @@
       var go = '';
       if (links && ref.length && it.level !== 'info') { VITEMS.push(it); go = '<button class="btn sm vgo vfix" data-xvfix="' + (VITEMS.length - 1) + '">바로 수정' + ic('chev', 12) + '</button>'; }
       return '<div class="vitem v-' + esc(it.level) + (isAiItem(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
-        '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (isAiItem(it) ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + esc(it.detail || '') + '</div></div>' + go + '</div>';
+        // 설명의 「항목 금액」은 한 덩이(C.keepPairs — 법인카드·운행일지 검증 항목과 같게, 2026-11-03 화면 다듬기)
+        '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (isAiItem(it) ? ' ' + C.vx.gemBadge() : '') + '</div><div class="vd">' + (C.keepPairs || String)(keepDots(esc(it.detail || ''))) + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
   function openFix(it) {
@@ -1193,7 +1198,8 @@
     h += steps;
     if (moving) h += AM.html(mk, verdict);
     else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
-      (row ? '마지막 검증 ' + esc(C.vx.whenText(row.created_at)) : '검증 전') + ' · 경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all) + '</div>' +
+      // 「마지막 검증 날짜」·「경비 N건 금액」은 한 덩이씩(법인카드 검증 머리와 같은 꼴 — 2026-11-03 화면 다듬기)
+      '<span>' + dnLine([(row ? '마지막 검증 ' + C.vx.whenText(row.created_at) : '검증 전'), '경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all)]) + '</span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' + fact('불일치', n0(s.bad), '금액·영수증이 서로 다름', s.bad > 0) + fact('확인 필요', n0(s.warn), '사람이 한 번 봐야 함') +
         fact('참고', n0(s.info), '사용처 다름 등(알림만)') +       // 식비 13,000원(X07)은 2026-11-02 부터 「확인 필요」 — 참고(info)는 사용처 다름(X03)·아직 안 읽음(X00) 등
@@ -1231,7 +1237,8 @@
     else { verdict = '<em>이상 없었어요</em>'; clean = ' clean'; }
     var at = v && (v.ran_at || v.created_at || (f && f.frozen_at));
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (v && !s.bad ? ' ok' : '') + '"></span>' +
-      '<span>상신 때 검증 결과' + (at ? ' · <span style="white-space:nowrap">' + esc(C.vx.whenText(at)) + '</span>' : '') + ' · <span style="white-space:nowrap">경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all) + '</span></span></div>' +
+      // 날짜·「경비 N건 금액」은 한 덩이 · 두 줄이 되면 덩이 사이에서만(줄 끝 「·」 없음 — 2026-11-03 화면 다듬기, 법인카드 검증 머리와 같은 꼴)
+      '<span>' + dnLine(['상신 때 검증 결과'].concat(at ? [C.vx.whenText(at)] : [], ['경비 ' + n0(rows.length) + '건 ' + won(sums(rows).all)])) + '</span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p></div>';
     if (v) {
       var need = items.filter(function (i) { return i.level !== 'info'; }), info = items.filter(function (i) { return i.level === 'info'; });
@@ -1637,10 +1644,16 @@
         fzFlush();
       });
   }
-  function byLine(sn) {
+  /** 구분별 합계 조각 — 「소모품비 ₩X」·「식비 ₩X」·「기타 ₩X」(늘 이 차례). */
+  function byParts(sn) {
     var by = sn.by || {};
-    return CATS.map(function (c) { var x = by[c] || {}; return c.replace('비용', '') + ' ' + won(x.sum || 0); }).join(' · ');
+    return CATS.map(function (c) { var x = by[c] || {}; return c.replace('비용', '') + ' ' + won(x.sum || 0); });
   }
+  /** 구분별 합계 한 줄(HTML) — 「구분 금액」 쌍은 덩이째, 줄은 쌍 사이에서만 바뀌고 줄 끝·처음에 「·」가 남지 않는다(C.dnJoin 걸린 구분점 —
+   *  법인카드 결재 창과 같은 방법, 2026-11-03 화면 다듬기: 「소모품비 23,000원 · 식비 / 11,000원 · 기타 3,000원」). 글(textContent)은 예전 「A · B」 그대로. 앞 판 본체면 글 그대로. */
+  function byHtml(sn) { return dnLine(byParts(sn)); }
+  /** 「 · 」로 잇는 짧은 조각(글 그대로 — 여기서 esc)을 한 줄로 — 조각은 덩이째, 줄은 조각 사이에서만 바뀌고 줄 끝·처음에 「·」가 남지 않는다(C.dnJoin). 앞 판 본체면 글 그대로. */
+  function dnLine(parts) { return C.dnJoin ? C.dnJoin(parts.map(esc)) : esc(parts.join(' · ')); }
   /** 지금 내가 결재할 차례인 건인가(요약 문구용). */
   function myTurn(a) { var me = (C.state().ME || {}).username; return !!me && (a.steps || []).some(function (s) { return s.seq === a.cur_seq && s.approver === me; }); }
   /** 결재 요약(결재 중) + 검증 딱지 · 문서 단추. 운행일지 apprBrief 와 같은 모양. */
@@ -1666,7 +1679,7 @@
       var p0 = Number(prev.snapshot.cost) || 0, d = cost - p0, pct = p0 ? Math.round(d / p0 * 100) : null;
       bigJump = p0 > 0 && d > 100000 && pct >= 50;
       cmp = '<div class="abf"><span class="k">전월(' + pm + ') 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' + (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) +
-        (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b><span class="sub">' + pm + ' ' + won(p0) + ' · ' + n0(prev.snapshot.n) + '건</span></div>';
+        (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b><span class="sub">' + dnLine([pm + ' ' + won(p0), n0(prev.snapshot.n) + '건']) + '</span></div>';
     } else cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 개인경비 결재가 없어요' : '추가 기간은 전월과 비교하지 않아요') + '</span></div>';
     var v = f && f.verify, vs = (v && v.summary) || null;
     var items = ((v && (v.items || (v.result && v.result.items))) || []).filter(function (i) { return i.level === 'bad' || i.level === 'warn'; });
@@ -1689,7 +1702,7 @@
       : ['ok', '금액·검증 모두 이상 없어요.' + (myTurn(a) ? ' 문서를 열지 않고 승인해도 돼요.' : '')];   // 「열지 않고 승인」은 지금 결재할 분에게만
     return '<div class="abrief ' + verdict[0] + '"><div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
-      '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + esc(byLine(s)) + '</span></div>' +
+      '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + byHtml(s) + '</span></div>' +
       '<div class="abf"><span class="k">영수증</span><b>' + n0(s.n) + '<small>장</small></b><span class="sub">' + esc(xSpanKey(a.cycle)) + '</span></div>' +
       cmp +
       '<div class="abf"><span class="k">식비 13,000원 초과</span><b>' + n0(s.meal_over || 0) + '<small>건</small></b><span class="sub">참고(알림만)</span></div>' +
@@ -1705,7 +1718,7 @@
     var kv = function (k, v) { return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; };
     if (s.cost == null) return '';
     return kv('기간', esc(cycName(a.cycle)) + ' <span class="dim">(' + esc(xSpanKey(a.cycle)) + ')</span>') +
-      kv('구분별', esc(byLine(s))) +
+      kv('구분별', byHtml(s)) +
       // 식비 13,000원 초과 수는 참고(경고 색 없음, 2026-11-02 고침 1차) — 비고가 안 된 줄은 검증의 X07 이 확인 필요로 말한다.
       //   이름 칸(86px)은 「식비」만, 「13,000원 초과」는 값 칸에 — 이름 칸이 두 줄로 갈렸다(고침 2차, 화면 검토 U-L7). 한 줄로 「식비 · 13,000원 초과 N건」
       kv('식비', s.meal_over ? '13,000원 초과 ' + n0(s.meal_over) + '건 <span class="dim">(참고)</span>' : '<span class="dim">13,000원 초과 없음</span>') +
@@ -1931,6 +1944,12 @@
   }
   /** 결재 완료 출력 표의 날짜 — 「10.14 15:20」(한국시간, 2026-10-20 AU6-M3 — 「완료 2026-10-14 15:20」은 1280 에서 표를 넘쳤다). */
   function finWhen(iso) { var ms = Date.parse(iso); return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : ''; }
+  /** 결재 중 표 「현재 결재자」 — 「이름 직책 (칸)」의 괄호 안은 한 덩이(줄은 칸 이름 앞에서만 — 법인카드 결재 중 표 curStepHtml 과 같다, 2026-11-03 화면 다듬기). */
+  function curStepHtml(s) {
+    if (!s || !s.approver) return '—';
+    var w = C.stepText(s), i = w.lastIndexOf(' (');
+    return i < 0 ? esc(w) : esc(w.slice(0, i)) + ' <span style="white-space:nowrap">' + esc(w.slice(i + 1)) + '</span>';
+  }
   function viewAdminFinal() {
     var S = C.state();
     if (!S.LOADED) return C.head('개인경비 결재 완료 문서') + C.skeleton();
@@ -1992,9 +2011,11 @@
       h += C.sect('결재 중', n0(going.length) + '명', '', '<div class="panel"><div class="scroll" data-rows data-keep="fin-going"><table class="rcard ftab"><thead><tr><th>파트·센터</th><th>이름</th><th>상태</th><th>날짜</th><th class="n">건수</th><th class="n">금액</th><th>현재 결재자</th><th></th></tr></thead><tbody>' +
         C.orgGroups(going, function (a) { return a.username; }, true).map(function (g) { return C.orgGroupRow(g, 8, '') + g.list.map(function (a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
+          // 날짜는 결재 완료 표처럼 「11.10 07:00」(전체 「상신 …」은 title) · 「현재 결재자」는 「(칸)」 앞에서만 두 줄(td.fcur — 법인카드 결재 중 표와 같게).
+          //   1024 에서 표가 상자보다 76px 넓어 붙은 「관리자 반려」 칸이 「현재 결재자」 글 64px 를 덮었다(2026-11-03 화면 다듬기)
           return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td><td><span class="st warn">결재 중</span></td>' +
-            '<td class="dim">' + (a.submitted_at ? '상신 ' + esc(C.vx.whenText(a.submitted_at)) : '') + '</td>' +
-            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td data-l="현재 결재자">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+            '<td class="dim" style="white-space:nowrap"' + (a.submitted_at ? ' title="상신 ' + esc(C.vx.whenText(a.submitted_at)) + '">' + esc(finWhen(a.submitted_at)) : '>') + '</td>' +
+            '<td class="n" data-l="건수">' + n0((a.snapshot || {}).n) + '</td><td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td><td class="fcur" data-l="현재 결재자">' + curStepHtml(cur) + '</td>' +
             '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-kind="expense" data-id="' + a.id + '">관리자 반려</button></td></tr>';
         }).join(''); }).join('') + '</tbody></table></div></div>');
     }

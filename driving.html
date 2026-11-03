@@ -161,6 +161,9 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 .ctab .cin:disabled{padding-right:26px;background-repeat:no-repeat;background-position:right 8px center;background-size:12px 12px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A0A6B0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E")}
 .ctab .cin.need:disabled{border-color:var(--ink-100);box-shadow:none}
+/* 잠긴 칸 글이 칸보다 길면 자물쇠 앞에서 글자 중간이 잘렸다(1280 비고 「김시험, 이가상」 → 「김시험, 이」+반쪽 글자, 2026-11-03 교육 자료 로봇) —
+   끝을 「…」로(전체 글은 칸 title — drv-card.js). 고칠 수 있는 칸은 그대로 */
+.ctab .cin:disabled{text-overflow:ellipsis}
 /* 식대 13,000원 넘는 줄의 비고 칸(2026-11-02 docs/meal-note/SPEC.md §4) — 구분·사용목적 빈칸(빨간 need, 2px)보다 약하게 주황 점선 1px(칸 크기·줄 맞춤 그대로).
    안내 글은 PC 표에서는 칸의 title, 폰·태블릿 카드(아래 820px 묶음)에서는 칸 아래 작은 줄(.cmeal).
    자리 글은 짧은 「이름·사유」(2026-11-02 고침 1차) — PC 표의 좁은 비고 칸(92~120px)에도 끝까지 들어간다(칸 폭은 그대로) */
@@ -2847,8 +2850,15 @@ table.mday td.mact .mlinkb{margin-top:0}
 .d2fol th:nth-child(1){width:150px} .d2fol th:nth-child(2){width:76px} .d2fol th:nth-child(4){width:92px} .d2fol th:nth-child(5){width:104px}
 .d2who b{display:block;font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
 .d2who small{display:block;margin-top:1px;font-size:13px;color:var(--ink-600);word-break:keep-all;overflow-wrap:anywhere}
-.d2left span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.5;color:var(--ink-800);
+/* 남은 일 칸의 글 상자(바로 아래 span 하나)만 두 줄 말줄임 — 그 안 「 · 」 조각(.dnc 안 span)까지 이 상자가 되면 조각이 한 줄에 하나씩 쌓인다(2026-11-03 화면 다듬기) */
+.d2left > span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.5;color:var(--ink-800);
   word-break:keep-all;overflow-wrap:anywhere}
+/* 남은 일 「 · 」 조각(driving-app.js dnClip) — 안 상자(.dnc)도 두 줄 말줄임(바깥 상자의 말줄임은 안 상자 줄을 세지 않는다), 줄은 조각 사이(<wbr>)에서만.
+   조각마다 맨 앞 구분점 상자(.dx)는 글자 「 · 」 폭(.724em — 앞뒤 칸이 예전 글과 같다)이고 안 상자를 그만큼 왼쪽으로 밀어 바깥 상자 밖으로 자르니
+   줄 처음·끝에 「·」가 없다. 칸보다 긴 조각은 「…」로 끝난다(901 「통행료 미확정 …」, 2026-11-03 화면 다듬기) */
+.d2left .dnc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;margin-left:-.724em}
+.d2left .dnc > .dw{white-space:nowrap}
+.d2left .dnc .dx{display:inline-block;width:.724em;text-align:center;font-style:normal}
 .d2chip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:700;white-space:nowrap}
 .d2chip.bad{background:var(--red-50);color:var(--red-700)}
 .d2chip.neu{background:var(--ink-100);color:var(--ink-700)}
@@ -3001,6 +3011,14 @@ table.mday td.mact .mlinkb{margin-top:0}
 .xmon .xnote{display:block;margin-top:1px;font-size:13px;color:var(--ink-600);overflow:hidden;text-overflow:ellipsis}
 /* 식비 13,000원 비고 안내(2026-11-02 docs/meal-note/SPEC.md §4) — 할 일 글이라 점 딱지가 아니라 주황 글 한 덩이, 사용내역·비고 글과 왼쪽 맞춤 */
 .xmon .xmeal2{display:block;margin-top:2px;white-space:normal;font-size:13px;line-height:1.5;color:var(--warn)}
+/* 좁은 PC 표(901~1279)에서는 위 긴 안내 대신 금액 아래 짧은 주황 점선 딱지 「이름·사유」 — 법인카드 PC 표 비고 칸(.cin.want 주황 점선 + 자리 글 + title)과 같은 방법.
+   사용내역 칸 글 자리가 44~140px 라 안내가 아홉 줄로 꺾이고 「13,000원 / 이 넘는」 낱말 갈림·「(혼자면 사유)」 칸 밖 7px 이었다(2026-11-03 화면 다듬기 P1).
+   전체 안내는 딱지 title · 표 위 요약 줄(.xsumnote)에도 같은 뜻이 있다. 1280 이상(칸 188px 이상)·폰·태블릿 카드는 예전처럼 긴 안내 한 덩이 */
+.xmon .xmeal3{display:none}
+@media screen and (min-width:901px) and (max-width:1279px){
+  .xmon .xmeal2{display:none}
+  .xmon .xmeal3{display:table;margin:4px 0 0 auto;padding:0 5px;border:1px dashed var(--warn);border-radius:6px;font-size:12px;font-weight:500;line-height:1.5;color:var(--warn);white-space:nowrap}
+}
 .xmon tr.xgrp td{background:var(--sunken);color:var(--ink-900);font-weight:700}
 .xmon tr.xgrp td > div{display:flex;align-items:baseline;gap:8px}
 .xmon .xgn{font-size:13px;font-weight:500;color:var(--ink-600);font-variant-numeric:tabular-nums}
@@ -3135,8 +3153,10 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   .acard.cmp .ahd>span[style*="flex:1"]{display:none}
   .acard.cmp .ahd>.st,.acard.cmp .ahd>.st.along{order:5;flex:1 1 100%}
   .acard.cmp .ahd>.asum{order:6;flex:1 1 0;min-width:0;text-align:left}
-  /* 「자세히」·「확인 항목 N건」은 글자 단추 — 누르는 칸 44px 은 두고 위아래 음수 여백으로 줄 높이는 늘리지 않는다 */
-  .acard.cmp .ahd>.adetbtn{order:7;margin:-10px -6px -10px auto;padding:0 4px 0 10px;border-color:transparent;background:transparent;box-shadow:none;color:var(--ink-600)}
+  /* 「자세히」·「확인 항목 N건」은 글자 단추 — 누르는 칸 44px 은 두고 위아래 음수 여백으로 줄 높이는 늘리지 않는다.
+     오른쪽은 머리 줄 안쪽 끝까지만(예전 오른쪽 여백 −6px·안쪽 4px 로 단추가 머리 줄 밖 6px 넘쳐 카드 안쪽 여백에 걸렸다 — 2026-11-03 화면 다듬기,
+     글·화살표 끝은 아래 [반려][승인] 오른쪽 끝과 같은 세로줄) */
+  .acard.cmp .ahd>.adetbtn{order:7;margin:-10px 0 -10px auto;padding:0 0 0 10px;border-color:transparent;background:transparent;box-shadow:none;color:var(--ink-600)}
   .acard.cmp .ahd>.ahact{order:8}
 }
 @media screen and (max-width:600px){
@@ -3288,6 +3308,11 @@ table.ftab td.el > span{white-space:normal;word-break:keep-all;overflow-wrap:any
   .xstripp .xstrip{margin-inline:-16px;padding-inline:16px;scroll-padding-inline:16px}
   /* R5 결재함 카드 「⋯」 — 첫 줄이 차면 「⋯」만 둘째 줄로 떨어져 빈 띠가 생겼다 → 기간 글이 남는 폭에서 줄바꿈하고 「⋯」는 늘 첫 줄 끝 */
   .acard.cmp .ahd>.acyc{flex:1 1 0;min-width:0}
+}
+/* F17 의 들어가는 칸 요일·날짜 글이 테두리에 반쯤 걸리는 폭(360 둘레 「월」 5px · 412 둘레)에서만 칸 사이 4 → 6px — 들어가는 칸은 글 없이 테두리만 보인다
+   (칸 폭 44·첫 칸 자리는 그대로, 2026-11-03 화면 다듬기). 375·390·393·430 은 칸 사이 4px 로 글이 걸리지 않는다 */
+@media screen and (min-width:352px) and (max-width:366px),screen and (min-width:400px) and (max-width:414px){
+  .xstripp .xcal.xdays{gap:6px}
 }
 @media screen and (max-width:820px){
   /* F19 체크칸이 있는 목록 카드 — 둘째 줄부터 체크칸 밑에서 시작해 첫 줄 글과 35px 어긋났다 → 글은 모두 같은 자리, 체크칸만 왼쪽으로 */

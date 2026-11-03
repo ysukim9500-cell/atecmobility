@@ -179,7 +179,8 @@
       // 설명 6줄은 「?」 안에 접는다(2026-10-19 웹 사용성 1차) — 첫 문장만 늘 보인다.
       right = '<div class="ocard"><div class="anote" style="margin:0"><b>결재선은 상신 창을 열 때 조직도로 미리 채워져요.</b> ' +
         '<details class="ohelp"><summary aria-label="결재선이 채워지는 방법 자세히">?<span> 어떻게 채워지나요</span></summary><div>' +
-        '결재란의 센터·파트장, 팀장, 사업부장 칸에는 상신자가 속한 <b>센터·파트의 센터장·파트장, 같은 팀의 팀장, 같은 사업부의 사업부장</b>이 들어가요. 전자 결재는 사업부장에서 끝나요. ' +
+        // 가운뎃점 낱말(「센터·파트장」·「센터장·파트장」)은 한 덩이 — 1024 에서 줄이 「·파트장, 같은 팀의…」로 시작했다(2026-11-03 화면 다듬기)
+        '결재란의 <span style="white-space:nowrap">센터·파트장</span>, 팀장, 사업부장 칸에는 상신자가 속한 <b><span style="white-space:nowrap">센터·파트의</span> <span style="white-space:nowrap">센터장·파트장</span>, 같은 팀의 팀장, 같은 사업부의 사업부장</b>이 들어가요. 전자 결재는 사업부장에서 끝나요. ' +
         '대표이사 칸은 빗금이에요. <b>사업부장이 올린 문서만</b> 이 칸을 비워 두고, 인쇄한 종이에 대표이사가 손으로 서명해요. ' +
         '직책으로 맞지 않는 사람은 ‘결재선 지정’으로 칸마다 정해 두면 그 결재선이 먼저 채워져요. 직원도 상신 창에서 칸마다 바꾸거나 비울 수 있어요. ' +
         '여기서는 사람의 <b>직책</b>, <b>소속</b>, <b>앱 계정</b>을 맞춰 두세요. ' +
@@ -201,7 +202,8 @@
     right += '<div class="otiles">' +
       tile('data-ounl', false, unl.length, '조직도에 연결되지 않은 계정', unl.length ? '눌러서 조직도의 누구인지 연결해 주세요.' : '모두 연결됐어요.', true) +
       tile('data-of="noacct"', OF === 'noacct', nNoAcct, '앱 계정 없는 사람', '결재자로 고를 수 없어요. 가입하면 연결해 주세요.', false) +
-      tile('data-of="nomail"', OF === 'nomail', nNoMail, '회사 메일 없는 사람', '팀즈 알림(결재 차례·반려)을 받지 못해요.', true) +
+      // 「(결재 차례·반려)」는 한 덩이 — 1024 에서 「팀즈 알림(결재 차례·」로 줄이 끝났다(2026-11-03 화면 다듬기)
+      tile('data-of="nomail"', OF === 'nomail', nNoMail, '회사 메일 없는 사람', '팀즈 알림<span style="white-space:nowrap">(결재 차례·반려)</span>을 받지 못해요.', true) +
       '</div>';
 
     var q = Q.trim().toLowerCase();

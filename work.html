@@ -439,6 +439,30 @@ footer .wrap{font-size:13px}
   .trw .tt .cpre{display:block}
   .trw .tt .cpre > i{display:none}
 }
+/* 「오늘 할 일」 줄 글(제목·작은 글)의 구분점 「 · 」(2026-11-03 포털 줄 끝 점 — 「내 상태」 줄의 걸린 점과 같은 생각을 흐르는 글에): 운행일지 「남은 일」(날짜를 「 · 」로 이은 글)·
+   「운행일지 11월분 · 1단계 운행 기록」 같은 글이 「·」로 끝나거나 시작하는 줄을 만들었다(901·960·1024 …).
+   점 앞 띄어쓰기(.ds)는 점 몫만큼 넓힌 띄어쓰기라 줄 끝에서는 없어지고, 점은 다음 낱말(또는 「1단계 운행 기록」 같은 덩이 하나)과 한 덩이(.dw)의 왼쪽 바깥에 걸려 있다 —
+   같은 줄이면 예전 「 · 」 자리 그대로 보이고, 줄이 바뀌면 그 덩이가 줄 맨 앞이라 점이 칸 왼쪽 밖으로 나가 잘린다(overflow-x:clip · clip-path — 「내 상태」 줄 R1 과 같이 높이는 그대로).
+   글 전체를 한 덩이로 묶지 않는다(검토 H1 — 좁은 칸 밖으로 나갔다): 묶는 것은 점과 바로 뒤 낱말 하나뿐, 나머지는 띄어쓰기에서 그대로 꺾인다.
+   .u = 줄이 그 안에서 바뀌지 않게 둘 짧은 말(‘다시 상신하세요.’ · 따옴표 말+조사 · 금액(장수)) — 칸보다 넓을 때만 그 안에서 꺾인다(max-width:100%).
+   제목(b) 안의 span 은 작은 글 모양(.trw .tt span — 13px·회색)을 받지 않고 제목 글자를 그대로 따른다.
+   첫 화면 마감 일정 판의 기간 줄(.dtx .per 「10.20~11.19 · 영수증 사진을 올리면 채워져요」)도 같은 장치 — 점 뒤 덩이는 설명 글 전체(아래 renderDeadlines).
+   설명 글이 판보다 길어 꺾이면 끝줄에 「적어요」 한 낱말만 남지 않게(오늘 할 일 작은 글과 같은 text-wrap:pretty — 한 줄이면 그대로). */
+.trw .tt .hang,.dtx .per{overflow-x:clip;clip-path:inset(-.5em 0)}   /* 자르기는 걸린 점이 있는 글(.hang — 아래 paintToday)에만 — 점 없는 줄은 예전과 픽셀까지 같게 */
+.dtx .per{text-wrap:pretty}
+.trw .tt b span{font-size:inherit;line-height:inherit;color:inherit}
+.trw .tt .ds,.dtx .per .ds{word-spacing:.49em}
+.trw .tt .dw,.trw .tt .u,.dtx .per .dw,.dtx .per .u{display:inline-block;max-width:100%}
+.trw .tt .dw,.dtx .per .dw{position:relative}
+.trw .tt .dw > i,.dtx .per .dw > i{position:absolute;right:100%;top:0;font-style:normal;white-space:pre}
+/* 첫 화면 마감 일정 판 1041~1200px(두 칸 첫 화면에서 판이 394~528px 로 좁은 폭, 2026-11-03 포털 줄 끝 점) — 오른쪽 마감 날짜 칸(.dside 「가장 먼저 · 11.19 마감」 116px)이 글 칸을
+   30~164px 로 눌러 「개인경비 / 지출결의 / 10.20~11.19 / · / 영수증 …」처럼 낱말마다 꺾이고 「·」만 한 줄에 서거나 줄 끝에 남았다 → 그 폭에서만 마감 날짜 칸을 글 아래 줄로(같은 글·같은 크기, 칸 자리만).
+   큰 D-day 는 두 줄에 걸쳐 가운데 그대로. 1040 이하(한 칸 — 판이 넓다)·1201 이상은 예전 그대로 */
+@media (min-width:1041px) and (max-width:1200px){
+  .dr{grid-template-columns:120px minmax(0,1fr);row-gap:4px}
+  .dr .dd{grid-row:1 / span 2}
+  .dr .dside{grid-column:2}
+}
 /* PC 오늘 할 일 · 마감 일정 — 두 카드 아래 끝이 146px 어긋나 빈 칸(R3-06) → 같은 높이. 할 일이 여섯 줄 넘게 길면 예전처럼 위 맞춤 */
 @media (min-width:901px){
   .pgrid{align-items:stretch}
@@ -1288,14 +1312,31 @@ footer .wrap{font-size:13px}
    *  HTML 글에서, escH 를 거친 뒤에(2026-11-03 설계 규칙, Fix 1·2). 「내 상태」 줄 조각(put)과 「오늘 할 일」 줄 작은 글의 「상신 전 N줄 · …」가 쓴다. */
   var DOT = '&nbsp;·&nbsp;';
   var dotJoin = function (h) { return String(h).replace(/ · /g, DOT).replace(/상신 전 (\d+줄)/g, '상신&nbsp;전&nbsp;$1'); };
+  /** 「오늘 할 일」 줄 글(제목·작은 글)의 HTML(2026-11-03 포털 줄 끝 점 — CSS 주석 「오늘 할 일」 줄 글의 구분점): 「 · 」 앞 띄어쓰기는 .ds(줄 끝에서 없어지는 넓힌 띄어쓰기),
+   *  점은 다음 낱말과 한 덩이(.dw)의 왼쪽 바깥에 건다 — 어느 줄도 「·」로 시작하거나 끝나지 않는다. 점 뒤 덩이는 낱말 하나이고, 「운행일지 11월분」·「1단계 운행 기록」 같은
+   *  덩이로 시작하면 그 덩이째(PT_HEAD). 나머지 글은 glue(짧은 말 묶기)만 하고 띄어쓰기에서 그대로 꺾인다. 글자(textContent)는 예전과 같다(「앞 · 뒤」). */
+  var PT_HEAD = /^(?:(?:운행일지|개인경비|법인카드) \d+월분(?: 2차)?|[1-4]단계 (?:운행 기록|영수증·통행료|검증·상신|정산)|[^ ]+)/;
+  /** 줄이 그 안에서 바뀌지 않게 둘 짧은 말(.u — 칸보다 넓을 때만 그 안에서 꺾인다), escH 를 거친 HTML 글에서: ‘다시 상신하세요.’ ·
+   *  따옴표 말+조사(‘없음’을 — keep-all 이어도 닫는 따옴표 뒤는 끊긴다) · 한글 바로 뒤에 여는 괄호가 붙은 낱말(100,000원(2장). — 괄호 앞도 끊긴다) ·
+   *  띄어 쓰지 않은 가운뎃점 낱말(영수증·통행료 — 점 앞뒤도 끊겨 「영수증·」으로 끝나는 줄이 생긴다) */
+  var GLUE = /다시 상신[가-힣]*\.?|‘[^‘’<>]{1,12}’[가-힣]*\.?|[^\s<>]*[가-힣]\([^\s<>]*|[^\s<>·]+(?:·[^\s<>·]+)+/g;
+  var glue = function (h) { return String(h).replace(GLUE, function (w) { return '<span class="u">' + w + '</span>'; }); };
+  var lineHtml = function (s) {
+    return String(s == null ? '' : s).split(' · ').filter(function (p, i) { return p || !i; }).map(function (p, i) {
+      if (!i) return glue(escH(p));
+      p = p.replace(/^ +/, '');
+      var m = PT_HEAD.exec(p), head = m ? m[0] : p;
+      return '<span class="ds"> </span><span class="dw"><i aria-hidden="true">· </i>' + glue(escH(head)) + '</span>' + glue(escH(p.slice(head.length)));
+    }).join('');
+  };
   /** 「오늘 할 일」 줄 작은 글의 HTML — 「 · 」를 &nbsp; 로 묶는 것은 **법인카드 줄만**(2026-11-03 Fix 3 — 검토 H1): 운행일지 「남은 일」 hint 의 「날짜 · 날짜 · …」 같은 다른 줄의 글까지 묶으면
-   *  칸(.tt, PC 4칸 나눔에서 95~294px)보다 넓은 한 덩이(244px)가 되어 마감 딱지를 덮고 폰 큰 글씨에서 칸 밖으로 나간다. 다른 줄은 escH 만(띄어쓰기에서 꺾인다).
+   *  칸(.tt, PC 4칸 나눔에서 95~294px)보다 넓은 한 덩이(244px)가 되어 마감 딱지를 덮고 폰 큰 글씨에서 칸 밖으로 나간다. 다른 줄은 lineHtml(걸린 점 — 띄어쓰기에서 꺾인다).
    *  법인카드 줄의 접두 「상신 전 N줄 · 」은 .cpre(말·숫자·점 한 덩이 — 좁은 901~950px 에서는 CSS 가 한 줄로 따로 세우고 점을 숨긴다, 검토 L2)로 묶는다. */
   var smallHtml = function (r) {
-    if (r.k !== 'c') return escH(r.s);
+    if (r.k !== 'c') return lineHtml(r.s);
     var s = r.s == null ? '' : String(r.s), m = /^(상신 전 \d+줄) · /.exec(s);
-    if (!m) return dotJoin(escH(s));
-    return '<span class="cpre">' + m[1].replace(/ /g, '&nbsp;') + '<i aria-hidden="true">' + DOT + '</i></span>' + dotJoin(escH(s.slice(m[0].length)));
+    if (!m) return glue(dotJoin(escH(s)));
+    return '<span class="cpre">' + m[1].replace(/ /g, '&nbsp;') + '<i aria-hidden="true">' + DOT + '</i></span>' + glue(dotJoin(escH(s.slice(m[0].length))));
   };
   function ddCls(n) { return n < 0 ? 'warn' : n <= 3 ? 'bad' : ''; }
   // 그 줄의 기간 열쇠 — deadlines 가 넣어 둔 엔진 열쇠(x.key, 12월 추가 기간이면 '2026-12b')가 먼저(2026-10-20 V3 — 예전 식은 마감일의 달이라
@@ -1417,8 +1458,10 @@ footer .wrap{font-size:13px}
         nmSeen[nk] = true;
         nb = '<button type="button" class="btn nm" data-nm="' + escH(nk) + '" aria-label="' + escH(KN[r.k] + ' ' + CR.short(r.key) + ' 내역 없음') + '">내역 없음</button>';
       }
+      // 걸린 점(.dw)이 있는 글만 칸 밖을 자른다(.hang — CSS 「오늘 할 일」 줄 글의 구분점)
+      var tH = lineHtml(r.t), sH = smallHtml(r), hang = function (h) { return h.indexOf('class="dw"') >= 0 ? ' class="hang"' : ''; };
       return '<li class="trw" data-k="' + r.k + '"' + (r.key ? ' data-key="' + escH(r.key) + '"' : '') + '><span class="tsys"><span class="cp line">' + KN[r.k] + '</span></span>' +
-        '<span class="tt"><b>' + escH(r.t) + '</b><span>' + smallHtml(r) + '</span></span>' +
+        '<span class="tt"><b' + hang(tH) + '>' + tH + '</b><span' + hang(sH) + '>' + sH + '</span></span>' +
         '<span class="tdue"><span class="cp ' + r.due[0] + '">' + escH(r.due[1]) + '</span>' + (r.note ? '<small>' + escH(r.note) + '</small>' : '') + '</span>' +
         '<span class="tbtns">' + nb + '<a class="btn' + (i === hot ? ' pri' : '') + '" href="' + r.href + '"' + (r.mode ? ' data-mode="' + r.mode + '"' : '') + '>' + escH(r.b) + '</a></span></li>';
     }).join('') : '<li class="tnone">지금 할 일이 없어요. 마감이 다가오면 여기에 보여요.</li>';
@@ -1696,7 +1739,8 @@ footer .wrap{font-size:13px}
         '<span class="dd' + (x.dday <= 0 ? ' now' : '') + '">' + dd + '</span>' +
         '<span class="dtx"><b><span class="lg">' + x.K.name + '</span><span class="sh">' + x.K.short + '</span></b>' +
         (first ? '<em class="chm">가장 먼저</em>' : '') +
-        '<span class="per">' + mdOf(x.from) + '~' + mdOf(x.due) + ' · ' + x.K.note + '</span>' +
+        // 기간 줄 「10.20~11.19 · 설명」 — 점은 설명 글 덩이(.dw) 왼쪽 바깥에 걸린다(줄이 「·」로 끝나거나 시작하지 않게, CSS .dtx .per). 글자는 예전과 같다
+        '<span class="per">' + mdOf(x.from) + '~' + mdOf(x.due) + '<span class="ds"> </span><span class="dw"><i aria-hidden="true">· </i>' + glue(escH(x.K.note)) + '</span></span>' +
         '<span class="due-m">' + due + '</span></span>' +
         '<span class="dside">' + (first ? '<span class="due"><span class="chip1">가장 먼저</span> · ' + due + '</span>' : '<span class="due">' + due + '</span>') + '</span></li>';
     }).join('');

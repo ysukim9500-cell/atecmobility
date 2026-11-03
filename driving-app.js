@@ -681,7 +681,8 @@
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
     if (cmpCycle(CYC, cur) < 0) {
-      return '<div class="cycband"><span>' + ic('cal', 15) + '지금 <b>' + cycleName(CYC) + ' (' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을 보고 있어요. ' +
+      // 「(기간) · 지난 기간을」은 한 덩이 — 폰에서 줄이 「…(10.01~10.31) ·」로 끝나지 않게(2026-11-03 화면 다듬기, 법인카드 띠와 같게)
+      return '<div class="cycband"><span>' + ic('cal', 15) + '지금 <b>' + cycleName(CYC) + ' </b><span style="white-space:nowrap"><b>(' + esc(cycleSpan(CYC)) + ') · 지난 기간</b>을</span> 보고 있어요. ' +
         '운행일지, 영수증, 정산 모두 이 기간 기준이에요.</span>' +
         '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + (cur.x ? '로' : '으로') + ' →</button></div>';
     }
@@ -707,8 +708,9 @@
       : st === 'approved' ? '결재가 끝났어요.' : st === 'submitted' ? '결재 중이에요.'
       : st === 'rejected' ? (!P && reopenInfo(myAppr(key)) ? '정정 중이에요. 고쳐서 다시 상신해 주세요.' : '반려됐어요. 고쳐서 다시 상신해 주세요.')
       : '아직 상신 전이면 지금 상신해 주세요.';
-    return '<div class="cycband grace" data-graceband><span>' + ic('cal', 15) + '<b>' + cycleName(CYC) + ' (' + esc(span) + ') · ' +
-      esc(dueText(r, Date.now())) + '</b>. ' + say + '</span>' +
+    // 「(기간) · 마감 N일 지남.」은 한 덩이(위 지난 기간 띠와 같은 까닭 — 줄 끝 「·」 없게, 2026-11-03 화면 다듬기)
+    return '<div class="cycband grace" data-graceband><span>' + ic('cal', 15) + '<b>' + cycleName(CYC) + ' </b><span style="white-space:nowrap"><b>(' + esc(span) + ') · ' +
+      esc(dueText(r, Date.now())) + '</b>.</span> ' + say + '</span>' +
       '<button class="btn sm" data-cyc="' + cycKey(cur) + '">' + CR.short(cur) + ' 보기 →</button></div>';
   }
   /** 내 결재 상태 한 마디(주기 목록에 붙인다). */
@@ -1734,27 +1736,31 @@
       if (nTwice) line.push('두 번 정산 의심 ' + n0(nTwice) + '일');
       if (nDupF) line.push('같은 금액 영수증 ' + n0(nDupF) + '일');
       var hideHow = fold && line.length > 0 && !myCycLocked();
-      var lineHtml = hideHow ? '<div class="mhl">' + line.join(' · ') + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히\u00a0보기’에 있어요.' : '') + '</div>' : '';
+      // 「영수증 없음 3일 · 금액 다름 1일」은 조각 사이에서만 줄을 바꾼다(줄 끝·처음 「·」 없음 — 2026-11-03 화면 다듬기, 아래 요약 줄과 같은 꼴)
+      var lineHtml = hideHow ? '<div class="mhl">' + dnJoin(line) + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히\u00a0보기’에 있어요.' : '') + '</div>' : '';
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
         (fold ? '자세히 보기 (' + n0(MC.days.length) + '일)' : '접기') + '</button>';
       var table = '<div class="scroll"' + (fold && !nFlag ? ' hidden' : '') + '><table class="mtable mday' + (fold ? ' fold' : '') + '"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행 금액</th>' +
         '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th><th><span class="sr">할 일</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
         (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. ‘자세히\u00a0보기’를 누르면 보여요.</div>' : '');
-      return box(!nBad && !nNoTrip && !nTwice && !nDupF, parts.join(' · '),
+      // 제목·요약 줄의 「 · 」 조각은 덩이째 — 줄은 조각 사이에서만 바뀌고 줄 끝·처음에 「·」가 남지 않는다(dnJoin — 2026-11-03 화면 다듬기:
+      //   390 「정산 주차비 11,000원 · 운행 금액 11,000원 ·」 / 「올린 영수증 4,500원」 · 360 「운행 / 금액 11,000원」)
+      return box(!nBad && !nNoTrip && !nTwice && !nDupF, dnJoin(parts),
         // 올린 영수증 합이 정산과 왜 다른지 한 마디(2026-10-17 모르는 로봇 「영수증 7,500원인데 정산 4,400원 — 잘못 들어간 줄」)
-        '정산 ' + word + ' <b>' + won(MS.settle) + '</b> · 운행 금액 ' + won(MS.T) +
+        dnJoin(['정산 ' + word + ' <b>' + won(MS.settle) + '</b>', '운행 금액 ' + won(MS.T)].concat(
           // 하이패스 이용내역으로 맞춘 금액도 증빙으로 보이게(모르는 로봇 3회차 — 「올린 영수증 1,100원」만 보여 나머지가 증빙 없는 것처럼 읽혔다)
-          (function () { var h = MC.days.reduce(function (x, d) { return x + (d.H || 0); }, 0); return h ? ' · 하이패스 ' + won(h) : ''; })() +
-          ' · 올린 영수증 ' + won(MS.R) +
+          (function () { var h = MC.days.reduce(function (x, d) { return x + (d.H || 0); }, 0); return h ? ['하이패스 ' + won(h)] : []; })(),
+          ['올린 영수증 ' + won(MS.R) +
           (function () {
             var why = [];
             if (MS.fill) why.push(won(MS.fill) + '은 운행에 넣음');
             if (MS.noTrip) why.push('운행 없는 날 ' + won(MS.noTrip) + '은 빠짐');
             var dupAmt = MC.days.reduce(function (a, d) { return a + (d.D || 0); }, 0);
             if (dupAmt) why.push('하이패스와 같은 통행료 ' + won(dupAmt) + '은 한 번만 셈');
-            return why.length ? ' (' + why.join(' · ') + ')' : '';
-          })() + lineHtml +
+            // 괄호 안 「 · 」도 조각 사이에서만(괄호는 앞뒤 조각에 붙인다) · 하나면 한 덩이(360·390 「(운행 없는 날 / 4,500원은 빠짐)」)
+            return why.length ? ' ' + (why.length > 1 ? dnJoin(why.map(function (w, i) { return (i ? '' : '(') + w + (i === why.length - 1 ? ')' : ''); })) : '<span style="white-space:nowrap">(' + why[0] + ')</span>') : '';
+          })()])) + lineHtml +
           (how.length ? '<div class="mhow"' + (hideHow ? ' hidden' : '') + '>' + how.join('. ') + '.</div>' : '') +
           (fold ? '' : '<div class="mrule">' + rule + '</div>') +
           // 「자세히 보기」는 안내 글 아래 한 줄 — 문장 사이에 끼면 그 줄만 단추 높이로 벌어졌다(2026-10-24 다듬기 2단계)
@@ -2201,8 +2207,8 @@
     return '<section class="sect"><div class="panel" style="padding:18px 20px;font-size:13px;' +
       'line-height:1.7;color:var(--ink-3)">' +
       '<b style="color:var(--ink-2)">100점에서 깎아요.</b> ' +
-      '과속 −3 · 어린이보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3 · ' +
-      '지속과속 −2(운행당 −10까지)<br>' +
+      // 깎는 점수 목록은 조각 사이에서만 줄을 바꾼다(360 「… 어린이보호구역 과속 −5 ·」 — 2026-11-03 화면 다듬기)
+      dnHtml('과속 −3 · 어린이보호구역 과속 −5 · 급가속 −3 · 급감속 −5 · 급회전 −3 · 지속과속 −2(운행당 −10까지)') + '<br>' +
       '밤 10시~새벽 6시에 출발한 운행은 깎인 점수를 <b>1.5배</b>로 계산해요.<br>' +
       '여러 운행의 평균은 <b>주행거리로 가중</b>해서, 짧은 운행이 너무 크게 반영되지 않아요.<br>' +
       '<b style="color:var(--ink-2)">수기로 넣은 운행은 평가하지 않아요.</b> GPS 기록이 없으면 ' +
@@ -4465,7 +4471,8 @@
     var body = '';
     if (act === 'withdraw') {
       body = '<div class="anote" style="margin-top:0">상신을 회수할까요? 결재선은 그대로 남고, <b>' +
-        (kd ? (kd.withdrawText || '이 기간의 경비를 다시 고칠 수 있게') : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 돼요. ' +
+        // 가운뎃점 낱말(「운행·영수증을」·「(구분·사용목적)」)은 한 덩이(keepDotsH — 2026-11-03 화면 다듬기, 1024~1440 법인카드 「…카드 내역(구분·」)
+        keepDotsH(kd ? (kd.withdrawText || '이 기간의 경비를 다시 고칠 수 있게') : '이 기간의 운행·영수증을 다시 고칠 수 있게') + '</b> 돼요. ' +
         '고친 뒤 다시 상신하면 그때 자료로 결재가 진행돼요.</div>' + apprTrack(a);
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
@@ -5398,8 +5405,35 @@
   function dnHtml(text) { return dnJoin(dnParts(text).map(esc)); }
   /** 조각이 둘 이상일 때만 조각으로, 아니면 글자 그대로(esc) — 운행일지·개인경비 이름처럼 「 · 」 없는 글은 예전 그대로 그린다. */
   function dnMaybe(text) { return dnParts(text).length > 1 ? dnHtml(text) : esc(text == null ? '' : text); }
+  /** 두 줄 말줄임 칸(챙길 사람 「남은 일」)용 「 · 」 조각 — dnJoin(줄 바꿈 상자)은 두 줄 말줄임이 걸리지 않아 좁은 PC(901)에서 줄이 늘고 긴 조각이
+   *  안에서 갈렸다(「통행료 미확정」 / 「3건」). 글 줄은 그대로 두고 줄바꿈 자리는 조각 사이(<wbr>)에만 — 조각마다 맨 앞 구분점 상자(.dx, 「 · 」 글자 폭)를
+   *  줄마다 칸 왼쪽 밖으로 밀어 잘라서 줄 처음에도 끝에도 「·」가 없고, 칸보다 긴 조각은 「…」로 끝난다(CSS driving-v2.html .d2left .dnc,
+   *  2026-11-03 화면 다듬기). 글자(textContent)는 예전 그대로 「A · B」. 조각이 하나면 글자 그대로(esc). */
+  function dnClip(text) {
+    var ps = dnParts(text);
+    if (ps.length < 2) return esc(text == null ? '' : text);
+    return '<span class="dnc">' + ps.map(function (p, i) {
+      return (i ? '<wbr>' : '') + '<span class="dw"><i class="dx"' + (i ? ' aria-hidden="true"> · ' : '>') + '</i>' + esc(p) + '</span>';
+    }).join('') + '</span>';
+  }
   /** 칸(창 제목·아래 줄)에 넣기 — 조각이 둘 이상이면 innerHTML(조각), 아니면 textContent(예전 그대로). */
   function dnSet(el, text) { if (!el) return; if (dnParts(text).length > 1) el.innerHTML = dnHtml(text); else el.textContent = text == null ? '' : text; }
+  /** 가운뎃점으로 이은 한글 낱말(「영수증·통행료」·「운행·영수증을」)은 한 덩이로 — 좁은 폭에서 줄 끝·처음에 「·」가 남지 않게(모듈의 keepDots 와 같은 규칙). esc 한 HTML 에 쓴다. */
+  function keepDotsH(h) { return String(h).replace(/[가-힣]{1,12}(?:·[가-힣]{1,12}){1,4}/g, function (m) { return '<span style="white-space:nowrap">' + m + '</span>'; }); }
+  /** 「항목 금액」(낱말 하나나 날짜 + 금액 — 「유류비 34,953원」·「합계 2,000원」·「10.04 2,000원」)은 한 덩이 — 긴 설명 글에서 금액만 다음 줄로 가지 않게
+   *  (2026-11-03 화면 다듬기: 「… 청구 유류비 / 34,953원」·「(합계 / 2,000원)」). esc 한 HTML 에 쓴다. 모듈도 C.keepPairs 로 같은 규칙을 쓴다. */
+  function keepPairs(h) { return String(h).replace(/(^|[\s(:,])((?:[가-힣A-Za-z]{1,12}|\d{2}\.\d{2}) [\d,]+원)/g, function (m, a, b) { return a + '<span style="white-space:nowrap">' + b + '</span>'; }); }
+  /** 설명 글 → 화면 HTML: 「 · 」로 이은 조각(날짜·「구분 금액」)은 덩이째·줄은 조각 사이에서만(dnJoin), 가운뎃점 낱말은 한 덩이(keepDotsH).
+   *  글자(textContent)는 예전 그대로(2026-11-03 화면 다듬기 — 월 마감 남은 일 1280 「09.25(금) · 09.28(월) · 09.29(화) ·」·「· 영수증 1,500원」, 360 「‘영수증·」). */
+  //   마지막 조각 뒤에 붙은 다른 문장(「…(1장). 빠진 주유 영수증을 올려 주세요.」)은 조각 밖 보통 글로 — 목록이 한 줄에 들면 예전처럼 그 뒤에 이어지고
+  //   (조각 안에 두면 긴 마지막 조각이 통째로 다음 줄로 가 줄이 하나 늘었다), 목록이 두 줄이면 그 아래에서 시작한다. 「, 운행 …」처럼 이어지는 말은 조각에 붙여 둔다
+  function dotText(t) {
+    var p = dnParts(t);
+    if (p.length < 2) return keepPairs(keepDotsH(esc(t == null ? '' : t)));
+    var m = /^(.*?\.)(\s.+)$/.exec(p[p.length - 1]), tail = '';
+    if (m) { p[p.length - 1] = m[1]; tail = m[2]; }
+    return dnJoin(p.map(function (s) { return keepPairs(keepDotsH(esc(s))); })) + keepPairs(keepDotsH(esc(tail)));
+  }
   function sect(title, cnt, right, body) {
     return '<section class="sect"><div class="hd"><h2>' + esc(title) + '</h2>' +
       (cnt ? '<span class="cnt">' + cnt + '</span>' : '') +
@@ -5784,7 +5818,8 @@
       fact('마감', closed ? (daysPast(r, now) <= CR.graceDays() ? daysPast(r, now) + '일 지남' : '종료') : (days <= 0 ? '오늘' : 'D-' + days),
         closed ? esc(cycleSpan(CYC)) + ' 종료' : pct + '% 지남') +
       fact('운행', n0(T.n) + '<small>건</small>', km(T.km) + 'km' + (T.manual ? ' · 수기 ' + n0(T.manual) : '')) +
-      fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll)) +
+      // 「유류비 ₩ · 통행료 ₩」는 조각 사이에서만 줄을 바꾼다(줄 끝 「·」 없음 — 2026-11-03 화면 다듬기, 현황 업무용 비용과 같은 꼴)
+      fact('업무용 비용', won(T.cost), { html: dnHtml('유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll)) }) +
       // 잠긴 뒤에는 채울 수 없다 — 빨갛게 '여기를 보라'고 하지 않고, 어떻게 올라갔는지만 적는다.
       fact('통행료 미확정', n0(T.unk) + '<small>건</small>',
         T.unk ? (approved ? '0원으로 상신됨' : '0원으로 정산') : '전부 확정', T.unk > 0 && !approved) +
@@ -5815,9 +5850,10 @@
     return h;
 
     function fact(k, v, sub, alert) {
+      // 설명이 { html } 이면 이미 만든 HTML 그대로(「 · 」 조각 dnHtml — 2026-11-03 화면 다듬기)
       return '<div class="fact"><div class="k">' + esc(k) + '</div>' +
         '<div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
-        '<div class="sub">' + esc(sub || '') + '</div></div>';
+        '<div class="sub">' + (sub && sub.html != null ? sub.html : esc(sub || '')) + '</div></div>';
     }
   }
 
@@ -5970,16 +6006,17 @@
   function closeTasksHtml(TK, step) {
     var h = '<section class="ccard ctasks" aria-label="남은 일" data-ctasks><div class="chd"><h2>남은 일<small>' + n0(TK.list.length) + '건</small></h2>' +
       '<span class="note">남은 일이 있어도 상신할 수 있고, 결재자에게도 보여요.</span></div>' +
-      (step ? '<p class="cnowl" data-cstep><b>지금 ' + step.n + '단계 · ' + esc(step.t) + '</b><span>' + esc(step.d) + '</span></p>' : '');
+      // 설명 글은 dotText — 「 · 」 목록은 조각 사이에서만 줄을 바꾸고, 「‘영수증·통행료’」 같은 가운뎃점 낱말은 한 덩이(2026-11-03 화면 다듬기)
+      (step ? '<p class="cnowl" data-cstep><b>지금 ' + step.n + '단계 · ' + esc(step.t) + '</b><span>' + dotText(step.d) + '</span></p>' : '');
     h += TK.list.length ? '<ul class="ctlist">' + TK.list.map(function (x) {
       return '<li class="ctask ' + x.sev + '" data-ctask="' + esc(x.k) + '">' + ic('alert', 20) +
-        '<span class="ctt"><b>' + esc(x.t) + '</b><span>' + esc(x.d) + '</span></span>' +
+        '<span class="ctt"><b>' + esc(x.t) + '</b><span>' + dotText(x.d) + '</span></span>' +
         '<span class="ctb">' + ctBtn(x.b1) + ctBtn(x.b2) + '</span></li>';
     }).join('') + '</ul>' : '<div class="cnone">' + ic('check', 18) + '남은 일이 없어요</div>';
     if (TK.done.length) h += '<details class="cdone"><summary><b>끝난 일 ' + n0(TK.done.length) + '</b>' +
       TK.done.slice(0, 4).map(function (x) { return '<span class="ci">' + ic('check', 14) + esc(x.t) + '</span>'; }).join('') +
       '<span class="cm" aria-hidden="true"></span></summary><ul>' + TK.done.map(function (x) {
-        return '<li>' + ic('check', 14) + '<span><b>' + esc(x.t) + '</b>' + (x.d ? ': ' + esc(x.d) : '') + '</span></li>';
+        return '<li>' + ic('check', 14) + '<span><b>' + esc(x.t) + '</b>' + (x.d ? ': ' + dotText(x.d) : '') + '</span></li>';
       }).join('') + '</ul></details>';
     return h + '</section>';
   }
@@ -6464,9 +6501,11 @@
       ? '<table class="d2tbl d2fol"><caption class="sr">챙길 사람(반려·상신 전)</caption><thead><tr><th scope="col">이름 · 팀</th><th scope="col">상태</th>' +
         '<th scope="col">남은 일</th><th scope="col" class="n">마지막 활동</th><th scope="col" class="n"><span class="sr">팀즈 알림</span></th></tr></thead><tbody>' +
         shown.map(function (p) {
-          return '<tr data-fol="' + esc(p.u) + '"><td class="d2who"><b>' + esc(nameOf(p.u)) + '</b><small>' + esc(who(p.u)) + '</small></td>' +
+          // 「팀 · 센터」와 남은 일(「업무 운행 9건 · 통행료 미확정 3건 · 검증 전」)은 조각 사이에서만 줄을 바꾼다 — 1024~1440 「광역교통지원팀 ·」 / 「대전센터」,
+          //   1024 「… 통행료 미확정 3건 ·」(2026-11-03 화면 다듬기). 남은 일은 두 줄 말줄임을 지키는 dnClip. 반려 사유(사람이 쓴 글)는 예전처럼 두 줄 말줄임 글 그대로
+          return '<tr data-fol="' + esc(p.u) + '"><td class="d2who"><b>' + esc(nameOf(p.u)) + '</b><small>' + dnMaybe(who(p.u)) + '</small></td>' +
             '<td class="d2st">' + stChip(p) + '</td>' +
-            '<td class="d2left"><span title="' + esc(p.left) + '">' + esc(p.left) + '</span></td>' +
+            '<td class="d2left"><span title="' + esc(p.left) + '">' + (/^반려 사유: /.test(p.left) ? esc(p.left) : dnClip(p.left)) + '</span></td>' +
             '<td class="n d2last" data-l="마지막 활동">' + (p.last ? md(p.last) : '—') + '</td>' +
             '<td class="n d2go">' + btn(p) + '</td></tr>';
         }).join('') + '</tbody></table>' +
@@ -6744,8 +6783,9 @@
       // 불일치와 확인 필요를 나눠 센다(2026-10-19 사용성 2차 — 「불일치 0명」인데 표에는 「확인 1」이 붙은 사람이 있어 헷갈렸다)
       fact('검증 불일치', V && !V.fail ? n0(c.vbad) + '<small>명</small>' : '—', V ? (V.fail ? '검증 결과를 불러오지 못했어요' : '검증 전 ' + n0(c.vnone) + '명') : '검증 결과를 받는 중…', c.vbad > 0) +
       (V && !V.fail ? fact('검증 확인 필요', n0(c.vwarn) + '<small>명</small>', c.vwarn ? '불일치는 없고 한 번 볼 것만 있어요' : '') : '') +   // 0명이면 설명 없음(2026-10-20)
-      fact('업무용 비용', won(T.cost), '유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
-        (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) +
+      // 「유류비 ₩ · 통행료 ₩ · 주차비 ₩」는 조각 사이에서만 줄을 바꾼다(390·768 줄 끝 「·」, 360 「주차비 / 25,500원」 — 2026-11-03 화면 다듬기)
+      fact('업무용 비용', won(T.cost), { html: dnHtml('유류비 ' + won(T.fuel) + ' · 통행료 ' + won(T.toll) + ' · 주차비 ' + won(T.park) +
+        (T.unk ? ' · 통행료 미확정 ' + n0(T.unk) + '건(0원)' : '')) }) +
       '</div></div>';
 
     // 바로 봐야 할 기록(계기판 튐·목적 미선택 등) — 있을 때만
@@ -6774,8 +6814,9 @@
     return h;
 
     function fact(k, v, sub, alert) {
+      // 설명이 { html } 이면 이미 만든 HTML 그대로(「 · 」 조각 dnHtml — 2026-11-03 화면 다듬기)
       return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
-        '<div class="sub">' + esc(sub || '') + '</div></div>';
+        '<div class="sub">' + (sub && sub.html != null ? sub.html : esc(sub || '')) + '</div></div>';
     }
   }
   /** 현황 표 — 소속별로 묶고(팀 합계), 사람마다 상신 상태 · 검증 · 금액 · 인쇄. */
@@ -13886,6 +13927,8 @@ window.EduGuard = {
       head: head, sect: sect, blank: blank, skeleton: skeleton,
       // 「 · 」로 이은 이름 → 줄바꿈 조각(2026-11-03 디자인 검사 M1·M3·L2): dn(글) = 글을 「 · 」에서 나눠 조각마다 esc · dnJoin([이미 esc 한 HTML 조각]) — 둘 다 <span class="dnl">…</span>
       dn: dnHtml, dnJoin: dnJoin,
+      // 「항목 금액」 한 덩이(2026-11-03 화면 다듬기 — esc 한 HTML 에 쓴다, 검증 항목 설명 등)
+      keepPairs: keepPairs,
       nameOf: nameOf, personOf: personOf, myName: myName,
       orgCell: orgCell, orgGroups: orgGroups, orgGroupRow: orgGroupRow, orgMatch: orgMatch, orgPath: orgPath, orgName: orgName, myAppr: myAppr, apprOf: apprOf,
       cycleRange: cycleRange, cycleName: cycleName, cycleSpan: cycleSpan,

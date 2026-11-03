@@ -270,7 +270,8 @@
       } else if (fx) go = '<button class="btn sm vgo" data-v="' + fx[0] + '">' + fx[1] + ic('chev', 12) + '</button>';
       return '<div class="vitem v-' + esc(it.level) + (isAi(it) ? ' v-ai' : '') + '"><span class="st ' + lv[1] + '">' + lv[0] + '</span>' +
         '<div class="vb"><div class="vt">' + keepDots(esc(it.title)) + (isAi(it) ? ' ' + gemBadge() : '') + '</div>' +
-        '<div class="vd">' + esc(appr ? apprDetail(it.detail) : it.detail) + '</div></div>' + go + '</div>';
+        // 설명의 「날짜 금액」·「합계 금액」은 한 덩이(C.keepPairs — 360 「10.04 2,000원 (합계 / 2,000원)」, 2026-11-03 화면 다듬기)
+        '<div class="vd">' + (C.keepPairs || String)(keepDots(esc(appr ? apprDetail(it.detail) : it.detail))) + '</div></div>' + go + '</div>';
     }).join('') + '</div>';
   }
   /** 「바로 고치기」 — 항목이 가리키는 운행·영수증을 한 창에 모아 거기서 바로 고친다.
@@ -344,6 +345,12 @@
     var ms = Date.parse(iso);
     return isFinite(ms) ? C.md(ms) + ' ' + C.hm(ms) : '';
   }
+  /** 결재 중 표 「현재 결재자」 — 「이름 직책 (칸)」의 괄호 안은 한 덩이(줄은 칸 이름 앞에서만 — 법인카드 결재 중 표 curStepHtml 과 같다, 2026-11-03 화면 다듬기). */
+  function curStepHtml(s) {
+    if (!s || !s.approver) return '—';
+    var w = C.stepText(s), i = w.lastIndexOf(' (');
+    return i < 0 ? esc(w) : esc(w.slice(0, i)) + ' <span style="white-space:nowrap">' + esc(w.slice(i + 1)) + '</span>';
+  }
 
   /* ══════════════════ 검증 (개인) ══════════════════ */
   function viewVerify() {
@@ -416,7 +423,8 @@
     h += steps;
     if (moving) h += aimHtml('d:' + k, verdict);
     else h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (row && !s.bad ? ' ok' : '') + '"></span>' +
-      (row ? '마지막 검증 ' + esc(whenText(row.created_at)) : '검증 전') + '</div>' +
+      // 「마지막 검증 날짜」는 한 덩이(날짜가 갈리지 않게 — 법인카드·개인경비 검증 머리와 같은 꼴, 2026-11-03 화면 다듬기)
+      '<span>' + dnLine([row ? '마지막 검증 ' + whenText(row.created_at) : '검증 전']) + '</span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (row ? '<div class="facts">' +
         fact('불일치', n0(s.bad), '금액·계기판이 서로 다름', s.bad > 0) +
@@ -472,7 +480,8 @@
         '<div class="v' + (alert ? ' alert' : '') + '">' + val + '</div><div class="sub">' + esc(sub || '') + '</div></div>';
     };
     h += '<div class="hero fade" data-lockedverify><div class="eyebrow"><span class="dot' + (v && !s.bad ? ' ok' : '') + '"></span>' +
-      '<span>상신 때 검증 결과' + (at ? ' · <span style="white-space:nowrap">' + esc(whenText(at)) + '</span>' : '') + '</span></div>' +
+      // 날짜는 한 덩이 · 두 줄이 되면 덩이 사이에서만(줄 끝 「·」 없음 — 2026-11-03 화면 다듬기, 법인카드·개인경비 검증 머리와 같은 꼴)
+      '<span>' + dnLine(['상신 때 검증 결과'].concat(at ? [whenText(at)] : [])) + '</span></div>' +
       '<p class="verdict' + clean + '">' + verdict + '</p>' +
       (v ? '<div class="facts">' +
         fact('불일치', n0(s.bad), '금액·계기판이 서로 다름', s.bad > 0) +
@@ -727,6 +736,10 @@
     if (un) return asApprover ? 'AI가 읽지 않은 사진 ' + n0(un) + '장은 직접 확인해 주세요' : 'AI가 읽지 않은 사진 ' + n0(un) + '장은 결재자가 직접 확인해요';
     return asApprover ? '‘!’ 표시만 살펴봐 주세요' : '‘!’ 표시는 결재자에게도 보여요';
   }
+  /** 「 · 」로 잇는 짧은 조각(글 그대로 — 여기서 esc)을 한 줄로 — 조각(「통행료 24,200원」 같은 「구분 금액」 쌍)은 덩이째, 줄은 조각 사이에서만 바뀌고
+   *  줄 끝·처음에 「·」가 남지 않는다(C.dnJoin 걸린 구분점 — 법인카드 결재 창 구분별 금액 줄과 같은 방법, 2026-11-03 화면 다듬기:
+   *  「유류비 121,285원 · 통행료 / 24,200원」). 글(textContent)은 예전 「A · B」 그대로. 앞 판 본체면 글 그대로. */
+  function dnLine(parts) { return C.dnJoin ? C.dnJoin(parts.map(esc)) : esc(parts.join(' · ')); }
   /**
    * 결재 요약(2026-10-07 사용자) — 결재자가 문서를 열지 않고도 승인할 수 있게, 상신 때 굳힌 금액·검증 결과와
    * 전월 대비를 한눈에. 결재 중(내 차례 포함)·완료 건에만 붙인다. 숫자는 모두 상신 때 서버가 굳힌 값(snapshot·고정본 검증)이다.
@@ -751,7 +764,7 @@
       bigJump = pc > 0 && d > 50000 && pct >= 50;
       cmp = '<div class="abf"><span class="k">전월(' + pm + ') 대비</span><b class="' + (d > 0 ? 'up' : d < 0 ? 'down' : '') + '">' +
         (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + won(Math.abs(d)) + (pct != null && d ? ' <small>(' + (d > 0 ? '+' : '−') + (Math.abs(pct) < 1 ? '1% 미만' : Math.abs(pct) + '%') + ')</small>' : '') + '</b>' +
-        '<span class="sub">' + pm + ' ' + won(pc) + ' · ' + n0(prev.snapshot.trips) + '건 · ' + C.km(prev.snapshot.km) + 'km</span></div>';
+        '<span class="sub">' + dnLine([pm + ' ' + won(pc), n0(prev.snapshot.trips) + '건', C.km(prev.snapshot.km) + 'km']) + '</span></div>';
     } else {
       cmp = '<div class="abf"><span class="k">전월 대비</span><b class="dimv">—</b><span class="sub">' + (pkey ? '볼 수 있는 ' + pm + ' 결재가 없어요.' : '추가 기간은 전월과 비교하지 않아요.') + '</span></div>';
     }
@@ -797,14 +810,15 @@
     return '<div class="abrief ' + verdict[0] + '">' +
       '<div class="abv"><span class="abi">' + (verdict[0] === 'ok' ? '✓' : '!') + '</span><b>' + esc(verdict[1]) + '</b></div>' +
       '<div class="abgrid">' +
-      '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">유류비 ' + won(s.fuel) + ' · 통행료 ' + won(s.toll) + ' · 주차비 ' + won(s.parking) + '</span></div>' +
+      '<div class="abf"><span class="k">청구 금액</span><b>' + won(cost) + '</b><span class="sub">' + dnLine(['유류비 ' + won(s.fuel), '통행료 ' + won(s.toll), '주차비 ' + won(s.parking)]) + '</span></div>' +
       // 운행은 업무 운행을 먼저(2026-10-20 — 금액이 업무 운행만이라). 고정본에 업무 건수가 없으면 업무 거리 · 전체 건수
       (s.biz_km != null && s.biz_trips == null
-        ? '<div class="abf"><span class="k">업무 운행</span><b>' + C.km(s.biz_km) + '<small>km</small></b><span class="sub">전체 운행 ' + n0(s.trips) + '건 · ' + C.km(s.km) + 'km</span></div>'
+        ? '<div class="abf"><span class="k">업무 운행</span><b>' + C.km(s.biz_km) + '<small>km</small></b><span class="sub">' + dnLine(['전체 운행 ' + n0(s.trips) + '건', C.km(s.km) + 'km']) + '</span></div>'
         // 「(전체 M건)」은 아랫줄 — 굵은 17px 한 줄로 두면 1280~1366 폭에서 옆 칸(전월 대비 「▼ ₩…」) 위로 넘쳤다(2026-10-20 V3 B3)
+        //   「업무 운행 11건 · 635km」는 조각 사이에서만 줄을 바꾼다(360·390 결재 창 「업무 운행 11건 ·」 / 「635km」 — 2026-11-03 화면 다듬기)
         : (function () {
           var tt = C.snapTrips ? C.snapTrips(s) : n0(s.trips) + '건', mm = /^(.*) \((전체 [^)]*)\)$/.exec(tt);
-          return '<div class="abf"><span class="k">운행</span><b class="abwrap">' + esc(mm ? mm[1] : tt) + '</b>' + (mm ? '<span class="sub">' + esc(mm[2]) + '</span>' : '') + '</div>';
+          return '<div class="abf"><span class="k">운행</span><b class="abwrap">' + dnLine((mm ? mm[1] : tt).split(' · ')) + '</b>' + (mm ? '<span class="sub">' + esc(mm[2]) + '</span>' : '') + '</div>';
         })()) +
       cmp +
       // 금액 규칙 v3(version 3) — ev_* 는 운행 금액이 없는 날 영수증으로 채운 금액, no_trip_* 는 운행 없는 날이라 정산에서 뺀 영수증.
@@ -814,12 +828,12 @@
       ((s.version || 1) >= 3
         ? ((Number(s.ev_parking) || 0) + (Number(s.ev_toll) || 0) > 0
           ? '<div class="abf"><span class="k">영수증으로 채운 금액</span><b>' + won((Number(s.ev_parking) || 0) + (Number(s.ev_toll) || 0)) +
-            (s.ev_n ? ' <small>' + n0(s.ev_n) + '장</small>' : '') + '</b><span class="sub">운행에 금액이 없던 날 · 주차비 ' + won(s.ev_parking || 0) + ' · 통행료 ' + won(s.ev_toll || 0) +
+            (s.ev_n ? ' <small>' + n0(s.ev_n) + '장</small>' : '') + '</b><span class="sub">' + dnLine(['운행에 금액이 없던 날', '주차비 ' + won(s.ev_parking || 0), '통행료 ' + won(s.ev_toll || 0)]) +
             (Number(s.no_trip_n) > 0 ? '</span><span class="sub abwarn">운행 없는 영수증 ' + n0(s.no_trip_n) + '장 ' + won(s.no_trip_amt || 0) + ' 정산 제외' : '') + '</span></div>'
           : Number(s.no_trip_n) > 0
             ? '<div class="abf"><span class="k">운행 없는 영수증</span><b>' + n0(s.no_trip_n) + '<small>장</small></b><span class="sub abwarn">' + won(s.no_trip_amt || 0) + ' 정산 제외</span></div>'
             : '')
-        : '<div class="abf"><span class="k">주차·통행 영수증</span><b>' + (s.ev_n == null ? '—' : n0(s.ev_n) + '<small>장</small>') + '</b><span class="sub">주차비 ' + won(s.ev_parking || 0) + ' · 통행료 ' + won(s.ev_toll || 0) + ' 포함</span></div>') +
+        : '<div class="abf"><span class="k">주차·통행 영수증</span><b>' + (s.ev_n == null ? '—' : n0(s.ev_n) + '<small>장</small>') + '</b><span class="sub">' + dnLine(['주차비 ' + won(s.ev_parking || 0), '통행료 ' + won(s.ev_toll || 0) + ' 포함']) + '</span></div>') +
       '</div>' +
       '<div class="abchk">' + checks.map(function (c) { return '<span class="ck ' + c[0] + '">' + (c[0] === 'ok' ? '✓' : '!') + ' ' + esc(c[1]) + '</span>'; }).join('') + '</div>' +
       (items.length ? '<ul class="abitems">' + items.slice(0, 4).map(function (i) {
@@ -1413,11 +1427,13 @@
     }
     function goingRow(a) {
           var cur = (a.steps || []).filter(function (s) { return s.seq === a.cur_seq; })[0] || {};
+          // 날짜는 결재 완료 표처럼 「11.10 07:00」(전체 「상신 …」은 title) · 「현재 결재자」는 「(칸)」 앞에서만 두 줄(td.fcur) — 세 시스템 결재 중 표를 같게
+          //   (2026-11-03 화면 다듬기: 법인카드 1024 27~33px · 개인경비 1024 76px 넓어 붙은 「관리자 반려」 칸이 「현재 결재자」 글을 덮었다)
           return '<tr>' + C.orgCell(a.username, true) + '<td><span class="lead">' + esc(C.nameOf(a.username)) + '</span></td>' +
             '<td><span class="st warn">결재 중</span></td>' +
-            '<td class="dim">' + (a.submitted_at ? '상신 ' + esc(whenText(a.submitted_at)) : '') + '</td>' +
+            '<td class="dim" style="white-space:nowrap"' + (a.submitted_at ? ' title="상신 ' + esc(whenText(a.submitted_at)) + '">' + esc(finWhen(a.submitted_at)) : '>') + '</td>' +
             '<td class="n" data-l="금액">' + n0((a.snapshot || {}).cost) + '</td>' +
-            '<td data-l="현재 결재자">' + esc(cur.approver ? C.stepText(cur) : '—') + '</td>' +
+            '<td class="fcur" data-l="현재 결재자">' + curStepHtml(cur) + '</td>' +
             '<td class="n ract"><button class="btn sm" data-appr="force_reject" data-id="' + a.id + '">관리자 반려</button></td></tr>';
     }
     if (back.length || notYet.length) {
