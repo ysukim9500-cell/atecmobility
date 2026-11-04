@@ -25,10 +25,11 @@
 
   /* ══════════════════ 서버 ══════════════════ */
   /** onEng(엔진, 때) — AI 를 부르는 op(read)는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
-   *  화면이 지금 읽는 엔진을 바꿔 보인다. 답 읽기·오류 글은 그대로. */
-  function call(body, onEng) {
+   *  서버가 status abort_safe 목록에 read 를 넣어 주면(늦은 판독이 더 새 판독을 덮지 않는 서버) 웹이 기다리는 시간(47초 · 원본 장 52초)이 지나도 끊고 Gemini(2026-11-04 —
+   *  driving-app.js AI_CLAUDE_MS). aiOpt = { page } — 원본 장 판독(기다리는 시간이 더 길다). 화면이 지금 읽는 엔진을 바꿔 보인다. 답 읽기·오류 글은 그대로. */
+  function call(body, onEng, aiOpt) {
     var ai = body && body.op === 'read' && C.ai;
-    return (ai ? C.ai.fetch('driving-verify', body, onEng) : C.apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify(body) }))
+    return (ai ? C.ai.fetch('driving-verify', body, onEng, aiOpt) : C.apiRetry('/functions/v1/driving-verify', { method: 'POST', body: JSON.stringify(body) }))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok || !j || j.error) throw new Error((j && j.error) || ('HTTP ' + r.status));
@@ -142,7 +143,9 @@
       say(label(0, unread.length), { phase: 'read', n: 0, N: unread.length, cur: unread[0] });
       return pool(unread, 3, function (id) {
         if (stop) return Promise.reject(new Error(stop));
-        return call({ op: 'read', evidence_id: id }, onEng).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
+        // 원본 장 줄(한 장에 여러 영수증 — 서버 isScanLine: scan_path 있고 계기판 아님)은 서버가 원본 장을 읽는다 — Claude 를 더 기다린다(dpage)
+        var ev = byId[String(id)], page = !!(ev && ev.scan_path && ev.category !== '계기판');
+        return call({ op: 'read', evidence_id: id }, onEng, { page: page }).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
           // 하루 상한에 닿았으면 남은 것은 더 보내지 않는다.
           if (/횟수|한도/.test(String(e && e.message))) stop = e.message;
           throw e;
@@ -1729,11 +1732,28 @@
       return '<span class="ai-hd ai-gh" aria-hidden="true">' + C.ai.head({ eng: g.eng, phase: g.phase, what: AIM.what }) + '</span>';
     }).join('');
   }
+  /** 바뀌는 순간의 굵은 글이 잡아 둔 자리(가장 긴 글 — 폰 360 법인카드 「Claude가 카드 내역을 / 검증하고 있어요 •••」는 두 줄)보다 짧으면
+   *  두 줄로(「Claude가 응답하지 / 않아요 •••」 — CSS .ai-2l) 자리를 채운다. 한 줄이면 자리 가운데에 와서 마크가 보이는 글 덩이보다 5px 위였다
+   *  (11/3 화면 재검사). 진행 글 줄 · 「N초 지남」 자리는 그대로. 자리도 한 줄인 폭(390 이상 · 영수증 판)은 그대로 한 줄. 두 줄로 해도 자리보다
+   *  길어지면(아주 좁은 폭) 되돌린다. 바뀌는 순간이 아니면 뗀다. */
+  function aimHdFit(root) {
+    var hd = root && root.querySelector('[data-aimo-hd]');
+    if (!hd) return;
+    hd.classList.remove('ai-2l');
+    if (!AIM || AIM.es !== 'swap') return;
+    var slot = 0;
+    Array.prototype.forEach.call(root.querySelectorAll('.aimo-top > .ai-gh'), function (g) { slot = Math.max(slot, g.getBoundingClientRect().height); });
+    if (!(slot > 0) || hd.getBoundingClientRect().height >= slot - 1) return;
+    hd.classList.add('ai-2l');
+    if (hd.getBoundingClientRect().height > slot + 1) hd.classList.remove('ai-2l');
+  }
   function aimHtml(k, verdictHtml) {
     if (!aimOn(k)) return '';
     var ph = aimPhoto(), el = Math.floor((Date.now() - AIM.t0) / 1000), long = el >= 60;
     AIM.pct = aimPctCalc();
     var eng = AIM.eng && C.ai ? AIM.eng : null;
+    // 바뀌는 순간에 다시 그려지면 그린 뒤(다음 그림 전에) 굵은 글 자리를 다시 맞춘다(aimHdFit)
+    if (eng && AIM.es === 'swap' && typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { aimHdFit(document.querySelector('[data-aimo]')); });
     return '<section class="hero aimo' + (eng ? ' ai-' + eng + (AIM.es === 'swap' ? ' swap' : '') : '') + '" data-aimo aria-busy="true" aria-label="AI 검증 중">' +
       (eng
         // 머리 = 상태 줄 — 마크 · 굵은 글(엔진) · 작은 글(진행 글 — 바뀌는 순간에는 「Gemini로 넘겨요」) | 오른쪽 지난 초 · 셈
@@ -1793,6 +1813,7 @@
       var vd = root.querySelector('.aimo-top > .verdict'), sw = vd && vd.querySelector('.ai-swn');
       if (vd && AIM.es === 'swap' && !sw) vd.insertAdjacentHTML('beforeend', AIM_SWN);
       if (sw && AIM.es !== 'swap') sw.remove();
+      aimHdFit(root);                                   // 바뀌는 순간 굵은 글이 잡아 둔 자리보다 짧으면 두 줄로(폰 360 법인카드)
       var nt = root.querySelector('[data-aimo-note]');
       if (AIM.eng === 'gemini' && !root.querySelector('[data-aimo-fb]') && nt) nt.insertAdjacentHTML('beforebegin', '<p class="ai-note" data-aimo-fb>' + esc(AIM.fbNote) + '</p>');
     }

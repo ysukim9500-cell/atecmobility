@@ -112,11 +112,12 @@
     });
   }
   /** onEng(엔진, 때) — AI 를 부르는 op(scan · read)는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
-   *  올리기 scan 만 웹이 기다리는 시간(20초)이 지나도 끊고 Gemini — read 는 끊지 않는다(까닭은 driving-app.js AI_CLAUDE_MS).
+   *  웹이 기다리는 시간이 지나도 끊고 Gemini — 올리기 scan 은 늘(20초), read 는 서버가 status abort_safe 목록에 넣어 줄 때만(늦은 판독이 더 새 판독을 덮지 않는 서버)
+   *  (42초 · 원본 장 52초 — 2026-11-04, 까닭은 driving-app.js AI_CLAUDE_MS). aiOpt = { page } — 원본 장 판독(기다리는 시간이 더 길다).
    *  화면이 지금 읽는 엔진을 바꿔 보인다. 답 읽기·오류 글은 그대로. */
-  function xai(body, onEng) {
+  function xai(body, onEng, aiOpt) {
     var ai = C.ai && body && (body.op === 'scan' || body.op === 'read');
-    return (ai ? C.ai.fetch('expense-ai', body, onEng) : C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) }))
+    return (ai ? C.ai.fetch('expense-ai', body, onEng, aiOpt) : C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) }))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok || !j || j.error) { var e = new Error((j && j.error) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
@@ -757,7 +758,15 @@
     var box = $('xList'); if (!box) return;
     var n = XUP.items.length, running = XUP.pages.filter(function (p) { return p.ai === 'run'; }).length;
     var b = $('btnXUpGo');
-    if (!n) { box.innerHTML = ''; if (b) { b.disabled = true; b.classList.remove('gembtn', 'running', 'ai-busy', 'ai-claude', 'ai-gemini'); b.textContent = '올리기'; } return; }
+    if (!n) {
+      box.innerHTML = '';
+      if (b) {
+        b.disabled = true; b.classList.remove('gembtn', 'running', 'ai-busy', 'ai-claude', 'ai-gemini');
+        if (C.ai && C.ai.busyOff) C.ai.busyOff(b);          // 짧은 꼴(ai-short)·전체 글(aria-label · title)까지(11/3 재검토 N1)
+        b.textContent = '올리기';
+      }
+      return;
+    }
     // 지금 AI 가 읽는 장 = 앞에서 첫 「읽는 중」 장 — 그 줄만 사진 위 빛·움직이는 상태 줄(2026-11-03)
     var U = C.ai ? XUP.ai : null, actPg = -1;
     XUP.pages.some(function (p, pi) { if (p.ai === 'run') { actPg = pi; return true; } return false; });
@@ -1103,7 +1112,9 @@
       say(label(0), { phase: 'read', n: 0, N: total, cur: unread[0] });
       return C.vx.pool(unread, 2, function (id) {
         if (stop) return Promise.reject(new Error(stop));
-        return xai({ op: 'read', item_id: id }, onEng).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
+        // 원본 장 줄(scan_path 있음)은 서버가 원본 장을 읽는다 — Claude 를 더 기다린다(page)
+        var it0 = byId[String(id)];
+        return xai({ op: 'read', item_id: id }, onEng, { page: !!(it0 && it0.scan_path) }).then(function (r) { last = { id: id, r: r }; return r; }, function (e) {
           if (/횟수|한도|429/.test(String(e && e.message)) || (e && e.status === 429)) stop = e.message;
           throw e;
         });

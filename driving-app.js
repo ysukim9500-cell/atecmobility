@@ -1739,13 +1739,14 @@
       if (nDupF) line.push('같은 금액 영수증 ' + n0(nDupF) + '일');
       var hideHow = fold && line.length > 0 && !myCycLocked();
       // 「영수증 없음 3일 · 금액 다름 1일」은 조각 사이에서만 줄을 바꾼다(줄 끝·처음 「·」 없음 — 2026-11-03 화면 다듬기, 아래 요약 줄과 같은 꼴)
-      var lineHtml = hideHow ? '<div class="mhl">' + dnJoin(line) + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 ‘자세히\u00a0보기’에 있어요.' : '') + '</div>' : '';
+      //   ‘자세히 보기’와 뒤 조사는 한 덩이(390 「‘자세히 보기’ / 에 있어요」처럼 따옴표 뒤에서 줄이 꺾이지 않게 — 11/3 화면 재검사 예전부터 남은 것)
+      var lineHtml = hideHow ? '<div class="mhl">' + dnJoin(line) + (canLink ? '. 줄마다 있는 버튼으로 바로 처리하세요. 설명은 <span style="white-space:nowrap">‘자세히\u00a0보기’에</span> 있어요.' : '') + '</div>' : '';
       var foldBtn = '<button type="button" class="btn sm mfoldb" data-mfold="' + esc(cat) + '" aria-expanded="' + (fold ? 'false' : 'true') + '">' +
         (fold ? '자세히 보기 (' + n0(MC.days.length) + '일)' : '접기') + '</button>';
       var table = '<div class="scroll"' + (fold && !nFlag ? ' hidden' : '') + '><table class="mtable mday' + (fold ? ' fold' : '') + '"><thead><tr><th>날짜</th><th>운행 (시각 · 방문처)</th><th class="n">운행 금액</th>' +
         '<th class="n">영수증</th><th class="n">정산에 들어가는 금액</th><th>결과</th><th><span class="sr">할 일</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         // 접어 둔 표에서 맞는 날이 사라진 것처럼 보이지 않게(2026-10-17 모르는 로봇 — 「10.02 가 표에서 사라졌다」)
-        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. ‘자세히\u00a0보기’를 누르면 보여요.</div>' : '');
+        (fold && nFlag && nOk ? '<div class="dim mfoldnote">맞는 날 ' + n0(nOk) + '일은 접어 두었어요. <span style="white-space:nowrap">‘자세히\u00a0보기’를</span> 누르면 보여요.</div>' : '');
       // 제목·요약 줄의 「 · 」 조각은 덩이째 — 줄은 조각 사이에서만 바뀌고 줄 끝·처음에 「·」가 남지 않는다(dnJoin — 2026-11-03 화면 다듬기:
       //   390 「정산 주차비 11,000원 · 운행 금액 11,000원 ·」 / 「올린 영수증 4,500원」 · 360 「운행 / 금액 11,000원」)
       return box(!nBad && !nNoTrip && !nTwice && !nDupF, dnJoin(parts),
@@ -7332,9 +7333,10 @@
       by[c].n++; by[c].sum += Number(e.amount) || 0;
     });
     var settle = ((by['주차'] || {}).sum || 0) + ((by['통행료'] || {}).sum || 0);
+    /** sub = 글(여기서 esc) 또는 { html } — 줄이 꺾이면 안 되는 덩이를 넣을 때(주유 「(유류비는 거리×단가)」) */
     var fct = function (k, v, sub) {
       return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v">' + v +
-        '</div><div class="sub">' + esc(sub || '') + '</div></div>';
+        '</div><div class="sub">' + (sub && typeof sub === 'object' ? sub.html : esc(sub || '')) + '</div></div>';
     };
     // 2026-10-19 사용성 2차: 이 카드는 「올린 영수증」 합계다 — 마감 화면의 업무용 비용(정산 금액)과 숫자가 달라 헷갈렸다.
     //   이름을 「올린 영수증 합계」로 하고, 내 화면에서는 정산에 들어가는 금액(마감 화면과 같은 계산 totals)을 한 줄 같이 보인다.
@@ -7350,7 +7352,8 @@
       '<div class="facts">' +
       fct('주차', won((by['주차'] || {}).sum || 0), n0((by['주차'] || {}).n || 0) + '건 · 올린 영수증') +
       fct('통행료', won((by['통행료'] || {}).sum || 0), n0((by['통행료'] || {}).n || 0) + '건 · 올린 영수증') +
-      fct('주유', won((by['주유'] || {}).sum || 0), n0((by['주유'] || {}).n || 0) + '건 · 증빙용(유류비는 거리×단가)') +
+      // 괄호 덩이는 한 줄로(390 「(유류비는 거리 / ×단가)」처럼 「×」 앞에서 꺾이지 않게 — 11/3 화면 재검사 예전부터 남은 것). 글은 그대로
+      fct('주유', won((by['주유'] || {}).sum || 0), { html: esc(n0((by['주유'] || {}).n || 0) + '건 · 증빙용') + '<span style="white-space:nowrap">(유류비는 거리×단가)</span>' }) +
       fct('계기판', n0((by['계기판'] || {}).n || 0) + '<small>장</small>', '운행 계기판 확인용') +
       '</div></div>';
 
@@ -7461,13 +7464,16 @@
      마크·상태 줄·단추 안 표시·끝난 줄은 여기 한 곳에서 만들고 세 시스템(운행일지·개인경비·법인카드)이 C.ai 로 같이 쓴다.
      색은 엔진 색 두 가지(:root --cl·--gm, 샘플 값)만 — 평소 화면(✦AI 딱지·끌어 놓기 상자)은 그대로 둔다. */
   var AI_NAME = { claude: 'Claude', gemini: 'Gemini' };
-  var AI_STATE = {};                          // 함수 이름 → { at, ai, eng } — status 로 받은 1순위 엔진(1분 동안 쓴다)
+  var AI_STATE = {};                          // 함수 이름 → { at, ai, eng, cut } — status 로 받은 1순위 엔진 · 끊어도 되나(1분 동안 쓴다)
   var AI_FB_AT = 0;                           // Claude 가 마지막으로 넘긴 때 — 3분 동안은 처음부터 Gemini
   var AI_STATE_MS = 60e3, AI_FB_MS = 3 * 60e3, AI_SWAP_MS = 800;
-  /** status 답(검증 status 포함)을 기억한다 — engine 칸이 없으면(옛 서버) 아무것도 하지 않는다. */
+  /** status 답(검증 status 포함)을 기억한다 — engine 칸이 없으면(옛 서버) 아무것도 하지 않는다.
+   *  cut = 서버가 abort_safe 로 알려 준 op 목록(2026-11-04 서버 — 늦게 끝난 판독·검증이 더 새 결과를 덮지 않게 자료 울타리가 지키는 op:
+   *  expense-ai ["read","card_review"] · driving-verify ["read"]) — 그 op 에만 판독·검증 기다리는 시간을 둔다(AI_CLAUDE_MS). 목록이 아니면 빈 목록. */
   function aiKeep(fn, j) {
     if (!j || typeof j !== 'object' || !('engine' in j)) return;
-    AI_STATE[fn] = { at: Date.now(), ai: j.ai !== false, eng: j.engine === 'gemini' || j.engine === 'claude' ? j.engine : null };
+    AI_STATE[fn] = { at: Date.now(), ai: j.ai !== false, eng: j.engine === 'gemini' || j.engine === 'claude' ? j.engine : null,
+      cut: Array.isArray(j.abort_safe) ? j.abort_safe.filter(function (x) { return typeof x === 'string'; }) : [] };
   }
   /** 묻지 않고 아는 대로 처음 엔진 — 모르면 claude, AI 가 꺼진 서버면 null(엔진 칸 없이 보낸다 — 예전과 같다). */
   function aiGuess(fn) {
@@ -7494,29 +7500,36 @@
     return p;
   }
   /**
-   * 「클로드만」 요청을 웹이 기다리는 시간(ms) — **올리기 scan 둘만**: scan(개인경비 올리기) · dscan(운행일지 올리기). 지금 auto 의 Claude 몫
-   * (_shared/ai.ts AI_JOBS.claudeMs 18 · 40초) + 2초(오가는 시간·로그인 확인). 서버의 claude 모드는 더 오래 기다린다(claudeOnlyMs 60 · 90초) —
-   * Claude 가 실패가 아니라 멈추면 웹이 먼저 끊고(AbortController) 503 과 똑같이 Gemini 로 넘긴다(2026-11-03). 시험은 C.ai.limits 를 줄여 쓴다.
-   * ★ scan 만인 까닭(11/3 검토 M1): 끊긴 요청을 서버가 알아채(req.signal) Claude 를 멈추는 것은 scan 뿐이다(expense-ai · driving-verify — scan 은
-   *   저장하는 것도 없다). 판독(read · page · dread · dpage)과 법인카드 검증(card_review)은 웹이 끊어도 서버의 Claude 가 끝까지 돌아 나중에 결과를
-   *   저장한다 — 판독은 그사이 Gemini 가 읽어 저장한 것을 덮어쓰고(upsert), 법인카드는 검증 기록이 한 줄 더 생겨, 상신해 굳는 문서가 직원이 본
-   *   화면(Gemini)과 달라질 수 있다. 그래서 그 셋은 끊지 않고 서버가 주는 503 AI_FALLBACK(+ ticket — 하루 횟수 한 번)을 기다린다(Claude 가 멈추면
-   *   claudeOnlyMs 90~110초). 나중에 서버가 저장하기 직전에 req.signal(끊김)을 보고 저장하지 않게 되면 그 셋도 여기에 시간을 넣을 수 있다.
+   * 「클로드만」 요청을 웹이 기다리는 시간(ms) — 일마다 지금 auto 의 Claude 몫(_shared/ai.ts AI_JOBS.claudeMs) + 2초(오가는 시간·로그인 확인).
+   * 서버의 claude 모드는 더 오래 기다린다(claudeOnlyMs 60~110초) — Claude 가 실패가 아니라 멈추면 웹이 먼저 끊고(AbortController) 503 과 똑같이
+   * Gemini 로 넘긴다(2026-11-03). 일: scan(개인경비 올리기) · dscan(운행일지 올리기) · read/page(개인경비 사진 한 장/원본 장) · card(법인카드 검증)
+   * · dread/dpage(운행일지 사진 한 장/원본 장). 시험은 C.ai.limits 를 줄여 쓴다.
+   * ★ 올리기 scan 은 늘 — 저장하지 않는 op 라 서버가 끊김(req.signal)에 Claude 를 멈출 뿐이다.
+   * ★ 판독·법인카드 검증(read · page · card · dread · dpage)은 **서버가 status 의 abort_safe 목록에 그 op 를 넣어 줄 때만**(aiKeep 의 cut —
+   *   2026-11-04 서버: 늦게 끝난 Claude 가 그 사이 저장된 더 새 판독·검증 기록을 덮지 않게 자료 울타리로 지킨다 · 끊김 신호가 오면 멈추기도 한다).
+   *   옛 서버는 웹이 끊어도 Claude 를 끝까지 돌려 나중에 저장해, 그사이 Gemini 가 읽어 저장한 판독을 덮거나(upsert) 법인카드 검증 기록이 한 줄 더
+   *   생겨 상신해 굳는 문서가 직원이 본 화면(Gemini)과 달라질 수 있었다(11/3 검토 M1) — 그런 서버(배포 차례가 어긋남 · status 를 못 받음 · 목록에
+   *   없는 op)에는 끊지 않고 서버가 주는 503 AI_FALLBACK(+ ticket — 하루 횟수 한 번)을 기다린다.
    */
-  var AI_CLAUDE_MS = { scan: 20e3, dscan: 42e3 };
-  /** 웹이 끊는 일의 이름(위 AI_CLAUDE_MS) — 올리기 scan 만, 그 밖(판독·법인카드 검증)은 '' = 끊지 않음 */
-  function aiJobOf(fn, body) {
-    if (!body || body.op !== 'scan') return '';
-    return fn === 'driving-verify' ? 'dscan' : fn === 'expense-ai' ? 'scan' : '';
+  var AI_CLAUDE_MS = { scan: 20e3, dscan: 42e3, read: 42e3, page: 52e3, card: 47e3, dread: 47e3, dpage: 52e3 };
+  /** 웹이 끊는 일의 이름(위 AI_CLAUDE_MS) — 올리기 scan 은 늘, 판독·법인카드 검증은 그 함수의 서버가 abort_safe 목록에 그 op 를 넣었을 때만
+   *  ('' = 끊지 않음). o.page = 원본 장 판독(한 장에 여러 영수증을 올린 줄: 개인경비는 scan_path 있음 · 운행일지는 scan_path 있고 계기판 아님) */
+  function aiJobOf(fn, body, o) {
+    var op = body && body.op, pg = !!(o && o.page), s = AI_STATE[fn];
+    if (op === 'scan') return fn === 'driving-verify' ? 'dscan' : fn === 'expense-ai' ? 'scan' : '';
+    if (!(s && s.cut && s.cut.indexOf(op) >= 0)) return '';
+    if (fn === 'driving-verify') return op === 'read' ? (pg ? 'dpage' : 'dread') : '';
+    return fn === 'expense-ai' ? (op === 'read' ? (pg ? 'page' : 'read') : op === 'card_review' ? 'card' : '') : '';
   }
   /**
    * AI 를 부르는 요청 하나(scan · read · card_review) — 두 단계. 돌려주는 것은 apiRetry 와 같은 Response(부르는 쪽의 읽기·오류 처리는 그대로).
    * on(엔진, 때) — 'start' 처음 엔진으로 보낼 때(엔진 null = AI 꺼짐·모름) · 'swap' Claude 가 넘겨 Gemini 로 다시 보낼 때. 화면이 글·마크를 바꾼다.
-   * Claude 를 넘기는 때 둘: ① 서버 503 AI_FALLBACK → 받은 ticket 과 함께 Gemini(하루 횟수 한 번) ② (올리기 scan 만) 웹이 기다리는 시간
-   *   (AI_CLAUDE_MS)이 지남 → 요청을 끊고(AbortController) ticket 없이 Gemini. ★ ②는 ticket 이 없어 그 사람 하루 AI 횟수를 한 번 더 센다
-   *   (Claude 요청 1 + Gemini 1 — 알고 받아들인 몫, 11/3 결정). 둘 다 「넘긴 뒤 3분은 처음부터 Gemini」에 든다.
+   * o = { page } — 원본 장 판독이면 기다리는 시간이 더 길다(AI_CLAUDE_MS).
+   * Claude 를 넘기는 때 둘: ① 서버 503 AI_FALLBACK → 받은 ticket 과 함께 Gemini(하루 횟수 한 번) ② 웹이 기다리는 시간(AI_CLAUDE_MS — 올리기 scan 은
+   *   늘, 판독·검증은 서버가 abort_safe 일 때만)이 지남 → 요청을 끊고(AbortController) ticket 없이 Gemini. ★ ②는 ticket 이 없어 그 사람 하루 AI
+   *   횟수를 한 번 더 센다(Claude 요청 1 + Gemini 1 — 알고 받아들인 몫, 11/3 결정). 둘 다 「넘긴 뒤 3분은 처음부터 Gemini」에 든다.
    */
-  function aiFetch(fn, body, on) {
+  function aiFetch(fn, body, on, o) {
     var tell = function (e, w) { if (on) { try { on(e, w); } catch (x) { console.warn('AI 표시:', x && x.message); } } };
     var send = function (eng, ticket, limit) {
       var b = {};
@@ -7544,14 +7557,14 @@
     var toGemini = function (ticket) { AI_FB_AT = Date.now(); tell('gemini', 'swap'); return send('gemini', ticket); };
     return aiEngine(fn).then(function (eng) {
       tell(eng, 'start');
-      return send(eng, '', eng === 'claude' ? AI_CLAUDE_MS[aiJobOf(fn, body)] : 0).then(function (r) {
+      return send(eng, '', eng === 'claude' ? AI_CLAUDE_MS[aiJobOf(fn, body, o)] : 0).then(function (r) {
         if (eng !== 'claude' || r.status !== 503) return r;
         return r.clone().json().catch(function () { return null; }).then(function (j) {
           if (!j || j.code !== 'AI_FALLBACK') return r;          // 다른 503(키 없음·기간 설정 등)은 그대로 — 지금 오류 글
           return toGemini(typeof j.ticket === 'string' ? j.ticket : '');
         });
       }, function (e) {
-        if (e && e.aiLate) return toGemini('');                   // 올리기 scan 의 기다리는 시간이 지남 — ticket 없이(위 ★)
+        if (e && e.aiLate) return toGemini('');                   // 기다리는 시간이 지남 — ticket 없이(위 ★)
         throw e;                                                   // 그 밖의 실패(연결 등)는 지금처럼 부르는 쪽이
       });
     });
@@ -7653,6 +7666,13 @@
       btn.classList.add('ai-short'); btn.setAttribute('aria-label', full); btn.title = full; btn.setAttribute('data-aifit', '');
     } else if (btn.hasAttribute('data-aifit')) { btn.removeAttribute('aria-label'); btn.removeAttribute('title'); btn.removeAttribute('data-aifit'); }
   }
+  /** 단추 안 표시를 뗀다 — 엔진 클래스와 함께 aiBusyFit 이 단 짧은 꼴(ai-short)·전체 글(aria-label · title)도. 다 읽은 뒤에도 그 단추가
+   *  「Claude가 읽는 중…」으로 읽히지 않게(11/3 재검토 N1 — 올리기 단추는 다시 그리지 않고 글만 바꾼다). 부르는 쪽이 단 aria-label 은 그대로. */
+  function aiBusyOff(btn) {
+    if (!btn) return;
+    btn.classList.remove('ai-busy', 'ai-claude', 'ai-gemini', 'ai-short');
+    if (btn.hasAttribute('data-aifit')) { btn.removeAttribute('aria-label'); btn.removeAttribute('title'); btn.removeAttribute('data-aifit'); }
+  }
   function aiFitAll() { Array.prototype.forEach.call(document.querySelectorAll('.btn.ai-busy'), aiBusyFit); }
   var AI_FIT_RAF = 0;
   if (typeof window !== 'undefined' && window.addEventListener) {
@@ -7694,7 +7714,7 @@
   function aiUpBtn(u, b, running) {
     if (!b) return;
     if (running) aiBusyPaint(b, u.eng, '가 읽는 중…');
-    else b.classList.remove('ai-busy', 'ai-claude', 'ai-gemini');
+    else aiBusyOff(b);
   }
   /** 그 자리에서 다시 칠하기 — box = 올리기 표 상자, btn = 올리기 단추. 다시 그리지 않아 바뀌는 순간의 흐림·색 바뀜이 보인다. */
   function aiUpPaint(u, box, btn) {
@@ -7711,7 +7731,7 @@
   }
   /** 내어 주는 것(모듈은 C.ai) */
   var AI_API = { fetch: aiFetch, engine: aiEngine, guess: aiGuess, keep: aiKeep, name: AI_NAME, limits: AI_CLAUDE_MS, mark: aiMark, spark: aiSpark, head: aiHead, sub: aiSub,
-    line: aiLine, paint: aiPaint, swapLater: aiSwapLater, done: aiDone, busy: aiBusy, busyPaint: aiBusyPaint, calm: aiCalm,
+    line: aiLine, paint: aiPaint, swapLater: aiSwapLater, done: aiDone, busy: aiBusy, busyPaint: aiBusyPaint, busyOff: aiBusyOff, calm: aiCalm,
     up: aiUp, upOn: aiUpOn, upRead: aiUpRead, upLine: aiUpLine, upSweep: aiUpSweep, upFoot: aiUpFoot, upBtn: aiUpBtn, upPaint: aiUpPaint };
 
 
@@ -8487,7 +8507,7 @@
       box.innerHTML = '';
       // 영수증 줄을 다 지우고 하이패스 이용내역만 남았으면 그 화면으로 가는 단추(runEvUpload → evHipassGo, 2026-10-29)
       var hpOnly = (EVUP.hp || []).length > 0;
-      if (b) { b.disabled = !hpOnly; b.classList.remove('gembtn', 'running', 'ai-busy', 'ai-claude', 'ai-gemini'); b.textContent = hpOnly ? '하이패스 확인하기' : '올리기'; }
+      if (b) { b.disabled = !hpOnly; b.classList.remove('gembtn', 'running'); aiBusyOff(b); b.textContent = hpOnly ? '하이패스 확인하기' : '올리기'; }
       if (f) f.hidden = true;
       return;
     }

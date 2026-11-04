@@ -2749,6 +2749,9 @@ table.ctrip td.cday .dim{margin-left:1px}
 .aimo-top .ai-swn{position:absolute;left:0;top:0;right:0}
 /* 굵은 글 자리 — Claude · Gemini · 바뀌는 순간 글을 보이지 않게 겹쳐(.ai-gh) 가장 긴 글만큼 높이를 잡는다(폰 360 에서 2줄 → 1줄 → 2줄로 판이 움직이지 않게) */
 .aimo-top > .ai-gh{visibility:hidden;pointer-events:none}      /* 자리는 .ai-hd 그대로(PC 2칸 · 폰 2 ~ 끝) */
+/* 바뀌는 순간 굵은 글이 잡아 둔 자리보다 짧으면(폰 360 법인카드 — 자리는 두 줄) 「않아요 •••」를 다음 줄로 — 두 줄로 자리를 채워 마크와 글 덩이
+   가운데가 맞는다(drv-verify.js aimHdFit · 11/3 화면 재검사 「마크가 글보다 5px 위」) */
+.aimo-top > .ai-hd.ai-2l .ai-nw{display:block}
 /* 폰 — 굵은 글은 한 줄 전체(오른쪽 칸 몫만큼 줄이 갈리지 않게), 지난 초는 진행 글 줄 오른쪽, 셈은 진행 글에 이미 있어(「1 / 6」) 숨긴다.
    굵은 글이 잡아 둔 자리보다 짧으면(바뀌는 순간 1줄) 그 자리 가운데 */
 @media (max-width:600px){

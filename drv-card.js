@@ -598,9 +598,17 @@
     var p = catParts(byCat);
     return !p.length ? '—' : C.dnJoin ? C.dnJoin(p.map(esc)) : esc(p.join(' · '));
   }
-  /** 통행료·하이패스 줄인가 — 하이패스 가맹점(R.isHipassMerchant — 「후불하이패스3건」) 또는 업종·가맹점에 통행료·톨게이트·도로공사(구분 칸 예시 글만 바꾼다). */
+  /** 통행료·하이패스 줄인가(구분 칸 예시 글만 바꾼다 — 판정·검증과는 상관없다).
+   *  ① 통행료 낱말이 먼저 이긴다 — 가맹점·업종이 하이패스(R.isHipassMerchant — 「후불하이패스3건」) · 업종·가맹점에 하이패스·통행료·톨링(스마트톨링)·톨게이트·요금소·유료도로
+   *  ② 「도로공사」·「고속도로」는 휴게소·식당·카페·편의점·주유소·마트 같은 가게 낱말이 없을 때만 — 가게 낱말은 「스마트」를 빼고 본다(「스마트톨링」 안의 「마트」)
+   *  (2026-11-04 — 가맹점 이름에 「도로공사」가 든 휴게소 식당 줄에도 「예: 통행료」가 보였고, 그 고침 뒤 「스마트톨링」 줄이 「마트」 때문에 「예: 중식대」가 됐다). */
+  var TOLL_WORD = /하이패스|통행료|톨링|톨게이트|요금소|유료도로/, TOLL_ROAD = /도로공사|고속도로/,
+    TOLL_NOT = /휴게소|식당|음식|한식|중식|일식|양식|분식|푸드|카페|커피|제과|베이커리|편의점|매점|마트|주유|충전/;
   function tollLine(it) {
-    return !!(R.isHipassMerchant && R.isHipassMerchant(it && it.merchant)) || /통행료|톨게이트|도로공사/.test(String((it && it.biz_type) || '').replace(/\s+/g, '') + ' ' + String((it && it.merchant) || '').replace(/\s+/g, ''));
+    if (R.isHipassMerchant && (R.isHipassMerchant(it && it.merchant) || R.isHipassMerchant(it && it.biz_type))) return true;
+    var t = String((it && it.biz_type) || '').replace(/\s+/g, '') + ' ' + String((it && it.merchant) || '').replace(/\s+/g, '');
+    if (TOLL_WORD.test(t)) return true;
+    return TOLL_ROAD.test(t) && !TOLL_NOT.test(t.replace(/스마트/g, ''));
   }
   /** 「 · 」로 잇는 짧은 조각(글 그대로 — 여기서 esc)을 한 줄로 — catHtml 과 같은 방법(조각은 덩이째, 줄은 조각 사이에서만 · 줄 끝·처음 「·」 없음).
    *  2026-11-03 화면 다듬기: 「상신 때 검증 결과 · 2026-11-10 07:00 ·」 / 「· 소모품비」처럼 「·」가 줄 끝·처음에 남던 곳. 앞 판 본체면 글 그대로. */
@@ -1462,7 +1470,8 @@
   var VRUN = { busy: false, note: '', k: '', t0: 0 }, VTICK = null, EXP = {};
   var AI_FAIL = 'AI 검증을 하지 못해 규칙으로만 검증했어요';   // 서버 expense-ai card_review FAIL_NOTE 와 같은 글자(2026-10-24 4단계 해요체)
   /** onEng(엔진, 때) — op card_review 는 두 단계(C.ai.fetch: Claude 먼저 → 503 AI_FALLBACK 이면 Gemini + ticket, 2026-11-03).
-   *  화면(AI 판·단추)이 지금 검증하는 엔진을 바꿔 보인다. 답 읽기·오류 처리는 그대로. */
+   *  서버가 status abort_safe 목록에 card_review 를 넣어 주면 웹이 기다리는 시간(47초)이 지나도 끊고 Gemini(2026-11-04 — driving-app.js
+   *  AI_CLAUDE_MS · 서버는 늦게 끝난 검증이 그 사이 생긴 더 새 기록을 두고 한 줄 더 남기지 않는다). 화면(AI 판·단추)이 지금 검증하는 엔진을 바꿔 보인다. 답 읽기·오류 처리는 그대로. */
   function cai(body, onEng) {
     var ai = C.ai && body && body.op === 'card_review';
     return (ai ? C.ai.fetch('expense-ai', body, onEng) : C.apiRetry('/functions/v1/expense-ai', { method: 'POST', body: JSON.stringify(body) }))
