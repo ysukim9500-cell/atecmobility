@@ -796,7 +796,7 @@
           '<input class="inp' + (it.date ? '' : ' need') + '" type="date" data-xdate style="width:150px;margin-top:6px" value="' + esc(it.date) + '" min="' + C.ymd(XUP.lo) + '" max="' + C.ymd(XUP.hi - 1) + '"' + lab('날짜') + '></td>' +
           '<td><input class="inp" data-xmer maxlength="60" style="width:100%" placeholder="사용처(상호)" value="' + esc(it.merchant) + '"' + lab('사용처') + '>' +
           '<input class="inp num' + (it.amt && !it.amtBad ? '' : ' need') + '"' + (it.amtBad ? ' aria-invalid="true" data-numbad="1"' : '') + ' data-xamt inputmode="numeric" style="width:120px;margin-top:6px" placeholder="금액(원)" value="' + esc(it.amtBad ? it.amt : it.amt ? n0(it.amt) : '') + '"' + lab('금액') + '></td>' +
-          '<td><input class="inp" data-xuse maxlength="200" style="width:100%" placeholder="사용내역 예) 장갑·청소용품 구입, 야간 작업 후 식사" value="' + esc(it.usage) + '"' + lab('사용내역') + '>' +
+          '<td><input class="inp" data-xuse maxlength="200" style="width:100%" placeholder="사용내역 예) 중식대, 주말 석식대, 장갑·청소용품 구입" value="' + esc(it.usage) + '"' + lab('사용내역') + '>' +
           '<input class="inp" data-xnote maxlength="200" style="width:100%;margin-top:6px" placeholder="비고(선택)" value="' + esc(it.note) + '"' + lab('비고') + ' aria-describedby="xmh' + i + '">' +
           (it.hint ? '<div class="evhint">' + (it.ai ? C.gemTag() + ' ' : '') + esc(it.hint) + '</div>'
             : it.ai ? '<div class="evhint ok">' + C.gemTag() + ' 자동으로 채웠어요. 사진과 맞는지 확인해 주세요.</div>' : '') +
