@@ -137,7 +137,7 @@
      되돌리지 않게. WRITE_N = 보내는 중인 쓰기 수 · WRITE_GEN = 쓰기를 보낼 때·끝날 때마다 +1.
      읽기만 하는 POST(잠금 묻기·출력 기록 요약·검증 계산·길찾기·내 계정 묻기)는 쓰기로 치지 않는다 — 모르는 POST 는 쓰기로 친다(덮는 것보다 한 번 더 받는 편이 안전). */
   var WRITE_N = 0, WRITE_GEN = 0;
-  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
+  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history|toll_accuracy_monthly)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
   function isWrite(path, opt) {
     var m = String((opt && opt.method) || 'GET').toUpperCase(), p = String(path || '');
     if (m === 'GET' || m === 'HEAD' || READ_POST.test(p)) return false;
@@ -474,6 +474,8 @@
   function notifyGo(v, prev) {
     FINQ = {};                     // 결재 완료 출력 이름 찾기 — 화면을 옮기면 비운다(2026-10-23)
     EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } });
+    // 통행료 정확도 — 들어올 때마다 서버에서 새로 읽는다(그 사이 하이패스가 올라왔을 수 있다, 2026-11-12). 늦게 온 옛 답은 seq 가 버린다.
+    if (v === 'tollacc' && prev !== 'tollacc' && TACC_ST) { TACC_ST.rows = undefined; TACC_ST.err = ''; TACC_ST.busy = false; TACC_ST.seq++; }
   }
   var LOADED = false, LOADING = false, AUDIT = null;
   var LOAD_SEQ = 0;      // 늦게 도착한 응답을 버리기 위한 표
@@ -5553,7 +5555,7 @@
       var btn = document.querySelector('[data-hpapply="' + gi + '"]');
       if (btn) { btn.disabled = !picked.length; btn.textContent = hpBtnText(picked); }
       // 「전부 고르기」 칸도 줄 체크를 따라간다(그릴 때의 allOn 과 같은 셈) — 줄을 다 켜도 빈칸이던 것(2026-10-29 교육 자료 로봇)
-      var todo = (g.matched || []).filter(function (e) { return !hpDone(e); });
+      var todo = (g.matched || []).filter(function (e) { return !hpDone(e) && !e.manual; });   // 수기 묶음은 「전부 고르기」 밖(그릴 때와 같게)
       var allOn = !!todo.length && todo.every(function (x) { return x.pick || x.locked; });
       document.querySelectorAll('input[data-hpall="' + gi + '"]').forEach(function (x) { x.checked = allOn; });
     });
@@ -5649,7 +5651,12 @@
       ? window.Hipass.bySource(t.toll_source) === 'person'
       : (t.toll_source === '하이패스 영수증' || t.toll_source === '웹 직접 입력');
     return '<span' + (human ? ' class="lead"' : ' class="dim"') +
-      ' title="' + esc(t.toll_source || '자동 계산') + '">' + n0(t.toll_cost) + '</span>';
+      ' title="' + esc(tollSrcShow(t.toll_source) || '자동 계산') + '">' + n0(t.toll_cost) + '</span>';
+  }
+  /** 보이는 출처 글(전체 검토 W3-1) — 저장된 「회사 하이패스 기록 · 같은 길 N번」은 「회사 하이패스 기록으로 추정」으로 보인다(저장 값은 그대로 · 다른 출처는 그대로). */
+  function tollSrcShow(src) {
+    var s = String(src || '');
+    return s.indexOf('회사 하이패스 기록') === 0 ? '회사 하이패스 기록으로 추정' : s;
   }
   function purposeCell(p) {
     if (p === BUSINESS) return '<span class="kind biz">업무</span>';
@@ -9948,9 +9955,15 @@ window.EduGuard = {
       var mv = SM.row(t);
       // 통행료 칸 출처(PDF 표시만 — 2026-10-23): 영 = 영수증으로 채운 금액 · 하 = 하이패스 이용내역으로 맞춘 통행료(규칙 v3 하이패스 몫이 있는 업무 운행)
       var ta = tollNeed(t).a;
+      //   (2026-11-12 §8.8) 추 = 회사 하이패스 기록으로 추정한 금액(출처 「회사 하이패스 기록…」) · 수 = 수기 운행에 붙인 하이패스 — 「하」 칸 중 근거 줄에 manual 이 있는 것(sheetpdf 가 근거 재료로 가린다, 그래서 id)
+      var biz = (t.purpose || '') === BUSINESS && !t.deleted_at && ta > 0;
       var tollMark = mv.evToll > 0 ? '영'
-        : (t.purpose || '') === BUSINESS && !t.deleted_at && ta > 0 && window.MoneyRule && window.MoneyRule.hipassOf(t, ta) > 0 ? '하' : '';
+        : biz && window.MoneyRule && window.MoneyRule.hipassOf(t, ta) > 0 ? '하'
+        // 「추」 = 회사 하이패스 기록으로 추정 — 「기사 확인 · 하이패스 기록」도(전체 검토 W3-2, 규칙은 sheetpdf.js estimateSrc 하나)
+        : biz && (window.SheetPdf && window.SheetPdf.estimateSrc ? window.SheetPdf.estimateSrc(t.toll_source)
+          : String(t.toll_source || '').indexOf('회사 하이패스 기록') === 0 || t.toll_source === '기사 확인 · 하이패스 기록') ? '추' : '';
       out.push({
+        id: t.id,
         date: day, start: dong(t.start_address), end: dong(t.end_address),
         visit: t.visit_place || '', purpose: t.purpose || '', manual: !!t.is_manual,
         odoS: g, odoE: hh, rate: rate, parking: mv.park, toll: mv.toll,
@@ -10343,6 +10356,135 @@ window.EduGuard = {
     return h;
   }
 
+  /* ══════════════════ 통행료 정확도(관리자, 2026-11-12) ══════════════════
+     달마다 운행 끝에 저장된 통행료가 나중에 올라온 하이패스 명세서와 같았는지(docs/toll-learn/spec.md §8.8).
+     서버 함수 toll_accuracy_monthly() 하나만 부른다(운행일지 관리자만 — 아니면 NOT_ALLOWED). 줄 = 달 · 칸 = 숫자뿐(사람·운행 칸 없음).
+     네 칸의 정의는 마이그레이션 20261112120000_toll_accuracy_fn.sql 머리말. 백분율·빨간 글(95% 아래, 전체 1건 이상)·빈 칸 글은 아래 순수 부분이 정한다. */
+  /* tollacc-core:begin — 순수 부분. web/test/toll-accuracy.test.mjs 가 이 사이를 그대로 떼어 돌린다(바깥 이름을 쓰지 않는다 · 숫자 꼴 fmt 는 받는다) */
+  function tollAccCore(fmt) {
+    // EMPTY = 칸 하나가 0 / 0 일 때(짧게 · 흐리게 — 한 화면에 열 번 넘게 나와도 숫자보다 눈에 띄지 않게). 화면 전체가 비면 따로 긴 문장(viewTollAcc).
+    // TACC_MIN_N(전체 검토 W1-3) — 견준 운행이 이보다 적은 칸은 한두 건으로 크게 움직여 빨갛게 하지 않고 「건수 적음」만 붙인다
+    var LOW = 95, TACC_MIN_N = 20, EMPTY = '자료 없음', KEYS = [['calc', 'calc_same', 'calc_n'], ['learn', 'learn_same', 'learn_n'], ['fill', 'fill_same', 'fill_n']];
+    function cnt(v) { return typeof v === 'number' && isFinite(v) && v >= 0 && Math.floor(v) === v ? v : null; }
+    /** 서버 줄 → 화면 줄 { mon, calc, learn, fill: {same, n}, hp }. 배열이 아니면 null(불러오기 실패로 본다).
+     *  꼴이 틀린 줄(달 꼴 · 음수 · 소수 · 맞은 수가 전체보다 많음)은 버린다. 최근 달부터, 같은 달은 한 번, 12개까지. */
+    function rows(raw) {
+      if (!Array.isArray(raw)) return null;
+      var out = [], seen = {};
+      raw.forEach(function (r) {
+        if (!r || typeof r !== 'object' || typeof r.mon !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(r.mon) || seen[r.mon]) return;
+        var o = { mon: r.mon, hp: cnt(r.hipass_n) }, ok = o.hp != null;
+        KEYS.forEach(function (k) {
+          var s = cnt(r[k[1]]), n = cnt(r[k[2]]);
+          if (s == null || n == null || s > n) ok = false; else o[k[0]] = { same: s, n: n };
+        });
+        if (!ok) return;
+        seen[r.mon] = 1; out.push(o);
+      });
+      out.sort(function (a, b) { return a.mon < b.mon ? 1 : a.mon > b.mon ? -1 : 0; });
+      return out.slice(0, 12);
+    }
+    /** 백분율(정수, 버림) — 전체가 0 이면 null. 버리므로 95% 아래인데 95% 로 보이는 일이 없고, 다 맞았을 때만 100% 다. */
+    function pct(same, n) { return n >= 1 ? Math.floor(same * 100 / n) : null; }
+    /** 빨간 글 — 전체 1건 이상이고 맞은 비율이 95% 보다 낮을 때(정수로 견줘 반올림 오차 없음). */
+    function low(same, n) { return n >= 1 && same * 100 < LOW * n; }
+    /** 견준 운행이 적은 칸인가(전체 1건 이상 · TACC_MIN_N 미만). */
+    function few(n) { return n >= 1 && n < TACC_MIN_N; }
+    /** 칸 하나 — 전체 0 이면 빈 칸 글, 아니면 「맞은 수 / 전체」 · 「(백분율%)」 · 빨간 글인지(전체 검토 W1-3: 전체 20건 이상이고 95% 보다 낮을 때만) ·
+     *  건수 적음(전체 20건 미만 — 빨갛게 하지 않고 작은 회색 글). 빨간 칸은 눈에 보이는 글 「낮음」도 붙인다(색만으로 알리지 않게 — 화면 taccCell). */
+    function cell(x) {
+      if (!x || !(x.n >= 1)) return { empty: true, text: EMPTY };
+      return { empty: false, frac: fmt(x.same) + ' / ' + fmt(x.n), pct: '(' + pct(x.same, x.n) + '%)', low: !few(x.n) && low(x.same, x.n), few: few(x.n) };
+    }
+    /** 'YYYY-MM' → 「2026년 10월」(운행을 시작한 날의 달력 달 — 마감 기간 이름 「10월분」과 다르다). */
+    function monLabel(mon) { return Number(mon.slice(0, 4)) + '년 ' + Number(mon.slice(5, 7)) + '월'; }
+    return { LOW: LOW, TACC_MIN_N: TACC_MIN_N, EMPTY: EMPTY, rows: rows, pct: pct, low: low, few: few, cell: cell, monLabel: monLabel };
+  }
+  /* tollacc-core:end */
+  var TACC = tollAccCore(n0);
+  /** rows: undefined 아직 · null 못 읽음(err) · [] 자료 없음. 들어올 때마다 새로 읽는다(notifyGo). */
+  var TACC_ST = { rows: undefined, err: '', busy: false, seq: 0 };
+  function taccErr(status, j) {
+    var code = j && typeof j.message === 'string' ? j.message : '', pg = j && j.code;
+    if (status === 401) return '로그인이 만료됐어요. 다시 로그인해 주세요.';
+    if (code === 'NOT_ALLOWED' || status === 403) return '통행료 정확도를 볼 권한이 없어요. 운행일지 관리자만 볼 수 있어요.';
+    if (status === 404 || pg === 'PGRST202') return '서버에 아직 통행료 정확도가 없어요. 서버 준비가 끝난 뒤 다시 열어 주세요.';
+    return '통행료 정확도를 불러오지 못했어요.';
+  }
+  function taccLoad() {
+    var my = ++TACC_ST.seq;
+    TACC_ST.busy = true;
+    var done = function (rows, err) {
+      if (my !== TACC_ST.seq) return;            // 그 사이 다시 불렀다 — 늦은 답은 버린다
+      TACC_ST.busy = false; TACC_ST.rows = rows; TACC_ST.err = err;
+      if (VIEW === 'tollacc') render();
+    };
+    apiRetry('/rest/v1/rpc/toll_accuracy_monthly', { method: 'POST', body: '{}' }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+        if (!r.ok) {
+          done(null, taccErr(r.status, j));
+          // 로그인 만료(갱신해도 401) — 다른 화면과 같은 길: 알림 뒤 다시 로그인 화면으로(돌아오면 이 화면, loadAll·결재 화면의 authGone 처리와 같다)
+          if (r.status === 401 && my === TACC_ST.seq && VIEW === 'tollacc') { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); }
+          return;
+        }
+        var rows = TACC.rows(j);
+        done(rows, rows ? '' : taccErr(0, null));
+      });
+    }).catch(function () { done(null, taccErr(0, null)); });
+  }
+  function taccCell(x, label) {
+    var c = TACC.cell(x);
+    // 값은 한 덩이(.tv) — 폰 카드에서 이름표(왼쪽)와 값(오른쪽) 둘로만 갈린다
+    return '<td class="n" data-l="' + esc(label) + '"><span class="tv">' + (c.empty ? '<span class="dim">' + esc(c.text) + '</span>'
+      // 백분율 뒤 자리(.tt)는 늘 둔다(빈 칸이어도 같은 폭) — 칸마다 백분율 끝이 같은 자리에 오게(전체 검토 W1-3·4)
+      : '<span class="tq">' + esc(c.frac) + '</span> <span class="tpw"><span class="tp' + (c.low ? ' lo' : '') + '">' + esc(c.pct) + '</span> ' +
+        '<span class="tt' + (c.low ? ' lo' : '') + '">' + (c.low ? '낮음' : c.few ? '건수 적음' : '') + '</span></span>' +
+        (c.low ? '<span class="sr">, 95%보다 낮아요</span>' : '')) + '</span></td>';
+  }
+  function viewTollAcc() {
+    // 제목 아래 줄은 불러오는 중·오류·자료 모두 같은 글(달 수는 「달마다」 머리에)
+    var top = head('통행료 정확도', '하이패스 이용내역과 견준 결과');
+    if (TACC_ST.rows === undefined) {
+      if (!TACC_ST.busy) taccLoad();
+      return top + skeleton();
+    }
+    if (TACC_ST.rows === null) {
+      // 권한 없음·로그인 만료는 다시 불러와도 같다 — 단추를 두지 않는다
+      var stuck = /권한|만료/.test(TACC_ST.err);
+      return top + '<section class="sect"><div class="panel" style="padding:34px 24px;text-align:center">' +
+        '<div style="font-weight:700;margin-bottom:6px" role="alert">' + esc(TACC_ST.err) + '</div>' +
+        (retryHint(TACC_ST.err) ? '<div class="dim" style="margin-bottom:16px">' + retryHint(TACC_ST.err) + '</div>' : '') +
+        (stuck ? '' : '<button class="btn pri" data-taccretry>다시 불러오기</button>') + '</div></section>';
+    }
+    var R = TACC_ST.rows, B = function (t) { return '<b style="color:var(--ink-2)">' + t + '</b>'; };
+    // 늘 보이는 두 문장(무엇을 견주나 · 빨간색이면 할 일) + 칸마다 뜻은 접어 둔다(하이패스 화면의 접는 상자 .hpun 과 같은 모양)
+    var h = top + '<section class="sect"><div class="panel tacc-intro" style="padding:16px 20px;font-size:13px;line-height:1.7;color:var(--ink-3)">' +
+      // (전체 검토 W1-2) 칸 이름은 낫표 대신 굵은 글(B) — 웹 문구 규칙(copy-style 「낫표」)이 문장 속 「」를 막는다
+      '<p style="margin:0">하이패스 이용내역으로 통행료를 맞추기 전에 저장돼 있던 금액이 이용내역과 같았는지를 달마다 세요. ' +
+      B('운행 끝 회사 기록') + '이나 ' + B('서버 채움') + '이 <b class="tacc-lo">빨간색</b>(<span style="white-space:nowrap">95%보다</span> 낮음)이면 회사 하이패스 기록으로 배운 값이 틀리고 있다는 뜻이니, ' +
+      '담당자에게 알려 배운 값 쓰기를 꺼 달라고 해 주세요. ' + B('계산 금액') + '은 앱의 경로 계산이라 꺼야 할 것이 없어요. ' +
+      '견준 운행이 ' + TACC.TACC_MIN_N + '건보다 적은 칸은 한두 건으로 크게 움직여서 빨간색으로 표시하지 않아요.</p>' +
+      '<details class="hpun tacc-more"><summary>칸마다 세는 것</summary><div class="hpunb"><ul class="tacc-defs">' +
+      '<li>' + B('계산 금액') + '은 앱이나 서버가 경로로 계산한 금액이에요. 회사 하이패스 기록 금액으로 저장된 운행은 이 칸에 들어가지 않아요.</li>' +
+      '<li>' + B('운행 끝 회사 기록') + '은 운행을 마칠 때 서버가 회사 하이패스 기록으로 알려 준 금액이에요. 이용내역을 맞추기 전에 알려 준 첫 금액만 세요.</li>' +
+      '<li>' + B('서버 채움') + '은 서버가 회사 하이패스 기록으로 채운 금액이에요.</li>' +
+      '<li>' + B('하이패스 운행') + '은 그달 하이패스 이용내역으로 맞춘 운행 수예요.</li>' +
+      '<li>달은 운행을 시작한 날의 달이라 마감 기간과 달라요. 자료 없음은 견줄 운행이 아직 없다는 뜻이에요.</li>' +
+      '</ul></div></details></div></section>';
+    if (!R.length) {
+      return h + sect('달마다', '', '', blank('아직 자료가 없어요.', '하이패스 이용내역으로 통행료를 맞춘 운행이 생기면 달마다 여기에 보여요.', 'ticket'));
+    }
+    var H = ['계산 금액', '운행 끝 회사 기록', '서버 채움', '하이패스 운행'];
+    return h + sect('달마다', R.length + '개월', '', '<div class="panel"><div class="scroll" data-rows><table class="tacc"><thead><tr>' +
+      '<th scope="col">달</th>' + H.map(function (t) { return '<th scope="col" class="n">' + esc(t) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      R.map(function (r) {
+        return '<tr><td class="tm"><span class="lead">' + esc(TACC.monLabel(r.mon)) + '</span></td>' +
+          taccCell(r.calc, H[0]) + taccCell(r.learn, H[1]) + taccCell(r.fill, H[2]) +
+          '<td class="n" data-l="' + esc(H[3]) + '"><span class="tv">' + n0(r.hp) + '건</span></td></tr>';
+      }).join('') + '</tbody></table></div></div>');
+  }
+
   /* ══════════════════ 교육 관리(관리자) — 앱 EduAdminScreen 과 같은 두 탭(2026-10-14) ══════════════════
      ① 영상 관리: 회차(YYYY-MM)별 유튜브 영상 등록·수정·삭제(삭제 = deleted 표시, 시청 이력은 남는다)
      ② 시청 현황: 고른 회차의 대상 / 수료 / 미수료 · 전체 평균 진행률 · 사람별 진행(영상별 %·이월 건수)
@@ -10564,10 +10706,16 @@ window.EduGuard = {
 
     HP.groups.forEach(function (g, gi) {
       var picked = (g.matched || []).filter(function (e) { return e.pick; });
+      // 범위 운행에 맞춘 것(표) · 수기 운행에 붙인 것(따로 묶음 — 2026-11-12 §8.5-6)
+      var rangeM = (g.matched || []).filter(function (e) { return !e.manual; });
+      var manM = (g.matched || []).filter(function (e) { return e.manual; });
+      var mrows = g.plate ? (g.manual || []) : [];
       // ★ 값이 이미 영수증과 같은 줄은 손댈 것이 없다. 표에서 빼고 접어 둔다.
       //   안 빼면 확정해도 표가 그대로라 아무 일도 안 일어난 것처럼 보인다.
-      var todo = (g.matched || []).filter(function (e) { return !hpDone(e); });
+      var todo = rangeM.filter(function (e) { return !hpDone(e); });
+      var mTodo = manM.filter(function (e) { return !hpDone(e); });
       var done = (g.matched || []).filter(hpDone);
+      var mOpen = mrows.filter(function (x) { return !x.trip; }).length;   // 「수기 운행이 여러 개예요」 — 아직 안 고른 줄
 
       h += '<section class="sect" data-hpcard="' + gi + '"><div class="hd">' +
         '<h2>카드 ' + esc(g.card4 || '?') + '</h2>' +
@@ -10579,21 +10727,32 @@ window.EduGuard = {
         '<option value="">— 차량 고르기 —</option>' +
         (g.candidates || []).map(function (c) {
           var v = (g.vote || []).filter(function (x) { return x.plate === c; })[0];
+          var mv = (g.manualVote || []).filter(function (x) { return x.plate === c; })[0];   // 범위 운행 표가 없을 때 — 그 날짜 수기 운행 수(§8.5-5)
           return '<option value="' + esc(c) + '"' + (g.plate === c ? ' selected' : '') + '>' +
-            esc(c) + (v ? ' (' + v.n + '건 일치)' : '') + '</option>';
+            esc(c) + (v ? ' (' + v.n + '건 일치)' : mv ? ' (수기 운행 ' + mv.n + '건)' : '') + '</option>';
         }).join('') + '</select></div>';
 
       // 맞는 운행을 못 찾은 기록 — 지금 보는 기간 안의 것과 밖의 것을 나눈다(2026-10-20 AU2 #7).
       //   기간 밖 기록(마감 뒤 5일 동안 10월분 화면에 10.22 기록이 든 PDF 를 올린 경우 등)의 운행은 다른 기간에 이미 있을 수 있다 —
       //   예전처럼 「운행을 먼저 넣으면 맞춰집니다」라고 하면 같은 운행을 또 넣게 된다. 그 기간 화면에서 올리라고 한다.
+      //   (2026-11-12 §8.4) 기간 안의 줄마다 까닭 — 그날 운행 기록 없음 · 그 시각에 운행 기록 없음 · 운행 시작 n분 전
       var unIn = (g.unmatched || []).filter(hpInView), unOut = (g.unmatched || []).filter(function (r) { return !hpInView(r); });
+      var whyOf = function (r) { var w = window.Hipass.whyText ? window.Hipass.whyText(r) : ''; return w ? '<span class="hpwhy" data-hpwhy="' + esc(r.why) + '">' + esc(w) + '</span>' : ''; };
       var unHtml = (unIn.length ? '<details class="hpun"><summary>맞는 운행을 못 찾은 기록 ' +
           n0(unIn.length) + '건</summary><div class="hpunb">' +
           unIn.slice(0, 60).map(function (r) {
             return '<div><span class="mono">' + esc(r.atText) + '</span> ' +
-              esc(r.office || '') + ' <b>' + n0(r.amount) + '</b></div>';
+              // 까닭과 금액은 한 덩이(폰에서 줄이 넘어가도 둘이 함께 오른쪽에)
+              '<span class="hpoff">' + esc(r.office || '') + '</span><span class="hpend">' + whyOf(r) + '<b>' + n0(r.amount) + '</b></span></div>';
           }).join('') +
-          '<p class="fhint">그 시각에 이 차량의 운행 기록이 없어요. 운행을 먼저 넣으면 맞춰져요.</p>' +
+          // 안내는 굴리는 목록(.hpunb 260px) 밖에 — 폰에서 두 줄이 목록 안에 들어가 아래가 잘려 보였다(전체 검토 W2-5 화면 확인)
+          '</div><div class="hpunf">' +
+          // 고르기를 기다리는 줄(수기 운행이 여러 개)은 여기 없다 — 수기 묶음의 고르기 줄에만(검토 L3).
+          //   (전체 검토 W2-5) 아래 안내는 까닭마다 — 운행이 없는 줄이 있을 때 · 다음 운행 바로 앞에 지난 줄이 있을 때(둘 다면 이 차례로)
+          (unIn.some(function (r) { return r.why === 'no_trip_day' || r.why === 'no_trip_time'; })
+            ? '<p class="fhint" data-hpfh="none">그 시각에 이 차량의 운행 기록이 없어요. 운행을 먼저 넣으면 맞춰져요.</p>' : '') +
+          (unIn.some(function (r) { return r.why === 'before_start'; })
+            ? '<p class="fhint" data-hpfh="before">운행 시작 시각이 늦게 찍혔을 수 있어요. 새 운행을 넣지 말고 그 운행의 시작 시각을 고쳐 주세요.</p>' : '') +
           '</div></details>' : '') +
         (unOut.length ? '<details class="hpun hpout" data-hpout><summary>이 기간 밖의 기록 ' + n0(unOut.length) +
           '건은 그 기간 화면에서 올려 주세요</summary><div class="hpunb">' +
@@ -10608,76 +10767,22 @@ window.EduGuard = {
 
       if (!g.plate) {
         h += blank('차량을 골라 주세요.', '어느 차의 카드인지 골라야 운행과 맞출 수 있어요.', 'car');
-      } else if (!(g.matched || []).length) {
+      } else if (!rangeM.length && !mrows.length) {
         h += unOut.length && !unIn.length
           ? blank('이 기간에 맞는 운행이 없어요.', '이 카드의 기록 ' + n0(unOut.length) + '건이 모두 지금 보는 기간(' + viewSpan() + ') 밖이에요. 그 기간 화면에서 올려 주세요.', 'ticket')
           : blank('맞는 운행이 없어요.', '통과 시각이 이 차량의 운행 시간 안에 들지 않아요.', 'ticket');
         h += unHtml;
-      } else if (!todo.length) {
+      } else if (!todo.length && !mTodo.length && !mOpen) {
         // 전부 맞은 상태. 여기서 표를 그대로 두면 '아직 할 일이 있다' 로 읽힌다.
         h += '<div class="panel"><div class="blank"><div class="ico" style="color:var(--ok)">' +
           ic('check', 21) + '</div><div class="t">이 카드는 다 확정됐어요.</div>' +
           '<div class="d">' + n0(done.length) + '건 모두 영수증 금액과 같아요. 이제 통행료로 돌아가세요.</div></div></div>';   // 돌아가는 단추는 맨 아래 하나(2026-10-15 2차)
-        h += unHtml;
+        h += hpDoneHtml(done) + unHtml;
       } else {
-        var allOn = todo.length && todo.every(function (x) { return x.pick || x.locked; });
-        // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-20 폰 마무리: 차이 칸이 오른쪽에서 잘렸다).
-        //   표 머리가 숨으므로 「전부 고르기」는 표 위 한 줄(같은 data-hpall — 같은 처리기).
-        h += '<div class="mselallm hptab"><label class="mselhit wide"><input type="checkbox" data-hpall="' + gi + '"' + (allOn ? ' checked' : '') + '>' +
-          '<span>이 카드의 운행 전부 고르기</span></label></div>' +
-          '<div class="panel"><div class="scroll" data-rows><table class="mc hptab"><thead><tr>' +
-          '<th style="width:36px"><input type="checkbox" data-hpall="' + gi + '"' +
-          (allOn ? ' checked' : '') +
-          ' aria-label="이 카드의 운행 전부 고르기"></th>' +
-          '<th>운행</th><th>지금 값</th><th class="n">영수증</th><th class="n">차이</th><th>영수증 내역</th>' +
-          '</tr></thead><tbody>';
-        todo.forEach(function (e) {
-          var ei = g.matched.indexOf(e);          // 체크박스 키는 원래 자리를 쓴다
-          var t = e.trip;
-          // 원본만 붙이기(keep, 2026-10-23) — 이미 하이패스로 맞춘 금액 그대로 · 원본 PDF 만 붙인다
-          var keep = e.kind === 'keep';
-          var now = keep ? '<span class="st ok">확정 ' + n0(t.toll_cost) + '</span>'
-            : e.kind === 'new' ? '<span class="st warn">미확정</span>'
-            : (e.who === 'person'
-              ? '<span class="st bad">직접 넣은 ' + n0(t.toll_cost) + '</span>'
-              : '<span class="dim">자동 ' + n0(t.toll_cost) + '</span>');
-          var diff = keep ? '<span class="st ok">그대로</span>'
-            : e.diff == null ? '<span class="dim">—</span>'
-            : e.diff === 0 ? '<span class="st ok">같음</span>'
-              : '<b style="color:' + (e.diff > 0 ? 'var(--ok)' : 'var(--red)') + '">' +
-                (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
-          h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '"' + (keep ? ' data-hpkeep' : '') + '>' +
-            '<td class="m1 hpck"><label class="mselhit"><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
-            ' aria-label="' + esc(md(t.start_time) + ' ' + hm(t.start_time) + (keep ? ' 운행 원본 첨부' : ' 운행 확정하기')) + '"' +
-            (e.pick ? ' checked' : '') +
-            (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없어요."' : '') + '></label></td>' +
-            '<td class="m1 hpwhen"><span class="lead">' + md(t.start_time) + '</span> <span class="dim">' +
-            hm(t.start_time) + '~' + (t.end_time ? hm(t.end_time) : '') + '</span>' +
-            (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
-            // 원본만 붙이기 — 폰에서도 보이게 운행 칸에(차이 칸은 「그대로」)
-            (keep ? '<div class="hpkeepl" data-hpkeepl>원본만 첨부 — 금액은 그대로</div>' : '') +
-            // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
-            (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있어요. 확정해도 정산은 한 번만 돼요.</div>' : '') + '</td>' +
-            '<td data-l="지금">' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
-            '<td class="n lead mr" data-u="원">' + n0(e.sum) + '</td>' +
-            '<td class="n" data-l="차이">' + diff + '</td>' +
-            '<td class="el dim m2" title="' + esc(e.lines.map(function (r) {
-              return r.atText + ' ' + r.office + ' ' + n0(r.amount);
-            }).join(' / ')) + '">' +
-            esc(e.lines.map(function (r) { return r.office + ' ' + n0(r.amount); }).join(' · ')) + '</td></tr>';
-        });
-        h += '</tbody></table></div></div>';
-
-        if (done.length) {
-          h += '<details class="hpun"><summary>이미 확정된 ' + n0(done.length) +
-            '건은 영수증과 같아 고칠 것이 없어요</summary><div class="hpunb">' +
-            done.slice(0, 60).map(function (e) {
-              return '<div><span class="mono">' + md(e.trip.start_time) + ' ' + hm(e.trip.start_time) +
-                '</span> ' + esc(dong(e.trip.start_address)) + ' → ' + esc(dong(e.trip.end_address)) +
-                ' <b>' + n0(e.sum) + '</b></div>';
-            }).join('') + '</div></details>';
-        }
-
+        if (todo.length) h += hpTableHtml(g, gi, todo, false);
+        // 「이미 확정된 n건」은 수기 묶음 아래 — 두 표 사이를 가르지 않게(전체 검토 W2-6)
+        if (mrows.length) h += hpManualHtml(g, gi, mTodo, mrows);
+        h += hpDoneHtml(done);
         h += unHtml;
 
         h += '<div class="hpact">' +
@@ -10689,6 +10794,117 @@ window.EduGuard = {
     });
     return h;
   }
+
+  /** 하이패스 표(범위 운행 · 수기 묶음 같은 꼴). man = 수기 운행 묶음이면 「전부 고르기」 칸 없이 · 운행 칸은 날짜와 「수기」(시각은 앱이 채운 자리 시각이라 안 보인다). */
+  function hpTableHtml(g, gi, list, man, choose) {
+    var h = '';
+    if (!man) {
+      var allOn = list.length && list.every(function (x) { return x.pick || x.locked; });
+      // 폰(≤600px)에서는 줄마다 두 줄 카드(table.mc — 2026-10-20 폰 마무리: 차이 칸이 오른쪽에서 잘렸다).
+      //   표 머리가 숨으므로 「전부 고르기」는 표 위 한 줄(같은 data-hpall — 같은 처리기).
+      h += '<div class="mselallm hptab"><label class="mselhit wide"><input type="checkbox" data-hpall="' + gi + '"' + (allOn ? ' checked' : '') + '>' +
+        '<span>이 카드의 운행 전부 고르기</span></label></div>';
+    }
+    h += '<div class="panel"><div class="scroll" data-rows><table class="mc hptab"><thead><tr>' +
+      '<th style="width:36px">' + (man ? '<span class="sr">고르기</span>' : '<input type="checkbox" data-hpall="' + gi + '"' +
+        (list.every(function (x) { return x.pick || x.locked; }) ? ' checked' : '') + ' aria-label="이 카드의 운행 전부 고르기">') + '</th>' +
+      '<th>운행</th><th>지금 값</th><th class="n">영수증</th><th class="n">차이</th><th>영수증 내역</th>' +
+      '</tr></thead><tbody>';
+    list.forEach(function (e) {
+      var ei = g.matched.indexOf(e);          // 체크박스 키는 원래 자리를 쓴다
+      var t = e.trip;
+      // 원본만 붙이기(keep, 2026-10-23) — 이미 하이패스로 맞춘 금액 그대로 · 원본 PDF 만 붙인다
+      var keep = e.kind === 'keep';
+      var now = keep ? '<span class="st ok">확정 ' + n0(t.toll_cost) + '</span>'
+        : e.kind === 'new' ? '<span class="st warn">미확정</span>'
+        : (e.who === 'person'
+          ? '<span class="st bad">직접 넣은 ' + n0(t.toll_cost) + '</span>'
+          : '<span class="dim">자동 ' + n0(t.toll_cost) + '</span>');
+      var diff = keep ? '<span class="st ok">그대로</span>'
+        : e.diff == null ? '<span class="dim">—</span>'
+        : e.diff === 0 ? '<span class="st ok">같음</span>'
+          : '<b style="color:' + (e.diff > 0 ? 'var(--ok)' : 'var(--red)') + '">' +
+            (e.diff > 0 ? '+' : '') + n0(e.diff) + '</b>';
+      var when = man
+        // 방문처는 아래 줄(표가 PC 폭에서도 옆으로 밀리지 않게 — 긴 방문처는 감싼다)
+        ? '<span class="lead">' + md(t.start_time) + '</span> <span class="kind">수기</span><div class="hpvisit dim">' + esc(t.visit_place || dong(t.end_address) || '') + '</div>'
+        : '<span class="lead">' + md(t.start_time) + '</span> <span class="dim">' + hm(t.start_time) + '~' + (t.end_time ? hm(t.end_time) : '') + '</span>';
+      h += '<tr class="' + (e.kind === 'diff-person' ? 'flagged' : '') + '"' + (keep ? ' data-hpkeep' : '') + (man ? ' data-hpmanrow' : '') + '>' +
+        '<td class="m1 hpck"><label class="mselhit"><input type="checkbox" data-hppick="' + gi + '.' + ei + '"' +
+        ' aria-label="' + esc(md(t.start_time) + (man ? ' 수기' : ' ' + hm(t.start_time)) + (keep ? ' 운행 원본 첨부' : ' 운행 확정하기')) + '"' +
+        (e.pick ? ' checked' : '') +
+        (e.locked ? ' disabled title="결재가 끝난 운행이라 바꿀 수 없어요."' : '') + '></label></td>' +
+        '<td class="m1 hpwhen">' + when +
+        (isAll() ? ' <span class="dim">' + esc(nameOf(t.username)) + '</span>' : '') +
+        // 원본만 붙이기 — 폰에서도 보이게 운행 칸에(차이 칸은 「그대로」)
+        (keep ? '<div class="hpkeepl" data-hpkeepl>원본만 첨부 — 금액은 그대로</div>' : '') +
+        // 같은 날 같은 금액 통행료 영수증 사진이 이미 있으면(웹 8차 — 확정해도 두 번 세지 않는다). 폰에서도 보이게 운행 칸에
+        (hpSamePhoto(t, e.sum) ? '<div class="hpphoto" data-hpphoto>같은 날 같은 금액 영수증 사진도 있어요. 확정해도 정산은 한 번만 돼요.</div>' : '') +
+'</td>' +
+        '<td data-l="지금">' + (e.locked ? '<span class="st ok">결재 완료</span>' : now) + '</td>' +
+        '<td class="n lead mr" data-u="원">' + n0(e.sum) + '</td>' +
+        '<td class="n" data-l="차이">' + diff + '</td>' +
+        '<td class="el dim m2" title="' + esc(e.lines.map(function (r) {
+          return r.atText + ' ' + r.office + ' ' + n0(r.amount);
+        }).join(' / ')) + '">' +
+        // 수기 묶음은 통과 시각을 함께 — 운행 시각이 없으니 직원이 볼 수 있는 시각은 이것뿐이다
+        esc(e.lines.map(function (r) { return (man ? String(r.atText || '').slice(11) + ' ' : '') + r.office + ' ' + n0(r.amount); }).join(' · ')) +
+        // 그날 이미 붙은 줄인지(수기 운행 근거) 확인하지 못했다 — 미리 체크하지 않았다(검토 M1). 넓은 내역 칸 아래에
+        (e.unsure ? '<div class="hpunsure" data-hpunsure>' + HP_UNSURE + '</div>' : '') + '</td></tr>';
+    });
+    // 수기 운행이 여럿인 빈 시간의 줄 — 같은 표 안 고르기 줄(고르기 칸은 운행·지금 값 두 칸 폭 · 금액은 영수증 칸 · 내역은 내역 칸 — 위 줄들과 칸이 맞게)
+    (choose || []).forEach(function (x) {
+      var ri = g.manual.indexOf(x), r = x.rec, at = String(r.atText || '').slice(11) + ' ' + (r.office || '');
+      // 고르기 칸 글은 짧게(날짜 · 수기 · 방문처) — 지금 통행료는 title(고른 뒤에는 그 운행 줄의 지금 값 칸에도 있다) (검토 3차: 960 폭에서 「…통행료 미」로 잘렸다)
+      var full = function (t) { return md(t.start_time) + ' 수기 · ' + (t.visit_place || dong(t.end_address) || '방문처 없음') + ' · ' + (isUnknownToll(t) ? '통행료 미확정' : '통행료 ' + n0(t.toll_cost)); };
+      var short = function (t) { return md(t.start_time) + ' 수기 · ' + (t.visit_place || dong(t.end_address) || '방문처 없음'); };
+      var sel = x.trip ? x.options.filter(function (t) { return String(t.id) === String(x.trip.id); })[0] : null;
+      h += '<tr data-hpmchoose' + (x.trip ? '' : ' data-hpmopen') + '><td class="m1 hpck"></td>' +
+        '<td class="hpsel" colspan="2"><select class="field" data-hpmpick="' + gi + '.' + ri + '" aria-label="' + esc(r.atText + ' 기록을 맞출 수기 운행') + '"' +
+        ' title="' + esc(sel ? full(sel) : window.Hipass.whyText({ why: 'manual_many' })) + '">' +
+        '<option value="">— 수기 운행 고르기 —</option>' +
+        x.options.map(function (t) {
+          return '<option value="' + esc(String(t.id)) + '" title="' + esc(full(t)) + '"' + (sel === t ? ' selected' : '') + '>' + esc(short(t)) + '</option>';
+        }).join('') + '</select>' +
+        (x.trip ? '' : '<div class="hpwhy" data-hpwhy="manual_many">' + esc(window.Hipass.whyText({ why: 'manual_many' })) + '</div>') +
+        '</td>' +
+        // 고른 뒤에는 금액을 그 운행 줄에만 — 여기 또 적으면 통과가 둘처럼 읽힌다(검토 3차). 고르기 전에는 이 줄에만 있으니 적는다
+        // 고른 뒤에는 고른 운행에 반영될 금액(그 운행 묶음 합)을 흐리게 — 비어 보이던 칸(전체 검토 W2-6) · 고르기 전에는 이 줄 금액
+        (x.trip ? '<td class="n mr dim" data-u="원" data-hpmamt title="' + esc(md(x.trip.start_time) + ' 수기 운행에 반영될 금액') + '">' + n0(x.e ? x.e.sum : r.amount) + '</td>'
+          : '<td class="n lead mr" data-u="원" data-hpmamt>' + n0(r.amount) + '</td>') + '<td class="n"></td>' +
+        '<td class="el dim m2" title="' + esc(r.atText + ' ' + (r.office || '') + ' ' + n0(r.amount)) + '">' +
+        esc(x.trip ? at : at + ' ' + n0(r.amount)) +
+        (x.trip ? '<div class="hpmnote">이 기록을 맞출 수기 운행을 바꿀 수 있어요.</div>' : '') +
+        (x.unsure ? '<div class="hpunsure" data-hpunsure>' + HP_UNSURE + '</div>' : '') + '</td></tr>';
+    });
+    return h + '</tbody></table></div></div>';
+  }
+  /** 이미 확정된(같은) 줄 접어 두기 */
+  function hpDoneHtml(done) {
+    if (!done.length) return '';
+    return '<details class="hpun"><summary>이미 확정된 ' + n0(done.length) +
+      '건은 영수증과 같아 고칠 것이 없어요</summary><div class="hpunb">' +
+      done.slice(0, 60).map(function (e) {
+        return '<div><span class="mono">' + md(e.trip.start_time) + ' ' + (e.manual ? '수기' : hm(e.trip.start_time)) +
+          '</span> ' + esc(dong(e.trip.start_address)) + ' → ' + esc(dong(e.trip.end_address)) +
+          ' <b>' + n0(e.sum) + '</b></div>';
+      }).join('') + '</div></details>';
+  }
+  /**
+   * 수기 운행에 맞춘 기록(2026-11-12 §8.5-6) — 따로 묶어 보인다. 직원이 골라서 확정을 눌러야 반영된다
+   *   (미리 체크는 그 운행에 같은 금액이 이미 들어 있을 때만 — 2026-11-13 전체 검토: 시각을 확인할 수 없는 맞춤이라 사람이 고른다).
+   *   ① 붙일 운행이 정해진 것(운행마다 한 줄 — 표) ② 빈 시간에 수기 운행이 여럿인 줄(고르기 칸 — 고르기 전에는 반영 대상이 아님 · 고른 뒤에도 바꿀 수 있게 남긴다)
+   */
+  function hpManualHtml(g, gi, mTodo, mrows) {
+    // 고르기 줄 — 빈 시간에 수기 운행이 여럿인 줄(이미 붙어 있는 줄은 그 운행으로 정해져 고르기 없음, 검토 M1)
+    var many = mrows.filter(function (x) { return !x.held && (x.options || []).length > 1; });
+    var h = '<div class="hpman" data-hpman="' + gi + '"><div class="hpmanh"><b>수기 운행에 맞춘 기록</b>' +
+      '<span class="dim">수기 운행은 시각을 확인할 수 없어서 앞뒤 운행 사이(빈 시간)의 기록을 모았어요. 맞는 기록만 골라서 확정해 주세요. 고르지 않은 기록은 반영되지 않아요.</span></div>';
+    if (mTodo.length || many.length) h += hpTableHtml(g, gi, mTodo, true, many);
+    return h + '</div>';
+  }
+  /** 이미 붙은 줄인지 확인하지 못한 줄의 안내(검토 M1 — 근거를 못 읽으면 미리 체크하지 않는다) */
+  var HP_UNSURE = '이 기록이 다른 운행에 이미 들어갔는지 확인하지 못했어요. 같은 날 같은 금액의 하이패스가 다른 운행에 있으면 고르지 마세요.';
 
   /** 하이패스 기록이 지금 보는 기간 안인가(2026-10-20 AU2 #7). 시각을 못 읽은 기록은 안으로 친다(예전과 같은 안내). */
   function hpInView(r) { var vr = viewRange(), t = Number(r && r.at); return !isFinite(t) || (t >= vr.lo && t < vr.hi); }
@@ -10809,6 +11025,15 @@ window.EduGuard = {
         ids.push(id);
       });
     });
+    return hpFetchEj(ids);
+  }
+  /**
+   * 운행 근거(toll_evidence_json)를 받아 HP.ej 에 둔다(읽기만 · 80개씩). 받은 것만 「앎」 — 못 받은 운행(연결 실패 · 볼 수 없는 운행)은 비워 둔다(모름).
+   * 이미 받은 운행은 다시 받지 않는다. 돌려주는 것: 다 받았으면 true.
+   */
+  function hpFetchEj(list) {
+    var cache = HP.ej = HP.ej || {}, ids = [];
+    (list || []).forEach(function (id) { if (id != null && !Object.prototype.hasOwnProperty.call(cache, String(id)) && ids.indexOf(id) < 0) ids.push(id); });
     var parts = [];
     for (var i = 0; i < ids.length; i += 80) parts.push(ids.slice(i, i + 80));
     return Promise.all(parts.map(function (part) {
@@ -10900,7 +11125,8 @@ window.EduGuard = {
             (rs || []).forEach(function (r) { var k = rk(r); (srcOf[k] = srcOf[k] || []).push({ fi: fi, page: r.page }); });
           });
           // 파일끼리 겹친 기록은 한 번만(2026-10-20 AU2 — 기간이 겹치는 두 파일·같은 파일 두 번이면 통행료가 두 배로 확정됐다).
-          //   열쇠: 통과 시각·금액·영업소·카드 끝 4자리(hipass.js mergeFiles · recKey). 파일 하나 안의 겹침은 읽을 때 이미 뺐다.
+          //   열쇠: 통과 시각·금액·카드 끝 4자리 — 영업소는 글이 같거나 다른 파일끼리 끝이 같으면 같은 것, 짝은 하나씩(hipass.js mergeFiles, 2026-11-12).
+          //   recKey(통과 시각·금액·영업소 글·카드)는 위 srcOf — 기록마다 든 파일을 찾는 열쇠로만 쓴다. 파일 하나 안의 겹침은 읽을 때 이미 뺐다.
           var mg = window.Hipass.mergeFiles ? window.Hipass.mergeFiles(lists) : { recs: [].concat.apply([], lists.filter(Boolean)), removed: 0 };
           recs = mg.recs; dup = mg.removed;
           recs.forEach(function (r) { r.srcs = srcOf[rk(r)] || []; });
@@ -10911,7 +11137,8 @@ window.EduGuard = {
               : 'PDF에서 통행 기록을 찾지 못했어요.';
             HP.groups = []; render(); return;
           }
-          HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS));
+          // ev = 받아 둔 운행 근거(HP.ej — 아직 비어 있음 = 모름). 이미 붙은 줄 찾기(검토 M1)는 아래에서 근거를 받은 뒤 다시 맞춘다
+          HP.groups = hpMarkLocked(window.Hipass.match(recs, TRIPS, { ev: HP.ej }));
           HP.batch = 'web-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
           // 원본 보관을 시작한다(기다리지 않는다 — 확정할 때 끝나기를 기다린다). 못 하면 안내 한 줄(hpKeepDone).
           var job = HP.pdfJob = hpKeep(files, lists);
@@ -10927,7 +11154,17 @@ window.EduGuard = {
           // 이미 맞춘 운행 중 원본이 없는 것 → 「원본만 붙이기」(2026-10-23). 근거를 받은 뒤에 그린다 —
           //   먼저 그리면 「이 카드는 다 확정됐습니다」가 보였다가 표로 바뀐다(받는 동안은 「읽는 중」 그대로 · 10초가 넘으면 기다리지 않는다).
           var hp0 = HP, grs = HP.groups;
-          Promise.race([hpScanKeep(grs), new Promise(function (ok) { setTimeout(function () { ok(false); }, 10000); })]).then(function (ok) {
+          // (검토 M1) 먼저 기록 날짜의 하이패스 0분 운행 근거를 받아 이미 붙은 줄을 그 운행으로 다시 맞춘다(Hipass.evNeed) — 못 받으면 그날 줄은
+          //   미리 고르지 않고 안내(hipass.js unsure). 그다음 예전처럼 원본만 붙이기 근거.
+          //   10초가 넘어 먼저 그렸으면 늦게 온 근거로 다시 맞추지 않는다(그린 체크 칸 번호가 다른 줄을 가리키게 된다 — 그 줄들은 unsure 그대로).
+          var need = window.Hipass.evNeed ? window.Hipass.evNeed(recs, TRIPS) : [], late = false;
+          var scan = hpFetchEj(need).then(function (ok1) {
+            if (late || HP !== hp0 || HP.groups !== grs) return false;
+            // 다시 맞춘다(카드 묶음 모두에 걸쳐 근거 줄 하나 = 기록 하나 — match 가 한 번에 정한다). 묶음 차례·차량 투표는 같은 자료라 그대로
+            if (need.length) HP.groups = grs = hpMarkLocked(window.Hipass.match(recs, TRIPS, { ev: HP.ej }));
+            return hpScanKeep(grs).then(function (ok2) { return ok1 && ok2; });
+          });
+          Promise.race([scan, new Promise(function (ok) { setTimeout(function () { late = true; ok(false); }, 10000); })]).then(function (ok) {
             if (HP !== hp0 || HP.groups !== grs) return;              // 그 사이 다른 PDF 를 올렸거나 기간을 바꿨다
             hpMarkKeep(grs);
             var nk = hpKeepCount(grs), nfix = grs.reduce(function (s, g) { return s + (g.matched || []).filter(function (e) { return !hpDone(e) && e.kind !== 'keep'; }).length; }, 0);
@@ -11014,7 +11251,9 @@ window.EduGuard = {
           note: '카드 ' + (g.card4 || '?') + ' · ' + (g.plate || ''),
           lines: e.lines.map(function (r) {
             // 입구 영업소·차종도 보낸다 — 서버 toll_evidence_json.lines 에 입구·출구·차종·금액이 남아 통행료 추정 개선에 쓴다(2026-10-17)
-            var o = { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
+            //   수기 운행에 붙인 줄(빈 시간 — 2026-11-12 §8.5-7)은 "manual": true(출력 「수」 · 배우는 재료에서 뺌)
+            var o = window.Hipass.lineOf ? window.Hipass.lineOf(r, e.manual)
+              : { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
             // 그 줄이 나온 PDF 원본(2026-10-23) — 보관한 것만 · page 는 그 PDF 안 쪽 번호
             var s = hpSrcOf(r, paths);
             if (s) { o.pdf = s.pdf; if (s.page != null) o.page = s.page; }
@@ -11118,7 +11357,7 @@ window.EduGuard = {
       ['유류비', '<b>' + won(tripFuel(t)) + '</b><div class="dim" style="font-size:12px">' +
         esc(region(t.start_address, t.start_lat, t.start_lng)) + ' · ' + qq.y + '년 ' + qq.q + '분기 단가</div>'],
       // 통행료·주차비 금액 모양을 같게(₩ · 굵게, 2026-10-16 3차) — 미확정·없음·면제는 표와 같은 딱지
-      ['통행료', (isUnknownToll(t) || Number(t.toll_cost) === 0 ? tollCell(t) : '<b>' + won(t.toll_cost) + '</b>') + (t.toll_source ?'<div class="dim" style="font-size:12px">' + esc(t.toll_source) + '</div>' : '')],
+      ['통행료', (isUnknownToll(t) || Number(t.toll_cost) === 0 ? tollCell(t) : '<b>' + won(t.toll_cost) + '</b>') + (t.toll_source ?'<div class="dim" style="font-size:12px">' + esc(tollSrcShow(t.toll_source)) + '</div>' : '')],
       ['주차비', t.parking_cost ? '<b>' + won(t.parking_cost) + '</b>' : '—'],
       ['입력', t.is_manual ? '수기 입력' : '자동 기록'],
       ['안전', '과속 ' + n0(t.overspeed_count) + ' · 급가속 ' + n0(t.rapid_accel_count) +
@@ -11173,7 +11412,9 @@ window.EduGuard = {
   function tollSrcText(t) {
     var a = tollNeed(t).a, src = String(t.toll_source || ''), st = t.toll_status;
     if (isUnknownToll(t) && !(a > 0)) return '미확정';
-    var from = src === '하이패스 영수증' ? '하이패스 비교' : src === '영수증' || /영수증/.test(src) ? '영수증' : src.indexOf('기사 확인') === 0 ? '운행 종료 때 확인'
+    // 「회사 하이패스 기록…」 = 회사 하이패스 기록으로 추정해 채운 금액(2026-11-12 spec toll-learn §8.8)
+    var from = src.indexOf('회사 하이패스 기록') === 0 ? '회사 하이패스 기록으로 추정'   // 운행 상세·말풍선(tollSrcShow)과 같은 글
+      : src === '하이패스 영수증' ? '하이패스 비교' : src === '영수증' || /영수증/.test(src) ? '영수증' : src.indexOf('기사 확인') === 0 ? '운행 종료 때 확인'
       : src === '웹 직접 입력' || st === 'MANUAL' ? '직접 입력' : st === 'CHARGED' ? '자동 계산' : st === 'FREE_CONFIRMED' ? '없음(0원)' : '';
     return (a > 0 ? n0(a) + '원' : '0원') + (from ? ' (' + from + ')' : '');
   }
@@ -11803,14 +12044,15 @@ window.EduGuard = {
     a_status: viewStatus, a_trips: viewTrips, a_check: viewCheck, a_evid: viewEvid,
     a_hipass: viewHipass,
     people: viewPeople, cars: viewCars, eduadm: viewEduAdm,
-    account: viewAccount, perm: viewPerm, tollfill: viewTollFill,
+    account: viewAccount, perm: viewPerm, tollfill: viewTollFill, tollacc: viewTollAcc,
     safety: viewSafety, a_safety: viewSafety
   };
   /** 관리자만 열 수 있는 화면. */
   /** 예전 관리 화면 주소 → 새 화면(북마크·알림 링크가 깨지지 않게, 2026-10-15 2차). readHash·go 가 쓴다. */
   var OLD_VIEWS = { a_close: 'a_status', a_verify: 'a_status', a_settle: 'a_status' };
   var ADMIN_VIEWS = ['a_status', 'a_trips', 'a_check', 'a_evid', 'a_hipass',
-    'people', 'cars', 'eduadm', 'perm', 'a_safety', 'cycset'];   // cycset = 마감 기간 설정(drv-cycles.js, 2026-10-20)
+    'people', 'cars', 'eduadm', 'perm', 'a_safety', 'cycset', 'tollacc'];   // cycset = 마감 기간 설정(drv-cycles.js, 2026-10-20) · tollacc = 통행료 정확도(2026-11-12)
+  // ↑ tollacc 도 여기 있으므로 그 화면에 있는 동안 isAll() 이 참 — applyScope 가 전 직원 운행(ALL_TRIPS)으로 바꾼다(그 화면은 운행을 쓰지 않아 해 없음).
   /** 지금 화면이 전사 범위인가. 화면 안에서 '이름 칸을 보일까' 같은 판단에 쓴다. */
   function isAll() { return ADMIN_VIEWS.indexOf(VIEW) >= 0; }
   /** 같은 화면을 개인/전사로 쓰므로 제목으로 범위를 드러낸다. */
@@ -11974,7 +12216,7 @@ window.EduGuard = {
   }
   var ND_AUTO = false;           // 자료가 오기 전에 첫 화면을 정했다(다 받은 뒤 결재할 것이 있으면 결재함으로 한 번 옮긴다)
 
-  var NOCYC_VIEWS = ['account', 'org', 'perm', 'eduadm', 'edu', 'cycset'];
+  var NOCYC_VIEWS = ['account', 'org', 'perm', 'eduadm', 'edu', 'cycset', 'tollacc'];   // 통행료 정확도는 달력 달마다(마감 기간과 무관, 2026-11-12)
   /** 포털(work.html 「시스템 선택」) 카드의 내 상태 한 줄에 쓸 것 — 이 화면이 이미 아는 것만 이 탭(sessionStorage)에 적어 둔다
       (2026-10-19 웹 사용성 1차). 이번 운행일지 기간의 내 단계·결재 상태, 종류별 「결재할 것」 수. 서버를 더 부르지 않는다. */
   function portalHint() {
@@ -12276,6 +12518,7 @@ window.EduGuard = {
     if ((el = e.target.closest('[data-educg]'))) { var cg = $('eduCongrats'); if (cg) { cg.hidden = true; cg.innerHTML = ''; } return; }
     if ((el = e.target.closest('[data-eatab]'))) { EDU_ADM.tab = el.dataset.eatab === 'status' ? 'status' : 'videos'; render(); return; }
     if (e.target.closest('[data-eduadd]')) { eduVideoForm(null); return; }
+    if (e.target.closest('[data-taccretry]')) { TACC_ST.rows = undefined; TACC_ST.err = ''; TACC_ST.busy = false; TACC_ST.seq++; render(); return; }
     if ((el = e.target.closest('[data-eduedit]'))) {
       var ev0 = EDUV.filter(function (x) { return String(x.id) === el.dataset.eduedit; })[0];
       if (ev0) eduVideoForm(ev0); return;
@@ -12400,8 +12643,9 @@ window.EduGuard = {
       var gi = +e.target.dataset.hpall, on = e.target.checked;
       // 접어 둔(이미 같은) 줄은 표에 없으니 건드리지 않는다. 안 그러면 "남은 것 3건 ·
       // 선택 7건" 처럼 보이는 것보다 많이 잡히고, 같은 값을 서버에 다시 쓴다.
+      //   수기 운행에 붙인 줄(§8.5-6)은 「전부 고르기」에 들지 않는다 — 시각을 확인할 수 없어 줄마다 직원이 고른다.
       (HP.groups[gi].matched || []).forEach(function (x) {
-        if (!x.locked && x.kind !== 'same') x.pick = on;
+        if (!x.locked && x.kind !== 'same' && !x.manual) x.pick = on;
       });
       render(); return;
     }
@@ -12812,9 +13056,33 @@ window.EduGuard = {
     if (e.target.id === 'hpFile') { hpFiles(e.target.files); return; }
     // (예전 통행료 차례 「하이패스 이용내역 PDF 올리기」 #hpQuick 은 2026-10-29 에 없앴다 — 올리기 창 하나가 가려 읽는다, evHipassOf)
     if (e.target.id === 'evFile') { evAddFiles(e.target.files); e.target.value = ''; return; }
+    // 빈 시간에 수기 운행이 여럿인 줄 — 직원이 고른 운행으로 다시 맞춘다(2026-11-12 §8.5-3). 빈 값이면 고르기 취소(반영 대상에서 빠짐).
+    if (e.target.dataset && e.target.dataset.hpmpick !== undefined) {
+      var mp = e.target.dataset.hpmpick.split('.'), mg = HP.groups[+mp[0]], mrow = mg && (mg.manual || [])[+mp[1]];
+      if (!mg || !mrow || !window.Hipass.chooseManual) return;
+      // 다시 맞추면 고름이 기본값으로 돌아간다 — 줄(운행·금액·종류)이 그대로인 것은 직원이 바꿔 둔 체크를 되살린다
+      var mkey = function (x) { return String(x.trip.id) + '|' + x.sum + '|' + x.kind; }, was = {};
+      (mg.matched || []).forEach(function (x) { was[mkey(x)] = x.pick; });
+      window.Hipass.chooseManual(mg, mrow.rec, e.target.value || null, TRIPS);
+      hpMarkKeep(hpMarkLocked([mg]));
+      (mg.matched || []).forEach(function (x) { var k = mkey(x); if (!x.locked && Object.prototype.hasOwnProperty.call(was, k)) x.pick = was[k]; });
+      render();
+      var mcard = document.querySelector('[data-hpman="' + mp[0] + '"]');
+      if (mcard) mcard.scrollIntoView({ block: 'nearest' });
+      // 새로 고른 운행이 이미 그 금액으로 맞춰져 있으면(같음) 근거를 받아 원본만 붙이기로(검토 L1 — 차량 고르기와 같은 길)
+      var mhp = HP, mgs = HP.groups;
+      hpScanKeep([mg]).then(function () {
+        if (HP !== mhp || HP.groups !== mgs) return;
+        var k0 = hpKeepCount([mg]);
+        hpMarkKeep([mg]);
+        if (hpKeepCount([mg]) !== k0) render();
+      });
+      return;
+    }
     if (e.target.dataset && e.target.dataset.hpcar !== undefined) {
       var g = HP.groups[+e.target.dataset.hpcar];   // 아래에서 재배분 후 잠금 표시를 다시 단다
       g.plate = e.target.value || null;
+      if (g.plate) g.tie = false;   // 동점이라 비워 둔 차량(§8.7)을 직원이 골랐다 — 「동점」 안내를 내린다
       // 원본만 붙이기(2026-10-23) — 받아 둔 근거로 바로 표시하고, 새로 맞은 이미 맞춘 운행의 근거는 받아 와서 바뀌었을 때만 다시 그린다
       hpMarkKeep(hpMarkLocked([window.Hipass.assign(g, TRIPS)]));
       var hpc = HP, hgs = HP.groups, hpl = g.plate;

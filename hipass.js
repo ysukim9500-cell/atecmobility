@@ -126,8 +126,10 @@
           .match(/총(\d+)건\/([\d,]+)원/);
         if (tot) total = { n: (total ? total.n : 0) + +tot[1], sum: (total ? total.sum : 0) + +tot[2].replace(/,/g, '') };
 
-        var heads = items.filter(function (i) { return i.t.replace(/\s/g, '') === '영수증'; });
-        if (!heads.length) heads = items.filter(function (i) { return /하이패스는/.test(i.t); });
+        var heads = headsOf(items);
+        // 폰 크롬 「PDF로 저장」(2026-11-12 점검 §2 — 28건 전부 못 읽던 파일): 글자가 한 자씩 따로 와서 머리 글자를 못 찾는다 →
+        //   같은 줄에 붙은 글자를 낱말로 합친 뒤 같은 규칙으로 다시 찾는다. 머리를 찾는 쪽(지금 읽히는 PDF)은 그대로 둔다.
+        if (!heads.length) { items = joinGlyphs(items); heads = headsOf(items); }
         if (!heads.length) continue;
 
         // 열 = 머리 글자 가운데 x 를 묶은 것
@@ -197,6 +199,44 @@
 
   function won(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; }
 
+  /** 인쇄 PDF 칸의 머리 글자(「영수증」, 없으면 「하이패스는」) */
+  function headsOf(items) {
+    var hs = items.filter(function (i) { return i.t.replace(/\s/g, '') === '영수증'; });
+    if (!hs.length) hs = items.filter(function (i) { return /하이패스는/.test(i.t); });
+    return hs;
+  }
+
+  /**
+   * 한 자씩 따로 온 글자 → 낱말(parsePrint, 2026-11-12 §8.2). 같은 줄(밑줄 y 차이 1 안)에서 앞 글자 끝과 다음 글자 시작 사이가
+   * 글자 높이의 0.6배 안이면 한 낱말로 잇고, 그 틈이 0.15배를 넘으면 사이에 빈칸을 둔다(「1 종」 · 「가상도로공사 서울영업소」 꼴이 붙은 글자 PDF 와 같게).
+   * 그보다 먼 글자(양쪽 맞춤으로 벌어진 「회사 ⋯ 영업소」 · 옆 칸)는 따로 둔다 — linesOf 가 빈칸으로 잇는다.
+   */
+  function joinGlyphs(items) {
+    // 먼저 줄로 묶고(밑줄 y 차이 1 안 — linesOf 처럼) 줄마다 x 차례로 잇는다 — 한 낱말 안 글자가 밑줄에서 1 안쪽으로 어긋나도
+    //   쪼개지거나 차례가 바뀌지 않게(2026-11-12 Task 3 검토 2 — 예전엔 y 를 그대로 먼저 견줘 0.3 어긋난 글자가 따로 놀았다).
+    var arr = items.slice().sort(function (a, b) { return b.y - a.y || a.x - b.x; }), rows = [], out = [];
+    arr.forEach(function (it) {
+      var l = rows[rows.length - 1];
+      if (l && Math.abs(l.y - it.y) < 1) l.items.push(it);
+      else rows.push({ y: it.y, items: [it] });
+    });
+    rows.forEach(function (row) {
+      var cur = null;
+      row.items.sort(function (a, b) { return a.x - b.x; }).forEach(function (it) {
+        var h = Math.max(cur ? cur.h : 0, it.h), gap = cur ? it.x - cur.xe : 0;
+        if (cur && gap < 0.6 * h && gap > -h) {
+          cur.t += (gap > 0.15 * h ? ' ' : '') + it.t;
+          cur.xe = Math.max(cur.xe, it.x + it.w); cur.h = h;
+        } else {
+          if (cur) out.push(cur);
+          cur = { x: it.x, y: it.y, xe: it.x + it.w, h: it.h, t: it.t };
+        }
+      });
+      if (cur) out.push(cur);
+    });
+    return out.map(function (c) { return { x: c.x, y: c.y, w: c.xe - c.x, h: c.h, t: c.t, cx: c.x + (c.xe - c.x) / 2 }; });
+  }
+
   /** 글자 조각 → 글줄(위에서 아래로). y 가 2.5 안쪽이면 같은 줄(「1 종」과 「800 원(카드)」은 1.5 쯤 어긋난다). */
   function linesOf(items) {
     var arr = items.slice().sort(function (a, b) { return b.y - a.y || a.x - b.x; }), out = [];
@@ -213,7 +253,7 @@
   /**
    * 여러 PDF 를 한 번에 올렸을 때 파일끼리 겹친 기록 빼기(2026-10-20 AU2) — 파일 하나 안의 겹침은 읽을 때(dedupe) 이미 뺐다.
    * 기간이 겹치는 두 달치 · 같은 파일을 이름만 바꿔 두 번 고른 경우 같은 통과 기록이 두 번 더해져 통행료가 두 배로 확정됐다.
-   * 열쇠: 통과 시각 · 금액 · 영업소 · 카드 끝 4자리. lists = 파일마다 읽은 기록 배열(파일 순서대로).
+   * 열쇠: 통과 시각 · 금액 · 영업소 · 카드 끝 4자리(2026-11-12 — 영업소는 다른 파일끼리면 끝이 같아도 같다, 아래 mergeFiles). lists = 파일마다 읽은 기록 배열(파일 순서대로).
    * 돌려주는 것: { recs: 합친 기록(시각 순), removed: 뺀 건수 }
    */
   /** 파일끼리 같은 기록인지 보는 열쇠(mergeFiles) — 웹 원본 보관(driving-app.js hpFiles)이 기록마다 든 파일을 찾을 때도 쓴다(2026-10-23). */
@@ -301,13 +341,52 @@
     });
     return out;
   }
+  /**
+   * (2026-11-12 §8.1 — 점검 §2 「두 꼴을 같이 올리면 두 배」) 도로공사 PDF 는 「한국도로공사성남영업소」, 인쇄 PDF 는 「성남영업소」라
+   * 영업소 글까지 같아야 하던 열쇠로는 같은 통과가 두 번 더해졌다 → 시각·금액·카드 끝 4자리로 묶고, 그 안에서
+   *   · 영업소 글이 똑같으면(어느 파일이든) 겹침 · 다른 파일의 기록과 끝이 같으면(sameOffice) 겹침 — 먼저 나온 파일의 기록을 남긴다.
+   *   · 짝은 하나씩 — 남긴 기록 하나는 다른 파일마다 기록 하나만 지운다(똑같은 글 먼저, 그다음 끝이 같고 길이 차이가 가장 작은 것).
+   * 같은 파일 안에서 끝만 같은 두 기록(「성남영업소」·「서성남영업소」)은 읽을 때 따로 센 것이라 빼지 않는다.
+   * recKey 는 그대로다(웹 원본 보관이 기록마다 든 파일을 찾는 열쇠).
+   */
   function mergeFiles(lists) {
-    var seen = new Set(), out = [], removed = 0;
-    (lists || []).forEach(function (rs) {
-      (rs || []).forEach(function (r) {
-        var k = recKey(r);
-        if (seen.has(k)) { removed++; return; }
-        seen.add(k); out.push(r);
+    var seen = new Map(), out = [], removed = 0;
+    // 짝은 하나씩(2026-11-12 Task 3 검토 1): 앞 파일에서 남긴 기록 하나는 뒤 파일마다 기록 하나만 지운다(x.used[fi]).
+    //   파일 하나씩 — ① 글이 똑같은 짝 먼저 ② 남은 것은 끝이 같은 짝을, 더 붙은 앞 글이 회사 이름인 짝 → 앞 글이 짧은 짝 차례로(파일 안 차례와 상관없이).
+    //   어느 짝을 고르든 지우는 수는 같다 — 고르는 차례는 뒤 파일에 끝이 같은 기록이 여럿일 때 엉뚱한 이름끼리 묶지 않게 할 뿐이다.
+    //   (예전엔 인쇄 「대전영업소」 하나가 도로공사 「…대전영업소」·「…남대전영업소」 둘을 다 지웠다 — 진짜 통과 하나가 사라짐)
+    var keyOf = function (r) { return r.at + '|' + r.amount + '|' + (r.card4 || ''); };
+    (lists || []).forEach(function (rs, fi) {
+      var list = (rs || []).slice(), gone = [], pairs = [];
+      list.forEach(function (r, i) {
+        var o = r.office || '', had = seen.get(keyOf(r)) || [];
+        for (var j = 0; j < had.length; j++) {
+          if (had[j].office === o && !had[j].used[fi]) { had[j].used[fi] = true; gone[i] = true; return; }
+        }
+      });
+      list.forEach(function (r, i) {
+        if (gone[i]) return;
+        var o = r.office || '';
+        (seen.get(keyOf(r)) || []).forEach(function (x) {
+          if (x.used[fi] || !sameOffice(x.office, o)) return;
+          // 긴 쪽에서 짧은 쪽을 뗀 앞 글 — 회사 이름(「한국도로공사」·「서울고속도로」 …)이면 가까운 짝, 아니면(「남」·「서」 — 다른 영업소 이름의 앞) 먼 짝
+          var lo = x.office.length >= o.length ? x.office : o, pre = lo.slice(0, lo.length - Math.min(x.office.length, o.length));
+          pairs.push({ i: i, x: x, d: (/(공사|고속도로|도로|하이웨이|\))$/.test(pre) ? 0 : 1000) + pre.length });
+        });
+      });
+      pairs.sort(function (a, b) { return a.d - b.d || a.i - b.i; }).forEach(function (p) {
+        if (gone[p.i] || p.x.used[fi]) return;
+        p.x.used[fi] = true; gone[p.i] = true;
+      });
+      var mine = [];
+      list.forEach(function (r, i) {
+        if (gone[i]) { removed++; return; }
+        // 같은 파일 안에서 글까지 똑같으면 겹침(읽을 때 dedupe 가 이미 빼므로 보통 없다) · 끝만 같은 것은 따로 센 것이라 남긴다
+        var k = keyOf(r), o = r.office || '';
+        if (mine.some(function (x) { return x.k === k && x.office === o; })) { removed++; return; }
+        mine.push({ k: k, office: o });
+        var had = seen.get(k) || [];
+        had.push({ office: o, used: {} }); seen.set(k, had); out.push(r);
       });
     });
     out.sort(function (a, b) { return a.at - b.at; });
@@ -469,32 +548,126 @@
    *  · 통과시각이 운행의 [출발, 도착] 안에 들어가면 그 운행의 통행료다.
    *  · 한 운행에 여러 번 지나갔으면 합산한다.
    *  · 카드 뒷4자리로 차량을 고를 수 없으니, 어느 차량이 가장 많이 맞는지 투표로 추정한다.
+   *  · (2026-11-12 §8.3) 시작 쪽만 조금 넓힌다 — inTrip 「넓힌 창」. 도착 쪽은 그대로.
+   *  · (2026-11-12 §8.7) 투표 1·2등이 같으면 차량을 정하지 않는다(plate null · tie true) — 예전엔 목록 차례로 남의 차가 뽑혔다.
+   *    opts.ownerPlates(올린 사람의 차량들)에 든 차량이 동점 후보 중 하나뿐이면 그 차량(tie false).
+   *    투표는 기록 하나가 한 차량에 한 표(같은 차량의 두 운행 창에 다 들어도 한 표).
    */
-  function match(recs, trips) {
-    var byCard = {};
+  function match(recs, trips, opts) {
+    var byCard = {}, own = (opts && opts.ownerPlates) || [];
     recs.forEach(function (r) { (byCard[r.card4 || '?'] = byCard[r.card4 || '?'] || []).push(r); });
 
     var groups = Object.keys(byCard).map(function (c4) {
       var rs = byCard[c4], vote = {};
       rs.forEach(function (r) {
+        // 넓히기 전 규칙으로 든 차량이 있으면 그 차량들만 표를 받는다(2026-11-12 Task 3 검토 3 — assign 의 「넓히기 전 규칙이 이김」과 같게).
+        //   예전엔 P 운행 한가운데의 기록이 Q 운행의 넓힌 시작 창에도 들어 Q 에도 표가 갔다.
+        //   (2026-11-12 §8.5-1) 표는 범위 운행(도착 > 출발)만 준다 — 0분 수기 운행의 자리 시각은 실제 시각이 아니다.
+        var got = {}, strict = {}, anyStrict = false;
+        trips.forEach(function (t) { if (isRange(t) && inTrip(t, r.at, false)) { strict[t.plate_no] = true; anyStrict = true; } });
         trips.forEach(function (t) {
-          if (t.end_time && t.start_time <= r.at && r.at <= t.end_time) {
-            vote[t.plate_no] = (vote[t.plate_no] || 0) + 1;
-          }
+          if (!isRange(t) || got[t.plate_no] || !(anyStrict ? strict[t.plate_no] : inTrip(t, r.at, true))) return;
+          got[t.plate_no] = true;
+          vote[t.plate_no] = (vote[t.plate_no] || 0) + 1;
         });
       });
-      var ranked = Object.keys(vote).sort(function (a, b) { return vote[b] - vote[a]; });
+      var pv = pickPlate(vote, own), mvote = {};
+      if (!pv.ranked.length) {
+        // (2026-11-12 §8.5-5) 범위 운행 표가 하나도 없으면 — 그 줄들의 날짜(KST)에 0분 수기 운행이 가장 많은 차량. 동점·없으면 비워 둔다(8.7 과 같은 원칙).
+        var days = {};
+        rs.forEach(function (r) { days[kstDay(r.at)] = true; });
+        trips.forEach(function (t) {
+          if (isZero(t) && t.plate_no && days[kstDay(Number(t.start_time))]) mvote[t.plate_no] = (mvote[t.plate_no] || 0) + 1;
+        });
+        pv = pickPlate(mvote, own);
+      }
       return {
         card4: c4, records: rs,
-        plate: ranked[0] || null,
-        vote: ranked.map(function (p) { return { plate: p, n: vote[p] }; }),
+        plate: pv.plate, tie: pv.tie,
+        vote: Object.keys(vote).sort(function (a, b) { return vote[b] - vote[a]; }).map(function (p) { return { plate: p, n: vote[p] }; }),
+        // 수기 운행 수로 차량을 정했을 때만 — 차량 고르기 칸 「(수기 n건)」
+        manualVote: Object.keys(vote).length ? [] : pv.ranked.map(function (p) { return { plate: p, n: mvote[p] }; }),
         candidates: Array.from(new Set(trips.map(function (t) { return t.plate_no; }))).filter(Boolean).sort()
       };
     });
 
-    groups.forEach(function (g) { assign(g, trips); });
+    // opts.ev = 받아 둔 운행 근거 { 운행 id: toll_evidence_json } — 이미 붙은 줄 찾기(assign ⓪, 검토 M1). 없으면 null(모름)
+    //   근거 줄 하나는 기록 하나만 차지한다 — 카드 묶음 모두에 걸쳐 한 번에 정한다(claimsOf · g.held 를 묶음들이 함께 쓴다).
+    var ev = (opts && opts.ev) || null, plateOfRec = new Map();
+    groups.forEach(function (g) { g.records.forEach(function (r) { plateOfRec.set(r, g.plate || null); }); });
+    var held = claimsOf(recs, trips, ev, function (r) { return plateOfRec.get(r) || null; });
+    groups.forEach(function (g) { g.ev = ev; g.held = held; assign(g, trips); });
     return groups;
   }
+
+  /** 표 { 차량: 수 } → 1등 차량. 1·2등이 같으면 올린 사람 차량(own)이 동점 후보 중 하나뿐일 때만 그 차량, 아니면 null · tie(§8.7). */
+  function pickPlate(vote, own) {
+    var ranked = Object.keys(vote).sort(function (a, b) { return vote[b] - vote[a]; });
+    var plate = ranked[0] || null, tie = false;
+    if (ranked.length > 1 && vote[ranked[0]] === vote[ranked[1]]) {
+      var top = ranked.filter(function (p) { return vote[p] === vote[ranked[0]]; });
+      var mine = top.filter(function (p) { return own.indexOf(p) >= 0; });
+      if (mine.length === 1) plate = mine[0];
+      else { plate = null; tie = true; }
+    }
+    return { plate: plate, tie: tie, ranked: ranked };
+  }
+
+  /* ── 수기 운행 「빈 시간」(2026-11-12 §8.5 · U7 사용자 확정) ──
+   *  수기 운행에는 실제 시각이 없다 — 앱이 「○○ 운행 다음」 자리를 시각으로 넣는다(앞 운행 끝 + 1분 / 맨 앞은 다음 운행 시작 − 1분 / 빈 날 00:05)
+   *  그래서 시각이 아니라 차례로 맞춘다. 범위 운행 = 도착 > 출발(자동 기록 · 고쳐서 수기가 됐어도 길이가 남은 운행) · 0분 운행 = 출발 = 도착.
+   *  도착이 없는 운행(아직 끝나지 않음·깨진 기록)은 어느 쪽도 아니고, 빈 시간의 경계로만 쓴다(그 출발 시각에서 끊는다). */
+  var DAY = 86400000, KST_MS = 9 * 3600000, BEFORE_MAX = 30;   // 「운행 시작 n분 전」은 다음 범위 운행이 30분 안에 시작할 때만
+  function num(v) { return v == null || v === '' ? NaN : Number(v); }
+  function isRange(t) { var s = num(t && t.start_time), e = num(t && t.end_time); return isFinite(s) && isFinite(e) && e > s; }
+  function isZero(t) { var s = num(t && t.start_time), e = num(t && t.end_time); return isFinite(s) && isFinite(e) && e === s; }
+  function kstDay(ms) { return Math.floor((Number(ms) + KST_MS) / DAY); }
+
+  /**
+   * 범위 운행에 못 맞춘 기록 r 의 그날 「빈 시간」과 그 안의 0분 운행(차례 순).
+   *   빈 시간 = [r 바로 앞에 끝난 범위 운행의 도착, r 바로 뒤에 시작하는 범위 운행의 출발] — 없으면 그날(KST) 0시 · 다음 날 0시.
+   *   돌려주는 것: { options: 0분 운행[], day: 그날 이 차량 운행이 있나, next: 바로 뒤 범위 운행(그날) | null }
+   */
+  function gapOf(r, mine) {
+    var d = kstDay(r.at), d0 = d * DAY - KST_MS, d1 = d0 + DAY, lo = d0, hi = d1, next = null, any = false;
+    mine.forEach(function (t) {
+      var s = num(t.start_time), e = num(t.end_time);
+      if (!isFinite(s)) return;
+      if (isRange(t)) {
+        if (s < d1 && e >= d0) any = true;                  // 그날에 걸친 범위 운행(자정 넘긴 것 포함)
+        if (e < r.at && e > lo) lo = e;
+        if (s > r.at && s < hi) { hi = s; next = t; }
+      } else if (isZero(t)) {
+        if (kstDay(s) === d) any = true;
+      } else {
+        if (kstDay(s) === d) any = true;                    // 도착 없는 운행 — 출발 시각에서 끊는다
+        if (s <= r.at && s > lo) lo = s;
+        if (s > r.at && s < hi) { hi = s; next = null; }
+      }
+    });
+    var options = mine.filter(function (t) {
+      var s = num(t.start_time);
+      return isZero(t) && kstDay(s) === d && s >= lo && s <= hi;
+    }).sort(function (a, b) { return num(a.start_time) - num(b.start_time) || (a.id > b.id ? 1 : a.id < b.id ? -1 : 0); });
+    return { options: options, day: any, next: next };
+  }
+
+  /**
+   * 통과 시각 at 이 운행 t 안인가. 넓히기 전 규칙 = [출발, 도착](도착이 있어야 한다).
+   * wide(2026-11-12 §8.3 · 점검 §6-5) = [출발을 분 단위로 내린 값 − 5분, 도착] — 통과 시각은 분까지만 적혀 같은 분의 통과가 빠졌고
+   *   앱이 몇 분 늦게 켜진 운행도 있었다. 도착 쪽은 넓히지 않는다(넓히면 틀린 짝이 생긴다).
+   *   길이가 없는 운행(출발 = 도착 — 시각 없는 0분 수기 운행)은 넓히지 않는다: 그 시각은 앱이 채운 자리 시각이라 실제 시각이 아니다(§8.5 는 차례로 맞춘다).
+   */
+  function inTrip(t, at, wide) {
+    if (!t || !t.end_time) return false;
+    if (t.start_time <= at && at <= t.end_time) return true;
+    if (!wide || !(t.end_time > t.start_time)) return false;
+    return Math.floor(t.start_time / 60000) * 60000 - 300000 <= at && at <= t.end_time;
+  }
+
+  /** 기사가 앱에서 「확인」만 누른 기계 값인가(2026-11-12 §8.6 · 연구 F-10) — 명세서 금액과 다르면 명세서가 이긴다(기본 선택). */
+  var CONFIRMED_MACHINE = ['기사 확인 · 경로 계산', '기사 확인 · 하이패스 기록'];
+  function confirmedMachine(src) { return CONFIRMED_MACHINE.indexOf(String(src || '')) >= 0; }
 
   /** 사람이 직접 정한 통행료인가. 서버의 보호 트리거(old_by_person)와 같은 기준을 쓴다. */
   var PERSON_SOURCES = ['미입력', 'legacy-client-compat', '하이패스 영수증', '웹 직접 입력'];
@@ -507,32 +680,179 @@
     //   (20260902010000_protect_driver_toll_decision_v5.sql)의 기계 출처 목록과 같게(2026-10-20 AU5-L7)
     if (s === '자동계산 실패' || s === '영업소 요금표' || s === '요금소 미통과(실주행 GPS)' || s === '명절 통행료 면제') return 'machine';
     if (s.indexOf('카카오 길찾기') === 0) return 'machine';
+    if (s.indexOf('회사 하이패스 기록') === 0) return 'machine';   // 회사 하이패스 기록으로 추정한 값(2026-11-12 §8.6 — 서버 채우기·앱 4.2.0)
     if (s === 'legacy migration') return 'person';   // 이관된 사람 입력값
     return 'unknown';
   }
 
-  /** 그룹의 차량이 정해진 상태에서 실제 배분을 계산한다(차량을 바꾸면 다시 부른다). */
-  function assign(g, trips) {
-    var mine = g.plate ? trips.filter(function (t) { return t.plate_no === g.plate; }) : [];
-    var per = new Map(), unmatched = [];
-    g.records.forEach(function (r) {
-      var hit = null;
-      for (var i = 0; i < mine.length; i++) {
-        var t = mine[i];
-        // 통과시각이 [출발, 도착] 안이면 그 운행이다. 수기 입력 운행도 시각이 있으면 똑같이 잡힌다.
-        if (t.end_time && t.start_time <= r.at && r.at <= t.end_time) { hit = t; break; }
-      }
-      if (!hit) { unmatched.push(r); return; }
-      if (!per.has(hit.id)) per.set(hit.id, { trip: hit, lines: [], sum: 0 });
-      var e = per.get(hit.id);
-      e.lines.push(r); e.sum += r.amount;
+  /* ── 이미 붙은 줄(2026-11-12 Task 8 검토 M1 — 「붙어 있는 운행이 이긴다」) ──
+   *  수기 운행은 고르기로 붙으므로 다시 올리면(같은 명세서 · 기간이 겹치는 명세서 · 빈 시간에 수기 운행이 나중에 늘어남) 같은 통과가 다른 운행에 또 붙을 수 있었다.
+   *  그래서 운행 근거(toll_evidence_json)에 이미 그 통과 줄이 있으면 그 운행(붙어 있는 운행)의 줄로 본다 — 빈 시간·범위 규칙보다 먼저.
+   *  같은 통과 = mergeFiles 와 같은 열쇠: 통과 시각(at ↔ atText) · 금액 · 영업소(sameOffice) · 카드 끝 4자리(근거 note 「카드 1234 · …」가 있을 때만 견줌 — 줄에는 카드가 없다).
+   *  줄은 근거 lines(비어 있지 않으면), 아니면 prev.lines(사람이 고친 뒤 — needPdf 와 같은 규칙). 근거 줄 하나는 기록 하나만 차지한다.
+   *  ev = { 운행 id: toll_evidence_json } — 받아 둔 근거(driving-app.js HP.ej). 그 운행 id 가 없으면 「모름」.
+   *  받아야 하는 근거(evNeed) = 기록 날짜(KST)에 걸친 운행 중 하이패스 금액이 있는 것(toll_hipass · 출처 「하이패스 영수증」 — 범위 운행도, 검토 M2) — 근거를 못 읽으면(모름)
+   *  그날 기록은 어느 운행에도 미리 체크하지 않고(e.unsure · 줄의 unsure) 까닭을 보인다 — 이미 붙은 줄일 수 있는 것은 「붙이기」가 기본이면 안 된다.
+   */
+  function ejOf(v) {
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return null; } }
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  }
+  function hasHp(t) { return !!t && ((t.toll_hipass != null && t.toll_hipass !== '') || t.toll_source === '하이패스 영수증'); }
+  function evKnown(ev, t) { return !!ev && !!t && Object.prototype.hasOwnProperty.call(ev, String(t.id)); }
+  /** 근거를 받아야 하는 운행 id — 기록 날짜(KST)에 걸친 운행 중 하이패스 금액이 있는 것(범위·0분 모두 · 차량은 가리지 않는다 — 검토 M2). */
+  function evNeed(recs, trips) {
+    var days = {}, out = [];
+    (recs || []).forEach(function (r) { if (r && isFinite(r.at)) days[kstDay(r.at)] = true; });
+    (trips || []).forEach(function (t) {
+      if (hasHp(t) && tripDays(t).some(function (d) { return days[d]; }) && out.indexOf(t.id) < 0) out.push(t.id);
     });
+    return out;
+  }
+  /** 운행이 걸친 날(KST) — 출발 날 · 도착 날(다르면). 범위 운행도 0분 운행도(검토 M2 — 붙어 있는 운행은 범위 운행일 수도 있다). */
+  function tripDays(t) {
+    var s = num(t && t.start_time), e = num(t && t.end_time), out = [];
+    if (isFinite(s)) out.push(kstDay(s));
+    if (isFinite(e) && out.indexOf(kstDay(e)) < 0) out.push(kstDay(e));
+    return out;
+  }
+  /** 받아 둔 근거로 — 근거 줄 목록(운행마다 { trip, lines, card, used }) */
+  function heldPool(trips, ev) {
+    if (!ev) return [];
+    return (trips || []).filter(function (t) { return evKnown(ev, t); }).map(function (t) {
+      var o = ejOf(ev[String(t.id)]), cur = o && Array.isArray(o.lines) && o.lines.length ? o.lines : null;
+      var pv = o && ejOf(o.prev), ls = cur || (pv && Array.isArray(pv.lines) ? pv.lines : []);
+      var cm = cur && typeof o.note === 'string' ? o.note.match(/카드 (\d{4})/) : null;
+      return { trip: t, lines: ls.slice(0, 50), card: cm ? cm[1] : null, used: [] };
+    }).filter(function (h) { return h.lines.length; })
+      .sort(function (a, b) { return num(a.trip.start_time) - num(b.trip.start_time); });
+  }
+  /** 기록 r 이 이미 붙어 있는 운행(없으면 null). 찾으면 그 근거 줄을 차지한다. */
+  /** 기록들 → Map(기록 → 붙어 있는 운행). 시각 차례로 근거 줄을 하나씩 차지한다(같은 꼴 기록이 둘이면 하나만). */
+  //   plateOf(r) = 그 기록 카드 묶음에 정해진 차량(없으면 null) — 근거 note 에 카드가 없는 줄은 차량이 같아야 차지한다(holderOf, 검토 3b·4).
+  //   돌려주는 Map 의 .doubt = 차량이 달라 차지하지 않았지만 다른 차 운행에 같은 통과 줄이 있는 기록(Set) — 붙여도 미리 체크하지 않는다(unsure, 검토 4 M3).
+  function claimsOf(recs, trips, ev, plateOf) {
+    var pool = heldPool(trips, ev), out = new Map();
+    out.doubt = new Set();
+    if (!pool.length) return out;
+    (recs || []).slice().sort(function (a, b) { return a.at - b.at; }).forEach(function (r) {
+      var info = { doubt: false };
+      var h = holderOf(r, pool, r.card4 || null, plateOf ? plateOf(r) : null, info);
+      if (h) out.set(r, h);
+      else if (info.doubt) out.doubt.add(r);
+    });
+    return out;
+  }
+  /** 차량 번호 견주기(검토 4 — 이 견줌에만): 빈칸을 모두 뺀 글. 투표·차량 거르기는 그대로다. */
+  function plateKey(p) { return String(p == null ? '' : p).replace(/\s+/g, ''); }
+  //   영업소는 글이 똑같은 줄을 먼저 찾고, 없을 때만 끝이 같은 줄(검토 L4 — mergeFiles 와 같은 차례: 「성남영업소」 기록이 「서성남영업소」 줄을 먼저 차지하지 않게)
+  //   (검토 3b·4) 근거 note 에 카드가 없으면 카드로 가릴 수 없다 — 그 기록 묶음의 차량(plate)이 정해져 있으면 붙어 있는 운행의 차량과 같을 때만(빈칸 빼고 견줌) 차지한다
+  //   (같은 분·같은 금액·같은 영업소를 두 차가 함께 지남 — 관리자 「전체」 화면). 차량이 다르면 차지하지 않고(그 줄은 맞는 차의 기록 몫으로 남긴다)
+  //   info.doubt 를 세운다 — 그 기록은 보통 규칙으로 가되 미리 체크하지 않는다(투표가 틀렸거나 운행이 다른 차로 적혔으면 같은 통과를 두 번 낼 수 있다, 검토 4 M3).
+  //   차량이 안 정해졌으면(동점) 예전처럼 차지한다. note 에 카드가 있으면 카드가 정한다.
+  function holderOf(r, pool, card4, plate, info) {
+    var ro = String(r.office || '');
+    for (var pass = 0; pass < 2; pass++) {
+      for (var i = 0; i < pool.length; i++) {
+        var h = pool[i];
+        if (h.card && card4 && card4 !== '?' && h.card !== card4) continue;
+        var other = !h.card && !!plate && plateKey(h.trip.plate_no) !== plateKey(plate);
+        for (var j = 0; j < h.lines.length; j++) {
+          var l = h.lines[j];
+          if (!l || typeof l !== 'object') continue;
+          if (String(l.at == null ? '' : l.at).trim() !== String(r.atText || '').trim()) continue;
+          if (typeof l.amount !== 'number' || l.amount !== r.amount) continue;
+          var lo = String(l.office == null ? '' : l.office);
+          if (pass === 0 ? lo !== ro : !sameOffice(lo, ro)) continue;
+          // 다른 차 운행의 같은 통과 줄 — 맞는 차 기록이 이미 차지했어도 이 기록은 미리 체크하지 않는다(어느 차례로 와도 같게)
+          if (other) { if (info) info.doubt = true; continue; }
+          if (h.used[j]) continue;
+          h.used[j] = true;
+          return h.trip;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 그룹의 차량이 정해진 상태에서 실제 배분을 계산한다(차량을 바꾸면 다시 부른다).
+   *  ⓪ (2026-11-12 검토 M1) 이미 운행 근거에 있는 줄은 그 운행(붙어 있는 운행이 이긴다 — 범위·빈 시간 규칙보다 먼저 · 차량 고르기 전에도) — heldPool·holderOf.
+   *     ev = 받아 둔 근거(없으면 g.ev). 근거를 모르는 하이패스 운행이 그날 있으면 그 기록은 미리 체크하지 않는다(unsure).
+   *  ① 범위 운행(도착 > 출발)에 [출발, 도착] → 넓힌 창(§8.3) 차례로 — 두 운행에 다 들면 넓히기 전 규칙이 이긴다.
+   *  ② (2026-11-12 §8.5) 남은 기록마다 그날 그 차량의 「빈 시간」(gapOf) 안 0분 운행 —
+   *     하나면 그 운행 · 둘 이상이면 직원이 고른다(g.manualPick 에 고른 운행이 있고 아직 후보면 그 운행, 아니면 「수기 운행이 여러 개예요」) ·
+   *     없으면 까닭(r.why: no_trip_day 그날 운행 없음 · before_start 다음 운행 시작 r.min 분 전 · no_trip_time 그 시각에 운행 없음).
+   *     수기에 붙인 줄은 운행마다 묶어 g.matched 에 e.manual = true 로 넣는다(확정·고르기·잠금은 범위 운행과 같은 길) ·
+   *     미리 체크는 아래 kind 규칙 그대로. 다만 수기 운행에 이미 있는 금액이 기계 출처가 아니면(사람이 넣었거나 출처를 모름) 다르면 diff-person(체크 안 함).
+   *  g.manual = 수기 줄마다 { rec, trip(고르기 전이면 null), options(빈 시간 안 0분 운행들 · 붙어 있으면 그 운행 하나), kind, pick,
+   *             why('manual_many' — 고르기 전), held(이미 붙어 있음), unsure(근거를 못 읽음), e(그 운행 묶음) }.
+   *  g.unmatched = 어느 운행에도 안 붙고 고를 것도 없는 기록 — 기록마다 why(·min). 고르기를 기다리는 줄(manual_many)은 g.manual 에만 있다(검토 L3).
+   */
+  function assign(g, trips, ev) {
+    // ev 를 주면 그 근거로 이 묶음의 붙은 줄을 새로 정한다 · 안 주면 지난번 것(g.ev · g.held — match 가 묶음들에 함께 정해 둔 것)
+    if (ev !== undefined) { g.ev = ev || null; g.held = null; }
+    ev = g.ev || null;
+    var held = g.held instanceof Map ? g.held : (g.held = claimsOf(g.records, trips, ev, function () { return g.plate || null; }));
+    // 다른 차 운행에 같은 통과 줄이 있어 차지하지 않은 기록(검토 4 M3) — 보통 규칙으로 가되 미리 체크하지 않는다
+    var doubtRec = held.doubt instanceof Set ? held.doubt : new Set();
+    var mine = g.plate ? trips.filter(function (t) { return t.plate_no === g.plate; }) : [];
+    var range = mine.filter(isRange);
+    var per = new Map(), unmatched = [], rows = [];
+    var chosen = g.manualPick instanceof Map ? g.manualPick : (g.manualPick = new Map());
+    // 근거를 모르는 하이패스 운행이 걸친 날(KST) — 그날 기록은 미리 체크하지 않는다
+    var doubtDay = {};
+    //   (검토 M2) 0분 운행만이 아니라 하이패스 금액이 있는 모든 운행 — evNeed 와 같은 무리(범위 운행이 시각을 고쳐 그 줄을 안 덮어도 그 운행이 가진 줄일 수 있다)
+    trips.forEach(function (t) { if (hasHp(t) && !evKnown(ev, t)) tripDays(t).forEach(function (d) { doubtDay[d] = true; }); });
+    var add = function (trip, r, manual) {
+      if (!per.has(trip.id)) per.set(trip.id, { trip: trip, lines: [], sum: 0, manual: !!manual, unsure: false });
+      var e = per.get(trip.id);
+      e.lines.push(r); e.sum += r.amount;
+      if (doubtDay[kstDay(r.at)] || doubtRec.has(r)) e.unsure = true;
+      return e;
+    };
+    g.records.forEach(function (r) {
+      var hit = null, i;
+      delete r.why; delete r.min;
+      var hold = held.get(r) || null;
+      if (hold) {
+        if (isZero(hold)) rows.push({ rec: r, trip: hold, options: [hold], held: true });
+        else add(hold, r, false);
+        return;
+      }
+      for (i = 0; i < range.length && !hit; i++) if (inTrip(range[i], r.at, false)) hit = range[i];
+      for (i = 0; i < range.length && !hit; i++) if (inTrip(range[i], r.at, true)) hit = range[i];
+      if (hit) { add(hit, r, false); return; }
+      if (!g.plate) { unmatched.push(r); return; }      // 차량을 고르기 전(예전 「차량을 골라 주세요」)
+      var gp = gapOf(r, mine), opts = gp.options, pickT = null;
+      if (opts.length === 1) pickT = opts[0];
+      else if (opts.length > 1) {
+        var want = chosen.get(r);
+        pickT = opts.filter(function (t) { return want != null && String(t.id) === String(want); })[0] || null;
+      }
+      if (pickT) { rows.push({ rec: r, trip: pickT, options: opts }); return; }
+      if (opts.length > 1) {
+        r.why = 'manual_many';
+        rows.push({ rec: r, trip: null, options: opts });
+        return;                                          // 고르기를 기다리는 줄 — 안 맞는 줄 목록에 넣지 않는다(검토 L3)
+      }
+      if (!gp.day) r.why = 'no_trip_day';
+      else if (gp.next && num(gp.next.start_time) - r.at <= BEFORE_MAX * 60000) {
+        r.why = 'before_start'; r.min = Math.max(1, Math.ceil((num(gp.next.start_time) - r.at) / 60000));
+      } else r.why = 'no_trip_time';
+      unmatched.push(r);
+    });
+    // 수기 줄은 운행마다 묶는다 — 한 빈 시간에 통과가 여럿이면 한 운행의 통행료로 더한다(범위 운행과 같다)
+    rows.forEach(function (x) { if (x.trip) x.e = add(x.trip, x.rec, true); });
+    rows.forEach(function (x) { x.unsure = !!doubtDay[kstDay(x.rec.at)] || doubtRec.has(x.rec); });
 
     g.matched = Array.from(per.values()).map(function (e) {
       var cur = e.trip.toll_cost;
       var st = e.trip.toll_status;
       var unset = st === 'UNKNOWN' || st === 'PENDING' || cur == null;
-      var who = bySource(e.trip.toll_source);
+      // 「기사 확인 · 경로 계산」·「기사 확인 · 하이패스 기록」은 기사가 확인만 누른 기계 값이다(§8.6) — 사람 값으로 보지 않는다
+      //   (금액이 다르면 기본 선택 · 화면도 「자동」). bySource 자체는 그대로(운행 표 「확정」 표시·이력 권하기 기준).
+      var who = confirmedMachine(e.trip.toll_source) ? 'machine' : bySource(e.trip.toll_source);
 
       if (unset) {
         e.kind = 'new';                 // 미확정 → 확정. 잃을 게 없다.
@@ -551,21 +871,58 @@
         //   "다 확정됐습니다"라고 하는데 R06 은 "0 입력"을 권해 맞는 통행료를 지우게 될 수 있었다).
         e.kind = 'confirm';
         e.diff = 0; e.pick = true;
-      } else if (who === 'person') {
+      } else if (who === 'person' || (e.manual && who !== 'machine')) {
         // ★ 사람이 직접 정한 값이다. 영수증이 더 정확하더라도 **기본으로 덮지 않는다** —
         //   관리자가 눈으로 보고 직접 고르게 한다.
+        //   수기 운행(§8.5-4)은 출처를 모르는 금액도 사람이 넣은 것으로 본다 — 하이패스에 현금 몫을 더해 넣어 둔 금액이 사라지지 않게.
         e.kind = 'diff-person';
         e.diff = e.sum - Number(cur); e.pick = false;
+        if (e.manual) who = 'person';
       } else {
         e.kind = 'diff';                // 자동계산과 다르다. 영수증이 실제 청구액이므로 기본 선택.
         e.diff = e.sum - Number(cur); e.pick = true;
       }
       e.who = who;
+      // 그날 근거를 못 읽은 하이패스 0분 운행이 있다 — 이 줄이 거기 이미 붙어 있을 수 있으니 미리 체크하지 않는다(검토 M1)
+      if (e.unsure) e.pick = false;
+      // (전체 검토 W2-2 · money M5) 수기 운행에 맞춘 기록은 그 운행에 이미 같은 금액이 있을 때(confirm)만 미리 체크한다 — 시각을 확인할 수 없는 맞춤이라
+      //   통행료가 비었거나(new) 금액이 다르면(diff) 사람이 고른다(하루에 수기 운행 하나뿐이면 그날 출퇴근 통과까지 모두 그 운행에 모인다). 범위 운행은 그대로.
+      if (e.manual && e.kind !== 'confirm') e.pick = false;
       return e;
     }).sort(function (a, b) { return a.trip.start_time - b.trip.start_time; });
+    g.manual = rows.map(function (x) {
+      return { rec: x.rec, trip: x.trip, options: x.options, kind: x.e ? x.e.kind : null, pick: x.e ? x.e.pick : false,
+        why: x.trip ? null : 'manual_many', held: !!x.held, unsure: !!x.unsure, e: x.e || null };
+    });
     g.unmatched = unmatched;
     return g;
   }
 
-  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, mergeFiles: mergeFiles, recKey: recKey, keepPath: keepPath, needPdf: needPdf, pdfOk: pdfOk };
+  /** 「수기 운행이 여러 개예요」 줄에 직원이 고른 운행(trip id · null 이면 고르기 취소)을 남기고 다시 맞춘다. */
+  function chooseManual(g, rec, tripId, trips) {
+    if (!(g.manualPick instanceof Map)) g.manualPick = new Map();
+    if (tripId == null || tripId === '') g.manualPick.delete(rec); else g.manualPick.set(rec, tripId);
+    return assign(g, trips);
+  }
+
+  /**
+   * 확정(toll-apply items[].lines)에 보낼 줄 하나 — 입구 영업소·차종도 보낸다(서버 근거 lines 에 남아 통행료 추정 개선에 쓴다, 2026-10-17).
+   * 수기 운행에 붙인 줄(빈 시간, §8.5-7)이면 "manual": true — 출력 「수」 표시 · 배우는 재료에서 빼는 표시(서버 clipLines 는 참거짓을 그대로 남긴다).
+   */
+  function lineOf(r, manual) {
+    var o = { at: r.atText, office: r.office, entry: r.entryOffice || null, cls: r.carClass || null, amount: r.amount, page: r.page };
+    if (manual) o.manual = true;
+    return o;
+  }
+
+  /** 안 맞는 줄의 까닭 글(§8.4) — r.why · r.min. 모르는 값이면 빈 글. */
+  var WHY_TEXT = { no_trip_day: '그날 운행 기록 없음', no_trip_time: '그 시각에 운행 기록 없음', manual_many: '수기 운행이 여러 개예요. 골라 주세요.' };
+  function whyText(r) {
+    if (!r || !r.why) return '';
+    if (r.why === 'before_start') return '다음 운행 ' + (r.min || 1) + '분 전에 지남';   // (전체 검토 W2-4) 그 통과가 다음 운행 시작보다 n분 앞
+    return WHY_TEXT[r.why] || '';
+  }
+
+  global.Hipass = { parsePdf: parsePdf, match: match, assign: assign, bySource: bySource, confirmedMachine: confirmedMachine, mergeFiles: mergeFiles, recKey: recKey, keepPath: keepPath, needPdf: needPdf, pdfOk: pdfOk,
+    chooseManual: chooseManual, whyText: whyText, lineOf: lineOf, isRange: isRange, isZero: isZero, evNeed: evNeed };
 })(window);

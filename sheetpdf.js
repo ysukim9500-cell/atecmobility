@@ -442,6 +442,36 @@
     return top + hdH + sgH;
   }
 
+  /** 운행기록부 통행료 칸 표시와 범례 글(2026-10-23 하·영 · 2026-11-12 수·추 — spec toll-learn §8.5-8·§8.8). 범례는 이 차례(하·수·추·영)로, 쓴 표시만. */
+  var TOLL_MARKS = {
+    '하': '하이패스 영수증(PDF)으로 맞춘 통행료',
+    '수': '수기 운행에 붙인 하이패스(시각 확인 못 함)',
+    '추': '회사 하이패스 기록으로 추정한 통행료',
+    '영': '운행에 통행료가 없어 영수증 사진으로 채운 금액'
+  };
+  /**
+   * 그 운행의 하이패스 줄이 수기 운행에 붙인 줄인가(웹 하이패스 화면 「빈 시간」 — 줄에 manual: true, 2026-11-12 §8.5-7).
+   * 줄은 tollFlow 와 같은 규칙(근거 lines 가 비어 있지 않으면 그것, 아니면 prev.lines) · 줄 하나라도 manual === true 면 참.
+   * 근거 재료(ev)가 없거나 그 운행 줄을 못 받았으면 거짓 — 칸은 예전처럼 「하」.
+   */
+  /**
+   * 「추」 출처인가(운행기록부 통행료 칸 — driving-app.js sheetDataFor 가 tollMark 를 정할 때 쓴다) — 출처가 「회사 하이패스 기록」으로 시작하거나
+   * 「기사 확인 · 하이패스 기록」(기사가 줄을 눌러 확인했어도 금액의 뿌리는 회사 하이패스 기록 추정이다 — 전체 검토 W3-2 · money M10).
+   */
+  function estimateSrc(src) {
+    var s = String(src || '');
+    return s.indexOf('회사 하이패스 기록') === 0 || s === '기사 확인 · 하이패스 기록';
+  }
+  function manualHipass(ev, id) {
+    if (!ev || id == null || !Array.isArray(ev.trips)) return false;
+    var t = ev.trips.filter(function (x) { return x && String(x.id) === String(id); })[0];
+    var ej = t && t.ej && typeof t.ej === 'object' ? t.ej : null;
+    if (!ej) return false;
+    var ls = Array.isArray(ej.lines) && ej.lines.length ? ej.lines
+      : ej.prev && typeof ej.prev === 'object' && Array.isArray(ej.prev.lines) ? ej.prev.lines : [];
+    return ls.some(function (l) { return !!l && typeof l === 'object' && l.manual === true; });
+  }
+
   function drawSheetBody(c, sh, calc, t) {
     // ── 운행 내역 ──
     drawTableHead(c);
@@ -467,7 +497,11 @@
       if (x.toll == null) { cells[11].color = 0.4; cells[11].align = 'center'; }
       // 통행료 칸 출처(2026-10-23) — 하: 하이패스 영수증(PDF)으로 맞춘 금액 · 영: 운행에 금액이 없어 영수증 사진으로 채운 금액. 표 아래 범례.
       //   「입력 구분」 칸(자동·수기)은 운행을 어떻게 넣었는지라 통행료가 어디서 왔는지는 말하지 않는다.
-      else if (r.tollMark === '하' || r.tollMark === '영') { cells[11].mark = r.tollMark; cells[11].padL = 0.7 + 4.9 + 0.8; marks[r.tollMark] = 1; }
+      //   (2026-11-12 §8.5-8 · §8.8) 수: 하이패스로 맞춘 운행인데 그 줄이 수기 운행에 붙인 줄(근거 줄 manual: true — 시각 확인 못 함) · 추: 회사 하이패스 기록으로 추정한 금액
+      else {
+        var tm = r.tollMark === '하' && manualHipass(c.doc && c.doc.ev, r.id) ? '수' : r.tollMark;
+        if (TOLL_MARKS[tm]) { cells[11].mark = tm; cells[11].padL = 0.7 + 4.9 + 0.8; marks[tm] = 1; }
+      }
       body.push(cells);
     });
     calc.orphans.forEach(function (d) {
@@ -498,7 +532,7 @@
       { w: COLS[12], t: n0(t.all), size: 8.6, bold: true, align: 'right', fill: 0.91 }
     ];
     // 하이패스 근거는 한국도로공사 하이패스 영수증 PDF 다(2026-10-23 관리자 — 문서 글은 「이용내역」이 아니라 「하이패스 영수증」, 사진은 「영수증 사진」으로 가른다)
-    var legend = [marks['하'] ? '하 = 하이패스 영수증(PDF)으로 맞춘 통행료' : '', marks['영'] ? '영 = 운행에 통행료가 없어 영수증 사진으로 채운 금액' : ''].filter(Boolean);
+    var legend = ['하', '수', '추', '영'].filter(function (k) { return marks[k]; }).map(function (k) { return k + ' = ' + TOLL_MARKS[k]; });
     var legendH = legend.length ? 1.4 * MM + 6.8 * LH : 0;
     var need = c.rowHeight(totRow) + partRows.reduce(function (s, r) { return s + c.rowHeight(r); }, 0) +
       c.rowHeight(grandRow, 6.4 * MM) + legendH;
@@ -2298,6 +2332,7 @@
     // 근거 흐름(2026-10-23) — 시험·결재 화면(사진 수 세기)이 쓴다
     tollFlow: tollFlow, dayChecks: dayChecks, evTime: evTime, photoSections: photoSections, odoPicks: odoPicks, scanPlan: scanPlan,
     imagePaths: imagePaths, scanPaths: scanPaths, samePhotoFn: samePhotoFn, odoKmOf: odoKmOf, hipassName: hipassName, lateText: lateText, lateNote: lateNote,
+    manualHipass: manualHipass, TOLL_MARKS: TOLL_MARKS, estimateSrc: estimateSrc,
     HP_ORIG_FROM: HP_ORIG_FROM, COLS_MM: COLS_MM, BOXES: BOXES, BOXES_V1: BOXES_V1, VERSION: '1.5.2'
   };
 });
