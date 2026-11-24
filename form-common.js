@@ -7,7 +7,7 @@
   'use strict';
 
   /* ---------- Supabase 설정 (index.html과 동일 프로젝트) ---------- */
-  var SB_URL = 'https://eiyksjcqntenmetmhmij.supabase.co';
+  var SB_URL = 'https://api.atec-server.com';
   var SB_KEY = 'sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
   var ADMIN_EMAIL = 'ysukim@atecmobility.com';
 

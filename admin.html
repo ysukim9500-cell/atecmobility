@@ -208,7 +208,7 @@ const $ = s => document.querySelector(s);
 /* ===== 고정 관리자 ===== */
 
 /* ===== Supabase ===== */
-const SB_URL='https://eiyksjcqntenmetmhmij.supabase.co';
+const SB_URL='https://api.atec-server.com';
 const SB_KEY='sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
 const SB_DATA='shared_data';
 function sbHeaders(extra){ return Object.assign({'apikey':SB_KEY,'Authorization':'Bearer '+(AtecAuth.token()||SB_KEY),'Content-Type':'application/json'}, extra||{}); }

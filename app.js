@@ -11,7 +11,7 @@
 (function () {
   'use strict';
 
-  var SB = 'https://eiyksjcqntenmetmhmij.supabase.co';
+  var SB = 'https://api.atec-server.com';
   // publishable(anon) 키 — 공개돼도 되는 값이다. 권한은 로그인 토큰과 RLS 가 정한다.
   var KEY = 'sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
   var K_AT = 'drv_at', K_RT = 'drv_rt', K_ME = 'drv_me';

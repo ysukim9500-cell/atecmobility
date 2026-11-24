@@ -895,7 +895,7 @@ function labelOf(line,name){ const st=STATIONS.find(s=>s.line===line && s.name==
 function lineList(){ const seen=[]; STATIONS.forEach(s=>{ if(s.line && !seen.includes(s.line)) seen.push(s.line); }); return seen; }
 
 /* ===== Supabase cloud (user-entered faults shared across users) ===== */
-const SB_URL='https://eiyksjcqntenmetmhmij.supabase.co';
+const SB_URL='https://api.atec-server.com';
 const SB_KEY='sb_publishable_9xO2pBxLIpMvxbFmQPw1hQ_qtHN5Rm5';
 const SB_TABLE='shared_data';
 const RAIL_KEY='knr_faults';   // cloud key for user-entered fault records
