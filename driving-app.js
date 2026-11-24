@@ -6484,7 +6484,8 @@
     FOLLOW_LIST[kind] = { cyc: cyc, people: people };
     var seen = remindSeen(kind) || {};
     // 오늘 보낸 것 = 팀즈가 받은 것(2xx)과 보내는 중(pending)만 — 팀즈가 받지 않은 것(500 등)은 「못 보냄」, 그날 다시 보낼 수 있다(2026-10-20 V3 B9, 서버 remind.ts 와 같은 판정)
-    var gone = function (u) { var s = seen[u]; return !!s && (/^2\d\d$/.test(String(s.result)) || s.result === 'pending'); };
+    //   push_only = 회사 메일이 없어 팀즈 대신 앱 알림만 보낸 줄(2026-11-24 B6) — 보낸 것으로 센다(하루 한 번 · 다시 알림 없음)
+    var gone = function (u) { var s = seen[u]; return !!s && (/^2\d\d$/.test(String(s.result)) || s.result === 'pending' || s.result === 'push_only'); };
     var notYet = people.filter(function (p) { return p.st !== 'rejected'; }), bulk = notYet.filter(function (p) { return !gone(p.u); });
     var all = !!FOLLOW_ALL[kind], shown = all ? people : people.slice(0, FOLLOW_N);
     var stChip = function (p) {
@@ -6496,6 +6497,10 @@
       var s = seen[p.u];
       // 다른 기간 안내를 보낸 날이면 그 기간 이름(「10월분 보냄」) — 한 사람에게 하루 한 번이라 오늘은 더 못 보낸다(V3 U8)
       var other = s && s.cycle && s.cycle !== cyc ? keyShort(s.cycle, s.cycle) : '';
+      // 앱 알림만 보냄(push_only) — 회사 메일이 없어 팀즈 대신 앱 알림. 다시 알림 없음. 다른 기간에 보낸 날이면 그 기간 이름은 title 에
+      //   (딱지에 붙이면 칸이 넘친다 — 1280 에서 표가 상자 밖으로 24px)
+      if (s && s.result === 'push_only') return '<span class="d2sent" title="' + esc(hm(s.at) + (other ? ' ' + other + ' 마감 안내.' : '') + ' 회사 메일이 없어 팀즈 대신 앱 알림만 보냈어요' +
+        (other ? '. 한 사람에게 하루 한 번만 보낼 수 있어요.' : '')) + '">' + ic('check', 13) + '앱 알림 보냄</span>';
       if (s && gone(p.u)) return '<span class="d2sent" title="' + esc(hm(s.at) + ' ' + (other ? other + ' 마감 안내 ' : '') + (s.result === 'pending' ? '보내는 중' : '보냄') +
         (other ? '. 한 사람에게 하루 한 번만 보낼 수 있어요.' : '')) + '">' + ic('check', 13) + (s.result === 'pending' ? '보내는 중' : other ? esc(other) + ' 보냄' : '오늘 보냄') + '</span>';
       // 팀즈가 받지 않음 — 폰에서도 보이게 글로(예전엔 「오늘 보냄」에 마우스를 올려야 보였다) + 다시 보내기
@@ -6618,7 +6623,7 @@
       var k1 = t.getAttribute('data-remindall'), L = FOLLOW_LIST[k1], seen = remindSeen(k1) || {};
       if (!L) return;
       // 팀즈가 받지 않은(못 보낸) 사람도 다시 보낸다 — 받은 것(2xx)·보내는 중만 뺀다(2026-10-20 V3 B9)
-      var sentOk = function (u) { var s = seen[u]; return !!s && (/^2\d\d$/.test(String(s.result)) || s.result === 'pending'); };
+      var sentOk = function (u) { var s = seen[u]; return !!s && (/^2\d\d$/.test(String(s.result)) || s.result === 'pending' || s.result === 'push_only'); };
       openRemind(k1, L.people.filter(function (p) { return p.st !== 'rejected' && !sentOk(p.u); }).map(function (p) { return p.u; }));
       return;
     }
