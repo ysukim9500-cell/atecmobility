@@ -529,10 +529,11 @@
     var m = { approved: ['결재 완료', 'ok'], submitted: ['결재 중', 'warn'], rejected: ['반려', 'bad'], withdrawn: ['회수', 'dim'] }[a.status] || [a.status, ''];
     return '<span class="st ' + m[1] + '">' + esc(m[0]) + '</span>';
   }
-  function fact(k, v, sub, alert) {
+  function fact(k, v, sub, alert, o) {
     // 설명의 가운뎃점 낱말(「구분·사용목적」)은 한 덩이로(keepDots) — 「확인 필요」 설명에 식대 비고를 더하자 360·390 에서 그 낱말이 두 줄로 갈렸다(2026-11-02 고침 2차)
     //   설명이 { html } 이면 이미 만든 HTML 그대로(「 · 」 조각 dnLine — 2026-11-03 화면 다듬기)
-    return '<div class="fact"><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
+    //   o = { cls, title }(있으면) — 칸 이름표(class)와 전체 글(title, 한 줄로 줄인 칸 — 카드 내역 요약, 2026-11-25)
+    return '<div class="fact' + (o && o.cls ? ' ' + o.cls : '') + '"' + (o && o.title ? ' title="' + esc(o.title) + '"' : '') + '><div class="k">' + esc(k) + '</div><div class="v' + (alert ? ' alert' : '') + '">' + v + '</div>' +
       '<div class="sub">' + (sub && sub.html != null ? sub.html : keepDots(esc(sub || ''))) + '</div></div>';
   }
   function head(title, extra) {
@@ -711,7 +712,8 @@
     //   칸은 자동 저장이고, 표 위 저장 상태 줄이 저장 중·저장됨·저장 못 함을 알리며, 저장이 실패했을 때만 그 줄에 「다시 저장」이 나온다.
     h += '<div class="hero fade"><div class="eyebrow"><span class="dot' + (allDone ? ' ok' : '') + '"></span>' +
       esc(cycName(S.CYCKEY)) + ' · ' + esc(R.span(S.CYCKEY)) + ' · ' + n0(T.n) + '건</div>' +
-      '<p class="verdict">' + won(T.cost) + '</p><div class="facts" id="cFacts">' + factsInner(rows) + '</div>' +
+      // 요약 칸(.cfx — 칸 자리·크기가 내용과 상관없이 같은 틀, 2026-11-25 factsInner)
+      '<p class="verdict">' + won(T.cost) + '</p><div class="facts cfx" id="cFacts">' + factsInner(rows) + '</div>' +
       (mlock || quiet ? '' : '<div class="vact" style="margin-top:16px"><button class="btn pri" data-cup>' + ic('card', 14) + 'ERP 엑셀 올리기</button>' +
         (open.length ? sugBtnHtml(nSug) : '') +
         (tg.length ? '<button class="btn" data-v="c_verify">검증·상신으로 ' + ic('chev', 13) + '</button>' : '') + '</div>') + '</div>';
@@ -871,6 +873,9 @@
     if (h) nt.title = h; else nt.removeAttribute('title');
     if (hl) { if (hl.getAttribute('data-h') !== h) { hl.innerHTML = h ? hintHtml(h) : ''; hl.setAttribute('data-h', h); } hl.hidden = !h; }
   }
+  /** 추천 칩 숨기기·보이기 — 자리는 남긴다(.csoff = visibility:hidden, 2026-11-25 사용자 「왔다갔다」 — 칩을 빼면 그 줄이 27px(폰 카드 38px) 줄어 아래 줄이 모두 올라갔다).
+   *  구분을 적거나 칩을 누르면 숨기고 지우면 제자리에 다시 보인다 · 줄 높이는 다음에 화면을 새로 그릴 때까지 그대로(그때 구분이 있는 줄은 칩 없이 그린다). */
+  function chipOff(chip, off) { if (chip) chip.classList.toggle('csoff', !!off); }
   function queueSave(el, now) {
     var id = el.dataset.cid, f = el.dataset.f, k = id + '|' + f;
     if (f !== 'note') el.classList.toggle('need', !el.value.trim());
@@ -883,7 +888,7 @@
     paintSave();
     if (f === 'category') {
       // 구분을 직접 적으면 그 줄의 추천 칩은 감춘다(지우면 다시 보임) — 적어 둔 값과 다른 추천이 남아 헷갈리던 것(2026-10-15)
-      var chip = document.querySelector('[data-csug="' + id + '"]'); if (chip) chip.hidden = !!el.value.trim();
+      chipOff(document.querySelector('[data-csug="' + id + '"]'), !!el.value.trim());
       paintSug();
     }
   }
@@ -950,7 +955,8 @@
       [].forEach.call(tr.querySelectorAll('.cin'), function (i) { i.disabled = L; if (L && i.value.trim()) i.title = i.value; else i.removeAttribute('title'); });
       [].forEach.call(tr.querySelectorAll('[data-cdel]'), function (b) { b.hidden = L; });
       var cat = tr.querySelector('.cin[data-f="category"]');
-      [].forEach.call(tr.querySelectorAll('[data-csug]'), function (b) { b.hidden = L || !!(cat && cat.value.trim()); });
+      // 추천 칩 — 잠기면 자리째 뺀다(예전 그대로: 다른 탭·기기의 상신으로 줄 모양이 통째로 바뀌는 때) · 풀리면 구분 칸 값대로 보이기·자리만(chipOff)
+      [].forEach.call(tr.querySelectorAll('[data-csug]'), function (b) { b.hidden = L; chipOff(b, !!(cat && cat.value.trim())); });
       var box = tr.querySelector('input[data-msel]'); if (box) box.disabled = L;
       var mh = $('cmh' + id);
       if (L) { if (mh) mh.hidden = true; } else paintMeal(id);
@@ -1100,16 +1106,30 @@
     var top = all.slice(0, 2), rest = all.slice(2);
     // 많이 쓴 구분 둘 + 나머지는 「외 N구분」 한 칸(2026-10-15 — 둘만 보여 위 합계와 안 맞아 보이던 것)
     var restSum = rest.reduce(function (s, x) { return s + (Number(x.sum) || 0); }, 0), restN = rest.reduce(function (s, x) { return s + x.n; }, 0);
+    // 칸 자리는 늘 다섯(2026-11-25 사용자 「왔다갔다」 — 구분을 적어 저장할 때마다 칸이 생기거나 「외 N구분」 목록이 길어져 요약 상자가 커지고 아래 표가 내려갔다):
+    //   건수 · 빈칸 · 많이 쓴 구분 둘 · 외 N구분. 아직 없는 구분 칸은 보이지 않는 빈 칸(.fgap)으로 자리만 · 바뀌는 칸(.cvar)은 한 줄로 줄이고 전체 글은 title ·
+    //   외 N구분 목록(.crest)은 첫 줄만(조각째). 칸 틀은 CSS(.facts.cfx) ·
+    //   고칠 줄(열린 줄)이 없는 달은 적는 동안 바뀔 일이 없으니 빈 칸을 두지 않는다(예전처럼 있는 칸만)
+    // 줄이 없으면 빈칸 칸은 뺀다(할 일이 아니다, 2026-11-02 화면 로봇) — 건수만
+    if (!rows.length) return fact('건수', n0(T.n) + '<small>건</small>', 'ERP에서 올린 승인');
+    var gap = openOf(rows).length ? '<div class="fact fgap" aria-hidden="true"><div class="k">&nbsp;</div><div class="v">&nbsp;</div><div class="sub">&nbsp;</div></div>' : '';
+    var restList = [n0(restN) + '건'].concat(rest.map(function (x) { return x.c; }));
     return fact('건수', n0(T.n) + '<small>건</small>', 'ERP에서 올린 승인') +
-      // 줄이 없으면 빈칸 칸은 뺀다(할 일이 아니다, 2026-11-02 화면 로봇)
-      (rows.length ? fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적을 채워야 상신할 수 있어요', blank > 0) : '') +
-      top.map(function (x) { return fact(x.c, won(x.sum), n0(x.n) + '건'); }).join('') +
-      // 「N건 · 구분 · 구분 …」은 조각 사이에서만 줄을 바꾼다(줄 처음 「· 소모품비」 없음 — 2026-11-03 화면 다듬기, 360)
-      (rest.length ? fact('외 ' + n0(rest.length) + '구분', won(restSum), { html: dnLine([n0(restN) + '건'].concat(rest.map(function (x) { return x.c; }))) }) : '');
+      fact('빈칸', '<span id="cBlankN">' + n0(blank) + '</span><small>줄</small>', '구분·사용목적을 채워야 상신할 수 있어요', blank > 0) +
+      [0, 1].map(function (k) {
+        var x = top[k];
+        return x ? fact(x.c, won(x.sum), n0(x.n) + '건', false, { cls: 'cvar', title: x.c + ' ' + won(x.sum) + ' · ' + n0(x.n) + '건' }) : gap;
+      }).join('') +
+      // 「N건 · 구분 · 구분 …」은 조각 사이에서만 줄을 바꾼다(줄 처음 「· 소모품비」 없음 — 2026-11-03 화면 다듬기, 360) — 보이는 것은 첫 줄의 조각까지
+      (rest.length ? fact('외 ' + n0(rest.length) + '구분', won(restSum), { html: dnLine(restList) }, false,
+        { cls: 'cvar crest', title: '외 ' + n0(rest.length) + '구분 ' + won(restSum) + ' · ' + restList.join(' · ') }) : gap);
   }
   function sectN(rows) {
-    var blank = R.blankRows(openOf(rows)), nMiss = rows.filter(function (it) { return MISSING[it.id] && !cancelOf(it); }).length, nCan = rows.filter(cancelOf).length;
-    return n0(rows.length) + '건' + (blank ? ' · 빈칸 ' + n0(blank) + '줄' : '') + (nCan ? ' · 전액 취소된 승인 ' + n0(nCan) : '') + (nMiss ? ' · 파일에 없는 줄 ' + n0(nMiss) : '');
+    var open = openOf(rows), blank = R.blankRows(open), nMiss = rows.filter(function (it) { return MISSING[it.id] && !cancelOf(it); }).length, nCan = rows.filter(cancelOf).length;
+    // 빈칸이 0 이면 「 · 빈칸 0줄」을 끝에 보이지 않게 둔다(2026-11-25) — 마지막 빈칸을 채울 때 글이 짧아져 좁은 화면에서 머리 줄이 한 줄 줄면 표가 올라갔다(반대로 지울 때도).
+    //   글 폭이 늘 같다. 고칠 줄(열린 줄)이 없는 달은 빈칸이 생길 수 없으니 두지 않는다
+    return n0(rows.length) + '건' + (blank ? ' · 빈칸 ' + n0(blank) + '줄' : '') + (nCan ? ' · 전액 취소된 승인 ' + n0(nCan) : '') + (nMiss ? ' · 파일에 없는 줄 ' + n0(nMiss) : '') +
+      (!blank && open.length ? '<span class="sn0" aria-hidden="true"> · 빈칸 0줄</span>' : '');
   }
   /** 전액 취소로 확인된 승인이 아직 남아 있으면 띠 하나(2026-10-20 AU2 #5 — 검증 경고). 고칠 수 없는 줄(상신한 문서에 든 줄 — 2026-11-03)은 세지 않는다. */
   function cancelBand(rows) {
@@ -1125,16 +1145,18 @@
     var sn = $('cSectN'); if (sn) sn.innerHTML = sectN(rows);
     paintSug();
   }
-  /** 「추천 구분 채우기 (N)」 숫자를 지금 칸 값으로 다시 센다 — 칩을 누르거나 구분을 적으면 바로 줄고, 0 이면 숨긴다(2026-10-15). */
+  /** 「추천 구분 채우기 (N)」 숫자를 지금 칸 값으로 다시 센다 — 칩을 누르거나 구분을 적으면 바로 준다(2026-10-15).
+   *  0 이 되면 숨기지 않고 막아 둔다(「(0)」, 2026-11-25) — 숨기면 좁은 화면에서 단추 줄이 한 줄 줄어 아래 표가 52px 올라갔다. 다음에 화면을 그릴 때 0 이면 예전처럼 없음.
+   *  처음 그릴 때 0 이라 숨겨 둔 단추는 그대로 숨김 — 나타나면 단추 줄이 늘어 표가 내려간다(그 줄의 추천 칩은 그대로 보인다). */
   function paintSug() {
-    var b = $('btnCSugAll'); if (!b) return;
+    var b = $('btnCSugAll'); if (!b || b.hidden) return;
     var rows = mineRows(C.state().CYCKEY), hist = histFor(rows);
     var n = openOf(rows).filter(function (it) {
       var el = document.querySelector('.cin[data-cid="' + it.id + '"][data-f="category"]');
       return !String(el ? el.value : (it.category || '')).trim() && R.suggest(it, hist);
     }).length;
     b.textContent = '추천 구분 채우기 (' + n0(n) + ')';
-    b.hidden = !n;
+    b.disabled = !n;
   }
   function pending() { return SAVING > 0 || Object.keys(SAVE_T).length > 0; }
   function fillSuggest() {
@@ -1153,7 +1175,7 @@
       // 화면의 칸도 바로 채운다 — 다른 칸에 쓰는 중이면 다시 그리지 않으므로(커서가 튄다) 칸 값만 바꾼다
       var inp = document.querySelector('.cin[data-cid="' + x.id + '"][data-f="category"]');
       if (inp && inp !== document.activeElement && !inp.value.trim()) { inp.value = x.cat; inp.classList.remove('need'); paintMeal(x.id); }
-      var chip = document.querySelector('[data-csug="' + x.id + '"]'); if (chip) chip.remove();
+      chipOff(document.querySelector('[data-csug="' + x.id + '"]'), true);     // 자리는 남긴다(끝나면 화면을 다시 그린다 — 쓰는 중이 아니면)
       return saveCell(x.id, 'category', x.cat, cyc);
     }).then(function () {
       FILLING = false;
@@ -2568,7 +2590,8 @@
     if (e.target.closest('#btnCUpGo')) { runUpload(); return; }
     if ((el = e.target.closest('[data-csug]'))) {
       var inp = document.querySelector('.cin[data-cid="' + el.dataset.csug + '"][data-f="category"]');
-      if (inp && !inp.disabled) { inp.value = el.dataset.cat; inp.classList.remove('need'); saveCell(el.dataset.csug, 'category', el.dataset.cat); paintMeal(el.dataset.csug); el.remove(); paintSug(); }
+      // 칩은 빼지 않고 숨긴다(자리는 남음 — 아래 줄이 올라가지 않게, 2026-11-25 chipOff)
+      if (inp && !inp.disabled) { inp.value = el.dataset.cat; inp.classList.remove('need'); saveCell(el.dataset.csug, 'category', el.dataset.cat); paintMeal(el.dataset.csug); chipOff(el, true); paintSug(); }
       return;
     }
     if (e.target.closest('[data-csugall]')) { fillSuggest(); return; }

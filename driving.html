@@ -176,6 +176,8 @@ body.nodrv #nav > a:not([data-v="inbox"]):not(.xnav):not(.cnav),body.nodrv #nav 
 .csug{display:flex;width:max-content;align-items:center;margin-top:4px;height:24px;padding:0 9px;border-radius:999px;border:1px dashed var(--ink-300);
   background:transparent;color:var(--ink-500);font:inherit;font-size:12px;cursor:pointer}
 .csug:hover,.csug:focus-visible{border-color:var(--red);color:var(--red)}
+/* 구분을 적거나 칩을 누르면 칩은 숨기되 자리는 남긴다(2026-11-25 — 칩을 빼면 그 줄이 27px(폰 카드 38px) 줄어 아래 줄이 모두 올라갔다. drv-card.js chipOff) */
+.csug.csoff{visibility:hidden}
 /* 줄 저장 표시(2026-11-25) — 「삭제」 왼쪽 16px 고정 자리. 예전엔 글(「저장 중…」·「저장됨」)이 바뀔 때마다 끝 칸 폭이 바뀌어 표 전체가 옆으로 움직였다(사용자 「왔다갔다」).
    글(저장 중… · 저장됨 · 저장 못 함)은 화면 읽기·시험용으로 안에 두고 자리 밖으로 밀어 숨긴다. 보이는 것은 data-s 표시(drv-card.js mark):
    saving = 회색 점 셋(보낸 지 600ms 지나야 — 빠른 저장은 안 보임) · ok = 초록 ✓(1.5초 뒤 흐려짐, 자리는 남음) · bad = 빨간 !(풀릴 때까지, title 「저장 못 함」).
@@ -221,6 +223,27 @@ tr.clock .csave:not([data-s]){display:none}
 .csaveline .csaven.csbad > .csg{visibility:hidden}
 @media screen and (max-width:900px){ .csaveline .csl1{min-height:38px} }
 @media screen and (max-width:600px){ .csaveline .csl1{min-height:44px} }
+/* 내역 머리 줄 숫자 — 빈칸 0 이면 「 · 빈칸 0줄」을 끝에 보이지 않게 둔다(글 폭이 늘 같아 좁은 화면에서 줄 수가 안 바뀐다, 2026-11-25 drv-card.js sectN) */
+#cSectN .sn0{visibility:hidden}
+/* 카드 내역 요약 칸(.facts.cfx, 2026-11-25 사용자 「왔다갔다」) — 구분을 적어 저장할 때마다 칸이 생기거나(건수·빈칸 → 많이 쓴 구분 → 외 N구분) 「외 N구분」 목록이 길어져
+   요약 상자가 줄 바꿈으로 커지고 아래 표가 내려갔다(1280 외 목록 +74 · 1024 +74 · 768 +85 · 390 칸이 생길 때마다 +85, 실측).
+   칸은 늘 다섯 자리(아직 없는 구분은 보이지 않는 빈 칸 .fgap) · 바뀌는 칸(.cvar — 구분 이름·금액·건수)은 한 줄(넘치면 「…」, 전체 글은 칸 title) ·
+   외 N구분 목록(.crest)은 첫 줄만(조각째 — 넘친 조각은 다음 줄로 넘어가 가려진다, 줄 끝 「·」 없음). 칸 틀은 내용 폭이 아니라 칸 수로 —
+   1280 이상 한 줄(건수·빈칸은 제 글 폭 · 구분 두 칸은 140 이상 — 천만 원대 금액이면 금액 폭만큼 넓어진다, 금액을 「…」로 자르지 않게 · 외 N구분 나머지) ·
+   901~1279 위 셋·아래 둘(601~900 다섯 칸 틀과 같다) · 600 이하 둘·둘·하나(예전 그대로).
+   건수·빈칸 설명은 늘 같은 글이라 줄 수는 화면 폭으로만 정해진다 */
+.facts.cfx > .fact{min-width:0}
+.facts.cfx > .fact.fgap{visibility:hidden}
+.facts.cfx > .fact.cvar > div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facts.cfx > .fact.crest > .sub{height:1.6em;overflow:hidden;text-overflow:clip}
+@media screen and (min-width:901px) and (max-width:1279px){
+  .facts.cfx{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px 24px}
+  .facts.cfx > .fact{grid-column:span 2}
+  .facts.cfx > .fact:nth-child(n+4){grid-column:span 3}
+}
+@media screen and (min-width:1280px){
+  .facts.cfx{display:grid;grid-template-columns:auto auto minmax(140px,max-content) minmax(140px,max-content) minmax(0,1fr);gap:0 38px}
+}
 /* 휴대폰: 한 줄 = 카드 한 장. 위 두 줄은 순번·승인일·시간·금액 / 가맹점·업종, 그 아래 손으로 적는 칸 셋(이름표와 함께)
    2026-10-20 AU6-M7: 768(태블릿)에서도 카드로 — 720 → 820px(표 893px 가 안쪽 가로 스크롤 뒤로 숨던 것) */
 @media (max-width:820px){
