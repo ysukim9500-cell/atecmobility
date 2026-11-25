@@ -583,6 +583,8 @@
      (A4 에 여러 장이면 영수증마다 오려 낸다) → 표에서 고친다 → 사진을 evidence/{나}/exp/{키}.jpg 로 올리고 expense_items 에 넣는다. */
   var XUP = { busy: false, items: [], pages: [], sent: false };
   var X_SENDING = false;
+  // 올리는 중이면(창을 닫아도 뒤에서 이어 올린다) 새 판 띠(live.js)가 저절로 새로 고치지 않게 — 본체 verHold 가 묻는다(2026-11-25 묶음 E 고침 1)
+  if (C.holdReload) C.holdReload(function () { return X_SENDING; });
   function freeUrls() {
     XUP.pages.forEach(function (p) { if (p.url) URL.revokeObjectURL(p.url); });
     XUP.items.forEach(function (it) { if (it.crop && it.crop.url) URL.revokeObjectURL(it.crop.url); });
@@ -1687,11 +1689,12 @@
         var by = {}; (rows || []).forEach(function (x) { by[x.approval_id] = x; });
         need.forEach(function (a) { FZSUM[fzKey(a)] = by[a.id] || null; });
         FZASK = '';
-        if (C.state().VIEW === view) C.render();
+        // 보던 자리 그대로 · 결재함이면 쓰는 중 · 누르는 중에는 맡아 둔다(본체 C.repaintKeep — 그냥 다시 그리면 새 내 차례 카드가 끼며 아래 카드가 밀렸다, 2026-11-25 F2)
+        if (C.state().VIEW === view) (C.repaintKeep || C.render)();
         fzFlush();
       }).catch(function () {
         need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = '';
-        if (C.state().VIEW === view) C.render();          // 못 받았어도 다시 그린다 — 결재함이 묶기 전에 기다린다(2026-10-20 V3 B7)
+        if (C.state().VIEW === view) (C.repaintKeep || C.render)();          // 못 받았어도 다시 그린다 — 결재함이 묶기 전에 기다린다(2026-10-20 V3 B7)
         fzFlush();
       });
   }

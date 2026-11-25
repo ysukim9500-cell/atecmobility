@@ -688,7 +688,8 @@
         need.forEach(function (a) { FZSUM[fzKey(a)] = by[a.id] || null; });
         FZASK = '';
         // 물어본 그 화면에 아직 있을 때만 다시 그린다(다른 화면에서 치던 것을 건드리지 않는다).
-        if (C.state().VIEW === view) C.render();
+        //   보던 자리 그대로 · 결재함이면 쓰는 중 · 누르는 중에는 맡아 둔다(본체 C.repaintKeep — 그냥 다시 그리면 새 내 차례 카드가 끼며 아래 카드가 밀렸다, 2026-11-25 F2)
+        if (C.state().VIEW === view) (C.repaintKeep || C.render)();
         fzFlush();
       })
       .catch(function () {
@@ -696,7 +697,7 @@
         need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); });
         FZASK = '';
         // 못 받았어도 다시 그린다 — 결재함은 검증 결과를 받기 전에는 카드를 묶지 않고 기다린다(2026-10-20 V3 B7)
-        if (C.state().VIEW === view) C.render();
+        if (C.state().VIEW === view) (C.repaintKeep || C.render)();
         fzFlush();
       });
   }

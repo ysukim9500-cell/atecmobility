@@ -135,9 +135,10 @@
   /* 이 탭의 쓰기 세기(2026-11-02 docs/nav-refresh/SPEC.md) — 화면을 옮길 때 조용히 새로 받기(navRefresh)는 받는 사이 이 탭에서 쓰기가
      있었으면(보내는 중이거나 끝남) 받아 온 것을 넣지 않는다: 쓰기 전에 읽은 목록이 늦게 와서 방금 저장한 칸(법인카드 구분 등)·확정한 통행료를
      되돌리지 않게. WRITE_N = 보내는 중인 쓰기 수 · WRITE_GEN = 쓰기를 보낼 때·끝날 때마다 +1.
-     읽기만 하는 POST(잠금 묻기·출력 기록 요약·검증 계산·길찾기·내 계정 묻기)는 쓰기로 치지 않는다 — 모르는 POST 는 쓰기로 친다(덮는 것보다 한 번 더 받는 편이 안전). */
+     읽기만 하는 POST(잠금 묻기·출력 기록 요약·검증 계산·길찾기·내 계정 묻기·바뀜 표식)는 쓰기로 치지 않는다 — 모르는 POST 는 쓰기로 친다(덮는 것보다 한 번 더 받는 편이 안전).
+     바뀜 표식(approval_live_mark, 2026-11-25)은 10초마다 읽는다 — 쓰기로 세면 그때마다 맡아 둔 조용한 받기(NAV_PEND)가 버려진다. */
   var WRITE_N = 0, WRITE_GEN = 0;
-  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history|toll_accuracy_monthly)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
+  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history|toll_accuracy_monthly|approval_live_mark)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
   function isWrite(path, opt) {
     var m = String((opt && opt.method) || 'GET').toUpperCase(), p = String(path || '');
     if (m === 'GET' || m === 'HEAD' || READ_POST.test(p)) return false;
@@ -432,7 +433,8 @@
   //   표가 없거나(배포 차례) 못 읽으면 빈 것 = 표시 없음(SPEC §9).
   var NONE = {};
   /** 확장 모듈(drv-*.js)이 얹는 것들. 파일 끝의 '확장 모듈 이음매'에서 채운다. */
-  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [],
+  // hold — 새 판으로 저절로 새로 고치기 전에 묻는 모듈 함수(C.holdReload, 2026-11-25 묶음 E 고침 1 — verHold): 화면 밖 상태(저장 전 · 보내는 중)가 있으면 참
+  var EXT = { apprExtra: null, wantSummaries: null, beforeSubmit: null, sumText: null, previewBytes: null, onCycle: [], dirty: [], onGo: [], hold: [],
     // 2026-10-07 개인경비 — 다른 결재 문서(kinds)·다른 기간 규칙(periods)·같이 받을 자료(load)·「보는 범위」 사람(orgUsers)
     // 2026-10-09 법인카드 — 기간 규칙이 둘이 되어 목록으로(개인경비 20~19일 'x' · 법인카드 1일~말일 'c'). 규칙마다 mode.
     // loadMode — load 마다 그 모듈의 갈래('x'·'c', 2026-11-02 조용히 새로 받기는 지금 갈래 모듈 것만 받는다)
@@ -1099,6 +1101,8 @@
       onl.forEach(function (f) { try { f(); } catch (e) { } });
       // 안전교육 이번 회차 내 대상 여부 스냅샷(앱 MainScreen 의 eduEnsureSelfTarget 과 같다, 2026-10-14).
       eduEnsureSelf();
+      // 바뀜 표식 되풀이 읽기를 켠다(2026-11-25 묶음 E — 이미 켜져 있으면 그대로 · 타이머는 하나)
+      if (LIVE_POLL) LIVE_POLL.start();
     }).catch(function (e) {
       if (seq !== LOAD_SEQ) return;
       LOADING = false;
@@ -4023,8 +4027,29 @@
     var ae = document.activeElement;
     return !!(ae && ae !== document.body && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable));
   }
+  /* 조용히 다시 그릴 때(apprShow · navRepaint · apprGone — 다 apprRepaint) 「내 차례」에 검증 요약(고정본)을 아직 받지 않은 문서가 있으면(그 순간 처음 보는
+     새 상신 등) 지금 그리면 turnGroups 가 묶음 전체를 자리표시(뼈대)로 바꾼다(V3 B7). 그리지 않고(보던 카드 그대로) 그 요약을 받은 뒤(못 받아도) 한 번 그린다
+     (apprShow — 쓰는 중이면 맡아 둠). 기다리는 동안(APPR_AWAIT) 다른 길로 그려지면 받는 중인 문서만 빼고 그린다(turnGroups). 들어올 때의 첫 그리기는 예전 그대로.
+     기다림은 그 요약 받기가 끝날 때 끝난다 — 받았든 못 받았든(못 받은 문서는 「불러오지 못했어요」 줄과 함께 나온다). 5초 안에 끝을 못 들으면(앞 판 모듈 등)
+     다시 묻는다(그때도 받는 중이면 또 기다린다 — 그냥 그리지는 않는다, 2026-11-25 묶음 E 고침 1). */
+  var APPR_AWAIT = 0;
+  function apprAwait() {
+    var SP = inboxSplit(), by = {};
+    SP.mine.concat(SP.ndMine).filter(apprLoading).forEach(function (a) {
+      var k = kindOf(a), w = k ? (EXT.kinds[k] || {}).wantSummaries : EXT.wantSummaries;
+      if (typeof w === 'function') (by[k] = by[k] || { w: w, ids: [] }).ids.push(a.id);
+    });
+    var ks = Object.keys(by), left = ks.length, over = false, t = 0;
+    if (!left) return false;
+    var fin = function () { if (over) return; over = true; clearTimeout(t); APPR_AWAIT = Math.max(0, APPR_AWAIT - 1); apprShow(); };
+    APPR_AWAIT++;
+    t = setTimeout(fin, 5000);
+    ks.forEach(function (k) { by[k].w(by[k].ids, function () { if (--left <= 0) fin(); }); });
+    return true;
+  }
   /** 결재함을 다시 그린다 — 내려 보던 중이면 화면 맨 위 카드가 같은 높이에 있게, 누르던 카드 단추에는 초점을 돌려준다. */
   function apprRepaint() {
+    if (apprAwait()) return;
     var inner = $('inner'), hd = document.querySelector('header.top'), hb = hd ? Math.max(0, hd.getBoundingClientRect().bottom) : 0;
     var top = null, cards = window.scrollY > 40 ? inner.querySelectorAll('.acard[data-akey]') : [];
     for (var i = 0; i < cards.length; i++) { var r0 = cards[i].getBoundingClientRect(); if (r0.bottom > hb) { top = { k: cards[i].getAttribute('data-akey'), y: r0.top }; break; } }
@@ -4050,13 +4075,15 @@
     // 결재 창이 열려 있으면 그 창이 그린 문서가 지금도 같은지 바로 본다(다시 받지 않고) — 회수된 문서 창은 [승인] 전에 닫힌다(M1)
     if ($('panel').classList.contains('open') && $('btnApprGo')) apprCheckDialog();
     if (VIEW !== 'inbox' || !LOADED || LOADING) return;
-    if (apprHold()) { APPR_DIRTY = true; return; }
+    // 누르고 있는 동안(APPR_PTR)도 맡아 둔다 — 손을 떼면(apprPtrUp → apprUnhold) 그린다(누르던 카드가 사라지지 않게, 2026-11-25)
+    if (apprHold() || APPR_PTR) { APPR_DIRTY = true; return; }
     APPR_DIRTY = false;
     apprRepaint();
   }
-  /** 창을 닫은 뒤(closePanel) — 창이 열린 동안 결재 건이 바뀌었으면 이제 결재함을 다시 그린다. */
+  /** 창을 닫은 뒤(closePanel) — 창이 열린 동안 결재 건이 바뀌었으면 이제 결재함을 다시 그린다. 결재함이 아닌 화면의 바뀜 표식 다시 그리기(LIVE_PAINT)도
+   *  (Esc·코드로 닫혀 초점이 옮겨 가지 않아도 — 2026-11-25). */
   function apprFlush() {
-    if (APPR_DIRTY) setTimeout(function () { if (APPR_DIRTY) apprShow(); }, 0);
+    if (APPR_DIRTY || LIVE_PAINT) setTimeout(function () { if (APPR_DIRTY) apprShow(); liveFlush(); }, 0);
   }
   // 칸에서 초점을 떼거나 한글 조합이 끝나거나 「⋯」 메뉴를 닫을 때도 미뤄 둔 다시 그리기를 푼다 — 예전엔 창을 닫을 때만 풀려
   //   상신자 이름 칸에 초점을 둔 채 다녀오면 옛 카드가 그대로 남았다(2026-11-02 검증 로봇 M2). toggle 은 거품이 없어 capture 로.
@@ -4064,7 +4091,7 @@
   //   손을 뗀 뒤에 풀면 click 이 먼저 옛 카드에 닿고(openApprAct 가 지금 자료로 다시 확인), 다시 그리기는 그 뒤에.
   var APPR_PTR = false;
   //   화면을 옮길 때 조용히 받아 맡아 둔 것(NAV_PEND, 2026-11-02 navKick)도 같은 때 넣는다.
-  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); navKick(); }, 0); }
+  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); navKick(); liveFlush(); }, 0); }
   function apprPtrUp() { APPR_PTR = false; apprUnhold(); }
   document.addEventListener('pointerdown', function () { APPR_PTR = true; }, true);
   document.addEventListener('pointerup', apprPtrUp, true);
@@ -4099,9 +4126,9 @@
       APPR_AT = Date.now();
       var changed = apprSig() !== sig0;
       if (changed) apprShow();
-      // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니고 다시 그려도 될 때만(창이 열렸거나 칸에 쓰는 중이면 다음에 그릴 때 보인다 ·
-      //   창 밖 칸에 적어 둔 글이 있어도 — navDirty, N5)
-      if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox' && LOADED && !LOADING && !apprHold() && !navDirty()) render(); }
+      // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니면 조용히 다시 그린다(liveFlush = navRepaint — 스크롤·펼친 접기·초점 그대로,
+      //   저절로 하는 일 없음). 쓰는 중이면(navHold — 칸 초점·한글 조합·창·적어 둔 글 N5·누르는 중 …) 맡아 두고 손을 떼면 그린다(LIVE_PAINT, 2026-11-25)
+      if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox') { LIVE_PAINT = true; liveFlush(); } }
       return changed;
     }, function (e) {
       APPR_BUSY = null;
@@ -4110,6 +4137,52 @@
     });
     return APPR_BUSY;
   }
+  /* ── 바뀜 표식으로 되풀이 읽기(2026-11-25 결재 웹 「바로 반영」 묶음 E — docs/nav-refresh/SPEC.md §10 · web/live.js) ──
+     남이 상신·결재·「내역 없음」 표시를 하면 페이지를 새로 열거나 화면을 옮기지 않아도 보이게. 서버의 가벼운 바뀜 표식(RPC approval_live_mark —
+     내가 볼 수 있는 결재 줄·표시의 개수 + 해시, 자료는 돌려주지 않는다)을 결재함이거나 결재 창이 열려 있으면 10초, 그 밖의 화면은 30초마다(±15%) 읽고,
+     값이 달라졌을 때만 지금 있는 받기를 부른다 — apprRefresh(결재 건·표시 — 개인경비·법인카드 결재 건도 · 숫자 딱지·종·결재함·열린 결재 창 맞추기는 그 안의
+     apprShow) · 결재함이 아닌 화면은 결재 건이 바뀌었으면 다시 그린다(liveFlush). 그 화면 자료는 억지로 받지 않는다 — 갈래 자료(내 줄)만 받을 때가 된 것만
+     (navRefresh noCore · 30초 규칙), 공통 자료(운행·영수증 — 관리자는 전 직원 것)는 받지 않고, 첫 값·관리자 전 직원 화면에서는 아예(표식이 누구의 결재로든 바뀌어
+     그때마다 전 직원 운행·모듈 관리 줄을 다시 받던 것 — 고침 1 I2 · 고침 2). 새 자료 길·새 그리기 함수는 없다.
+       · 화면이 안 보이면 읽지 않는다 · 타이머는 하나 · 읽는 중이면 겹치지 않는다 · 실패하면 간격 × 2ⁿ(5분까지) — live.js poller.
+       · 표식 읽기는 쓰기가 아니다(READ_POST). 401(갱신해도) = 멈춤 · 403·404(표식 함수가 없는 옛 서버) = 10분 쉼 — 알림·로그아웃은 하지 않는다(다른 받기가 한다).
+       · 첫 적재가 끝나면 켠다(loadAll — 여러 번 불러도 하나) · 화면을 옮기면(navMove) 남은 기다림이 새 간격보다 길 때만 당긴다 · 401 로 멈췄으면 다시 켠다.
+       · 첫 값(hit(true) — 적재와 첫 읽기 사이를 메운다)도 같은 길: 결재 건·표시만 다시 받는다. 시험 손잡이 window.__LIVE_KNOB. */
+  function liveReadMark(signal) {
+    return apiRetry('/rest/v1/rpc/approval_live_mark', { method: 'POST', body: '{}', signal: signal }).then(function (r) {
+      if (r.status === 401) return { gone: true };
+      if (r.status === 403 || r.status === 404) return { off: true };
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' approval_live_mark');
+      return r.json().then(function (j) {
+        if (typeof j !== 'string') throw new Error('approval_live_mark: 글자가 아니에요');
+        return { ok: true, mark: j };
+      });
+    });
+  }
+  function liveBase() {
+    var k = window.AtecLive.knob();
+    return VIEW === 'inbox' || ($('panel').classList.contains('open') && $('btnApprGo')) ? k.fast : k.slow;
+  }
+  function liveReady() { return !!ME && LOADED && !LOADING && !LOAD_ERR; }
+  // LIVE_PAINT — 결재함이 아닌 화면에서 결재 건이 바뀌었는데 아직 다시 그리지 못했다(쓰는 중). apprShow 는 결재함만 다시 그리고 navCommit 은 자기가 받은
+  //   자료(결재 건 빼고)가 바뀌었을 때만 그려, 마감 화면 결재 띠·카드 내역·경비 내역의 결재 상태 글이 그대로 남았다. 「내역 없음」 표시만 바뀌었을 때도(apprRefresh).
+  //   손을 떼면(apprUnhold) · 창을 닫으면(apprFlush) 그린다 · 화면을 옮기면(go) 버린다
+  var LIVE_PAINT = false;
+  // first — 첫 값(hit(true)). 결재 건이 바뀌었으면 지금 화면의 갈래 자료(개인경비·법인카드 내 줄)만, 받을 때가 됐을 때만(30초 규칙 — 억지로 받지 않는다) 조용히 받는다:
+  //   결재 건에 딸린 것이 결재 표 밖에 있다(다른 탭이 상신하면 법인카드 줄이 문서에 묶인다 — card_items.approval_id · 하네스 live L13). 공통 자료(운행·영수증 —
+  //   관리자는 전 직원 것)는 받지 않는다(noCore). 첫 값 · 관리자 전 직원 화면(isAll — 갈래 관리 화면은 전 직원 줄)은 아예 하지 않는다(I2 · live L12b · L13b)
+  function liveHit(first) {
+    apprRefresh({ max: 0 }).then(function (changed) {
+      if (!changed || VIEW === 'inbox') return;
+      LIVE_PAINT = true; liveFlush();
+      if (!first && !isAll()) navRefresh({ noAppr: true, noCore: true });
+    }).then(null, function (e) { console.warn('[바뀜 표식] 다시 그리지 못해 받아 둔 화면 그대로', e && (e.message || e)); });
+  }
+  function liveFlush() {
+    if (!LIVE_PAINT || VIEW === 'inbox' || !LOADED || LOADING || navHold()) return;
+    LIVE_PAINT = false; paintCycle(); navRepaint();
+  }
+  var LIVE_POLL = window.AtecLive ? window.AtecLive.poller(window.AtecLive.env(), { read: liveReadMark, base: liveBase, ready: liveReady, hit: liveHit }) : null;
   /** 다른 탭·앱에서 돌아오면 — 결재함이면 10초, 다른 화면이면 1분 안에 받았을 때만 건너뛴다(메뉴 숫자·종이 맞게). */
   //   2026-11-02: 결재 건 받기(예전 그대로)에 더해 지금 화면 자료를 조용히 새로 받는다(navMove — 받은 지 30초가 넘었을 때만).
   //   결재 건 받기가 출발했으면 조용히 받기는 결재 건·표시를 빼고 받는다(같은 것을 두 번 받지 않게, N8 — 결재 건은 예전처럼 바로 넣는다: 칸에 쓰는 중이어도 숫자 딱지·종).
@@ -4300,10 +4373,13 @@
     console.warn('[새로 받기] 받지 못해 받아 둔 화면 그대로', e && (e.message || e));
   }
   /** 받을 때가 됐으면(force 면 바로) 조용히 다시 받는다. 받는 중이거나 아직 넣지 못한 새 것이 그것을 덮으면 true.
-   *  opt.noAppr — 같은 때 결재함 받기(apprRefresh)가 결재 건·표시를 받는 중: 그것은 빼고 받는다(N8). */
+   *  opt.noAppr — 같은 때 결재함 받기(apprRefresh)가 결재 건·표시를 받는 중: 그것은 빼고 받는다(N8).
+   *  opt.noCore — 공통 자료(운행·13조각)는 받을 때가 됐어도 빼고 지금 화면의 갈래 자료(개인경비·법인카드 — 모듈 EXT.load)만 받는다(바뀜 표식 liveHit, 2026-11-25 —
+   *    관리자는 개인 화면에서도 공통 자료가 전 직원 운행·영수증이라 표식이 바뀔 때마다 그것을 다시 받게 된다). */
   function navRefresh(opt) {
     if (!ME || !LOADED || LOADING || LOAD_ERR) return false;
     var need = navNeed(opt && opt.force), now = Date.now(), noAppr = !!(opt && opt.noAppr);
+    if (opt && opt.noCore) need.core = false;
     if (!need.core && !need.mods.length) return false;
     if (NAV_BUSY && navCovers(NAV_BUSY, need)) return true;
     if (NAV_PEND && navCovers(NAV_PEND, need) && now - NAV_PEND.at < navMs('core')) return true;
@@ -4341,7 +4417,12 @@
     return true;
   }
   /** 화면을 옮긴 뒤(go · 주소 · 결재함 갈래 · 알림) · 탭으로 돌아올 때 — 맡아 둔 것이 있으면 넣고, 받을 때가 됐으면 조용히 받는다. */
-  function navMove(opt) { navKick(); return navRefresh(opt); }
+  function navMove(opt) {
+    navKick(); var r = navRefresh(opt);
+    // 바뀜 표식 — 결재함으로 오면 30초 기다림을 10초로(kick) · 로그인 문제(401)로 멈춰 있었으면 다시 켠다(그 사이 토큰이 살아났을 수 있다, 2026-11-25)
+    if (LIVE_POLL) { if (LIVE_POLL.state().why === 'gone') LIVE_POLL.start(); else LIVE_POLL.kick(); }
+    return r;
+  }
   /** 받아 온 것을 한 번에 넣는다(navKick 이 부른다 — 늦은 것·쓰는 중인 것은 이미 걸렀다). 바뀐 조각이 있을 때만 다시 그린다.
    *  받은 글이 넣어 둔 것과 같은 조각은 그대로 둔다(fetchAllSig same) — JSON 으로 견주지 않는다(N3). 넣은 뒤 저절로 하는 일은 없다(N7). */
   function navCommit(P) {
@@ -5029,6 +5110,8 @@
     // 검증 결과(상신 때 굳힌 판정)를 받기 전에는 묶지 않는다 — 받는 동안 「확인 필요」로 묶였다가 받은 뒤 「이상 없음」으로 옮겨 가며
     //   첫 카드가 바뀌었다(2026-10-20 V3 B7 — 누르려던 「승인」 자리에 다른 문서가 올 수 있다). 받는 동안은 자리표시(뼈대)만.
     //   모듈이 받으면(못 받아도) 다시 그린다 — 못 받은 문서는 판정 띠가 「불러오지 못했습니다」라 「확인 필요」로 묶인다.
+    //   단, 조용히 다시 그리려고 요약을 기다리는 중이면(apprAwait — 그사이 다른 길로 그려질 때) 자리표시로 바꾸지 않고 받는 중인 문서만 빼고 그린다(2026-11-25).
+    if (APPR_AWAIT && list.some(function (a) { return apprLoading(a); })) list = list.filter(function (a) { return !apprLoading(a); });
     if (list.some(function (a) { return apprLoading(a); })) {
       return '<div class="ibload" aria-busy="true"><span class="sr" role="status">검증 결과를 받는 중…</span>' +
         '<div class="sk" style="width:38%;height:14px"></div><div class="sk" style="width:100%;height:64px;margin-top:12px"></div>' +
@@ -12392,6 +12475,7 @@ window.EduGuard = {
     // 보던 추가 기간(…-12b)이 이 화면 갈래에는 없으면 그 달로(2026-10-20 연말 마감)
     else if (fixX(v)) { setPeriod(RANGE ? { range: RANGE } : { cyc: CYC }, { silent: true }); clampCyc = true; }
     AUDIT = null;                 // 점검 결과는 범위가 바뀌면 다시 내야 한다
+    LIVE_PAINT = false;           // 바뀜 표식으로 맡아 둔 다시 그리기 — 화면을 옮기면 어차피 새로 그린다(2026-11-25)
     clearFilters();
     if (v === 'evid' && !isMulti()) { EVF.cat = EV_SUBS[evSub()]; EVF.touched = false; }   // 영수증·통행료 단계: 지금 차례의 구분부터
     // ★ 하이패스 대조 결과도 반드시 버린다. 안 버리면 관리 화면에서 맞춰 둔
@@ -14519,6 +14603,13 @@ window.EduGuard = {
       /** 관리 화면(마감 기간 설정)이 저장한 뒤 — 서버 답의 cycle_rules 를 바로 쓴다(바뀌었으면 true). 다시 받기(loadAll)는 부른 쪽이. */
       reloadRules: function (raw) { var ch = CR.set(raw); if (ch) { if (fixX()) writeHash(); paintCycle(); } return ch; },
       render: render, go: go, loadAll: loadAll, closePanel: closePanel, openPanel: openPanel, backBtn: backBtn,
+      // 다시 그리되 보던 자리 · 펼친 접기 · 칸 초점 그대로 — 뒤늦게 온 자료로 다시 그리는 모듈이 쓴다(출력 기록 요약 drv-prints · 결재 카드 검증 요약
+      //   drv-verify · drv-expense · drv-card, 2026-11-25 묶음 E 고침 1 · 마지막 고침 F2). 결재함이면 apprShow — 창 · 칸에 쓰는 중 · 「⋯」 메뉴 · 누르는 중이면
+      //   맡아 두었다가 놓을 때 그리고(apprHold · APPR_PTR) 보던 카드 그대로(apprRepaint). navRepaint 는 결재함에서 지킴 없이 apprRepaint 만 불러, 요약이 오는
+      //   순간 새 내 차례 카드가 끼며 누르던 카드 자리가 바뀌거나 메뉴가 닫혔다(F2). 다른 화면은 navRepaint(조용히 다시 그리기)
+      repaintKeep: function () { if (VIEW === 'inbox') apprShow(); else navRepaint(); },
+      // 새 판으로 저절로 새로 고치기 전에 물을 함수를 맡긴다(참이면 기다림 — verHold). 화면 밖에만 있는 저장 전 · 보내는 중 상태를 가진 모듈이(2026-11-25 묶음 E 고침 1)
+      holdReload: function (fn) { if (typeof fn === 'function') EXT.hold.push(fn); },
       // pdfPrep — 인쇄 준비(하이패스 이용내역 줄 · 사진 판독 시각, 2026-10-23). PDF 를 만드는 세 길이 모두 pdfDocFor 다음에 부른다.
       pdfDocFor: pdfDocFor, pdfPrep: pdfPrep, fillSigns: fillSigns, openEdit: openEdit, photoUrl: photoUrl, evLocked: evLocked, xlsxFiles: xlsxFiles, withFrozen: withFrozen, saveBlob: saveBlob,
       // pdf.js 불러오기 — 결재 문서 PDF 가 하이패스 영수증 원본(「영수증 출력」 화면을 인쇄한 PDF)의 영수증을 읽을 때(drv-verify parseHipass, 2026-10-23)
@@ -14613,6 +14704,40 @@ window.EduGuard = {
   // 앱 → 웹 프리패스(2026-10-20): 머리 스크립트(driving-v2.html)가 #pass=<코드> 를 보고 work.html 로 넘기는 중이면 아무것도 시작하지 않는다 —
   //   여기서 화면 주소를 바꾸거나 toPortal 로 다시 보내면 코드가 실린 이동이 덮여 코드를 잃는다.
   if (window.__DRV_TO_WORK) return;
+  /* ── 새 판 알아채기(2026-11-25 결재 웹 「바로 반영」 묶음 E — web/live.js verStart · 띠 #verBar) ──
+     사이트 새 판을 올리면(올리는 도구가 판 번호를 <meta name="atec-ver"> · version.json · 스크립트 주소 ?v= 에 넣는다) 열어 둔 이 화면이 스스로 새 판으로 바뀐다:
+     5분마다 · 탭으로 돌아올 때 version.json 을 읽어 판이 다르면, 쓰는 중이 아닐 때(1초 간격으로 두 번 잇따라) 같은 주소 + v=판 으로 새로 고친다(질의 · #/… 그대로 —
+     ?direct=1 · 보던 화면·기간도). 쓰는 중이면(verHold) 화면 맨 위 띠로 알리고 기다린다 · 같은 판으로 되풀이하지 않는다(10분에 세 번 · 이미 그 판 주소면 손으로).
+     verHold(고침 1): 받는 중(LOADING)이면 기다린다. 아직 받은 것이 없으면(?direct=1 로그인 화면 · 적재 실패 화면) 로그인 칸에 적은 글이 있을 때만 기다린다
+     (브라우저 자동 완성이 채운 값은 빼고). 받은 뒤에는 칸 초점 · 한글 조합 · 창 · 「⋯」 메뉴 · 적어 둔 글(navHold) · 저장 안 한 통행료(unsavedFills) · 창에 적은 것
+     (panelDirty) · 보내는 중인 쓰기(WRITE_N) · 보던 안전교육 영상(EDUW) · 모듈이 맡긴 것(EXT.hold — 마감 기간 설정의 저장 전 날짜·사유 · 법인카드 칸 저장 기다림·
+     보내는 중 · 개인경비 올리는 중)에 기다린다. 「나가시겠어요?」(beforeunload)를 띄우는 곳은 둘 — 이 파일(unsavedFills · panelDirty)과 drv-card.js
+     (칸 저장 pending() · 올리는 중 C_SENDING) — 둘 다 위에 들어 있어 저절로 새로 고칠 때 그 물음이 뜨는 일이 없다.
+     띠가 생기고 걷힐 때 보던 것(초점 칸 · 창 안 글 · 본문)은 화면에서 그대로다(live.js — 머리띠 · 창 머리 줄만 띠 밑으로). 소스를 그대로 열면(하네스 포함) 판 번호가 없어 꺼져 있다. */
+  function filledByBrowser(el) {
+    var s = [':autofill', ':-webkit-autofill'], i;
+    for (i = 0; i < s.length; i++) { try { if (el.matches(s[i])) return true; } catch (e) { /* 그 이름을 모르는 브라우저 */ } }
+    return false;
+  }
+  function loginTyped() {
+    var u = $('u'), p = $('p');
+    return !!((u && String(u.value || '').trim() && !filledByBrowser(u)) || (p && String(p.value || '') && !filledByBrowser(p)));
+  }
+  function verHold() {
+    if (LOADING) return true;
+    if (!LOADED) return loginTyped();
+    return !!(navHold() || unsavedFills() || panelDirty() || WRITE_N > 0 || !!EDUW ||
+      EXT.hold.some(function (fn) { try { return !!fn(); } catch (e) { return true; } }));
+  }
+  if (window.AtecLive && window.AtecLive.verStart) {
+    window.AtecLive.verStart({
+      hold: verHold,
+      head: function () { return document.querySelector('#app header.top'); },
+      main: function () { return $('main').getClientRects().length ? $('main') : $('login'); },
+      // 열린 창의 글 — 옆 창 본문 · 알림 창(종 — 스스로 스크롤하는 상자). 기간 고르기 창은 머리띠에 붙어 함께 내려온다
+      boxes: function () { var a = []; if ($('panel').classList.contains('open')) a.push($('pBody')); if (NOTE.open) a.push($('notePop')); return a; }
+    });
+  }
   // 로그인 전이면 업무 결재 포털로 보낸다(보던 주소는 로그인 뒤 돌아오게). ?direct=1 이면 예전 로그인 화면을 쓴다.
   if (ss(K_AT) && me()) enter();
   else if (!window.__VERIFY__ && !/[?&]direct=1/.test(location.search)) toPortal(location.hash);

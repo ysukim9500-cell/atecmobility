@@ -3,6 +3,7 @@
   여기서 직접 고치지 말고 그쪽을 고친 뒤 복사할 것. 두 곳이 갈라지면 찾기 어렵다.
   같이 올라가야 하는 것: cycle-rules.js · drv-cycles.js (기간 엔진·마감 기간 설정)
                          money-rule.js · driving-app.js · drv-verify.js · drv-prints.js · drv-org.js · sheetpdf.js · xlsx.js · hipass.js
+                         live.js (결재 바로 반영 · 새 판 알아채기)
                          card-rules.js · card-erp.js · card-sheet.js · drv-card.js (법인카드)
                          vendor/ (pdf.js — 증빙 PDF 를 이미지로 / pdf-lib · fontkit · 나눔고딕 — 결재 문서 PDF / xlsx.full.min.js · LICENSE-SheetJS.txt — 카드 엑셀)
                          brand/atec-driving.png · brand/atec-lockup.png · brand/atec-mark.png
@@ -10,7 +11,7 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="atec-ver" content="34c040486c">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>
 /* 로그인 전이면 화면을 그리기 전에 업무 결재 포털로 보낸다(새로 고침 때 로그인 창이 깜빡이지 않게, 2026-10-06).
@@ -372,6 +373,22 @@ header.top{
   position:sticky;top:0;z-index:50;height:var(--head);background:var(--surface);
   /* 불투명(2026-10-16 3차) — 반투명이면 내릴 때 뒤 글자·단추가 비쳤다 */
   border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:14px;padding:0 20px}
+/* 새 판 띠(live.js #verBar, 2026-11-25 묶음 E) — 띠가 보이는 동안(html.has-verbar) 화면 맨 위 띠 높이(--verbar-h)만큼: 본문이 내려오고 머리띠 · 메뉴 · 옆 창이
+   띠 밑으로 내려온다(머리띠 단추 · 창 머리 줄이 띠에 가리지 않게). 보던 자리 · 초점 칸 · 창 안 글은 live.js 가 그만큼 스크롤해 화면에서 그대로 둔다 —
+   min-height 는 그 스크롤 자리(짧은 화면). 좁은 화면 기간 · 알림 창 · 아래에서 올라오는 창은 아래 max-width:900px. 화면에만 — 인쇄(결재 문서 출력)는 그대로 */
+@media screen{
+  html.has-verbar{scroll-padding-top:calc(var(--head) + 12px + var(--verbar-h))}
+  html.has-verbar body{padding-top:var(--verbar-h);min-height:calc(100vh + var(--verbar-h))}
+  html.has-verbar header.top{top:var(--verbar-h)}
+  html.has-verbar aside{top:calc(var(--head) + var(--verbar-h));height:calc(100dvh - var(--head) - var(--verbar-h))}
+  html.has-verbar #panel{top:var(--verbar-h)}
+}
+@media screen and (min-width:901px){html.has-verbar .otree{top:calc(var(--head) + 14px + var(--verbar-h));max-height:calc(100dvh - var(--head) - 40px - var(--verbar-h))}}
+@media screen and (max-width:900px){
+  html.has-verbar #cycPop,html.has-verbar #notePop{top:calc(var(--head) + 6px + var(--verbar-h))}
+  html.has-verbar #notePop{max-height:calc(100dvh - var(--head) - 24px - var(--verbar-h))}
+  html.has-verbar #panel .sheet{max-height:min(92dvh,100%)}
+}
 .sp{flex:1}
 
 /* 마감주기 = 전 화면을 지배하는 값이라 머리띠에 고정한다 */
@@ -3996,25 +4013,27 @@ td.ccards .dnl:has(> .dn:nth-child(4)){flex-wrap:wrap;min-width:9em}
 <div id="toast" role="status"></div>
 
 <!-- 마감 기간 엔진(2026-10-20 연말 마감) — 본체·모듈·법인카드 규칙(card-rules.js)이 모두 쓴다. hipass.js 바로 앞(하네스가 가짜 서버를 이 뒤에 끼운다). -->
-<script src="cycle-rules.js"></script>
-<script src="hipass.js"></script>
-<script src="xlsx.js"></script>
-<script src="money-rule.js"></script>
+<script src="cycle-rules.js?v=34c040486c"></script>
+<script src="hipass.js?v=34c040486c"></script>
+<script src="xlsx.js?v=34c040486c"></script>
+<script src="money-rule.js?v=34c040486c"></script>
 <!-- 통행료 맞추기 제안(2026-10-21) — money-rule.js 결과를 읽어 「모름」 운행에 넣을 값을 제안만 한다(없으면 그 한 줄·창이 안 나올 뿐) -->
-<script src="toll-suggest.js"></script>
+<script src="toll-suggest.js?v=34c040486c"></script>
 <!-- 확장 모듈은 본체보다 먼저 싣는다(DrvExtQ 에 올려 두면 본체가 붙인다). PDF 도구·글꼴은 쓸 때 받는다. -->
-<script src="sheetpdf.js"></script>
-<script src="drv-verify.js"></script>
-<script src="drv-prints.js"></script>
-<script src="drv-org.js"></script>
-<script src="drv-expense.js"></script>
+<script src="sheetpdf.js?v=34c040486c"></script>
+<script src="drv-verify.js?v=34c040486c"></script>
+<script src="drv-prints.js?v=34c040486c"></script>
+<script src="drv-org.js?v=34c040486c"></script>
+<script src="drv-expense.js?v=34c040486c"></script>
 <!-- 법인카드 지출결의(2026-10-09) — 순수 모듈 셋을 먼저, 확장 모듈은 본체 앞에. SheetJS(vendor/xlsx.full.min.js)는 올리기 창을 열 때만 싣는다. -->
-<script src="card-rules.js"></script>
-<script src="card-erp.js"></script>
-<script src="card-sheet.js"></script>
-<script src="drv-card.js"></script>
+<script src="card-rules.js?v=34c040486c"></script>
+<script src="card-erp.js?v=34c040486c"></script>
+<script src="card-sheet.js?v=34c040486c"></script>
+<script src="drv-card.js?v=34c040486c"></script>
 <!-- 관리 › 마감 기간 설정(2026-10-20 연말 마감 — 권한 관리를 맡은 관리자만) -->
-<script src="drv-cycles.js"></script>
-<script src="driving-app.js"></script>
+<script src="drv-cycles.js?v=34c040486c"></script>
+<!-- 결재 바로 반영(2026-11-25 묶음 E) — 바뀜 표식 되풀이 읽기·새 판 알아채기(window.AtecLive). 본체가 쓰므로 바로 앞에. 없어도 본체는 그대로 돈다 -->
+<script src="live.js?v=34c040486c"></script>
+<script src="driving-app.js?v=34c040486c"></script>
 </body>
 </html>

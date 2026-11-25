@@ -84,11 +84,13 @@
       repaint();
     });
   }
-  /** 받은 요약을 화면에 — 칸에 글을 치는 중이면 다시 그리지 않는다(커서가 튄다). 다음에 그릴 때 붙는다. */
+  /** 받은 요약을 화면에 — 칸에 글을 치는 중이면 다시 그리지 않는다(커서가 튄다). 다음에 그릴 때 붙는다.
+   *  보던 자리 그대로 다시 그린다(본체 조용히 다시 그리기 C.repaintKeep — 2026-11-25 묶음 E 고침 1). 그냥 다시 그리면 바뀜 표식으로 결재 완료가 들어온 뒤
+   *  이 요약이 늦게(수십 ms) 와 붙는 「미출력」 딱지가 좁은 폭(360)에서 결재 띠를 한 줄 키워 그 아래 운행 줄이 56px 밀렸다. 그 길이 없는 판이면 예전처럼 */
   function repaint() {
     var a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox') return;
-    C.render();
+    if (typeof C.repaintKeep === 'function') C.repaintKeep(); else C.render();
   }
 
   /* ── 남기기 ── */

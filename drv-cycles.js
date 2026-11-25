@@ -276,6 +276,9 @@
   function chip(kind, t) { return '<span class="cys-chip' + (kind ? ' ' + kind : '') + '">' + esc(t) + '</span>'; }
   function dirtyK(k) { return !!(ST.form && ST.saved) && JSON.stringify(ST.form[k]) !== JSON.stringify(ST.saved[k]); }
   function isDirty() { return KINDS.some(dirtyK); }
+  // 새 판 띠(live.js)가 저절로 새로 고치지 않게 본체 verHold 에 맡긴다(2026-11-25 묶음 E 고침 1) — 이 화면에서 고치고 저장하지 않은 날짜 · 적어 둔 사유.
+  //   칸 값은 상태(ST)에 바로 적혀 본체 navDirty 가 세지 않는다. 이 화면을 떠나면 다시 들어올 때 새로 읽으므로 이 화면에 있을 때만
+  if (C.holdReload) C.holdReload(function () { return C.state().VIEW === 'cycset' && (isDirty() || !!String(ST.note || '').trim()); });
   function blParts(b) {
     var p = [];
     if (+b.submitted) p.push('결재 중 ' + n0(b.submitted) + '건');

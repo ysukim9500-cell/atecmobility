@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="atec-ver" content="34c040486c">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>업무 결재 포털 · ATEC 에이텍모빌리티</title>
 <meta name="description" content="운행일지와 결재 시스템을 한 번의 로그인으로 쓰는 에이텍모빌리티 업무 결재 포털">
@@ -23,7 +23,9 @@
 try { if (sessionStorage.getItem("drv_at") && sessionStorage.getItem("drv_me")) document.documentElement.classList.add("booting"); } catch (e) { }
 </script>
 <!-- 마감 기간 규칙 엔진(2026-10-20 연말 마감 설정) — 아래 마감 일정·카드가 쓴다. 운행일지(driving.html)와 같은 파일 -->
-<script src="cycle-rules.js"></script>
+<script src="cycle-rules.js?v=34c040486c"></script>
+<!-- 결재 바로 반영(2026-11-25 묶음 E) — 바뀜 표식을 되풀이해 읽는 조각(운행일지 화면과 같은 파일). 빠지면(AtecLive 없음) 저절로 반영만 멈춘다 -->
+<script src="live.js?v=34c040486c"></script>
 <!-- 글꼴은 Pretendard 하나(2026-10-24 다듬기 2단계) — 예전 Noto Sans KR(구글 글꼴)은 그리기 전에 91KB 를 기다리게 했는데 실제로 그리는 글자는 Pretendard 였다 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -73,6 +75,19 @@ button,input{font-family:inherit}
 .ub .who{line-height:1.3;text-align:right}
 .ub .who b{display:block;font-size:14px}
 .ub .who span{font-size:12px;color:var(--grey-2)}
+/* 새 판 띠(live.js #verBar, 2026-11-25 묶음 E) — 띠가 보이는 동안(html.has-verbar) 화면 맨 위 띠 높이(--verbar-h)만큼 본문 · 머리띠가 내려온다(첫 화면 머리띠는
+   본문과 함께, 로그인 뒤 머리띠(sticky)는 띠 밑에 붙어서). 보던 자리 · 초점 칸 · 창 안 글은 live.js 가 스크롤해 화면에서 그대로 — min-height 는 그 스크롤 자리.
+   창(.veil)은 위아래 여백을 같이 늘려 창 가운데가 그대로다(짧은 창은 안 움직임) · 화면을 거의 채우는 긴 창만 띠 밑으로 줄어든다(창 안 글은 그 창 스크롤로 그대로). 화면에만 */
+@media screen{
+  html.has-verbar body{padding-top:var(--verbar-h);min-height:calc(100vh + var(--verbar-h))}
+  html.has-verbar .top{top:var(--verbar-h)}
+  html.has-verbar .veil{padding-block:max(20px,calc(var(--verbar-h) + 8px))}
+  html.has-verbar .modal{max-height:calc(100dvh - 2 * max(20px,calc(var(--verbar-h) + 8px)))}
+  /* 창 닫기(×)는 띠가 있는 동안 창 위 끝에 붙는다(sticky, 고침 1 R5-6) — 긴 창은 띠만큼 줄어들며 안 글을 그만큼 스크롤해 그대로 두는데, × 가 글과 같이 올라가
+     창 위 끝에 잘렸다(폰 가입 창). 자리 · 크기는 그대로(창 위 끝에서 12px — sticky 의 top 은 창 안쪽 여백(36px) 안에서 재므로 12−36 · 음수 여백으로 아래 글을 밀지 않는다) */
+  html.has-verbar .modal .x{position:sticky;top:-24px;display:block;margin:-24px -22px -16px auto;z-index:1;background:#fff}
+}
+@media screen and (max-width:480px){html.has-verbar .modal .x{top:-26px;margin:-26px -16px -18px auto}}   /* 폰: 창 위 끝에서 4px(4−30) */
 /* 「관리자」 표시 — 테두리 상자는 단추처럼 보여서(2026-10-15 화면 정리) 연한 바탕 글자로. 누르는 것이 아니다. */
 .ub .who .tag{display:inline-block;margin-left:6px;padding:1px 6px;font-size:12px;font-weight:700;line-height:1.5;color:var(--red-700);background:var(--red-50);border:0;vertical-align:1px}
 
@@ -904,6 +919,7 @@ footer .wrap{font-size:13px}
     if (m.is_admin) { var t = document.createElement('span'); t.className = 'tag'; t.textContent = '관리자'; $('uName').appendChild(t); }
     window.scrollTo(0, 0);
     paintMine(m);
+    if (LIVE_POLL) LIVE_POLL.start();    // 되풀이 읽기(바뀜 표식, 아래 liveMarkRead) — 나가면 멈춘다(leave). 다시 들어오면 다시 켠다
     liveRead(m);          // 로그인 직후에도 내 결재 상태·결재할 건수를 한 번 읽는다(2026-10-20 V3 B1 — 받으면 다시 그린다)
     // 권한 관리를 맡은 관리자에게는 가입 신청이 있으면 알린다.
     post('/functions/v1/driving-account', { action: 'signups' }, ss(K_AT)).then(function (res) {
@@ -915,6 +931,7 @@ footer .wrap{font-size:13px}
     // 서버의 갱신 토큰도 끊는다(창만 지우면 토큰이 살아 있다). 실패해도 화면은 로그아웃한다.
     var at = ss(K_AT);
     if (at) fetch(SB + '/auth/v1/logout?scope=local', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + at } }).catch(function () { });
+    if (LIVE_POLL) LIVE_POLL.stop();
     ss(K_AT, null); ss(K_RT, null); ss(K_ME, null);
     ss('drv_navmode', null);            // 운행일지 메뉴 갈래(2026-10-08) — 다음 사람이 앞사람 갈래로 열리지 않게
     ss('drv_portal_hint', null);        // 카드의 내 상태 한 줄(아래 paintMine) — 다음 사람에게 남기지 않는다
@@ -1130,6 +1147,93 @@ footer .wrap{font-size:13px}
     if (!LIVE || LIVE.u !== m.username || !LIVE.done) return;      // 읽은 적 없거나 읽는 중 — 그 읽기가 끝나면 그린다
     if (Date.now() - LIVE_AT < ms || document.querySelector('.veil.open')) return;
     liveRead(m, true);
+  }
+  /* ── 바뀜 표식으로 되풀이 읽기(2026-11-25 결재 웹 「바로 반영」 묶음 E — docs/nav-refresh/SPEC.md §10 · live.js) ──
+     남이 상신·결재·「내역 없음」 표시를 해도 포털을 새로 열지 않고 내 결재 상태·결재할 건수·마감 줄이 맞게 — 서버의 가벼운 바뀜 표식(RPC approval_live_mark,
+     자료는 돌려주지 않는다)을 30초마다(±15%) 읽고, 값이 달라졌을 때만 지금 있는 조용히 다시 읽기(liveRead(m, true))를 부른다. 새 자료 길·새 그리기 함수는 없다.
+       · 안 보이면 읽지 않는다 · 타이머는 하나 · 실패하면 간격 × 2ⁿ(5분까지) — live.js poller · 시험 손잡이 window.__LIVE_KNOB.
+       · 401 은 한 번 갱신한 뒤 다시 — 그래도 401 이면 멈춘다(세션을 지우지 않는다 — 지우는 것은 지금 있는 길만. 다시 들어오면(enter) 다시 켠다).
+       · 403 · 404(표식 함수가 없는 옛 서버) = 10분 쉼. 알림·로그아웃은 하지 않는다.
+       · 창(.veil.open)이 열려 있거나 조용히 읽는 중이면 반영하지 않고 false — 바뀐 표식을 받아 두지 않아 다음 차례에 다시 시도한다. 창을 닫는 순간이 아니라
+         닫은 뒤 다음 차례에 반영된다(지금 간격 30초 ±15% — 보통 34초 남짓, 표식 읽기가 잇따라 실패하면 그 간격이 두 배씩 늘어 5분까지 더 늦을 수 있다).
+         첫 값(hit(true) — 적재와 첫 읽기 사이를 메우는 한 번)은 여기서 false 여도
+         poller 가 받아 둔다(그때 창이 열려 있었으면 그 한 번은 건너뛴다 — 다음에 표식이 바뀌거나 탭으로 돌아오면(liveWake) 읽는다). */
+  function liveMarkRead(signal) {
+    var at0 = ss(K_AT);
+    if (!at0) return Promise.resolve({ gone: true });
+    var go = function () {
+      return fetch(SB + '/rest/v1/rpc/approval_live_mark', {
+        method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + ss(K_AT), 'Content-Type': 'application/json' }, body: '{}', signal: signal
+      });
+    };
+    return go().then(function (r) {
+      if (r.status !== 401) return r;
+      return refreshToken().then(function (t) {
+        if (t.ok) return go();
+        if (t.status >= 500) throw new Error('갱신 서버 ' + t.status);      // 갱신 서버가 잠깐 아프다 — 멈추지 않고 다음에 다시
+        return r;
+      });
+    }).then(function (r) {
+      if (r.status === 401) return { gone: true };
+      if (r.status === 403 || r.status === 404) return { off: true };
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' approval_live_mark');
+      return r.json().then(function (j) {
+        if (typeof j !== 'string') throw new Error('approval_live_mark: 글자가 아니에요');
+        return { ok: true, mark: j };
+      });
+    });
+  }
+  function liveReady() {
+    var m = me();
+    return !document.hidden && !!m && document.body.classList.contains('in') && !!LIVE && LIVE.u === m.username && LIVE.done;
+  }
+  function liveHit() {
+    var m = me();
+    if (!m || document.querySelector('.veil.open') || LIVE_Q) return false;
+    liveRead(m, true);
+    return true;
+  }
+  var LIVE_POLL = window.AtecLive ? window.AtecLive.poller(window.AtecLive.env(), {
+    read: liveMarkRead, base: function () { return window.AtecLive.knob().slow; }, ready: liveReady, hit: liveHit
+  }) : null;
+  /* ── 새 판 알아채기(2026-11-25 묶음 E — live.js verStart · 띠 #verBar, 운행일지 화면과 같은 조각) ──
+     사이트 새 판을 올리면(올리는 도구가 판 번호를 <meta name="atec-ver"> · version.json 에 넣는다) 열어 둔 포털이 스스로 새 판으로 바뀐다 — 쓰는 중이 아닐 때
+     (1초 간격으로 두 번 잇따라) 같은 주소 + v=판(?next= 질의 그대로 · 앱 프리패스 #pass= 는 머리 스크립트가 이미 주소에서 지웠다). 쓰는 중이면 맨 위 띠로 알리고 기다린다:
+     창(.veil.open) · 칸에 초점(입력 · 고르기 · 글 칸 · contenteditable) · 한글 조합 중 · 로그인 · 가입 · 비밀번호 초기화 요청을 보내는 중(그 단추가 잠김) ·
+     로그인 전 첫 화면 칸에 적어 두고 보내지 않은 것(비밀번호 · 저장한 아이디와 다른 아이디 · 열어 둔 비밀번호 초기화 칸 — 새로 고치면 지워진다. 브라우저 자동 완성이
+     채운 값은 빼고 — 다시 열면 또 채운다) · 세션을 확인하는 중(html.booting — 처음 열 때 · 앱 프리패스 코드를 바꾸는 중 passIn, 고침 1).
+     띠가 생기고 걷힐 때 초점 칸 · 창 안 글 · 본문은 화면에서 그대로다(live.js). 소스를 그대로 열면(하네스 포함) 판 번호가 없어 꺼져 있다. */
+  var WK_IME = false;
+  document.addEventListener('compositionstart', function () { WK_IME = true; }, true);
+  document.addEventListener('compositionend', function () { WK_IME = false; }, true);
+  function wkFilled(el) {
+    var s = [':autofill', ':-webkit-autofill'], i;
+    for (i = 0; i < s.length; i++) { try { if (el.matches(s[i])) return true; } catch (e) { /* 그 이름을 모르는 브라우저 */ } }
+    return false;
+  }
+  /** 사람이 적은 글(앞뒤 빈칸 뺌 — 비밀번호는 그대로) · 자동 완성이 채운 값이면 '' */
+  function wkVal(id, raw) { var el = $(id), v = el ? String(el.value || '') : ''; if (!raw) v = v.trim(); return v && !wkFilled(el) ? v : ''; }
+  function wkTyped() {
+    if (document.body.classList.contains('in')) return false;
+    var u = wkVal('liUser');
+    if (wkVal('liPw', true) || (u && u !== (ls(K_UID) || ''))) return true;
+    return !$('forgotT').hidden && !!(wkVal('pwUser') || wkVal('pwName'));
+  }
+  function verHold() {
+    if (document.documentElement.classList.contains('booting')) return true;
+    if (document.querySelector('.veil.open') || WK_IME) return true;
+    var ae = document.activeElement;
+    if (ae && ae !== document.body && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable)) return true;
+    if ($('liBtn').disabled || $('suBtn').disabled || $('pwBtn').disabled) return true;
+    return wkTyped();
+  }
+  if (window.AtecLive && window.AtecLive.verStart) {
+    window.AtecLive.verStart({
+      hold: verHold,
+      head: function () { return document.querySelector(document.body.classList.contains('in') ? '#appRoot .top .wrap' : '#landing .top .lw'); },
+      main: function () { return document.body.classList.contains('in') ? $('appRoot') : $('landing'); },
+      boxes: function () { return [].slice.call(document.querySelectorAll('.veil.open .modal')); }
+    });
   }
   /** 다 읽은 뒤(2026-11-02) — 「내역 없음」 효력과 지난 기간 줄. 효력 = 표시 && 결재 중·완료가 아님 && 그 기간 자료 0건(SPEC §1 —
    *  자료를 못 읽었으면 효력 없음, 자료가 생기면 표시는 그대로 두고 무시한다). 지난 기간이 효력이면 「오늘 할 일」 맨 위에 남기지 않는다.

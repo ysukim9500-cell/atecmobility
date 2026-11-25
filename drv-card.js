@@ -1091,6 +1091,9 @@
     });
   }
   // 쓰다가 새로 고침·탭 닫기 — 본체의 묻기는 창(panel)이 열려 있을 때만 모듈을 본다. 칸 저장은 창 밖이라 여기서 따로 묻는다.
+  //   새 판 띠(live.js)가 저절로 새로 고칠 때도 같은 것을 기다린다 — 본체 verHold 가 묻는다(2026-11-25 묶음 E 고침 1). 저장 못 한 칸(FAILED — 「다시 저장」이
+  //   그때 적은 값을 다시 보낸다)도 — 저절로 새로 고치면 그 값이 사라진다(마지막 고침 F3). 손으로 새로 고칠 때의 묻기(아래)는 그대로
+  if (C.holdReload) C.holdReload(function () { return pending() || C_SENDING || Object.keys(FAILED).length > 0; });
   window.addEventListener('beforeunload', function (e) {
     if (pending() || C_SENDING) { flushSaves(); e.preventDefault(); e.returnValue = ''; }
   });
@@ -1995,11 +1998,12 @@
         var by = {}; (rows || []).forEach(function (x) { by[x.approval_id] = x; });
         need.forEach(function (a) { FZSUM[fzKey(a)] = by[a.id] || null; });
         FZASK = '';
-        if (C.state().VIEW === view && !typing()) C.render();
+        // 보던 자리 그대로 · 결재함이면 쓰는 중 · 누르는 중에는 맡아 둔다(본체 C.repaintKeep — 그냥 다시 그리면 새 내 차례 카드가 끼며 아래 카드가 밀렸다, 2026-11-25 F2)
+        if (C.state().VIEW === view && !typing()) (C.repaintKeep || C.render)();
         fzFlush();
       }).catch(function () {
         need.forEach(function (a) { FZFAIL[fzKey(a)] = Date.now(); }); FZASK = '';
-        if (C.state().VIEW === view && !typing()) C.render();   // 못 받았어도 다시 그린다 — 결재함이 묶기 전에 기다린다(2026-10-20 V3 B7)
+        if (C.state().VIEW === view && !typing()) (C.repaintKeep || C.render)();   // 못 받았어도 다시 그린다 — 결재함이 묶기 전에 기다린다(2026-10-20 V3 B7)
         fzFlush();
       });
   }
