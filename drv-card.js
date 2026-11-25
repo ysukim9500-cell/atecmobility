@@ -751,7 +751,11 @@
     var sel = rows.length > 0 && !!C.mselBox, G = cardGroups(rows), n = 0;
     var body = G ? G.map(function (g) { return grpRow(g) + g.rows.map(function (it) { return rowHtml(it, n++, hist); }).join(''); }).join('')
       : rows.map(function (it, i) { return rowHtml(it, i, hist); }).join('');
-    return (sel ? C.mselAllLine('c', 'ctab') : '') + '<div class="panel"><div class="scroll tall cscroll" data-rows><table class="ctab"><thead><tr><th class="n' + (sel ? ' mselth">' + C.mselAll('c') : '">') + '순번</th><th>승인일</th><th>시간</th><th>가맹점</th><th>업종</th>' +
+    // 칸 폭(2026-11-25 사용자 「옆으로 밀어야 해서 불편해요」) — PC 표(821px 이상)는 table-layout:fixed 로 상자 안에 맞춘다. 폭은 CSS 의 col 규칙(driving-v2.html 「C — 상자 안에 맞춤」).
+    //   첫 줄이 카드 묶음 머리 줄(colspan 10)이어도 폭이 col 로 정해진다. 칸 수·차례는 그대로(폰·태블릿 카드는 nth-child 로 칸을 놓는다)
+    var cols = '<colgroup><col class="k-no"><col class="k-dt"><col class="k-tm"><col class="k-mer"><col class="k-biz"><col class="k-amt">' +
+      '<col class="k-cat"><col class="k-pur"><col class="k-note"><col class="k-act"></colgroup>';
+    return (sel ? C.mselAllLine('c', 'ctab') : '') + '<div class="panel"><div class="scroll tall cscroll" data-rows><table class="ctab">' + cols + '<thead><tr><th class="n' + (sel ? ' mselth">' + C.mselAll('c') : '">') + '순번</th><th>승인일</th><th>시간</th><th>가맹점</th><th>업종</th>' +
       '<th class="n">승인금액</th><th>구분</th><th>사용목적</th><th>비고</th><th></th></tr></thead><tbody>' + body +
       '</tbody><tfoot><tr><td colspan="5">합계 ' + n0(rows.length) + '건</td><td class="n total">' + n0(R.totals(rows).cost) + '</td><td colspan="4"></td></tr></tfoot></table></div></div>' + (sel ? C.mselBar('c') : '');
   }
@@ -816,8 +820,8 @@
         (f === 'note' ? ' aria-describedby="cmh' + it.id + '"' + (want ? ' title="' + esc(mh) + '"' : '') : '') +
         // 잠긴 칸은 글이 길면 「…」로 끝나니(CSS .cin:disabled) 전체 글을 title 로(2026-11-03 화면 다듬기)
         (locked && v.trim() && !want ? ' title="' + esc(v) + '"' : '') +
-        // 사용목적 칸 최소 폭 220 → 180(2026-10-15) — PC 폭(1280)에서 맨 끝 「지우기」가 표 밖으로 잘리던 것
-        (f === 'purpose' ? ' style="min-width:180px"' : '') + '>';
+        // 사용목적 칸 최소 폭(2026-10-15 220 → 180 줄 style)은 뺐다(2026-11-25) — PC 표는 칸 폭이 고정(col)이라 최소 폭이 표를 상자 밖으로 밀었다. 폭은 CSS
+        '>';
     };
     var cls = (MISSING[it.id] ? ' cmiss' : '') + (locked ? ' clock' : '');
     return '<tr data-crow="' + it.id + '"' + (cls ? ' class="' + cls.slice(1) + '"' : '') + '>' +
@@ -830,7 +834,8 @@
       '<td class="el" data-l="가맹점" title="' + esc(it.merchant || '') + '">' + esc(it.merchant || '—') +
         (cancelOf(it) ? '<div style="margin-top:3px;line-height:1"><span class="st bad" data-ccancel title="' + esc((it.src.cancel.file || 'ERP 파일') + '에서 전액 취소로 확인됐어요. 청구하지 않으려면 이 줄을 지워 주세요.') + '">전액 취소된 승인</span></div>'
           : MISSING[it.id] ? '<div style="margin-top:3px;line-height:1"><span class="st warn">파일에 없는 줄</span></div>' : '') + '</td>' +
-      '<td class="el dim" data-l="업종">' + esc(it.biz_type || '') + '</td>' +
+      // 업종도 칸 폭이 고정이라 길면 「…」 — 전체 글은 title(가맹점과 같게, 2026-11-25)
+      '<td class="el dim" data-l="업종"' + (it.biz_type ? ' title="' + esc(it.biz_type) + '"' : '') + '>' + esc(it.biz_type || '') + '</td>' +
       '<td class="n total" data-l="승인금액">' + n0(it.amount) + '</td>' +
       // 추천은 칸 아래 점선 단추 하나로만 보인다 — 칸 안 흐린 글씨(placeholder)에 또 쓰지 않는다(2026-10-15)
       //   통행료·하이패스 줄은 예시도 「예: 통행료」(「후불하이패스3건」 줄에 「예: 중식대」가 보였다 — 2026-11-03 교육 자료 로봇)
@@ -839,16 +844,21 @@
       '<td data-l="사용목적">' + inp('purpose', '무엇에 썼는지') + '</td>' +
       '<td data-l="비고">' + inp('note', !locked && mealWants(it) ? MEAL_PH : '') +
         '<div class="cmeal" id="cmh' + it.id + '"' + (mh ? '>' + hintHtml(mh) : ' hidden>') + '</div></td>' +
-      '<td class="n" data-l=""><span class="csave" id="cs' + it.id + '" aria-live="polite"></span>' +
+      // 줄 저장 표시(.csave)는 칸 폭을 바꾸지 않는 고정 자리(2026-11-25 — 글이 「저장 중…」·「저장됨」으로 바뀔 때마다 끝 칸 폭이 바뀌어 표 전체가 옆으로 움직였다).
+      //   알림(aria-live)은 표 위 저장 줄 하나만 — 저장 한 번을 두 번 읽지 않게
+      '<td class="n" data-l=""><span class="csave" id="cs' + it.id + '"></span>' +
         (locked ? '' : '<button type="button" class="btn sm" data-cdel="' + it.id + '" aria-label="' + (i + 1) + '번째 줄 삭제">삭제</button>') + '</td></tr>';
   }
 
   /* ── 칸 저장 — 칸마다 차례로(늦게 온 응답이 새 값을 덮지 않게), 다시 그리지 않는다 ── */
   // SAVE_T: 'id|f' → { t: 타이머, id, f, v, cyc } — 기다리는 칸(쓰는 중). 기간은 넣을 때 굳힌다(그사이 기간을 바꿔도 그 줄로 간다).
   var SAVE_T = {}, CHAIN = {}, SAVING = 0;
-  // 저장 상태 줄(2026-10-12): INFL 'id|f' → id(보내는 중) · FAILED 'id|f' → { id, f, v, cyc }(마지막 저장이 실패한 칸과 그때 적은 값 — 「다시 저장」이 다시 보낸다, 2026-10-15)
-  //   · LAST_SAVE 마지막으로 저장된 시각(ms)
+  // 저장 상태 줄(2026-10-12): INFL 'id|f' → 보내기 시작한 시각(ms, 보내는 중 — 2026-11-25 전에는 id) · FAILED 'id|f' → { id, f, v, cyc }(마지막 저장이 실패한 칸과
+  //   그때 적은 값 — 「다시 저장」이 다시 보낸다, 2026-10-15) · LAST_SAVE 마지막으로 저장된 시각(ms)
   var INFL = {}, FAILED = {}, LAST_SAVE = 0;
+  // 「저장 중…」은 보내는 저장이 이만큼 넘게 걸릴 때만 보인다(2026-11-25 사용자 「적을 때마다 저장중이 뜨고 왔다갔다」) — 쓰는 중(800ms 기다림)·빠른 저장은
+  //   「자동 저장됨」 그대로 두고 시각만 바뀐다. 보이는 것만 바꾼다 — pending()·떠나기 전 묻기·상신 전 저장 기다리기는 그대로
+  var SLOW_MS = 600;
   /** 그 줄 비고 칸의 식대 안내(주황 점선 · placeholder · title · 칸 아래 줄)를 지금 칸 값으로 다시 — 구분·비고를 적을 때마다(다시 그리지 않는다). */
   function paintMeal(id) {
     var tr = document.querySelector('tr[data-crow="' + id + '"]'), it = findMine(id);
@@ -885,17 +895,23 @@
     (rows || []).forEach(function (it) { var t = Date.parse(it.updated_at || ''); if (isFinite(t) && t > mx) mx = t; });
     return mx;
   }
+  /** 보내는 저장 가운데 SLOW_MS 넘게 걸리고 있는 것이 있나(저장 줄 「저장 중…」 — 보이는 것만). */
+  function slowSave() { var now = Date.now(); return Object.keys(INFL).some(function (k) { return now - INFL[k] >= SLOW_MS; }); }
+  /** 저장 상태 줄 — 적는 동안·저장하는 동안·실패해도 높이가 그대로다(2026-11-25 — 예전엔 쓰는 중이면 한 줄 「저장 중…」으로 바뀌어 표와 적던 칸이 한 줄 위로 갔다가 돌아왔다).
+   *  첫 줄(.csl1) = 상태 딱지(자동 저장됨 · 저장 중… · 저장 못 함 N곳) + 「· 마지막 저장 HH:MM」 + 실패면 「다시 저장」 — 줄 높이는 늘 그 단추 높이(CSS).
+   *  둘째 줄(.csaven) = 다시 올리기 안내 · 실패면 같은 자리에 실패 안내(안내 글은 남겨 두고 숨긴다 — 둘째 줄 높이가 두 글 가운데 긴 쪽으로 그대로, CSS). */
   function saveLineText(rows) {
-    var nf = Object.keys(FAILED).length;
-    if (pending()) return '<span class="st warn">저장 중…</span> <span>칸에 적은 값을 보내고 있어요.</span>';
+    var nf = Object.keys(FAILED).length, slow = slowSave(), bad = !slow && nf > 0, t = lastSaveMs(rows);
     // 실패한 칸은 서버 값으로 되돌려 둔다 — 그때 적은 값은 FAILED 에 남겨 「다시 저장」으로 다시 보낸다(2026-10-15, 「임시저장」 단추 대신).
-    if (nf) return '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span> <span>적은 값이 되돌아갔어요. ‘다시 저장’을 누르면 적었던 값을 다시 보내요.</span>' +
-      '<button type="button" class="btn sm" id="btnCRetry" data-cretry>다시 저장</button>';
-    var t = lastSaveMs(rows);
+    //   다시 보내려고 목록을 받는 동안(RETRYING)은 단추를 막아 둔다
     // 안내 글은 늘 둘째 줄(.csaven) — 한 덩이로 두면 좁은 폰에서 둘째 줄이 「· 마지막 저장…」처럼 「·」로 시작했다(2026-10-28 로봇)
     //   「구분·사용목적·비고는」은 한 덩이(keepDots) — 360·390 에서 「…적어 둔 구분·」 / 「사용목적·비고는…」으로 갈렸다(2026-11-03 화면 다듬기)
-    return '<span class="st ok">자동 저장됨</span>' + (t ? ' <span>· 마지막 저장 ' + hhmm(t) + '</span>' : '') +
-      ' <span class="csaven">' + keepDots('같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적·비고는 그대로예요.') + '</span>';
+    return '<span class="csl1">' + (slow ? '<span class="st warn">저장 중…</span>' : bad ? '<span class="st bad">저장 못 함 ' + n0(nf) + '곳</span>' : '<span class="st ok">자동 저장됨</span>') +
+      (t ? ' <span>· 마지막 저장 ' + hhmm(t) + '</span>' : '') +
+      (bad ? ' <button type="button" class="btn sm" id="btnCRetry" data-cretry' + (RETRYING ? ' disabled' : '') + '>다시 저장</button>' : '') + '</span>' +
+      ' <span class="csaven' + (bad ? ' csbad' : '') + '"><span class="csg"' + (bad ? ' aria-hidden="true"' : '') + '>' +
+      keepDots('같은 달 ERP 엑셀을 다시 올리면 새 줄만 추가되고, 적어 둔 구분·사용목적·비고는 그대로예요.') + '</span>' +
+      (bad ? '<span class="csf">적은 값이 되돌아갔어요. ‘다시 저장’을 누르면 적었던 값을 다시 보내요.</span>' : '') + '</span>';
   }
   /** 다시 받은 줄(지금 기간)에 없는 줄의 「저장 못 함」 표시는 지운다(지운 줄·다른 기간으로 옮겨진 줄). */
   function pruneFailed(cyc) {
@@ -906,7 +922,14 @@
     paintSave();
   }
   function saveLineHtml(rows) { return '<div class="csaveline" id="cSaveLine" aria-live="polite">' + saveLineText(rows) + '</div>'; }
-  function paintSave() { var el = $('cSaveLine'); if (el) el.innerHTML = saveLineText(mineRows(C.state().CYCKEY)); }
+  /** 저장 줄을 지금 상태로 — 글이 그대로면 넣지 않는다(2026-11-25: 한 글자 적을 때마다 같은 글을 새로 넣어 알림 자리(aria-live)가 같은 말을 또 알릴 수 있었고,
+   *  누르려던 「다시 저장」 단추가 그 사이 새 단추로 바뀌었다). */
+  function paintSave() {
+    var el = $('cSaveLine'); if (!el) return;
+    var h = saveLineText(mineRows(C.state().CYCKEY));
+    if (el.cfHtml === h) return;
+    el.cfHtml = h; el.innerHTML = h;
+  }
 
   /* ── 그 사이 상신돼 잠긴 줄(2026-11-03 회귀 N2) — 칸 저장이 CARD_LOCKED 로 막히면(다른 탭·기기에서 그 줄이 든 문서를 상신함) 결재 목록과 줄을
      다시 받아 잠긴 줄을 잠긴 모양으로 바꾼다(칸 막음 · 삭제·추천 숨김 · tr.clock). 다시 그리지 않고 그 자리에서 — 「저장 못 함」 표시·「다시 저장」과
@@ -960,8 +983,8 @@
     if (!list.length) { C.toast('다시 보낼 값이 없어요. ‘저장 못 함’으로 표시된 칸을 다시 적어 주세요.', true); paintSave(); return; }
     if (RETRYING) return;
     RETRYING = true;
-    var cyc = C.state().CYCKEY, b = $('btnCRetry');
-    if (b) b.disabled = true;
+    var cyc = C.state().CYCKEY;
+    paintSave();                 // 받는 동안 「다시 저장」 단추는 막힌 모양(saveLineText 가 RETRYING 을 본다 — 저장 줄은 같은 글이면 다시 넣지 않으므로 단추를 직접 막지 않는다)
     Promise.all([loadAppr(), loadItems(cyc, false, true, true)]).then(function () { return settledFor(cyc); }).then(function () {
       RETRYING = false;
       var gone = [], send = [];
@@ -997,7 +1020,19 @@
     var all = Object.keys(CHAIN).map(function (k) { return CHAIN[k]; });
     return Promise.all(all).then(function () { return pending() ? settleSaves() : null; });
   }
-  function mark(id, t, bad) { var el = $('cs' + id); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } }
+  /** 줄 저장 표시(.csave — 끝 칸 「삭제」 왼쪽 고정 자리, 2026-11-25). s = '' | 'saving' | 'ok' | 'bad'.
+   *  글(저장 중… · 저장됨 · 저장 못 함)은 화면 읽기·시험이 읽게 그 안에 두고 화면에는 data-s 표시만(CSS): 저장 중(600ms 넘을 때만 옅게) · 초록 ✓(1.5초 뒤 흐려짐, 자리는 남음) ·
+   *  빨간 !(풀릴 때까지, title 「저장 못 함」). 칸 폭이 바뀌지 않는다 — 예전엔 글이 바뀔 때마다 끝 칸 폭이 바뀌어 표 전체가 옆으로 움직였다. */
+  var MARK = { saving: '저장 중…', ok: '저장됨', bad: '저장 못 함' };
+  function mark(id, s) {
+    var el = $('cs' + id); if (!el) return;
+    // ✓ 는 늘 처음부터(1.5초 보인 뒤 흐려짐) — 저장이 아주 빨라 「저장 중」 모양을 한 번도 그리지 않은 채 ✓ 가 다시 와도 지난 ✓ 의 끝난 움직임이 이어지지 않게
+    if (s === 'ok' && el.hasAttribute('data-s')) { el.removeAttribute('data-s'); void el.offsetWidth; }
+    el.textContent = MARK[s] || '';
+    el.classList.toggle('bad', s === 'bad');
+    if (s) el.setAttribute('data-s', s); else el.removeAttribute('data-s');
+    if (s === 'bad' || s === 'saving') el.title = MARK[s]; else el.removeAttribute('title');
+  }
   function saveCell(id, f, v, cyc) {
     var k = id + '|' + f;
     cyc = cyc || C.state().CYCKEY;
@@ -1006,7 +1041,7 @@
   }
   /** 실패하면 칸을 서버 값으로 되돌리고 「저장 못 함」 + 까닭. 말없이 버리지 않는다 — 적었던 값(v)은 「다시 저장」용으로 남긴다. */
   function failCell(id, f, prev, msg, v, cyc) {
-    mark(id, '저장 못 함', true);
+    mark(id, 'bad');
     FAILED[id + '|' + f] = { id: id, f: f, v: v == null ? null : String(v), cyc: cyc || C.state().CYCKEY };
     paintSave();
     var el = document.querySelector('.cin[data-cid="' + id + '"][data-f="' + f + '"]');
@@ -1030,7 +1065,9 @@
       if (String(it[f] == null ? '' : it[f]) === v) { mark(id, ''); delete FAILED[k]; paintSave(); return; }
       var body = {}, prev = it[f];
       body[f] = v;
-      it[f] = v; SAVING++; INFL[k] = id; mark(id, '저장 중…'); paintSave();
+      it[f] = v; SAVING++; INFL[k] = Date.now(); mark(id, 'saving'); paintSave();
+      // SLOW_MS 가 지나도 아직 보내는 중이면 그때 저장 줄을 「저장 중…」으로(빠른 저장은 그 전에 끝나 아무것도 바뀌지 않는다)
+      var slowT = setTimeout(paintSave, SLOW_MS + 20);
       // keepalive — 페이지를 닫는 중(pagehide)에 보낸 저장도 끝까지 간다
       return rest('/rest/v1/card_items?id=eq.' + encodeURIComponent(id) + '&select=id,' + f + ',updated_at', {
         method: 'PATCH', keepalive: true, headers: { Prefer: 'return=representation' }, body: JSON.stringify(body)
@@ -1038,13 +1075,13 @@
         if (!out || !out.length) throw new Error('CARD_LOCKED');     // 0행 = 잠긴 줄과 같은 뜻(2026-11-03 SPEC §5-1 — why 가 말로 바꾼다)
         it[f] = out[0][f]; it.updated_at = out[0].updated_at;
         delete FAILED[k]; LAST_SAVE = Date.now();
-        mark(id, '저장됨');
+        mark(id, 'ok');
       }).catch(function (e) {
         it[f] = prev;
         failCell(id, f, prev, failMsg('저장하지 못했어요', e, why(e, it)), v, cyc);      // 그 줄의 문서 상태대로(고침 1 L3)
         // 그 사이 상신돼 잠겼다(다른 탭·기기) — 결재 목록·줄을 다시 받아 잠긴 줄을 잠긴 모양으로(회귀 N2 — 「저장 못 함 · 다시 저장」만 남지 않게)
         if (/CARD_LOCKED/.test(String((e && e.message) || ''))) relockSoon(cyc);
-      }).then(function () { SAVING--; delete INFL[k]; paintBlank(); paintSave(); });
+      }).then(function () { clearTimeout(slowT); SAVING--; delete INFL[k]; paintBlank(); paintSave(); });
     });
   }
   // 쓰다가 새로 고침·탭 닫기 — 본체의 묻기는 창(panel)이 열려 있을 때만 모듈을 본다. 칸 저장은 창 밖이라 여기서 따로 묻는다.
