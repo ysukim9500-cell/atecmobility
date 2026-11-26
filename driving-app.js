@@ -136,9 +136,10 @@
      있었으면(보내는 중이거나 끝남) 받아 온 것을 넣지 않는다: 쓰기 전에 읽은 목록이 늦게 와서 방금 저장한 칸(법인카드 구분 등)·확정한 통행료를
      되돌리지 않게. WRITE_N = 보내는 중인 쓰기 수 · WRITE_GEN = 쓰기를 보낼 때·끝날 때마다 +1.
      읽기만 하는 POST(잠금 묻기·출력 기록 요약·검증 계산·길찾기·내 계정 묻기·바뀜 표식)는 쓰기로 치지 않는다 — 모르는 POST 는 쓰기로 친다(덮는 것보다 한 번 더 받는 편이 안전).
-     바뀜 표식(approval_live_mark, 2026-11-25)은 10초마다 읽는다 — 쓰기로 세면 그때마다 맡아 둔 조용한 받기(NAV_PEND)가 버려진다. */
+     바뀜 표식(approval_live_mark, 2026-11-25)은 10초마다 읽는다 — 쓰기로 세면 그때마다 맡아 둔 조용한 받기(NAV_PEND)가 버려진다.
+     의견 칸에서 부를 사람 목록(approval_comment_people, 2026-11-26 묶음 D)도 읽기만 한다. */
   var WRITE_N = 0, WRITE_GEN = 0;
-  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history|toll_accuracy_monthly|approval_live_mark)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
+  var READ_POST = /^\/(rest\/v1\/rpc\/(expense_cycle_locked|card_cycle_locked|card_cycle_fp|approval_print_stats|approval_print_history|toll_accuracy_monthly|approval_live_mark|approval_comment_people)|functions\/v1\/(driving-verify|trip-geo))(\?|$)/;
   function isWrite(path, opt) {
     var m = String((opt && opt.method) || 'GET').toUpperCase(), p = String(path || '');
     if (m === 'GET' || m === 'HEAD' || READ_POST.test(p)) return false;
@@ -475,6 +476,7 @@
   /** 다른 화면으로 옮겨 갈 때 확장 모듈에 알린다(검증 화면은 들어올 때마다 ① 검증하기부터). */
   function notifyGo(v, prev) {
     FINQ = {};                     // 결재 완료 출력 이름 찾기 — 화면을 옮기면 비운다(2026-10-23)
+    CMT_EDIT = null; CMT_DELQ = null;   // 의견 고치기 칸 · 지울지 묻기는 화면을 옮기면 그만둔다(적던 새 의견 CMT_DRAFT 는 남긴다, 2026-11-26 묶음 D)
     EXT.onGo.forEach(function (f) { try { f(v, prev); } catch (e) { } });
     // 통행료 정확도 — 들어올 때마다 서버에서 새로 읽는다(그 사이 하이패스가 올라왔을 수 있다, 2026-11-12). 늦게 온 옛 답은 seq 가 버린다.
     if (v === 'tollacc' && prev !== 'tollacc' && TACC_ST) { TACC_ST.rows = undefined; TACC_ST.err = ''; TACC_ST.busy = false; TACC_ST.seq++; }
@@ -916,7 +918,7 @@
       // 한 건이 빠지거나 두 번 들어왔다. 서버(approval-act)도 같은 이유로 id 를 넣어 두었다.
       '&start_time=gte.' + r.lo + '&start_time=lt.' + r.hi + '&order=start_time.desc,id.desc';
   }
-  /* 기간과 무관한 것들(사람·차량·영수증·교육 셋·단가·설정·결재·사람 목록·조직도·결재선 지정·「내역 없음」 표시) — 13조각, putStatic 이 같은 차례로 넣는다.
+  /* 기간과 무관한 것들(사람·차량·영수증·교육 셋·단가·설정·결재·사람 목록·조직도·결재선 지정·「내역 없음」 표시·결재 의견 줄) — 14조각, putStatic 이 같은 차례로 넣는다.
      ★ 1000행씩 나눠 받는 읽기는 모두 겹치지 않는 열쇠로 정렬한다(2026-10-20 AU2 #16) — 정렬이 없거나 같은 값이 있으면
        페이지 경계에서 한 줄이 빠지거나 두 번 들어올 수 있다(지금은 1000행 미만이라 안 났다).
      null = 따로 받는 조각(7 app_config · 11 결재선 지정).
@@ -942,21 +944,25 @@
     // 관리자가 지정한 결재선(2026-10-14). 표가 아직 없거나 못 받아도 화면은 멈추지 않는다(자동 결재선만 쓴다).
     null,
     // 「이번 기간 내역 없음」 표시(2026-11-02) — 못 받거나 표가 없으면(404) 빈 목록 = 표시 없음. 적재를 막지 않는다(SPEC §4·§9)
-    '/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc'
+    '/rest/v1/approval_none?select=kind,username,cycle&order=kind.asc,username.asc,cycle.asc',
+    // 결재 의견 줄(2026-11-26 묶음 D — approval_comments, 읽기는 부모 결재 줄이 보이는가 하나). 못 받거나 표가 없으면(404 — 옛 서버) 받아 둔 것 그대로 ·
+    //   적재를 막지 않는다. 한 번도 못 읽었으면(CMT_OK 거짓) 의견은 예전 그림(상신 의견 · 승인 의견, 읽기만)
+    '/rest/v1/approval_comments?select=id,kind,approval_id,src,author,author_name,author_pos,body,mentions,created_at,edited_at&order=id.asc'
   ];
-  var APPR_PATH = STATIC_PATHS[8], NONE_PATH = STATIC_PATHS[12];
+  var APPR_PATH = STATIC_PATHS[8], NONE_PATH = STATIC_PATHS[12], CMT_PATH = STATIC_PATHS[13];
   var STATIC_OBJ = [function () { return USERS; }, function () { return VEHICLES; }, function () { return ALL_EVID; }, function () { return EDUV; },
     function () { return EDUP; }, function () { return EDUT; }, function () { return RATES; }, function () { return QBOUNDS; }, function () { return APPR; },
-    function () { return PEOPLE; }, function () { return ORG; }, function () { return LINE_OV; }, function () { return NONE; }];
+    function () { return PEOPLE; }, function () { return ORG; }, function () { return LINE_OV; }, function () { return NONE; }, function () { return CMT; }];
   var STATIC_MEMO = [];
   function staticMemo(i) { var m = STATIC_MEMO[i]; return m && m.obj === STATIC_OBJ[i]() ? m : null; }
-  /** 13조각을 받는 약속 — 조각마다 { v: 값, pages | text | json: 서명 } · 조용히 받기(quiet)에서 넣어 둔 것과 같으면 { same: true } · 건너뜀(o.noAppr — 같은 때
-   *  결재함 받기(apprRefresh)가 결재 건·표시를 받는 중, N8) { skip: true }. 표시를 못 받으면 quiet 는 v null(받아 둔 표시 그대로), 적재는 빈 목록(표시 없음, SPEC §9). */
+  /** 14조각을 받는 약속 — 조각마다 { v: 값, pages | text | json: 서명 } · 조용히 받기(quiet)에서 넣어 둔 것과 같으면 { same: true } · 건너뜀(o.noAppr — 같은 때
+   *  결재함 받기(apprRefresh)가 결재 건·표시·의견 줄을 받는 중, N8) { skip: true }. 표시를 못 받으면 quiet 는 v null(받아 둔 표시 그대로), 적재는 빈 목록(표시 없음, SPEC §9).
+   *  의견 줄(13)을 못 받으면 늘 v null — 받아 둔 줄 그대로(처음이면 예전 그림, 2026-11-26 묶음 D). */
   function staticReqs(quiet, o) {
     o = o || {};
     var sg = o.signal;
     return STATIC_PATHS.map(function (path, i) {
-      if (o.noAppr && (i === 8 || i === 12)) return Promise.resolve({ skip: true });
+      if (o.noAppr && (i === 8 || i === 12 || i === 13)) return Promise.resolve({ skip: true });
       var m = quiet ? staticMemo(i) : null;
       if (i === 7) {
         return apiRetry('/rest/v1/app_config?id=eq.1&select=*', sg ? { signal: sg } : undefined)
@@ -976,7 +982,7 @@
       }
       var p = fetchAllSig(path, { signal: sg, memo: m ? m.pages : null })
         .then(function (x) { return x.same ? { same: true, pages: x.pages } : { v: x.rows, pages: x.pages }; });
-      return i === 12 ? p.catch(function (e) { if (e && e.name === 'AbortError') throw e; return { v: quiet ? null : [] }; }) : p;
+      return i === 12 || i === 13 ? p.catch(function (e) { if (e && e.name === 'AbortError') throw e; return { v: quiet || i === 13 ? null : [] }; }) : p;
     });
   }
   /** staticReqs 로 받은 것을 넣는다 — 적재와 조용히 새로 받기(navCommit)가 같이 쓴다. { rulesNew: 서버 기간 설정이 바뀌었나, changed: 넣은 조각이 있나 }.
@@ -985,9 +991,11 @@
    *  ng0 — 출발 때의 NONE_GEN: 그 사이 이 탭에서 표시하기·되살리기를 했거나 다른 받기가 더 새 표시 목록을 넣었으면 덮지 않는다(2026-11-02 검토 L5 · N6).
    *  결재 건·표시는 넣을 때(같아도) 세대를 올린다 — 먼저 출발해 늦게 온 옛 목록이 덮지 못하게. at — 받은 시각(없으면 지금).
    *  objs0 — 조용히 새로 받기가 출발할 때의 조각별 상태 객체(STATIC_OBJ): 그 사이 다른 길(교육 다시 받기·조직도 고치기 등)이 그 조각을 바꿨으면
-   *  그 조각은 넣지 않는다(그쪽이 더 새것 · 「같은 글」은 출발 때 객체와 같다는 뜻이라). */
-  function putStatic(out, g0, ng0, at, objs0) {
-    var ch = false, rulesNew = false;
+   *  그 조각은 넣지 않는다(그쪽이 더 새것 · 「같은 글」은 출발 때 객체와 같다는 뜻이라).
+   *  cg0 — 출발 때의 CMT_GEN(의견 줄, 2026-11-26 묶음 D): 그 사이 이 탭에서 의견을 쓰고·고치고·지웠거나 다른 받기가 더 새 줄을 넣었으면 덮지 않는다.
+   *  의견 줄만 바뀐 것은 changed 로 치지 않는다 — 화면 전체를 다시 그리지 않고 의견 조각만(cmtCh → cmtPaint). 처음 읽힌 것(옛 그림 → 새 그림)만 changed. */
+  function putStatic(out, g0, ng0, at, objs0, cg0) {
+    var ch = false, rulesNew = false, cmtCh = false;
     var mv = objs0 ? STATIC_OBJ.map(function (f, i) { return f() !== objs0[i]; }) : [];   // 넣기 전에 본다(넣으면 객체가 바뀐다)
     var moved = function (i) { return !!mv[i]; };
     var take = function (i) { var x = out[i]; return x && !x.same && !x.skip && !moved(i) ? x : null; };
@@ -1023,8 +1031,14 @@
       if (!x.same) { setNone(x.v); ch = true; }
       NONE_GEN++; keep(12);
     }
+    x = out[13];
+    if (x && !x.skip && CMT_GEN === cg0 && (x.same || Array.isArray(x.v))) {   // v null = 못 받음 — 받아 둔 줄 그대로(옛 서버면 예전 그림)
+      if (x.same) CMT_GEN++;                                                  // 같아도 세대를 올린다(먼저 출발한 옛 목록이 덮지 못하게 — 표시와 같다)
+      else { var cs = cmtSet(x.v); if (cs.flip) ch = true; else if (cs.ch) cmtCh = true; }
+      keep(13);
+    }
     STATIC_AT = at || Date.now();
-    return { rulesNew: rulesNew, changed: ch };
+    return { rulesNew: rulesNew, changed: ch, cmtCh: cmtCh };
   }
   function loadAll(opt) {
     // ★ 예전에는 로딩 중이면 그냥 돌아갔다. 주기를 빠르게 두 번 바꾸면 두 번째
@@ -1032,6 +1046,7 @@
     //   달아 두고, 늦게 도착한 응답을 버린다.
     var soft = !!(opt && opt.soft);
     var seq = ++LOAD_SEQ, ng0 = NONE_GEN;     // ng0 — 받는 사이 표시하기·되살리기를 했으면 받아 온 표시 목록으로 덮지 않는다(2026-11-02 검토 L5)
+    var cg0 = CMT_GEN;                        // cg0 — 받는 사이 이 탭에서 의견을 쓰고·고치고·지웠으면 받아 온 의견 줄로 덮지 않는다(2026-11-26 묶음 D)
     // 조용히 새로 받기(navRefresh, 2026-11-02) — 돌던 것은 멈추고(N3) 맡아 둔 것은 버린다(이 적재가 대신한다).
     //   다 받으면 그 범위의 「받은 시각」을 남긴다 — soft 는 운행·사람·결재 목록 중 가장 오래된 조각의 받은 시각(받은 지 3분 안의 것을 그대로 쓰기 때문, N8)
     var nk = navCoreKey(), t0 = Date.now(), st0 = STATIC_AT;
@@ -1080,7 +1095,7 @@
       LOADED_ALL = wantAll;
       // fetchAll 은 41,000행에서 멈춘다. 닿았으면 잘렸다는 것을 숨기지 않는다.
       if (ALL_TRIPS.length >= 41000) toast('운행이 너무 많아 일부만 불러왔어요. 기간을 줄여 주세요.', true);
-      var rulesNew = out ? putStatic(out, null, ng0).rulesNew : false;
+      var rulesNew = out ? putStatic(out, null, ng0, null, null, cg0).rulesNew : false;
       if (out) LOAD_APPR_AT = STATIC_AT;
       RATE_MISS = {};
       // 기간 설정이 바뀌었으면 이 응답의 운행은 옛 범위다 — 기간을 확인하고 새 범위로 한 번 더 받는다(늦게 온 이 응답은 LOAD_SEQ 가 버린다)
@@ -3528,7 +3543,8 @@
   /* ── 의견 모아 보기(2026-10-21 사용자 「결재할 때 의견란이 이미 있으니 영수증마다 따로 둘 필요 없고, 담당자부터 의견이 결재함 어딘가에 있기만 하면 된다」) ──
      차례대로 — 담당(상신 의견: 서버가 그 상신의 요약 snapshot.note 에 굳힌 글) → 결재자마다 승인 의견(steps[].comment). 글이 있는 것만.
      반려 사유는 넣지 않는다 — 반려된 문서는 상태 글(「반려 — 이름 · 사유」)·반려 띠가 이미 보인다(겹치지 않게).
-     세 결재 같은 조각: 결재함 「문서 보기」를 편 자리(apvSlot) · 승인·반려 창(「의견」 칸 위) · 상신한 본인의 결재 띠(apprStrip). */
+     세 결재 같은 조각: 결재함 「문서 보기」를 편 자리(apvSlot) · 승인·반려 창(「의견」 칸 위) · 상신한 본인의 결재 띠(apprStrip).
+     ★ 2026-11-26 묶음 D: 이 그림(읽기만)은 이제 의견 표(approval_comments)를 한 번도 못 읽은 옛 서버(CMT_OK 거짓)에서만 쓴다 — 아래 「의견 줄」. */
   function apprOpinions(a) {
     var out = [];
     if (!a) return out;
@@ -3541,7 +3557,7 @@
     });
     return out;
   }
-  function opinionsHtml(a) {
+  function opinionsOld(a) {
     var L = apprOpinions(a);
     if (!L.length) return '';
     return '<div class="aops" role="group" aria-label="의견"><div class="aoph">의견</div><ol class="aopl">' + L.map(function (o) {
@@ -3549,6 +3565,710 @@
       return '<li><div class="aopw"><b>' + esc(o.who) + '</b> <span>' + esc(o.tag + (isFinite(t) ? ' · ' + noteTime(t) : '')) + '</span></div>' +
         '<div class="aopt">' + esc(o.txt) + '</div></li>';
     }).join('') + '</ol></div>';
+  }
+
+  /* ── 의견 줄 — 댓글처럼 여러 번 · 본인 글 고치기·지우기 · 남이 쓰면 그 조각만 조용히(2026-11-26 묶음 D — 스펙 §5 · 계획 Task 6) ──
+     의견은 의견 표 한 곳(approval_comments — 세 갈래 공용 · 읽기는 부모 결재 줄이 보이는가 하나)에서 읽는다. 상신 의견 · 승인 의견 · 반려 사유도
+     서버(맞추기 트리거)가 줄로 만든다 — 화면은 그 줄만 그린다(steps[].approved_comment · *_approval_history 같은 고치기 전 글은 그리지 않는다).
+       · 조각 하나(opinionsHtml — 모듈은 C.opinions): <div class="aops cmt" data-cmt="갈래:번호"> 머리 「의견 N」 · 줄(이름 직위 · 종류 딱지 · 등록 일시 · 수정 일시 ·
+         글 — 부른 이름 굵게 · 본인 줄이면 수정 삭제(반려 사유 빼고)) · 적는 칸(높이 고정 · 글자 수 칸 폭 고정 · 등록). 세 곳 — 결재함 「문서 보기」 자리(apvSlot,
+         줄이 0이어도) · 승인·반려 창(적는 칸 없이 — 그 창의 적는 칸은 #apprWhy, 줄이 0이면 숨김) · 올린 사람의 결재 띠(세 갈래).
+       · 쓰기는 서버 기능만(approval-act comment_add · comment_edit · comment_delete) — callAppr 를 타지 않는다(결재 건 다시 받기 · STALE 처리 없음).
+         보내는 동안 단추만 잠근다(글자 · 폭 그대로 · 「…중」 없음) · 성공하면 알림 없이 그 줄만 넣고 조각만 다시 그린다 · 실패는 오류 글 알림 · 적던 글 그대로.
+         등록 열쇠(client_key)는 누를 때 한 번 만들어 실패 뒤 다시 눌러도 같은 값(두 번 가도 줄 하나) · 성공하면 버린다.
+       · 바로 반영: 결재 건 새로 받기(apprRefresh — 넷째 받기) · 조용히 새로 받기(navRefresh — 14번째 조각) · 적재가 받은 줄이 달라졌으면 조각만(cmtPaint —
+         [data-cmt] 의 머리 글 · 줄 목록과 접힌 「문서 보기」 옆 「의견 N」만 바꾼다. 문서 그림 열쇠 apvKey · apprSig 는 그대로라 PDF 미리보기 · 결재 창은 다시 그려지지 않는다).
+       · 지킴: 칸에 초점 · 한글 조합 · 누르는 중 · 「⋯」 메뉴 · @ 목록이 열림이면 그리지 않고 맡아 둔다(CMT_DIRTY) — 손을 떼면 apprUnhold 가 푼다. 내 동작 바로 뒤에는
+         바로 그린다(그 동작의 칸 밖 다른 글 칸에 적는 중이면 그 칸을 뗀 뒤). 초점 — 등록 뒤 그 적는 칸 · 저장 뒤 그 줄 「수정」 · 지운 뒤 조각(글 칸으로 옮기지 않는다).
+       · 적던 글은 CMT_DRAFT(갈래:번호 → 글)에 바로 적어 화면을 다시 그려도 그대로(NAV_MIRROR) · 적던 글이나 열린 고치기 칸이 있으면 새 판으로 저절로 새로 고치지 않는다(EXT.hold). */
+  var CM = window.AtecComments || null;
+  // CMT 보이는 의견 줄 모두(서버가 이 사람에게 준 것 그대로) · CMT_OK 표를 읽었나 · CMT_GEN 넣을 때마다 +1(늦게 온 옛 목록이 덮지 못하게) · CMT_DIRTY 맡아 둔 그리기
+  // CMT_IME · CMT_IME_EL 의견 칸 한글 조합 중 · 그 칸(조합하던 칸이 사라지거나 초점이 떠나면 끝을 못 들어도 풀린다 — cmtIme)
+  var CMT = [], CMT_OK = false, CMT_GEN = 0, CMT_DIRTY = false, CMT_IME = false, CMT_IME_EL = null;
+  // CMT_DRAFT 적던 글 · CMT_KEY 등록 열쇠 { k, text, men }(보내다 실패한 것 — 같은 글 · 같은 부른 사람을 다시 보낼 때만 같은 열쇠) · CMT_BUSY 보내는 중(갈래:번호 · e<의견> · x<의견>) ·
+  // CMT_PICKED 새 의견 칸에서 @ 로 고른 사람 [{ username, name }](Task 7 — 아래 「@ 로 사람 부르기」)
+  var CMT_DRAFT = {}, CMT_KEY = {}, CMT_BUSY = {}, CMT_PICKED = {};
+  // 줄 단추 표시(다시 그린 뒤 키보드 초점을 같은 단추로 돌려줄 때 짝을 찾는다)
+  var CMT_BTN_ATTRS = ['data-cmtedit', 'data-cmtdel', 'data-cmtdelgo', 'data-cmtdelno', 'data-cmtsave', 'data-cmtcancel'];
+  // 한 번에 하나 — 고치는 줄 { id, text, picked, w } · 지울지 묻는 줄 { id, w }. w = 그것을 연 조각에 적는 칸이 있나(승인·반려 창 조각은 거짓) —
+  //   승인 창과 그 뒤 카드에 같은 줄이 둘 그려져도 고치기 칸 · 묻기는 연 곳에만 그린다(창에서 연 것은 창을 닫으면 버린다 — closePanel)
+  var CMT_EDIT = null, CMT_DELQ = null;
+  var CMT_PH = '의견을 남겨 보세요. @를 치면 사람을 부를 수 있어요.';
+  function cmtOn() { return !!(CM && CMT_OK); }
+  /** 조각 열쇠 — 결재함 카드 열쇠(akey)와 같은 꼴 「d:번호」·「expense:번호」·「card:번호」. */
+  function cmtKeyOf(a) { return (kindOf(a) || 'd') + ':' + a.id; }
+  function cmtParse(key) {
+    var m = /^(d|expense|card):(\d+)$/.exec(String(key || ''));
+    return m ? { kind: m[1] === 'd' ? 'driving' : m[1], id: Number(m[2]) } : null;
+  }
+  function cmtRowsKey(key) { var p = cmtParse(key); return p && CM ? CM.rowsOf(CMT, p.kind, p.id) : []; }
+  function cmtRow(id) { for (var i = 0; i < CMT.length; i++) if (Number(CMT[i].id) === Number(id)) return CMT[i]; return null; }
+  /** 바뀜 판단 — 줄 · 고친 때(sigAll)에 부른 사람까지(승인·반려 창의 부름은 줄이 생긴 뒤 적힌다). */
+  function cmtSig() {
+    return CMT.slice().sort(function (p, q) { return Number(p.id) - Number(q.id); })
+      .map(function (r) { return r.id + '@' + (r.edited_at || '') + '@' + (Array.isArray(r.mentions) ? r.mentions.join(',') : ''); }).join('|');
+  }
+  /** 고치는 줄 · 지울지 묻는 줄이 없어졌으면(남이 지움 · 다른 탭) 그 상태를 버린다. */
+  function cmtTidy() {
+    if (CMT_EDIT && !cmtRow(CMT_EDIT.id)) CMT_EDIT = null;
+    if (CMT_DELQ && !cmtRow(CMT_DELQ.id)) CMT_DELQ = null;
+  }
+  /** 받은 목록을 넣는다 — { flip: 처음 읽혔다(옛 그림 → 새 그림), ch: 줄이 바뀌었다 }. */
+  function cmtSet(list) {
+    var s0 = cmtSig(), ok0 = CMT_OK;
+    CMT = (list || []).slice(); CMT_OK = true; CMT_GEN++;
+    cmtTidy();
+    return { flip: !ok0, ch: cmtSig() !== s0 };
+  }
+  /** 내 동작의 답(줄 하나) — 넣거나 바꾼다(새 배열 — 조용히 받기의 받은 글 서명은 무효가 된다). */
+  function cmtUpsert(row) {
+    if (!row || row.id == null) return;
+    CMT = CMT.filter(function (r) { return Number(r.id) !== Number(row.id); }).concat([row]); CMT_GEN++;
+    cmtTidy();
+  }
+  function cmtDrop(id) { CMT = CMT.filter(function (r) { return Number(r.id) !== Number(id); }); CMT_GEN++; cmtTidy(); }
+  /** 받은 목록을 넣은 뒤 — 처음 읽혔으면(옛 그림이 그려져 있다) 화면을 조용히 다시 그리고, 줄만 바뀌었으면 조각만. */
+  function cmtShow(cs) {
+    if (!cs) return;
+    if (cs.flip) {
+      if (VIEW === 'inbox') { APPR_DIRTY = true; apprShow(); } else { LIVE_PAINT = true; liveFlush(); }
+      paintPills();
+    } else if (cs.ch) { cmtPaint(); paintPills(); }
+  }
+  /** 의견 줄만 새로 받는다 — 결재 동작(상신 의견 · 승인 의견 · 반려 사유는 서버가 줄로 만든다)이 끝난 뒤. 그 사이 이 탭에서 쓰고·고치고·지웠으면 덮지 않는다. */
+  function cmtRefresh() {
+    if (!CM || !ME) return Promise.resolve(false);
+    var g0 = CMT_GEN, who = myName();
+    return fetchAllSig(CMT_PATH).then(function (x) {
+      if (myName() !== who || CMT_GEN !== g0 || !x || !Array.isArray(x.rows)) return false;
+      var cs = cmtSet(x.rows);
+      STATIC_MEMO[13] = { pages: x.pages, obj: CMT };
+      cmtShow(cs);
+      return cs.ch || cs.flip;
+    }, function () { return false; });
+  }
+  function cmtHead(n) { return '의견' + (n ? ' ' + n0(n) : ''); }
+  function cmtWho(r) {
+    var n = String(r.author_name || '').trim() || nameOf(r.author), p = String(r.author_pos || '').trim();
+    return n + (p ? ' ' + p : '');
+  }
+  /** 글 — 부른 사람(mentions)의 「@이름」만 굵게(나머지는 글 그대로 · esc). */
+  function cmtBody(r) {
+    var names = (Array.isArray(r.mentions) ? r.mentions : []).map(function (u) { var x = USERS[u] || PEOPLE[u]; return x && x.name ? x.name : ''; }).filter(Boolean);
+    return CM.marks(String(r.body == null ? '' : r.body), names).map(function (m) { return m.at ? '<b class="cmt-men">' + esc(m.t) + '</b>' : esc(m.t); }).join('');
+  }
+  /** 고치기 칸의 글자 한도 — 줄의 출처대로(상신 의견 300 · 승인 의견 500 · 그냥 의견 1,000 — 서버 commentBody 와 같다, R8). */
+  function cmtMax(r) { return r && r.src === 'submit' ? 300 : r && r.src === 'approve' ? 500 : (CM ? CM.MAX : 1000); }
+  function cmtCountText(text, max) { var n = CM.count(text).n; return { t: n0(n) + '/' + n0(max), over: n > max }; }
+  function cmtCountHtml(text, max) { var c = cmtCountText(text, max); return '<span class="cmt-n' + (c.over ? ' over' : '') + '">' + c.t + '</span>'; }
+  /** 칸 글 — <textarea> 바로 뒤 줄바꿈 하나는 HTML 이 버리므로 글이 줄바꿈으로 시작하면 하나 더. */
+  function cmtTa(text) { var s = String(text == null ? '' : text); return (s.charAt(0) === '\n' ? '\n' : '') + esc(s); }
+  function cmtRowHtml(r, me, w) {
+    var lab = CM.srcLabel(r), t = Date.parse(r.created_at || ''), te = Date.parse(r.edited_at || '');
+    var mine = CM.canEdit(r, me), id = Number(r.id);
+    var ed = mine && !!CMT_EDIT && Number(CMT_EDIT.id) === id && CMT_EDIT.w === !!w;
+    var del = mine && !ed && !!CMT_DELQ && Number(CMT_DELQ.id) === id && CMT_DELQ.w === !!w;
+    var acts = !mine ? '' : del
+      ? '<span class="cmt-ask">삭제할까요?</span><button type="button" class="cmt-btn bad" data-cmtdelgo="' + id + '"' + (CMT_BUSY['x' + id] ? ' disabled' : '') + '>삭제</button>' +
+        '<button type="button" class="cmt-btn" data-cmtdelno="' + id + '">취소</button>'
+      : '<button type="button" class="cmt-btn" data-cmtedit="' + id + '">수정</button><button type="button" class="cmt-btn" data-cmtdel="' + id + '">삭제</button>';
+    var body = '<div class="aopt">' + cmtBody(r) + '</div>';
+    if (ed) {
+      var mx = cmtMax(r), tx = CMT_EDIT.text;
+      body = '<div class="cmt-box cmt-edbox"><textarea class="inp cmt-ed" rows="2" maxlength="' + mx + '" data-cmted="' + id + '" aria-label="의견 고치기">' + cmtTa(tx) + '</textarea>' +
+        '<div class="cmt-bar">' + cmtCountHtml(tx, mx) + '<span class="cmt-bb"><button type="button" class="btn sm pri" data-cmtsave="' + id + '"' + (CMT_BUSY['e' + id] ? ' disabled' : '') + '>저장</button>' +
+        '<button type="button" class="btn sm" data-cmtcancel="' + id + '">취소</button></span></div></div>';
+    }
+    // 머리 줄 = 쓴 사람 · 딱지 · 일시(좁으면 그 안에서 줄을 바꾼다) + 오른쪽 단추(이름 줄에 붙어 있다)
+    return '<li class="cmt-row" data-cmtid="' + id + '"><div class="aopw"><span class="cmt-who"><b>' + esc(cmtWho(r)) + '</b>' +
+      (lab ? '<span class="cmt-src s-' + esc(r.src) + '">' + esc(lab) + '</span>' : '') +
+      (isFinite(t) ? '<span class="cmt-time">' + noteTime(t) + '</span>' : '') +
+      (isFinite(te) ? '<span class="cmt-mod">수정 ' + noteTime(te) + '</span>' : '') + '</span>' +
+      (acts ? '<span class="cmt-acts' + (ed ? ' off' : '') + '">' + acts + '</span>' : '') + '</div>' + body + '</li>';
+  }
+  function cmtListHtml(rows, me, w) { return rows.map(function (r) { return cmtRowHtml(r, me, w); }).join(''); }
+  function cmtWriteHtml(key) {
+    var d = CMT_DRAFT[key] || '';
+    return '<div class="cmt-box cmt-new"><textarea class="inp cmt-in" rows="2" maxlength="' + (CM ? CM.MAX : 1000) + '" placeholder="' + esc(CMT_PH) + '" aria-label="의견 쓰기" data-cmtin="' + esc(key) + '">' + cmtTa(d) + '</textarea>' +
+      '<div class="cmt-bar">' + cmtCountHtml(d, CM ? CM.MAX : 1000) + '<button type="button" class="btn sm pri" data-cmtsend="' + esc(key) + '"' + (CMT_BUSY[key] ? ' disabled' : '') + '>등록</button></div></div>';
+  }
+  /** 조각 — write 거짓이면 적는 칸 없이(승인·반려 창 — 줄이 0이면 숨겨 두고 줄이 생기면 보인다). data-cmtsig = 줄 목록 글의 해시(cmtPaint 가 견준다). */
+  function cmtFragHtml(key, write) {
+    var rows = cmtRowsKey(key), list = cmtListHtml(rows, myName(), !!write);
+    return '<div class="aops cmt" data-cmt="' + esc(key) + '"' + (write ? '' : ' data-cmtw="0"') + ' data-cmtsig="' + fnvText(list) + '" role="group" aria-label="의견" tabindex="-1"' +
+      (!write && !rows.length ? ' hidden' : '') + '><div class="aoph">' + esc(cmtHead(rows.length)) + '</div><ol class="aopl">' + list + '</ol>' + (write ? cmtWriteHtml(key) : '') + '</div>';
+  }
+  /** 세 곳이 같이 쓰는 의견 조각(모듈은 C.opinions). opt.write === false = 적는 칸 없이(승인·반려 창). 옛 서버(CMT_OK 거짓)는 예전 그림 그대로. */
+  function opinionsHtml(a, opt) {
+    if (!a) return '';
+    if (!cmtOn()) return opinionsOld(a);
+    return cmtFragHtml(cmtKeyOf(a), !(opt && opt.write === false));
+  }
+  /** @ 목록(#cmtPop)이 열려 있는가(Task 7 — 아래 「@ 로 사람 부르기」). 열려 있으면 조각을 다시 그리지 않고(cmtHold) Esc 는 목록이 먼저 받는다. */
+  function cmtPopOpen() { return !!POP; }
+  /** 지금 초점이 있는 글 칸(글 칸 · 고르기 · contenteditable) — 없으면 null. */
+  function cmtTextFocus() {
+    var ae = document.activeElement;
+    if (!ae || ae === document.body) return null;
+    if (ae.isContentEditable || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT') return ae;
+    return ae.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color|hidden|image)$/i.test(ae.type || '') ? ae : null;
+  }
+  /** 의견 칸 한글 조합 중인가 — 조합을 시작한 그 칸에 아직 초점이 있을 때만. 칸이 사라졌거나(다시 그림) 초점이 떠났으면 끝(compositionend)을 못 들었어도 푼다. */
+  function cmtIme() {
+    if (!CMT_IME) return false;
+    var t = CMT_IME_EL;
+    if (t && t.isConnected && document.activeElement === t) return true;
+    CMT_IME = false; CMT_IME_EL = null;
+    return false;
+  }
+  /** 지금 의견 조각을 다시 그리면 안 되는가 — 칸에 초점(글 칸 · 고르기) · 한글 조합(찾기 칸 · 결재 창 · 의견 칸) · 누르는 중 · 「⋯」 메뉴 · @ 목록이 열림. */
+  function cmtHold() {
+    return !!(APPR_PTR || IME || DLG_IME || cmtIme() || cmtPopOpen() || document.querySelector('#inner details.kmenu[open]') || cmtTextFocus());
+  }
+  /** 의견 조각만 다시 그린다(화면 전체 · 문서 미리보기 · 결재 창은 그대로) — 머리 「의견 N」 · 줄 목록(그 글이 바뀐 조각만) · 승인 창 조각 숨김 · 등록 단추 잠금 ·
+   *  접힌 「문서 보기」 옆 「의견 N」. 적는 칸(.cmt-in)은 건드리지 않는다(적던 글 · 커서 · 한글 조합 그대로). opt.now = 내 동작 바로 뒤(지킴 없이) ·
+   *  opt.own = 그 동작의 칸(보낸 적는 칸 · 저장/취소한 고치기 칸) — 내 동작 뒤라도 그 밖의 글 칸(다른 의견 칸 · #apprWhy 등)에 초점이 있으면 줄 목록은 다시 그리지 않고
+   *  맡아 둔다(CMT_DIRTY — 보낸 칸 비우기 · 등록 단추만 한다) · opt.clear { key, text } = 보낸 글을 그 칸에서 지움 ·
+   *  opt.focus { fr, key, sel, box } = 그 조각 안으로 초점(지금 초점이 그 조각 안이거나 없을 때만 — cmtFocus). 줄 목록을 다시 그리면 그 안 단추에 있던 키보드 초점은 같은 단추로 돌려준다. */
+  function cmtPaint(opt) {
+    opt = opt || {};
+    if (!cmtOn()) return;
+    if (!opt.now && cmtHold()) { CMT_DIRTY = true; return; }
+    var tf = opt.now ? cmtTextFocus() : null, keep = !!tf && tf !== opt.own;
+    CMT_DIRTY = keep;
+    cmtTidy();
+    var me = myName();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cmt]'), function (el) {
+      var key = el.getAttribute('data-cmt'), write = el.getAttribute('data-cmtw') !== '0';
+      if (write) {
+        var ta = el.querySelector(':scope > .cmt-new .cmt-in'), sb = el.querySelector(':scope > .cmt-new [data-cmtsend]');
+        if (sb && sb.disabled !== !!CMT_BUSY[key]) sb.disabled = !!CMT_BUSY[key];
+        if (ta && opt.clear && opt.clear.key === key && ta.value === opt.clear.text) { ta.value = ''; ta.scrollTop = 0; cmtCount(ta); }
+      }
+      if (keep) return;                                                       // 다른 칸에 적는 중 — 줄 목록은 손을 뗀 뒤(apprUnhold)
+      var rows = cmtRowsKey(key), list = cmtListHtml(rows, me, write), sig = String(fnvText(list));
+      var hd = el.querySelector(':scope > .aoph'), ht = cmtHead(rows.length);
+      if (hd && hd.textContent !== ht) hd.textContent = ht;
+      if (el.getAttribute('data-cmtsig') !== sig) {
+        var ol = el.querySelector(':scope > .aopl'), fa = document.activeElement, fb = null;
+        if (ol && fa && ol.contains(fa)) CMT_BTN_ATTRS.forEach(function (n) { if (!fb && fa.hasAttribute(n)) fb = { n: n, v: fa.getAttribute(n) }; });
+        if (ol) ol.innerHTML = list;
+        el.setAttribute('data-cmtsig', sig);
+        // 그 줄 단추에 있던 키보드 초점 — 새 목록의 같은 단추로(그 줄이 없어졌으면 조각으로 — 초점이 맨 위로 떨어지지 않게)
+        if (fb) { var nb = ol.querySelector('[' + fb.n + '="' + fb.v + '"]'); try { (nb || el).focus({ preventScroll: true }); } catch (e) { } }
+      }
+      if (!write && el.hidden !== !rows.length) el.hidden = !rows.length;
+    });
+    if (CMT_IME_EL && !CMT_IME_EL.isConnected) { CMT_IME = false; CMT_IME_EL = null; }   // 조합하던 고치기 칸을 다시 그렸다
+    cmtPopCheck();                                                            // @ 목록을 연 고치기 칸을 다시 그렸다(내 동작 바로 뒤 — Task 7)
+    if (keep) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.apvopn[data-cmtn]'), function (c) {
+      var n = cmtRowsKey(c.getAttribute('data-cmtn')).length, t = '의견 ' + n0(n);
+      if (c.textContent !== t) c.textContent = t;
+      if (c.hidden !== !n) c.hidden = !n;
+    });
+    if (opt.focus) cmtFocus(opt.focus);
+  }
+  /** 내 동작 뒤 초점 — 그 조각(지금 화면의 것)의 sel → (box 일 때만) 적는 칸 → 조각(tabindex -1). 사람이 있지 않던 글 칸으로는 초점을 옮기지 않는다
+   *  (폰 자판이 올라오고 cmtHold 가 걸린다 — 적는 칸은 등록 뒤에만: box). 지금 초점이 그 조각 안 · 그 조각을 감싼 것(창) · 없음일 때만(다른 곳으로 옮겨 갔으면 그대로). */
+  function cmtFocus(f) {
+    var fr = f.fr && f.fr.isConnected ? f.fr : document.querySelector('[data-cmt="' + f.key + '"]');
+    if (!fr) return;
+    var ae = document.activeElement;
+    if (ae && ae !== document.body && !fr.contains(ae) && !ae.contains(fr)) return;
+    var el = (f.sel && fr.querySelector(f.sel)) || (f.box && fr.querySelector(':scope > .cmt-new .cmt-in')) || fr;
+    if (el === document.activeElement) return;
+    try { el.focus({ preventScroll: true }); } catch (e) { }
+    if (f.end && el.setSelectionRange) { try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { } }
+  }
+  function cmtCount(t) {
+    var box = t.closest('.cmt-box'), c = box && box.querySelector('.cmt-n');
+    if (!c || !CM) return;
+    var x = cmtCountText(t.value, +t.getAttribute('maxlength') || CM.MAX);
+    if (c.textContent !== x.t) c.textContent = x.t;
+    if (c.classList.contains('over') !== x.over) c.classList.toggle('over', x.over);
+  }
+  /** 보내는 동안 단추 잠금(그 단추만 — 글자 · 폭 그대로). */
+  function cmtLock(sel, on) {
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function (b) { if (b.disabled !== !!on) b.disabled = !!on; });
+  }
+  function cmtNewKey() {
+    var s = '';
+    try { var a = new Uint8Array(12); window.crypto.getRandomValues(a); for (var i = 0; i < a.length; i++) s += ('0' + a[i].toString(16)).slice(-2); }
+    catch (e) { s = Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+    return 'c' + s;
+  }
+  /** 의견 동작 보내기 — callAppr 를 쓰지 않는다(결재 건 다시 받기 · STALE · 창 닫기 없음). { ok, st, j, err } */
+  function callCmt(body) {
+    return apiRetry('/functions/v1/approval-act', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        j = j || {};
+        var ok = r.ok && !!j.ok;
+        return { ok: ok, st: r.status, j: j, err: ok ? '' : (apiErrText(j, r.status) || '처리하지 못했어요.') };
+      });
+    }, function () { return { ok: false, st: 0, j: {}, err: '서버에 연결하지 못했어요. 잠시 후 다시 해 주세요.' }; });
+  }
+  /** 「@이름」이 글에 남은 고른 사람만 부른다(CMT_PICKED · CMT_EDIT.picked — @ 목록에서 고른 사람, Task 7). */
+  function cmtMentions(text, picked) { return CM.keepMentions(text, picked || []); }
+  function cmtSend(key, fr) {
+    var p = cmtParse(key), ta = fr.querySelector(':scope > .cmt-new .cmt-in');
+    if (!p || !ta || CMT_BUSY[key]) return;
+    var text = ta.value;
+    if (!CM.count(text).n) { toast('의견을 적어 주세요.', true); try { ta.focus({ preventScroll: true }); } catch (e) { } return; }
+    // 등록 열쇠 — 실패 뒤 같은 글 · 같은 부른 사람으로 다시 보내면 같은 열쇠(서버가 한 줄로 받는다), 글이나 부른 사람을 바꿨으면 새 열쇠
+    //   (바꾼 글 · 같은 이름의 다른 사람이 옛 줄로 돌아오지 않게 — 서버는 같은 열쇠면 먼저 받은 줄을 그대로 준다, Task 7)
+    var men = cmtMentions(text, CMT_PICKED[key]), mk = men.join(',');
+    var pk = CMT_KEY[key], ck = pk && pk.text === text && pk.men === mk ? pk.k : '';
+    if (!ck) { ck = cmtNewKey(); CMT_KEY[key] = { k: ck, text: text, men: mk }; }
+    CMT_BUSY[key] = true; cmtLock('[data-cmtsend="' + key + '"]', true);
+    callCmt({ action: 'comment_add', kind: p.kind, id: p.id, body: text, mentions: men, client_key: ck }).then(function (res) {
+      delete CMT_BUSY[key];
+      if (res.ok && res.j.comment) {
+        delete CMT_KEY[key];
+        if (String(CMT_DRAFT[key] || '') === text) delete CMT_DRAFT[key];      // 보내는 사이 더 적었으면 그 글은 남긴다
+        cmtUpsert(res.j.comment);
+        cmtPaint({ now: true, own: ta, clear: { key: key, text: text }, focus: { fr: fr, key: key, box: true } });
+        // 고른 사람은 칸에 남은 글로 거른다 — 보내는 사이 더 적어 글이 남았으면 그 글의 「@이름」 은 그대로 그 사람(통째로 버리면 아무도 안 불렀다, 고침 1)
+        var rest = ta.isConnected ? ta.value : String(CMT_DRAFT[key] || ''), keepPk = cmtPrune(rest, CMT_PICKED[key] || []);
+        if (keepPk.length) CMT_PICKED[key] = keepPk; else delete CMT_PICKED[key];
+        return;
+      }
+      if (res.st === 404) delete CMT_KEY[key];                                  // 같은 열쇠의 줄이 지워졌거나 다른 문서 것 — 다음에는 새 열쇠로
+      cmtLock('[data-cmtsend="' + key + '"]', false);
+      toast(res.err || '처리하지 못했어요.', true);
+    });
+  }
+  /** 내 줄 고치기 — 그 줄의 글 자리가 같은 꼴의 칸 + [저장][취소](한 번에 한 줄 · 연 조각에만). */
+  function cmtEdit(id, fr) {
+    var r = cmtRow(id);
+    if (!r || !CM.canEdit(r, myName())) return;
+    // 부른 사람은 줄의 멘션에서 — 이름은 그 문서의 부를 수 있는 사람 목록 → 직원 목록(모르면 '' — 목록을 받으면 채운다 · 보낼 때 다시 본다)
+    CMT_EDIT = { id: Number(id), text: String(r.body == null ? '' : r.body), w: fr.getAttribute('data-cmtw') !== '0',
+      picked: (Array.isArray(r.mentions) ? r.mentions : []).map(function (u) { return { username: u, name: cmtNameOf(cmtRowKey(r), u) }; }) };
+    CMT_DELQ = null;
+    cmtPaint({ now: true, focus: { fr: fr, key: fr.getAttribute('data-cmt'), sel: '[data-cmted="' + Number(id) + '"]', end: true } });
+  }
+  function cmtEditSave(id, fr) {
+    var key = fr.getAttribute('data-cmt'), p = cmtParse(key), r = cmtRow(id), ta = fr.querySelector('[data-cmted="' + Number(id) + '"]');
+    if (!p || !ta || CMT_BUSY['e' + id]) return;
+    var mine = CMT_EDIT && Number(CMT_EDIT.id) === Number(id) ? CMT_EDIT : null, text = ta.value;
+    // 칸에 적는 동안 남(다른 탭)이 그 줄을 지웠다 — 받아 둔 목록에 없으면 묻지 않고 알린 뒤 칸을 걷는다(맡아 둔 그리기 때문에 칸이 아직 보였다) · 초점은 조각
+    if (!r) { if (mine) CMT_EDIT = null; cmtPaint({ now: true, own: ta, focus: { fr: fr, key: key } }); toast('지워졌거나 없는 의견이에요', true); return; }
+    if (!CM.count(text).n) { toast('의견을 적어 주세요.', true); try { ta.focus({ preventScroll: true }); } catch (e) { } return; }
+    var picked = (mine ? mine.picked || [] : (Array.isArray(r.mentions) ? r.mentions : []).map(function (u) { return { username: u, name: '' }; }))
+      .map(function (x) { return { username: x.username, name: x.name || cmtNameOf(key, x.username) }; });
+    CMT_BUSY['e' + id] = true; cmtLock('[data-cmtsave="' + Number(id) + '"]', true);
+    callCmt({ action: 'comment_edit', kind: p.kind, id: p.id, comment_id: Number(id), body: text, mentions: cmtMentions(text, picked) }).then(function (res) {
+      delete CMT_BUSY['e' + id];
+      if (res.ok && res.j.comment) {
+        if (CMT_EDIT && Number(CMT_EDIT.id) === Number(id)) CMT_EDIT = null;
+        cmtUpsert(res.j.comment);
+        // 초점은 저장한 그 줄의 「수정」(없으면 조각) — 적는 칸으로 옮기지 않는다(폰 자판 · cmtHold)
+        cmtPaint({ now: true, own: ta, focus: { fr: fr, key: key, sel: '[data-cmtedit="' + Number(id) + '"]' } });
+        return;
+      }
+      if (res.st === 404) {                                                       // 그 사이 지워졌다 — 줄을 뺀다 · 초점은 조각
+        if (CMT_EDIT && Number(CMT_EDIT.id) === Number(id)) CMT_EDIT = null;
+        cmtDrop(id); cmtPaint({ now: true, own: ta, focus: { fr: fr, key: key } });
+      } else cmtLock('[data-cmtsave="' + Number(id) + '"]', false);
+      toast(res.err || '처리하지 못했어요.', true);
+    });
+  }
+  function cmtEditCancel(id, fr) {
+    var own = fr.querySelector('[data-cmted="' + Number(id) + '"]');           // Esc — 초점이 그 고치기 칸에 있어도 걷는다
+    if (CMT_EDIT && Number(CMT_EDIT.id) === Number(id)) CMT_EDIT = null;
+    cmtPaint({ now: true, own: own, focus: { fr: fr, key: fr.getAttribute('data-cmt'), sel: '[data-cmtedit="' + Number(id) + '"]' } });
+  }
+  /** 내 줄 지우기 — 그 줄의 단추 자리가 「삭제할까요?」 [삭제][취소]로(연 조각에만). */
+  function cmtDel(id, fr) {
+    var r = cmtRow(id);
+    if (!r || !CM.canEdit(r, myName())) return;
+    CMT_DELQ = { id: Number(id), w: fr.getAttribute('data-cmtw') !== '0' }; CMT_EDIT = null;
+    cmtPaint({ now: true, focus: { fr: fr, key: fr.getAttribute('data-cmt'), sel: '[data-cmtdelno="' + Number(id) + '"]' } });
+  }
+  function cmtDelNo(id, fr) {
+    if (CMT_DELQ && Number(CMT_DELQ.id) === Number(id)) CMT_DELQ = null;
+    cmtPaint({ now: true, focus: { fr: fr, key: fr.getAttribute('data-cmt'), sel: '[data-cmtdel="' + Number(id) + '"]' } });
+  }
+  function cmtDelGo(id, fr) {
+    var key = fr.getAttribute('data-cmt'), p = cmtParse(key);
+    if (!p || CMT_BUSY['x' + id]) return;
+    CMT_BUSY['x' + id] = true; cmtLock('[data-cmtdelgo="' + Number(id) + '"]', true);
+    callCmt({ action: 'comment_delete', kind: p.kind, id: p.id, comment_id: Number(id) }).then(function (res) {
+      delete CMT_BUSY['x' + id];
+      if (res.ok || res.st === 404) {                                             // 지웠다(404 — 이미 없다)
+        if (CMT_DELQ && Number(CMT_DELQ.id) === Number(id)) CMT_DELQ = null;
+        cmtDrop(id); cmtPaint({ now: true, focus: { fr: fr, key: key } });
+        if (!res.ok) toast(res.err || '처리하지 못했어요.', true);
+        return;
+      }
+      cmtLock('[data-cmtdelgo="' + Number(id) + '"]', false);
+      toast(res.err || '처리하지 못했어요.', true);
+    });
+  }
+  /** 적던 글이 있거나 고치는 칸이 열려 있거나 보내는 중이면 새 판으로 저절로 새로 고치지 않는다(verHold — EXT.hold). */
+  function cmtPending() {
+    if (CMT_EDIT || Object.keys(CMT_BUSY).length) return true;
+    return Object.keys(CMT_DRAFT).some(function (k) { return String(CMT_DRAFT[k] || '').trim() !== ''; });
+  }
+  EXT.hold.push(cmtPending);
+  // 적는 칸 · 고치기 칸 — 적던 글은 바로 상태에(다시 그려도 그대로) · 글자 수 칸만 바꾼다(폭 고정 — 아무것도 밀지 않는다). capture — 칸에서 거품을 멈춰도 듣는다
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.matches || !CM) return;
+    if (t.matches('.cmt-in')) {
+      var k = t.getAttribute('data-cmtin');
+      if (t.value) CMT_DRAFT[k] = t.value; else delete CMT_DRAFT[k];
+      cmtCount(t);
+    } else if (t.matches('.cmt-ed')) {
+      if (CMT_EDIT && String(CMT_EDIT.id) === t.getAttribute('data-cmted')) CMT_EDIT.text = t.value;
+      cmtCount(t);
+    }
+  }, true);
+  // 의견 칸 한글 조합 — 초점이 있는 의견 칸에서 시작한 것만 센다(그 칸을 기억 — 칸이 사라지거나 초점이 떠나면 cmtIme 가 푼다). 끝은 어디서 와도 내린다
+  document.addEventListener('compositionstart', function (e) {
+    var t = e.target;
+    if (t && t.matches && t.matches('.cmt-in,.cmt-ed') && document.activeElement === t) { CMT_IME = true; CMT_IME_EL = t; }
+  }, true);
+  document.addEventListener('compositionend', function () { CMT_IME = false; CMT_IME_EL = null; }, true);
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-cmtsend],[data-cmtedit],[data-cmtsave],[data-cmtcancel],[data-cmtdel],[data-cmtdelgo],[data-cmtdelno]');
+    var fr = t && t.closest('[data-cmt]');
+    if (!fr || !cmtOn() || t.disabled) return;
+    if (t.hasAttribute('data-cmtsend')) { cmtSend(fr.getAttribute('data-cmt'), fr); return; }
+    if (t.hasAttribute('data-cmtedit')) { cmtEdit(+t.getAttribute('data-cmtedit'), fr); return; }
+    if (t.hasAttribute('data-cmtsave')) { cmtEditSave(+t.getAttribute('data-cmtsave'), fr); return; }
+    if (t.hasAttribute('data-cmtcancel')) { cmtEditCancel(+t.getAttribute('data-cmtcancel'), fr); return; }
+    if (t.hasAttribute('data-cmtdel')) { cmtDel(+t.getAttribute('data-cmtdel'), fr); return; }
+    if (t.hasAttribute('data-cmtdelgo')) { cmtDelGo(+t.getAttribute('data-cmtdelgo'), fr); return; }
+    cmtDelNo(+t.getAttribute('data-cmtdelno'), fr);
+  });
+  // Esc — 고치기 칸이면 고치기를, 지울지 묻는 중이면 묻기를 그만둔다(창은 닫지 않는다). capture 로 먼저 받아 창 닫기(askClose)로 가지 않게.
+  //   @ 목록이 열려 있으면(cmtPopOpen — Task 7) 그 목록이 먼저 받는다(목록만 닫히고 고치기는 그대로)
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || e.isComposing || cmtPopOpen() || !e.target || !e.target.closest) return;
+    var fr = e.target.closest('[data-cmt]');
+    if (!fr) return;
+    if (e.target.matches('.cmt-ed')) { e.preventDefault(); e.stopPropagation(); cmtEditCancel(+e.target.getAttribute('data-cmted'), fr); return; }
+    var q = e.target.closest('[data-cmtdelgo],[data-cmtdelno]');
+    if (q) { e.preventDefault(); e.stopPropagation(); cmtDelNo(+(q.getAttribute('data-cmtdelgo') || q.getAttribute('data-cmtdelno')), fr); }
+  }, true);
+
+  /* ── @ 로 사람 부르기(2026-11-26 묶음 D Task 7 — 스펙 §5-2 · 계획 Task 7) ──
+     의견 칸(.cmt-in) · 고치기 칸(.cmt-ed) · 승인 · 반려 창의 #apprWhy 에서 「@」 뒤 글자로 그 문서를 읽을 수 있는 사람을 골라 부른다
+     (승인 취소·반려 · 관리자 반려 · 정정 · 상신 창은 달지 않는다).
+       · 사람 목록 = RPC approval_comment_people(문서마다 한 번 — CMT_PEOPLE[갈래:번호]). 그 칸에 처음 초점이 갈 때 미리 받는다. 못 받으면 목록이 안 뜰 뿐
+         (알림 없음 · 다음 초점에 다시). 함수가 없는 옛 서버(404) · 권한 없음(403)이면 이 화면에서는 다시 묻지 않는다.
+       · 목록 #cmtPop(body 에 하나 · position:fixed · role=listbox) — 칸 바로 아래에 겹쳐 뜬다(자리를 밀지 않는다) · 아래가 모자라면 위 · 칸 왼쪽 선 · 칸 폭(360px 까지) ·
+         보이는 화면 안 · 8줄까지 · 줄 40px(이름 굵게 / 소속·직책 흐리게). 맞는 사람이 없거나 받는 중이면 아무것도 띄우지 않는다.
+       · 열쇠: ↑↓ 고르기 · Enter/Tab 넣기 · Esc 목록만 닫기(창 · 고치기는 그대로 — 같은 「@」 에서는 다시 띄우지 않는다) · 한글 조합 중(isComposing · keyCode 229)의
+         키는 건드리지 않는다(넣지도 보내지도 않는다 — 조합이 먼저). 목록을 눌러도 칸의 초점을 잃지 않는다(pointerdown · mousedown preventDefault — 고르기는 click).
+         조합 중에 누른 줄은 조합이 끝난 뒤 넣는다.
+       · 고른 사람은 칸마다 모은다(새 의견 CMT_PICKED[갈래:번호] · 고치기 CMT_EDIT.picked · 창 WHY_PICKED). 글에서 「@이름」을 지우면 뺀다 — 같은 이름은 글에 남은
+         「@이름」 수만큼 나중에 고른 사람부터(앞에 고른 사람을 지우고 같은 이름의 다른 사람을 고르면 그 사람만). 보낼 때 keepMentions(글, 고른 사람)로 거른 아이디만
+         mentions 로 — 손으로 친 「@이름」은 아무도 부르지 않는다. 서버가 다시 거른다. */
+  var CMT_PEOPLE = {}, WHY_PICKED = [];
+  // POP 열린 목록 { el 칸, key 갈래:번호, at {from, q}, list [{ username, name, sub }], i 고른 줄, side 'below' | 'above' } ·
+  //   POP_DISMISS Esc 로 닫은 「@」 { el, from } · POP_PEND 조합 중에 누른 줄 { el, u }
+  var POP = null, POP_DISMISS = null, POP_PEND = null;
+  var POP_ROW = 40, POP_PAD = 4, POP_MAXW = 360;
+  /** 의견 줄의 조각 열쇠(갈래:번호). */
+  function cmtRowKey(r) { return (r.kind === 'driving' ? 'd' : r.kind) + ':' + r.approval_id; }
+  /** 그 의견 줄이 나를 불렀나 — 종 알림(「… 의견에서 나를 불렀어요」)과 결재함 「그 밖의 건」(불린 문서도 내 문서처럼 — cmtCalledDocs)이 같이 쓰는 한 가지 잣대.
+   *  받은 줄(CMT)은 내가 읽을 수 있는 줄 · 지우지 않은 줄뿐이다(서버 읽기 정책). */
+  function cmtCallsMe(c, me) { return !!c && !!me && Array.isArray(c.mentions) && c.mentions.indexOf(me) >= 0; }
+  /** 나를 부른 의견이 있는 문서 — { '결재 표 kind:번호': 1 }('driving:9001' 꼴). 부를 수 있는 사람은 읽을 수 있는 사람(approval_comment_readers)뿐이라
+   *  결재선 · 올린 사람이 아닌데 불리는 사람은 사실상 관리자다 — 그 문서 카드가 결재함 「그 밖의 건」에 생겨 종 알림을 누르면 그 카드로 간다(고침 1). */
+  function cmtCalledDocs(me) {
+    var o = {};
+    if (cmtOn()) CMT.forEach(function (c) { if (cmtCallsMe(c, me)) o[c.kind + ':' + c.approval_id] = 1; });
+    return o;
+  }
+  /** 그 문서의 사람 이름 — 부를 수 있는 사람 목록(서버가 「@이름」을 견주는 이름) → 직원 목록 → 모르면 ''. */
+  function cmtNameOf(key, u) {
+    var c = CMT_PEOPLE[key], L = c && c.who === myName() && c.list ? c.list : [], i;
+    for (i = 0; i < L.length; i++) if (L[i].username === u) return L[i].name;
+    var x = USERS[u] || PEOPLE[u];
+    return x && x.name ? String(x.name) : '';
+  }
+  /** 그 칸이 @ 듣기 칸인가 — { key, get(), set(L) }(그 칸의 고른 사람 읽기 · 쓰기) · 아니면 null. */
+  function cmtPickOf(t) {
+    if (!t || !t.matches || !CM || !cmtOn()) return null;
+    if (t.matches('.cmt-in')) {
+      var k1 = t.getAttribute('data-cmtin');
+      if (!cmtParse(k1)) return null;
+      return { key: k1, get: function () { return CMT_PICKED[k1] || []; }, set: function (L) { if (L.length) CMT_PICKED[k1] = L; else delete CMT_PICKED[k1]; } };
+    }
+    if (t.matches('.cmt-ed')) {
+      var fr = t.closest('[data-cmt]'), id = t.getAttribute('data-cmted'), k2 = fr ? fr.getAttribute('data-cmt') : '';
+      if (!cmtParse(k2)) return null;
+      var mine = function () { return CMT_EDIT && String(CMT_EDIT.id) === id ? CMT_EDIT : null; };
+      return { key: k2, get: function () { var m = mine(); return (m && m.picked) || []; }, set: function (L) { var m = mine(); if (m) m.picked = L; } };
+    }
+    if (t.id === 'apprWhy' && $('pBody').contains(t)) {
+      // 승인 · 반려 창만 — 유류단가 되묻는 동안(아래 줄이 바뀌어 #btnApprGo 가 없다)은 그 요청으로 본다
+      var g = $('btnApprGo'), ra = !g && RATE_ASK ? RATE_ASK.payload : null;
+      var act = g ? g.dataset.act : ra ? ra.action : '', k3 = (g ? g.dataset.kind || 'd' : ra ? ra.kind || 'd' : '') + ':' + (g ? g.dataset.id : ra ? ra.id : '');
+      if (!/^(approve|reject)$/.test(act || '') || !cmtParse(k3)) return null;
+      return { key: k3, get: function () { return WHY_PICKED; }, set: function (L) { WHY_PICKED = L; } };
+    }
+    return null;
+  }
+  /** 그 문서의 부를 수 있는 사람 — 받아 두었으면 목록, 아니면 받기 시작하고 null(받으면 초점이 그 칸에 있을 때 목록을 다시 본다).
+   *  다시 상신했으면(상신 시각이 바뀜 — 결재선이 바뀌었을 수 있다) 다시 받는다. 못 받았으면(fail) 적는 키마다 다시 묻지 않고 그 칸에 다시 초점이 갈 때만(retry — focusin) 다시. */
+  function cmtPeople(key, retry) {
+    var who = myName(), c = CMT_PEOPLE[key], p = cmtParse(key);
+    var a = p ? apprFind(p.id, p.kind === 'driving' ? '' : p.kind) : null, sub = a ? String(a.submitted_at || '') : '';
+    if (c && c.who === who && c.sub === sub && !(c.fail && retry)) return c.list;
+    if (!p || !who) return null;
+    c = CMT_PEOPLE[key] = { who: who, sub: sub, list: null, fail: false };
+    apiRetry('/rest/v1/rpc/approval_comment_people', { method: 'POST', body: JSON.stringify({ p_kind: p.kind, p_id: p.id }) }).then(function (r) {
+      if (r.ok) return r.json();
+      return r.status === 404 || r.status === 403 ? [] : null;
+    }).then(function (rows) {
+      if (CMT_PEOPLE[key] !== c) return;
+      if (!Array.isArray(rows)) { c.fail = true; return; }                     // 받지 못했다 — 알림 없이 목록만 안 뜬다 · 다음에 그 칸에 초점이 가면 다시
+      c.list = rows.filter(function (x) { return x && x.username && x.name; })
+        .map(function (x) { return { username: String(x.username), name: String(x.name), dept: String(x.dept || ''), title: String(x.title || '') }; });
+      // 고치기 칸 — 이름을 몰랐던 부른 사람(직원 목록에 없는 분)의 이름을 채운다(글에 「@이름」이 남았는지 보려면 이름이 있어야 한다)
+      var er = CMT_EDIT && cmtRow(CMT_EDIT.id);
+      if (er && cmtRowKey(er) === key) (CMT_EDIT.picked || []).forEach(function (x) { if (!x.name) x.name = cmtNameOf(key, x.username); });
+      var ae = document.activeElement, pk = cmtPickOf(ae);
+      if (pk && pk.key === key) cmtPopEval(ae);
+    }).catch(function () { if (CMT_PEOPLE[key] === c) c.fail = true; });
+    return null;
+  }
+  /** 고른 사람 가운데 글에 「@이름」이 남은 만큼만 — 같은 이름은 글에 남은 수만큼 나중에 고른 사람부터. 이름을 아직 모르는 사람은 그대로(보낼 때 다시 본다). */
+  function cmtPrune(text, L) {
+    var left = {}, out = [], has = {}, i, p, tok;
+    text = String(text == null ? '' : text);
+    for (i = L.length - 1; i >= 0; i--) {
+      p = L[i];
+      if (!p || !p.username || has[p.username]) continue;
+      if (p.name) {
+        tok = '@' + p.name;
+        if (!Object.prototype.hasOwnProperty.call(left, tok)) left[tok] = text.split(tok).length - 1;
+        if (left[tok] <= 0) continue;
+        left[tok]--;
+      }
+      has[p.username] = 1;
+      out.unshift(p);
+    }
+    return out;
+  }
+  /** 그 칸이 한글 조합 중인가(의견 칸 · 고치기 칸은 CMT_IME — 그 칸에 초점이 있을 때만, 창 칸은 DLG_IME). */
+  function cmtComposing(t) { return !!t && ((cmtIme() && CMT_IME_EL === t) || (DLG_IME && t.id === 'apprWhy')); }
+  function cmtPopEl() {
+    var el = $('cmtPop');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'cmtPop'; el.className = 'cmt-pop'; el.hidden = true;
+    el.setAttribute('role', 'listbox'); el.setAttribute('aria-label', '부를 사람');
+    // 누르는 동안 칸의 초점을 잃지 않게(고르기는 click — 터치도 click 은 온다)
+    el.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+    el.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    el.addEventListener('click', function (e) {
+      var o = e.target.closest && e.target.closest('[data-cmtopt]'), p = o && POP ? POP.list[+o.getAttribute('data-cmtopt')] : null;
+      if (!p) return;
+      if (cmtComposing(POP.el)) { POP_PEND = { el: POP.el, u: p.username }; return; }      // 조합이 끝나면 넣는다(compositionend)
+      cmtPopPick(p.username);
+    });
+    el.addEventListener('pointermove', function (e) {
+      var o = e.target.closest && e.target.closest('[data-cmtopt]');
+      if (o && POP && +o.getAttribute('data-cmtopt') !== POP.i) cmtPopSel(+o.getAttribute('data-cmtopt'));
+    });
+    document.body.appendChild(el);
+    return el;
+  }
+  /** 지금 글 · 커서로 목록을 다시 본다 — 띄우거나 · 바꾸거나 · 닫는다(「@」 밖 · Esc 로 닫은 그 「@」 · 받는 중 · 맞는 사람 없음이면 닫는다).
+   *  한글 조합 중에는 커서를 조합 글 끝(selectionEnd)으로 보고, 조합 중간 글(「@ㄱ」 · 「@기」 · 「@김ㅅ」)이 아무와도 안 맞아도 같은 「@」 이면 보이던 목록을
+   *  그대로 둔다(글자마다 닫혔다 다시 뜨지 않게) — 조합이 끝나면(compositionend) 다시 본다(고침 1). */
+  function cmtPopEval(t) {
+    var pk = cmtPickOf(t), ime = !!pk && cmtComposing(t), at = null;
+    if (pk && document.activeElement === t && (ime || t.selectionStart === t.selectionEnd)) at = CM.atQuery(t.value, ime ? t.selectionEnd : t.selectionStart);
+    if (!at) { if (POP_DISMISS && POP_DISMISS.el === t) POP_DISMISS = null; cmtPopClose(); return; }
+    if (POP_DISMISS && POP_DISMISS.el === t && POP_DISMISS.from === at.from) { cmtPopClose(); return; }
+    var people = cmtPeople(pk.key), list = people ? CM.pickList(people, at.q, myName()) : [];
+    if (!list.length) {
+      if (ime && POP && POP.el === t && POP.at.from === at.from) { POP.at = at; return; }
+      cmtPopClose(); return;
+    }
+    cmtPopShow(t, pk.key, at, list);
+  }
+  function cmtPopShow(t, key, at, list) {
+    var el = cmtPopEl(), same = !!POP && POP.el === t && POP.at.from === at.from;
+    var keep = same && POP.list[POP.i] ? POP.list[POP.i].username : '', i = 0, j;
+    for (j = 0; j < list.length; j++) if (list[j].username === keep) i = j;
+    var html = list.map(function (p, n) {
+      return '<div class="cmt-opt" role="option" id="cmtOpt' + n + '" aria-selected="false" data-cmtopt="' + n + '"><b>' + esc(p.name) + '</b>' +
+        (p.sub ? '<span>' + esc(p.sub) + '</span>' : '') + '</div>';
+    }).join('');
+    POP = { el: t, key: key, at: at, list: list, i: i, side: same ? POP.side : '' };
+    if (el.__sig !== html) { el.innerHTML = html; el.__sig = html; el.scrollTop = 0; }
+    if (el.hidden) el.hidden = false;
+    // 목록이 뜬 동안만 칸이 combobox(고침 1) — 닫으면 cmtPopClose 가 모두 걷는다
+    t.setAttribute('role', 'combobox'); t.setAttribute('aria-expanded', 'true'); t.setAttribute('aria-controls', 'cmtPop'); t.setAttribute('aria-autocomplete', 'list');
+    cmtPopPlace();
+    if (POP) cmtPopSel(i, true);
+  }
+  /** 고른 줄을 바꾼다(끝에서 돌아간다). scroll = 그 줄이 목록 안에 보이게 목록만 굴린다(열쇠 · 새로 띄울 때 — 마우스를 올렸을 때는 굴리지 않는다). 화면은 움직이지 않는다. */
+  function cmtPopSel(i, scroll) {
+    if (!POP || !POP.list.length) return;
+    var n = POP.list.length, el = cmtPopEl();
+    POP.i = ((i % n) + n) % n;
+    Array.prototype.forEach.call(el.querySelectorAll('[data-cmtopt]'), function (o) {
+      var on = String(+o.getAttribute('data-cmtopt') === POP.i);
+      if (o.getAttribute('aria-selected') !== on) o.setAttribute('aria-selected', on);
+    });
+    POP.el.setAttribute('aria-activedescendant', 'cmtOpt' + POP.i);
+    var o = scroll ? el.querySelector('[data-cmtopt="' + POP.i + '"]') : null;
+    if (o) {
+      var top = o.offsetTop, bot = top + o.offsetHeight;
+      if (top - POP_PAD < el.scrollTop) el.scrollTop = Math.max(0, top - POP_PAD);
+      else if (bot + POP_PAD > el.scrollTop + el.clientHeight) el.scrollTop = bot + POP_PAD - el.clientHeight;
+    }
+  }
+  /** 목록 자리 — 칸 바로 아래(모자라면 위) · 칸 왼쪽 선 · 칸 폭(360px 까지) · 보이는 화면(visualViewport) 안. 위 · 아래는 그 「@」 동안 그대로(모자라게 되면 바꾼다).
+   *  높이는 줄 수로 안다(재지 않는다). 칸이 화면 밖으로 나갔거나 초점이 떠났으면 닫는다. */
+  function cmtPopPlace() {
+    if (!POP) return;
+    var t = POP.el, el = cmtPopEl();
+    if (!t.isConnected || document.activeElement !== t) { cmtPopClose(); return; }
+    var r = t.getBoundingClientRect(), vv = window.visualViewport;
+    var vx = vv ? vv.offsetLeft : 0, vy = vv ? vv.offsetTop : 0, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
+    var cb = t.closest('#pBody'), cr = cb ? cb.getBoundingClientRect() : null;          // 창 칸은 창 본문(스크롤 상자)에 보이는 동안만
+    if (r.bottom <= Math.max(vy, cr ? cr.top : vy) || r.top >= Math.min(vy + vh, cr ? cr.bottom : vy + vh)) { cmtPopClose(); return; }
+    var gap = 4, edge = 8, min = POP_ROW + POP_PAD * 2 + 2;
+    var w = Math.max(0, Math.min(r.width, POP_MAXW, vw - edge * 2));
+    var left = Math.max(vx + edge, Math.min(r.left, vx + vw - edge - w));
+    var h = POP.list.length * POP_ROW + POP_PAD * 2 + 2;                          // 줄 · 위아래 안쪽 · 테두리
+    var below = vy + vh - edge - (r.bottom + gap), above = r.top - gap - (vy + edge), side = POP.side;
+    if (!side) side = below >= h || below >= above ? 'below' : 'above';
+    else if (side === 'below' && below < h && above > below) side = 'above';
+    else if (side === 'above' && above < h && below > above) side = 'below';
+    POP.side = side;
+    var hh = Math.min(h, Math.max(min, side === 'below' ? below : above));
+    var top = side === 'below' ? r.bottom + gap : r.top - gap - hh;
+    top = Math.max(vy + edge, Math.min(top, vy + vh - edge - hh));
+    var s = el.style, px = function (v) { return Math.round(v * 100) / 100 + 'px'; };
+    if (s.left !== px(left)) s.left = px(left);
+    if (s.top !== px(top)) s.top = px(top);
+    if (s.width !== px(w)) s.width = px(w);
+    if (s.maxHeight !== px(hh)) s.maxHeight = px(hh);
+  }
+  /** 고른 사람을 넣는다 — 「@찾던 글」을 「@이름 」으로(되돌리기가 되는 길로) · 커서는 그 뒤 · 그 칸의 고른 사람에 더한다 · 목록을 닫는다(칸 초점 그대로). */
+  function cmtPopPick(u) {
+    if (!POP) return;
+    var t = POP.el, pk = cmtPickOf(t), p = null, i;
+    for (i = 0; i < POP.list.length; i++) if (POP.list[i].username === u) p = POP.list[i];
+    var at = pk && p && t.isConnected && t.selectionStart === t.selectionEnd ? CM.atQuery(t.value, t.selectionStart) : null;
+    POP_DISMISS = null;
+    cmtPopClose();
+    if (!at) return;
+    var c = t.selectionStart, res = CM.applyPick(t.value, c, at, p), ins = res.text.slice(at.from, res.caret);
+    // 고른 사람을 먼저 적는다 — 넣기가 부르는 input(고른 사람 거르기 · 목록 다시 보기)이 새 「@이름」을 본다
+    pk.set(pk.get().filter(function (x) { return x.username !== p.username; }).concat([{ username: p.username, name: p.name }]));
+    var before = t.value, done = false;
+    try { t.setSelectionRange(at.from, c); done = document.execCommand('insertText', false, ins); } catch (e) { done = false; }
+    // execCommand 가 아무것도 못 한 곳에서만 글을 바로 바꾸고 input 을 알린다 — 글자 한도(maxlength)를 넘으면 넣지 않는다(고침 1).
+    //   execCommand 가 한도 때문에 일부만 넣었으면 그대로 둔다(브라우저가 한도를 지켰다 — 덮어쓰면 한도를 넘었다)
+    if ((!done || t.value === before) && !(t.maxLength > 0 && res.text.length > t.maxLength)) {
+      t.value = res.text;
+      try { t.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
+    }
+    try { if (t.value === res.text) t.setSelectionRange(res.caret, res.caret); else if (t.value === before) t.setSelectionRange(c, c); } catch (e) { }
+  }
+  function cmtPopClose() {
+    POP_PEND = null;
+    if (!POP) return;
+    var t = POP.el, el = $('cmtPop');
+    POP = null;
+    if (el) { el.hidden = true; el.innerHTML = ''; el.__sig = ''; }
+    if (t && t.removeAttribute) ['role', 'aria-expanded', 'aria-controls', 'aria-autocomplete', 'aria-activedescendant'].forEach(function (n) { t.removeAttribute(n); });
+    apprUnhold();       // 목록 때문에 맡아 둔 의견 조각 그리기가 있으면(초점이 칸을 떠나지 않아도) — 맡아 둘 까닭이 남았으면 그대로 둔다
+  }
+  /** 목록을 연 칸이 화면에서 사라졌거나(다시 그림 · 창) 초점이 떠났으면 닫는다. */
+  function cmtPopCheck() { if (POP && (!POP.el.isConnected || document.activeElement !== POP.el)) cmtPopClose(); }
+  // 사람이 준 초점인가 — 그 칸을 눌렀거나(pointerdown 뒤 0.8초 안 — 터치는 손을 뗀 뒤 초점이 온다) Tab 으로 왔다(0.5초 안).
+  //   코드가 준 초점(등록 뒤 · 고치기 열기 · 빈 글 확인 · 다시 그린 뒤 — 다 preventScroll)과 탭 · 창으로 돌아와 다시 온 초점은 아니다(고침 1)
+  var CMT_UF = { el: null, at: 0, tab: 0 };
+  document.addEventListener('pointerdown', function (e) { CMT_UF.el = e.target; CMT_UF.at = Date.now(); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Tab') CMT_UF.tab = Date.now(); }, true);
+  function cmtUserFocus(t) {
+    var now = Date.now(), p = CMT_UF.el;
+    return (!!p && (p === t || (!!t.contains && t.contains(p))) && now - CMT_UF.at < 800) || now - CMT_UF.tab < 500;
+  }
+  /** 폰(≤600) 결재함 내 차례 카드 — 아래에 붙은 [반려][승인] 줄(.amact · sticky)이 사람이 누른(Tab 으로 온) 의견 칸의 적는 줄(칸 + 글자 수 · 등록 줄)을 가리면
+   *  그 줄 위로 올라오게 화면을 올린다 — 가려진 만큼만(그 줄과 겹친 높이 + 틈 8px, 칸이 화면 아래로 멀리 있어도 크게 뛰지 않는다) · 초점이 가는 순간 한 번.
+   *  코드가 준 초점은 움직이지 않는다(등록하는 동안 내려 보다가 답이 와도 화면이 뛰지 않게). 크롬은 화면 안 칸에 초점을 줄 때 scroll-margin 을 보지 않는다. */
+  function cmtBarClear(t) {
+    var c = t.closest && t.closest('.acard.turn'), bar = c && c.querySelector('.amact');
+    if (!bar || !bar.getClientRects().length || getComputedStyle(bar).position !== 'sticky' || !cmtUserFocus(t)) return;
+    var row = t.closest('.cmt-box') || t, rb = row.getBoundingClientRect(), br = bar.getBoundingClientRect(), gap = 8;
+    var need = rb.bottom + gap - br.top, cover = Math.max(0, Math.min(rb.bottom, br.bottom) - Math.max(rb.top, br.top));
+    if (need > 0) window.scrollBy(0, Math.min(need, cover + gap));
+  }
+  // 칸에 초점이 가면 — 그 문서의 사람 목록을 미리 받고(못 받았던 것도 이때 다시), 폰 결재함 카드의 아래 고정 줄이 그 적는 줄을 가리면 그만큼 올린다
+  document.addEventListener('focusin', function (e) {
+    var t = e.target, pk = cmtPickOf(t);
+    if (pk) cmtPeople(pk.key, true);
+    if (t && t.matches && t.matches('.cmt-in,.cmt-ed')) cmtBarClear(t);
+  }, true);
+  document.addEventListener('focusout', function (e) { if (POP && e.target === POP.el) cmtPopClose(); }, true);
+  // 적을 때 — 지운 「@이름」의 사람을 빼고 목록을 다시 본다(capture — 칸에서 거품을 멈춰도 듣는다)
+  document.addEventListener('input', function (e) {
+    var t = e.target, pk = cmtPickOf(t);
+    if (!pk) return;
+    var L = pk.get();
+    if (L.length) { var L2 = cmtPrune(t.value, L); if (L2.length !== L.length) pk.set(L2); }
+    cmtPopEval(t);
+  }, true);
+  // 목록이 열려 있을 때 — ↑↓ 고르기 · Enter/Tab 넣기 · Esc 목록만 닫기. 조합 중(isComposing · 229)의 키는 그대로 둔다(조합이 먼저).
+  //   capture · stopPropagation — 창 닫기(Esc) · 창 안 Tab 돌기 · 고치기 그만두기(위 Esc — 목록이 열려 있으면 비켜 준다)로 가지 않게
+  document.addEventListener('keydown', function (e) {
+    if (!POP || e.target !== POP.el) return;
+    if (e.isComposing || e.keyCode === 229 || cmtComposing(POP.el)) return;
+    var k = e.key, plain = !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    if ((k === 'ArrowDown' || k === 'ArrowUp') && plain) { e.preventDefault(); e.stopPropagation(); cmtPopSel(POP.i + (k === 'ArrowDown' ? 1 : -1), true); return; }
+    if ((k === 'Enter' || k === 'Tab') && plain) {
+      // 커서가 키 · 누름 없이 옮겨졌을 수 있다(폰에서 커서를 끎 · 전체 고르기 · 코드) — 지금 커서의 「@」 로 다시 본다(고침 1).
+      //   「@」 가 없으면 목록만 닫고 그 키는 그대로(줄바꿈 · 다음 칸) · 다른 「@」 이면 그 「@」 의 목록으로 바꾸기만(보이지 않던 목록에서 넣지 않는다)
+      var t = POP.el, at = t.selectionStart === t.selectionEnd ? CM.atQuery(t.value, t.selectionStart) : null;
+      if (!at) { cmtPopClose(); return; }
+      e.preventDefault(); e.stopPropagation();
+      if (at.from !== POP.at.from || at.q !== POP.at.q) { cmtPopEval(t); return; }
+      var p = POP.list[POP.i];
+      if (p) cmtPopPick(p.username); else cmtPopClose();
+      return;
+    }
+    if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); POP_DISMISS = { el: POP.el, from: POP.at.from }; cmtPopClose(); }
+  }, true);
+  // 커서만 옮겼을 때(← → Home End · 칸 안을 누름) — 「@」 밖으로 나갔으면 닫는다(닫힌 목록을 새로 띄우지는 않는다)
+  document.addEventListener('keyup', function (e) {
+    if (POP && e.target === POP.el && /^(ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)$/.test(e.key)) cmtPopEval(POP.el);
+  }, true);
+  document.addEventListener('click', function (e) { if (POP && e.target === POP.el) cmtPopEval(POP.el); }, true);
+  // 조합이 끝나면 — 조합 중에 누른 줄이 있으면 조합이 넣은 글이 들어간 뒤 그 사람이 아직 목록에 있을 때 넣고,
+  //   아니면 끝낸 글로 목록을 다시 본다(조합 중간에 안 맞아도 두었던 목록 — 끝낸 글도 안 맞으면 이제 닫는다, 고침 1)
+  document.addEventListener('compositionend', function (e) {
+    var pp = POP_PEND, t = e.target;
+    if (pp && t === pp.el) {
+      POP_PEND = null;
+      setTimeout(function () {
+        if (document.activeElement !== pp.el) return;
+        cmtPopEval(pp.el);
+        if (POP && POP.el === pp.el && POP.list.some(function (x) { return x.username === pp.u; })) cmtPopPick(pp.u);
+      }, 0);
+      return;
+    }
+    if (cmtPickOf(t)) setTimeout(function () { if (document.activeElement === t) cmtPopEval(t); }, 0);
+  }, true);
+  // 화면 · 창 본문이 움직이면 칸을 따라간다(목록 자체의 스크롤은 빼고 — 칸이 화면 밖으로 나가면 닫는다)
+  document.addEventListener('scroll', function (e) { if (POP && e.target !== $('cmtPop')) cmtPopPlace(); }, { capture: true, passive: true });
+  window.addEventListener('resize', function () { if (POP) cmtPopPlace(); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function () { if (POP) cmtPopPlace(); });
+    window.visualViewport.addEventListener('scroll', function () { if (POP) cmtPopPlace(); });
   }
 
   /* ── 상신 창 ── */
@@ -3892,12 +4612,13 @@
   /** 낡은 결재 화면(409 STALE, 2026-10-20 서버·웹 약속) — 서버 문구를 띄우고 창을 닫은 뒤 그 종류의 결재 목록을 새로 받아 다시 그린다.
    *  (그 사이 상신자가 회수하고 금액을 바꿔 다시 상신했다 — 결재함을 다시 열어 새 문서를 보고 결재하게.) */
   /** STALE 로 창이 닫힐 때 적던 반려·정정 사유(종류:번호:동작 → 글) — 같은 문서의 같은 창을 다시 열면 채운다(2026-10-20 V3 B8 — 창이 닫히며 사유가 사라졌다). 처리되면 지운다. */
-  var APPR_KEEP = {};
+  //   APPR_KEEP_PK — 그 사유에서 @ 로 고른 사람(같은 열쇠, 2026-11-26 Task 7 — 다시 채운 「@이름」이 아무도 부르지 않게 되지 않도록)
+  var APPR_KEEP = {}, APPR_KEEP_PK = {};
   function apprStale(payload, j) {
     // 적던 사유를 맡아 둔다 — 같은 문서의 같은 창을 다시 열면 채운다(V3 B8). 바뀌기 전 금액도 기억한다(새로 읽은 뒤 무엇이 바뀌었는지 알린다 — V3 U6)
     var kk = (payload && payload.kind || 'd') + ':' + (payload && payload.id);
     var why = String(($('apprWhy') || {}).value || '').trim();
-    if (why && payload && payload.action) APPR_KEEP[kk + ':' + payload.action] = why;
+    if (why && payload && payload.action) { APPR_KEEP[kk + ':' + payload.action] = why; APPR_KEEP_PK[kk + ':' + payload.action] = WHY_PICKED.slice(); }
     var a0 = payload && payload.id ? apprFind(+payload.id, (payload && payload.kind) || '') : null, c0 = a0 && a0.snapshot ? a0.snapshot.cost : null;
     closePanel();
     TRIP_CACHE = {};
@@ -3966,8 +4687,9 @@
           if (ej.error === 'RATE_CHANGED' && payload && payload.action === 'approve' && !payload.ack_rate_change &&
             apprRateAsk(payload, okMsg, ej)) return 'ask';
           toast(apiErrText(ej, res.st) || '처리하지 못했어요.', true);
-          // 그 사이 다른 처리가 있었다(409 「결재 중인 건이 아니에요」·403 「지금은 … 님 차례예요」 등) — 결재 건을 바로 새로 받아 창·결재함을 맞춘다(2026-11-02)
-          if (payload && payload.id && (res.st === 409 || res.st === 403)) apprCheckOpen(payload.action, +payload.id, payload.kind || '', 0);
+          // 그 사이 다른 처리가 있었다(409 「결재 중인 건이 아니에요」·403 「지금은 … 님 차례예요」 등) — 결재 건을 바로 새로 받아 창·결재함을 맞춘다(2026-11-02).
+          //   칸에 초점이 남아 있어도 기다리지 않는다(now — 단추를 누른 것은 적기를 끝낸 것, 2026-11-26 묶음 D Task 1)
+          if (payload && payload.id && (res.st === 409 || res.st === 403)) apprCheckOpen(payload.action, +payload.id, payload.kind || '', 0, true);
           // 상신 실패는 그 종류 모듈에 알린다(onSubmitFail — 법인카드 추가 상신: 409·404·400 CARD_* 면 문서·줄을 다시 받는다, 2026-11-03 PLAN K5).
           //   알림 글은 위에서 이미 띄웠다(모듈이 바꿔 띄울 수 있다). 갈고리가 없으면 예전 그대로.
           if (payload && payload.action === 'submit') {
@@ -3981,7 +4703,7 @@
         var acted = payload && payload.id && /^(approve|reject|recall_reject)$/.test(payload.action || '');
         if (acted) INBOX_JUST = (payload.kind || 'd') + ':' + payload.id;
         // 처리된 문서의 맡아 둔 사유(STALE, V3 B8)는 지운다
-        if (payload && payload.id) Object.keys(APPR_KEEP).forEach(function (x) { if (x.indexOf((payload.kind || 'd') + ':' + payload.id + ':') === 0) delete APPR_KEEP[x]; });
+        if (payload && payload.id) Object.keys(APPR_KEEP).forEach(function (x) { if (x.indexOf((payload.kind || 'd') + ':' + payload.id + ':') === 0) { delete APPR_KEEP[x]; delete APPR_KEEP_PK[x]; } });
         if (acted) inboxNextMark(payload);    // 결재함 내 차례에서 승인·반려했으면 다음 문서를 바로 연다(2026-10-20 D2)
         var midOk = payload && payload.action === 'approve' && res.j.row && res.j.row.status === 'submitted';
         toastOk(endDot(res.j.message || okMsg || '처리했어요.') +
@@ -3991,16 +4713,17 @@
         closePanel();
         TRIP_CACHE = {};                   // 잠금 상태가 바뀌었다 — 다른 주기 캐시도 믿지 않는다
         // 개인경비 결재 건이면 그 모듈이 자기 결재 목록을 다시 받는다.
+        //   의견 줄도 다시 받는다(2026-11-26 묶음 D — 상신 의견 · 승인 의견 · 반려 사유는 서버가 줄로 만든다. 바뀌었으면 의견 조각만 다시 그린다)
         var kd = kindDef(payload && payload.kind);
         if (kd) {
           return Promise.resolve(kd.reload ? kd.reload() : null)
-            .then(function () { paintPills(); render(); return true; })
+            .then(function () { paintPills(); render(); cmtRefresh(); return true; })
             .catch(function () { toast('처리는 됐어요. 목록을 다시 불러올게요.'); loadAll(); return true; });
         }
         // 처리는 이미 끝났다. 뒤이은 목록 재조회가 실패해도 '연결 실패' 로 오인시키지 않는다 —
         // 그러면 사용자가 상신을 다시 눌러 헷갈린다. 전체를 다시 불러오게 한다.
         return fetchAll('/rest/v1/driving_approvals?select=*&order=submitted_at.desc,id.desc')
-          .then(function (rows) { APPR = rows || []; APPR_GEN++; paintPills(); render(); return true; })
+          .then(function (rows) { APPR = rows || []; APPR_GEN++; paintPills(); render(); cmtRefresh(); return true; })
           .catch(function (e) {
             if (e && e.authGone) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.', true); setTimeout(signOut, 900); return true; }
             toast('처리는 됐어요. 목록을 다시 불러올게요.'); loadAll(); return true;
@@ -4055,7 +4778,7 @@
     for (var i = 0; i < cards.length; i++) { var r0 = cards[i].getBoundingClientRect(); if (r0.bottom > hb) { top = { k: cards[i].getAttribute('data-akey'), y: r0.top }; break; } }
     var ae = document.activeElement, fc = null;
     if (ae && ae !== document.body && inner.contains(ae)) {
-      var an = ['data-appr', 'data-apvtog', 'data-adet', 'data-fixgo', 'data-inboxf', 'data-ibcyc', 'data-inboxmode'].filter(function (n) { return ae.hasAttribute(n); })[0];
+      var an = ['data-appr', 'data-apvtog', 'data-adet', 'data-fixgo', 'data-inboxf', 'data-ibcyc', 'data-inboxmode', 'data-cmtsend', 'data-cmtedit', 'data-cmtdel'].filter(function (n) { return ae.hasAttribute(n); })[0];
       var ac = ae.closest('.acard');
       if (an) fc = { k: ac ? ac.getAttribute('data-akey') : '', n: an, v: ae.getAttribute(an) };
     }
@@ -4091,7 +4814,16 @@
   //   손을 뗀 뒤에 풀면 click 이 먼저 옛 카드에 닿고(openApprAct 가 지금 자료로 다시 확인), 다시 그리기는 그 뒤에.
   var APPR_PTR = false;
   //   화면을 옮길 때 조용히 받아 맡아 둔 것(NAV_PEND, 2026-11-02 navKick)도 같은 때 넣는다.
-  function apprUnhold() { setTimeout(function () { if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); navKick(); liveFlush(); }, 0); }
+  //   맡아 둔 결재 창 맞추기(DLG_PEND — 의견·사유 칸에 적는 중이라 창을 다시 그리지도 닫지도 않았다, 2026-11-26 묶음 D Task 1)도 — 이제 맡아 둘 때가 아니면 한 번(dlgUnhold).
+  //   그 맞추기가 던져도 아래 결재함 그리기 · 맡아 둔 받기 · 바뀜 표식 그리기는 그대로 한다(고침 1)
+  //   맡아 둔 의견 조각 그리기(CMT_DIRTY — 칸에 초점 · 한글 조합 · 누르는 중 · @ 목록이라 그리지 않았다, 2026-11-26 묶음 D Task 6)도 — 맨 뒤에(위에서 결재함을 다시 그렸으면 바꿀 것이 없다)
+  function apprUnhold() {
+    setTimeout(function () {
+      try { dlgUnhold(); } catch (e) { console.error('맡아 둔 결재 창 맞추기 오류', e); }
+      if (APPR_DIRTY && !APPR_PTR && !apprHold()) apprShow(); navKick(); liveFlush();
+      try { if (CMT_DIRTY && !cmtHold()) cmtPaint(); } catch (e) { console.error('맡아 둔 의견 그리기 오류', e); }
+    }, 0);
+  }
   function apprPtrUp() { APPR_PTR = false; apprUnhold(); }
   document.addEventListener('pointerdown', function () { APPR_PTR = true; }, true);
   document.addEventListener('pointerup', apprPtrUp, true);
@@ -4105,7 +4837,7 @@
     // 「바로」(max 0 — 409·403 뒤)인데 앞서 출발한 받기가 도는 중이면, 그것이 끝난 뒤 한 번 더 받는다(앞 받기는 바뀌기 전 자료일 수 있다, 재검토 R1)
     if (APPR_BUSY) return max === 0 ? APPR_BUSY.then(function () { return apprRefresh(opt); }) : APPR_BUSY;
     if (Date.now() - Math.max(APPR_AT, LOAD_APPR_AT) < max) return Promise.resolve(false);
-    var who = myName(), sig0 = apprSig(), g0 = APPR_GEN, ng0 = NONE_GEN;
+    var who = myName(), sig0 = apprSig(), g0 = APPR_GEN, ng0 = NONE_GEN, cg0 = CMT_GEN;
     APPR_AT = Date.now();                  // 실패해도 바로 다시 묻지 않게(창을 오갈 때마다)
     // 받은 글 서명(fetchAllSig)도 맡아 둔다 — 조용히 새로 받기(navRefresh)가 결재 건·표시가 그대로인지 글로 본다(2026-11-02 N3, 받는 것은 같다)
     APPR_BUSY = Promise.all([
@@ -4114,7 +4846,9 @@
       Promise.all(EXT.load.map(function (fn) { try { return Promise.resolve(fn(true)).catch(function () { }); } catch (e) { return null; } })),
       // 「이번 기간 내역 없음」 표시도 다시 받는다 — 포털(다른 탭)에서 표시·되살리기하고 돌아오면 그 탭이 다음 전체 적재까지 옛 표시로
       //   빨간 마감 띠·깜빡임을 보였다(2026-11-02 검토 L5). 못 받으면(표 없음·실패) null = 받아 둔 표시 그대로 — 새로 받기를 막지 않는다.
-      fetchAllSig(NONE_PATH).catch(function () { return null; })
+      fetchAllSig(NONE_PATH).catch(function () { return null; }),
+      // 의견 줄(2026-11-26 묶음 D) — 남이 쓰고·고치고·지운 것(바뀜 표식 |o:). 못 받으면(옛 서버 404 · 실패) null = 받아 둔 줄 그대로
+      fetchAllSig(CMT_PATH).catch(function () { return null; })
     ]).then(function (res) {
       APPR_BUSY = null;
       if (myName() !== who) return false;
@@ -4123,9 +4857,14 @@
       // 그 사이 이 탭에서 표시·되살리기를 했거나 다른 받기가 더 새 목록을 넣었으면 덮지 않는다(L5) — 넣으면 세대를 올린다(늦게 온·맡아 둔 옛 목록이 덮지 못하게, N6)
       if (res[2] && Array.isArray(res[2].rows) && NONE_GEN === ng0) { setNone(res[2].rows); NONE_GEN++; STATIC_MEMO[12] = { pages: res[2].pages, obj: NONE }; }
       var noneCh = noneSig() !== ns0;
+      // 의견 줄 — 그 사이 이 탭에서 쓰고·고치고·지웠거나 더 새 목록이 들어왔으면 덮지 않는다(CMT_GEN)
+      var cs = null;
+      if (res[3] && Array.isArray(res[3].rows) && CMT_GEN === cg0) { cs = cmtSet(res[3].rows); STATIC_MEMO[13] = { pages: res[3].pages, obj: CMT }; }
       APPR_AT = Date.now();
       var changed = apprSig() !== sig0;
       if (changed) apprShow();
+      // 의견만 바뀌었으면 의견 조각만(문서 그림 열쇠 apvKey · apprSig 는 그대로 — PDF 미리보기 · 열린 결재 창은 다시 그리지 않는다) · 종 · 처음 읽힌 것이면 화면을 조용히 다시 그린다
+      if (cs) { if (cs.flip) cmtShow(cs); else if (cs.ch) { cmtPaint(); if (!changed) paintPills(); } }
       // 표시가 바뀌었으면 — 메뉴 단계 깜빡임은 바로, 화면은 결재함이 아니면 조용히 다시 그린다(liveFlush = navRepaint — 스크롤·펼친 접기·초점 그대로,
       //   저절로 하는 일 없음). 쓰는 중이면(navHold — 칸 초점·한글 조합·창·적어 둔 글 N5·누르는 중 …) 맡아 두고 손을 떼면 그린다(LIVE_PAINT, 2026-11-25)
       if (noneCh) { if (!changed) paintPills(); if (VIEW !== 'inbox') { LIVE_PAINT = true; liveFlush(); } }
@@ -4214,27 +4953,87 @@
     toast('그 사이 문서가 바뀌어 이 결재를 할 수 없어요. 결재함을 새로 불러왔어요.', true);
     setTimeout(function () { if (!apprHold()) apprRepaint(); else APPR_DIRTY = true; }, 0);
   }
+  /* ── 승인·반려 창 — 적는 동안 다시 그리지도 닫지도 않기(2026-11-26 묶음 D Task 1 — 사용자 11/25 「적는 동안 화면이 움직이면 안 된다」) ──
+     묶음 E 의 되풀이 읽기(결재 창이 열려 있으면 10초)로 결재 건을 받으면 열린 창을 맞추고(apprCheckDialog — 바뀐 문서는 다시 열고 할 수 없게 된 문서는 닫는다),
+     늦게 온 검증 요약으로 창을 다시 그린다(openApprAct 의 wantS 되부름). 그래서 의견·사유를 적는 동안 사람이 아무것도 안 해도 칸이 새로 그려지거나(커서가 글 끝으로 ·
+     창 스크롤이 맨 위로) 창이 닫혔다. 이제 적기 시작한 뒤의 초점 · 한글 조합 · 누르는 중이면(dlgHold) 아무것도 하지 않고 맡아 둔다(DLG_PEND · 늦은 요약은 DLG_SUM도) —
+     손을 떼면(apprUnhold: 초점을 뗌 · 한글 조합 끝 · 손을 뗌) 가장 새 자료로 한 번 맞춘다(dlgUnhold — 알림은 예전 글 그대로 한 번).
+       · 맡아 두는 때(dlgHold) = 누르는 중(APPR_PTR — 누르는 사이 다시 그리면 그 클릭이 사라진다) · 창 안 한글 조합 중(DLG_IME — 창 안 compositionstart/compositionend) ·
+         적기 시작한 뒤(DLG_TYPED — 창 안 칸에 입력(input)이 있었다) 초점이 그 안의 칸에 있음(dlgTyping — input · textarea · select · contenteditable).
+         셋 다 풀리는 때가 꼭 온다(손을 뗌 · 조합 끝 · 초점을 뗌). 창 안 단추에 초점이 있으면 맡아 두지 않는다(예전처럼 바로 맞춘다).
+       · 반려 · 정정 열기 · 관리자 반려 · 승인 취소·반려 창은 열 때 사유 칸에 저절로 초점이 간다 — 아직 아무것도 적지 않았으면 맡아 두지 않는다(고침 1 R5: 사유를 적기 전에
+         검증 결과가 오면 바로 보이고, 회수된 문서는 바로 닫는다. 맡아 두면 결재자가 검증 결과를 못 본 채 사유를 보낼 수 있었다). 적던 사유를 다시 채운 칸(APPR_KEEP)도
+         입력이 없었으니 적은 것이 아니다.
+       · 할 수 없게 된 문서(회수 · 반려 · 남이 처리)도 적는 동안은 닫지 않는다. 적는 채로 [승인]·[반려]를 누르면 서버가 막고(409 · STALE — callAppr) 그 뒤 맞추기는
+         기다리지 않는다(apprCheckDialog now — 누른 것은 적기를 끝낸 것. 단추를 눌러도 칸이 초점을 잃지 않는 폰에서도 창을 닫고 알린다).
+       · 창을 닫거나(closePanel) 새로 열면(openApprAct checked 아님) 맡아 둔 것 · 조합 · 적기 시작 깃발을 버린다. 다시 그릴 때(dlgRedraw)는 적던 칸의 글 · 칸 스크롤 ·
+         창 본문(#pBody) 스크롤을 그대로, 칸에 초점이 있었으면 초점과 커서도 그대로 둔다. 하네스 live L4 · G1~G5 · docs/nav-refresh/SPEC.md §10.
+       · dlgTyping() 은 「초점이 창 안 칸에 있나」 그대로 둔다(묶음 D 뒤 작업이 그 뜻으로 쓴다). */
+  var DLG_IME = false, DLG_PEND = false, DLG_SUM = false, DLG_TYPED = false;
+  /** 결재 창 안에서 적는 중인가 — 창(#panel)이 열려 있고 (그 안에서 한글 조합 중이거나 초점이 그 안의 칸). */
+  function dlgTyping() {
+    var p = $('panel');
+    if (!p || !p.classList.contains('open')) return false;
+    if (DLG_IME) return true;
+    var ae = document.activeElement;
+    return !!(ae && p.contains(ae) && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable));
+  }
+  /** 지금 결재 창을 맞추면 안 되는가(맡기 · 풀기 같은 잣대) — 누르는 중 · 창 안 한글 조합 중 · 적기 시작한 뒤 칸에 초점(고침 1 R5). */
+  function dlgHold() {
+    return APPR_PTR || DLG_IME || (dlgTyping() && DLG_TYPED);
+  }
+  /** 맡아 둔 창 맞추기를 푼다(apprUnhold 의 타이머) — 이제 맡아 둘 때가 아니면(dlgHold 거짓) 가장 새 자료로 한 번: 문서가 바뀌었으면 다시 열거나 닫고,
+   *  문서는 그대로인데 늦게 온 검증 요약을 맡아 뒀으면 그 요약으로 다시 그리기만(알림 없음 — 둘 다 apprCheckDialog).
+   *  보내는 중(단추 잠김 — 맡아 둔 채 [승인]을 마우스로 누르면 손을 뗄 때가 바로 그때)이면 맡아 둔 채 둔다: 끝나면 창이 닫히거나(성공 · STALE) 맞춰지고(409 · 403 — now),
+   *  그 밖의 실패(연결 끊김 등)로 단추가 풀리면 다음에 손을 뗄 때 맞춘다(apprCheckDialog 는 보내는 중엔 건드리지 않아 그대로 두면 버려진다). */
+  function dlgUnhold() {
+    if (!DLG_PEND || dlgHold()) return;
+    var g = $('btnApprGo');
+    if (g && g.disabled) return;
+    DLG_PEND = false;
+    apprCheckDialog();
+  }
+  /** 열린 결재 창을 지금 자료로 다시 그린다(openApprAct checked — 확인을 또 걸지 않는다). 적던 의견·사유 칸의 글 · 칸 안 스크롤 · 창 본문(#pBody) 스크롤은 그대로,
+   *  칸에 초점이 있었으면 초점과 고른 자리(커서)도 그대로(예전엔 글과 초점만 되돌려 커서가 글 끝으로 · 창 본문이 맨 위로 갔다). 초점이 없던 칸의 커서는 건드리지 않는다 —
+   *  setSelectionRange 를 부르면 아이폰 사파리가 자판을 올린다(손을 뗀 뒤 다시 그릴 때가 그렇다, 고침 1). */
+  function dlgRedraw(act, id, kind) {
+    var w = $('apprWhy'), pb = $('pBody'), top = pb ? pb.scrollTop : 0;
+    var k = w ? { v: w.value, a: w.selectionStart, b: w.selectionEnd, d: w.selectionDirection, t: w.scrollTop, f: document.activeElement === w } : null;
+    openApprAct(act, id, kind, true);
+    var w2 = $('apprWhy');
+    if (w2 && k) {
+      w2.value = k.v;
+      if (k.f) {
+        try { w2.focus({ preventScroll: true }); } catch (e) { }
+        try { w2.setSelectionRange(k.a, k.b, k.d || 'none'); } catch (e) { }
+      }
+      w2.scrollTop = k.t;
+    }
+    if (pb && pb.scrollTop !== top) pb.scrollTop = top;
+  }
   /** 열린 결재 창이 그린 문서(단추의 data-akey)가 지금 목록과 다르면 — 그 동작을 할 수 없게 됐으면 닫고 알리고, 아직 할 수 있으면
-   *  새 자료로 다시 연다(적던 의견·사유·초점 그대로). 기준은 창이 그린 자료라 다른 길로 먼저 새로 받았어도 놓치지 않는다(M1).
-   *  보내는 중(단추 잠김)·유류단가 되묻는 중이면 건드리지 않는다. 서버도 상신 시각으로 낡은 화면을 막는다(STALE). */
-  function apprCheckDialog() {
+   *  새 자료로 다시 연다(적던 의견·사유·커서·초점 그대로). 기준은 창이 그린 자료라 다른 길로 먼저 새로 받았어도 놓치지 않는다(M1).
+   *  보내는 중(단추 잠김)·유류단가 되묻는 중이면 건드리지 않는다. 서버도 상신 시각으로 낡은 화면을 막는다(STALE).
+   *  맡아 둘 때면(dlgHold — 위) 맡아 둔다(DLG_PEND). now = 서버가 막은 뒤(callAppr 409 · 403)라 기다리지 않는다. 지킴을 지나면 맡아 둔 것은 여기서 끝난다
+   *  (now 로 다시 연 뒤 손을 뗄 때 한 번 더 보지 않게). 문서는 그대로인데 늦은 요약을 맡아 뒀으면(DLG_SUM) 그 요약으로 다시 그리기만(알림 없음). */
+  function apprCheckDialog(now) {
     var g = $('btnApprGo');
     if (!g || g.disabled || RATE_ASK || !$('panel').classList.contains('open')) return;
+    if (!now && dlgHold()) { DLG_PEND = true; return; }
+    DLG_PEND = false;
     var act = g.dataset.act, id = +g.dataset.id, kind = g.dataset.kind || '';
     var a1 = apprFind(id, kind);
-    if (a1 && apvKey(kind, a1) === (g.dataset.akey || '')) return;
+    if (a1 && apvKey(kind, a1) === (g.dataset.akey || '')) { if (DLG_SUM) dlgRedraw(act, id, kind); return; }
     if (!apprStill(act, a1)) { apprGone(); return; }
-    var wEl = $('apprWhy'), w = wEl ? wEl.value : '', wF = !!wEl && document.activeElement === wEl;
-    openApprAct(act, id, kind, true);
-    if ($('apprWhy')) { $('apprWhy').value = w; if (wF) { try { $('apprWhy').focus(); } catch (e) { } } }    // 적던 칸·초점 그대로
+    dlgRedraw(act, id, kind);           // 적던 칸의 글 · 칸 스크롤 · 창 본문 스크롤 그대로(초점이 있었으면 초점 · 커서도)
     toast('그 사이 문서가 바뀌어 새 내용으로 다시 열었어요. 확인한 뒤 결재해 주세요.', true);
   }
-  /** 결재 창을 연 뒤(또는 409·403 뒤) — 결재 건을 다시 받아(max ms 안에 받았으면 그대로, 기본 3초) 열린 창을 맞춘다. */
-  function apprCheckOpen(act, id, kind, max) {
+  /** 결재 창을 연 뒤(또는 409·403 뒤 — now) — 결재 건을 다시 받아(max ms 안에 받았으면 그대로, 기본 3초) 열린 창을 맞춘다. */
+  function apprCheckOpen(act, id, kind, max, now) {
     apprRefresh({ max: max == null ? 3000 : max }).then(function () {
       var g = $('btnApprGo');
       if (!g || g.dataset.act !== act || +g.dataset.id !== +id || (g.dataset.kind || '') !== (kind || '')) return;
-      apprCheckDialog();
+      apprCheckDialog(now);
     });
   }
 
@@ -4309,7 +5108,8 @@
    *  적을 때 표시해 두고(아래 input 듣기), 그 칸이 아직 화면에 있고 처음 그린 값과 다르면 「적는 중」. 저장·지움·다른 화면으로 옮김이면 풀린다.
    *  상태에 바로 적히는 칸(찾기·거르기·법인카드 칸·통행료 채우기·마감 기간 설정 — 다시 그려도 상태에서 그 값으로 그린다)은 셈하지 않는다. */
   var NAV_DIRTY = [];
-  var NAV_MIRROR = '.cin,#qBox,#ibQ,[data-finq],[data-tfamt],#permQ,#orgQ,[data-cysf],#cysNote,#dfFrom,#dfTo,#ibD1,#ibD2';
+  //   의견 적는 칸 · 고치기 칸(.cmt-in · .cmt-ed, 2026-11-26 묶음 D)도 — 적던 글은 CMT_DRAFT · CMT_EDIT 에 바로 적힌다(새 판 지킴은 따로 EXT.hold)
+  var NAV_MIRROR = '.cin,#qBox,#ibQ,[data-finq],[data-tfamt],#permQ,#orgQ,[data-cysf],#cysNote,#dfFrom,#dfTo,#ibD1,#ibD2,.cmt-in,.cmt-ed';
   document.addEventListener('input', function (e) {
     var t = e.target, inner = $('inner');
     if (!t || !t.matches || !inner || !inner.contains(t) || !t.matches('input,textarea') || /^(file|checkbox|radio|hidden|button|submit)$/.test(t.type || '')) return;
@@ -4387,7 +5187,7 @@
     navAbort();
     var r = viewRange(), wantAll = tripsAll(), seq = ++NAV_SEQ;
     var ctl = typeof AbortController === 'function' ? new AbortController() : null, sg = ctl ? ctl.signal : undefined;
-    var P = { seq: seq, t0: now, ls: LOAD_SEQ, w0: WRITE_GEN, g0: APPR_GEN, ng0: NONE_GEN, who: myName(), ck: need.ck, core: need.core, mods: need.mods,
+    var P = { seq: seq, t0: now, ls: LOAD_SEQ, w0: WRITE_GEN, g0: APPR_GEN, ng0: NONE_GEN, cg0: CMT_GEN, who: myName(), ck: need.ck, core: need.core, mods: need.mods,
       wantAll: wantAll, tck: (wantAll ? 'all' : 'me') + '|' + r.lo + '|' + r.hi, noAppr: noAppr, coreData: null, modData: [],
       objs: STATIC_OBJ.map(function (f) { return f(); }) };              // 출발 때 조각별 상태 객체 — 그 사이 다른 길이 바꾼 조각은 넣지 않는다(putStatic objs0)
     NAV_PEND = null; NAV_RETRY = false; NAV_BUSY = { seq: seq, ck: P.ck, core: P.core, mods: P.mods, ctl: ctl };
@@ -4426,7 +5226,7 @@
   /** 받아 온 것을 한 번에 넣는다(navKick 이 부른다 — 늦은 것·쓰는 중인 것은 이미 걸렀다). 바뀐 조각이 있을 때만 다시 그린다.
    *  받은 글이 넣어 둔 것과 같은 조각은 그대로 둔다(fetchAllSig same) — JSON 으로 견주지 않는다(N3). 넣은 뒤 저절로 하는 일은 없다(N7). */
   function navCommit(P) {
-    var ch = false, rulesNew = false;
+    var ch = false, rulesNew = false, cmtCh = false;
     if (P.coreData) {
       var T = P.coreData.trips;
       // 「같은 글」은 출발 때 운행 목록(= 지금 목록 — 목록을 바꾸는 적재는 위에서 걸렀다)과 같다는 뜻
@@ -4436,8 +5236,8 @@
       }
       if (LOADED_ALL !== P.wantAll) { LOADED_ALL = P.wantAll; ch = true; }
       TRIP_CACHE[P.tck] = { rows: ALL_TRIPS, at: P.t0, pages: T.pages };
-      var put = putStatic(P.coreData.out, P.g0, P.ng0, P.t0, P.objs);
-      rulesNew = put.rulesNew; if (put.changed) ch = true;
+      var put = putStatic(P.coreData.out, P.g0, P.ng0, P.t0, P.objs, P.cg0);
+      rulesNew = put.rulesNew; if (put.changed) ch = true; if (put.cmtCh) cmtCh = true;
       NAV_AT[P.ck] = P.t0; delete NAV_FAIL[P.ck];
       // 결재함 받기의 「방금 받았음」은 세 결재 건(운행일지 + 모듈 모두)을 다 받았을 때만 — 지금 갈래 모듈 것만 받았으면 다른 갈래 결재 건이 낡는다
       var allAppr = !P.noAppr && EXT.load.every(function (fn, i) { return P.modData.some(function (x) { return x.m.i === i; }); });
@@ -4449,7 +5249,8 @@
     });
     // 서버 기간 설정이 바뀌었으면 받은 운행은 옛 범위다 — 적재처럼 기간을 확인하고 새 범위로 받는다(드문 일 — 그때는 뼈대가 잠깐 보인다)
     if (rulesNew) { rulesChanged(); return; }
-    if (!ch) return;                                                       // 바뀐 것 없음 — 그리지 않는다(깜빡임·움직임 없음)
+    // 의견 줄만 바뀌었으면 의견 조각만(화면 전체를 다시 그리지 않는다, 2026-11-26 묶음 D) — 다른 조각도 바뀌었으면 아래 다시 그리기가 조각까지 그린다
+    if (!ch) { if (cmtCh) { cmtPaint(); paintPills(); } return; }          // 바뀐 것 없음 — 그리지 않는다(깜빡임·움직임 없음)
     RATE_MISS = {}; AUDIT = null; applyScope();
     paintPills(); paintCycle();
     navRepaint();
@@ -4522,6 +5323,11 @@
     if (!a) { toast('결재 건을 찾지 못했어요. 새로고침해 주세요.', true); return; }
     // 연 순간 그 동작을 지금 자료로 아직 할 수 있는지 — 옛 카드 단추를 눌렀어도(목록은 뒤에서 이미 새로 받았을 수 있다) 창을 열지 않고 알린다(M2)
     if (!checked && !apprStill(act, a)) { apprGone(); return; }
+    // 새로 여는 창이면 맡아 둔 창 맞추기 · 조합 · 적기 시작 깃발을 버린다(2026-11-26 묶음 D Task 1 — dlgHold). 맡아 둔 늦은 요약(DLG_SUM)은 어느 그림이든 지금 요약을 그리므로 늘 버린다.
+    //   다시 그릴 때(checked)는 적기 시작 깃발(DLG_TYPED)을 그대로 둔다 — 적던 글을 새 칸에 되돌려 놓으므로 여전히 적던 칸이다
+    //   @ 로 고른 사람(WHY_PICKED, Task 7)도 — 새 창이면 맡아 둔 사유(APPR_KEEP)의 고른 사람부터 · 다시 그릴 때는 그대로
+    if (!checked) { DLG_PEND = false; DLG_IME = false; DLG_TYPED = false; WHY_PICKED = (APPR_KEEP_PK[(kind || 'd') + ':' + a.id + ':' + act] || []).slice(); }
+    DLG_SUM = false;
     var s = a.snapshot || {};
     var cname = keyName(a.cycle, a.cycle);
     if (kd && kd.cycName) cname = kd.cycName(a);
@@ -4542,13 +5348,14 @@
     if (act !== 'withdraw' && a.status === 'submitted' && s.cost != null) sumHtml = '';
     // 상신 때 검증 결과(고정본 요약)를 이 창에서 직접 받는다 — 관리자 「결재 완료 출력」 등 카드가 받아 두지 않은 화면에서
     //   열면 「검증 결과를 불러오는 중…」에 멈춰 있었다. 받으면(못 받아도) 이 창을 다시 그린다(적던 사유는 그대로).
+    //   맡아 둘 때면(dlgHold — 적기 시작한 뒤 칸 초점 · 한글 조합 · 누르는 중) 다시 그리지 않고 맡아 둔다 — 손을 떼면 dlgUnhold 가 그 요약으로 그린다(2026-11-26 묶음 D Task 1).
+    //   같은 창인지는 동작 · 번호 · 종류로 본다(결재 표 셋의 번호가 겹칠 수 있다 — apprCheckOpen 과 같게, 고침 1)
     var wantS = act === 'withdraw' ? null : kd ? kd.wantSummaries : EXT.wantSummaries;
     if (wantS) wantS([a.id], function () {
       var g = $('btnApprGo');
-      if (!g || !$('panel').classList.contains('open') || g.dataset.act !== act || +g.dataset.id !== +id) return;
-      var w = $('apprWhy') ? $('apprWhy').value : '';
-      openApprAct(act, id, kind, true);          // 받아 둔 요약으로 다시 그리기만 — 확인을 또 걸지 않는다
-      if ($('apprWhy')) $('apprWhy').value = w;
+      if (!g || !$('panel').classList.contains('open') || g.dataset.act !== act || +g.dataset.id !== +id || (g.dataset.kind || '') !== (kind || '')) return;
+      if (dlgHold()) { DLG_PEND = true; DLG_SUM = true; return; }
+      dlgRedraw(act, id, kind);                  // 받아 둔 요약으로 다시 그리기만 — 확인을 또 걸지 않는다(적던 칸의 글 · 스크롤 그대로, 초점이 있었으면 초점 · 커서도)
     });
     var title = act === 'approve' ? '승인' : act === 'reject' ? '반려' : act === 'force_reject' ? '관리자 반려'
       : act === 'reopen' ? '정정 열기' : act === 'recall_reject' ? '승인 취소·반려' : '상신 회수';
@@ -4563,7 +5370,8 @@
     } else {
       body = sumHtml + apprTrack(a) + (kd ? (kd.extra ? kd.extra(a) : '') : (EXT.apprExtra ? EXT.apprExtra(a) : '')) +
         // 지금까지의 의견(담당 상신 의견 → 앞 결재자 승인 의견) — 「의견」 칸 바로 위(2026-10-21)
-        opinionsHtml(a) +
+        //   2026-11-26 묶음 D: 의견 줄과 본인 줄의 수정 · 삭제만 — 적는 칸은 두지 않는다(이 창의 적는 칸은 아래 #apprWhy — 그 글이 승인 의견 · 반려 사유 줄이 된다)
+        opinionsHtml(a, { write: false }) +
         '<div class="frow" style="border:0;padding-bottom:0"><label class="flab" for="apprWhy">' +
         (act === 'approve' ? '의견' : act === 'reopen' ? '정정 사유' : '반려 사유') + '</label><div class="fbody">' +
         '<textarea class="inp" id="apprWhy" rows="3" maxlength="500" placeholder="' +
@@ -4602,7 +5410,8 @@
       '<button class="btn" data-close>' + (act === 'recall_reject' ? '닫기' : '취소') + '</button>');
     // 창 아래 줄(문서 이름) — 「 · 」로 이은 이름은 조각으로(폰에서 줄 끝 「·」 없게, 2026-11-03 디자인 검사 M1). 글자는 같다
     dnSet($('pSub'), cname);
-    if (act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
+    // 반려·정정 사유 칸에 초점 — 처음 열 때만(다시 그릴 때는 dlgRedraw 가 초점을 그대로 둔다: 칸에서 손을 뗀 뒤 다시 그리며 초점을 도로 가져가면 폰 자판이 다시 올라온다)
+    if (!checked && act !== 'approve' && $('apprWhy')) $('apprWhy').focus();
     // 연 문서가 지금 것인지 — 결재 건을 다시 받아 바뀌었으면 창을 새 자료로 다시 그리거나 닫는다(2026-11-02, checked = 방금 그렇게 다시 연 창)
     if (!checked) apprCheckOpen(act, id, kind);
   }
@@ -4617,7 +5426,7 @@
     var mine = SP.mine;
     // ★ 결재함은 개인 화면이다. 관리자는 APPR 에 전 직원 결재건이 들어 있어,
     //   거르지 않으면 남의 결재 진행상황과 금액이 '그 밖의 건' 으로 나열됐다.
-    //   내가 올린 것과 내가 결재선에 든 것만 남긴다.
+    //   내가 올린 것 · 내가 결재선에 든 것 · 보이는 의견이 나를 부른 것만 남긴다(inboxSplit — 2026-11-26 묶음 D 고침 1, 종 알림과 같은 잣대 cmtCallsMe).
     var others = SP.others;
 
     // 예전에는 40건에서 말없이 잘랐다(건수는 전체로 적어 놓고). 이제는 상태로 좁히고, 넘치면 넘친다고 말한다.
@@ -4723,10 +5532,11 @@
     var me = myName();
     return a.username === me || (a.steps || []).some(function (s) { return s && s.approver === me; });
   }
-  /** 결재함이 그릴 것 — 지금 갈래의 내 차례·그 밖의 건, 다른 갈래 건수, 운전 안 하는 사람의 운행일지 건. */
+  /** 결재함이 그릴 것 — 지금 갈래의 내 차례·그 밖의 건, 다른 갈래 건수, 운전 안 하는 사람의 운행일지 건.
+   *  그 밖의 건 = 내가 올렸거나 결재선에 든 문서 + 보이는 의견이 나를 부른 문서(2026-11-26 묶음 D 고침 1 — 종 알림과 같은 잣대 cmtCallsMe). */
   function inboxSplit() {
-    var all = inbox(), split = Object.keys(EXT.kinds).length > 0, mode = split ? inboxMode() : 'd', nd = split && noDriving();
-    var rel = allAppr().filter(function (a) { return all.indexOf(a) < 0 && involvesMe(a); });
+    var all = inbox(), split = Object.keys(EXT.kinds).length > 0, mode = split ? inboxMode() : 'd', nd = split && noDriving(), called = cmtCalledDocs(myName());
+    var rel = allAppr().filter(function (a) { return all.indexOf(a) < 0 && (involvesMe(a) || !!called[(kindOf(a) || 'driving') + ':' + a.id]); });
     if (!split) return { split: false, mode: mode, mine: all, others: rel, ndMine: [], ndOthers: [], other: [] };
     var modes = ['d'];
     Object.keys(EXT.kinds).forEach(function (k) { var m = EXT.kinds[k].mode || 'x'; if (modes.indexOf(m) < 0) modes.push(m); });
@@ -4915,6 +5725,25 @@
         }
       }
     });
+    // 의견 줄(2026-11-26 묶음 D Task 7) — 내가 볼 수 있는 문서(받은 결재 건)의 남이 쓴 줄 가운데: 그냥 의견(src comment)은 내가 올렸거나 결재선에 있을 때,
+    //   어느 줄이든 나를 불렀으면(mentions — 관리자라서만 보이는 문서도). 승인 의견 · 반려 사유는 위 알림의 사유 자리에 이미 있다(불렀을 때만 따로 한 줄).
+    //   열쇠 = <갈래>:<번호>:c<의견 번호>(고쳐도 같은 열쇠 — 다시 안 읽음이 되지 않는다) · 시각 = 등록 시각 · 사유 자리 = 의견 글 · 지운 줄은 받지 않으므로 빠진다.
+    if (cmtOn() && CMT.length) {
+      var docs = {};
+      allAppr().forEach(function (a) { docs[(kindOf(a) || 'driving') + ':' + a.id] = a; });
+      CMT.forEach(function (c) {
+        var a = c && c.author !== me ? docs[c.kind + ':' + c.approval_id] : null;
+        if (!a) return;
+        var called = cmtCallsMe(c, me);                                        // 결재함 「그 밖의 건」(inboxSplit)과 같은 잣대
+        if (!called && !(c.src === 'comment' && involvesMe(a))) return;
+        var ms = noteMs(c.created_at);
+        if (!ms || ms < lo) return;
+        var D = noteDoc(a), who = String(c.author_name || '').trim() || nameOf(c.author);
+        out.push({ k: (kindOf(a) || 'd') + ':' + a.id + ':c' + c.id, ms: ms, sys: D.sys, tag: D.tag,
+          doc: (a.username === me ? '내 ' : nameOf(a.username) + ' 님 ') + D.tag + ' ' + D.month,
+          txt: who + (called ? ' 님이 의견에서 나를 불렀어요' : ' 님이 의견을 남겼어요'), why: String(c.body == null ? '' : c.body), turn: false, cmt: true, id: a.id, kind: kindOf(a) });
+      });
+    }
     // 공지 한 줄(2026-10-15 2차) — 운행일지를 쓰는 사람에게만
     if (usesDriving(me)) NOTICES.forEach(function (n) {
       if (n.ms >= lo) out.push({ k: n.k, ms: n.ms, sys: 'd', tag: '공지', doc: n.doc, txt: n.title, why: '', turn: false, notice: n });
@@ -4982,7 +5811,7 @@
       (ev.length
         ? '<div class="nlist">' + ev.map(function (e) {
             var u = noteUnread(e);
-            return '<button type="button" class="ni' + (u ? ' un' : '') + (e.turn ? ' turn' : '') + '" data-note="' + esc(e.k) + '">' +
+            return '<button type="button" class="ni' + (u ? ' un' : '') + (e.turn ? ' turn' : '') + (e.cmt ? ' cmt' : '') + '" data-note="' + esc(e.k) + '">' +
               '<span class="nd" aria-hidden="true"></span>' +
               '<span class="nb"><span class="nt"><span class="akind' + (e.sys !== 'd' ? ' ' + e.sys : '') + '">' + esc(e.tag) + '</span>' +
                 '<span class="ndoc">' + esc(e.doc) + '</span><time>' + noteTime(e.ms) + '</time></span>' +
@@ -5304,10 +6133,13 @@
     // 내 차례 카드도 접은 채로 시작한다(2026-10-19 사용자 「한 건 한 건이 너무 두꺼워서」) — 펼친 것은 카드마다 기억
     var open = sv === '1';
     // 의견(2026-10-21) — 펼친 문서 위에 차례대로(담당 → 결재자). 접힌 동안은 「의견 N」만. 상신한 본인의 결재 띠는 띠에 이미 있어 빼고 부른다(opt.ops === false)
-    var ops = opt && opt.ops === false ? '' : opinionsHtml(a), nOps = ops ? apprOpinions(a).length : 0;
+    //   2026-11-26 묶음 D: 의견 표를 읽었으면(cmtOn) 줄이 0이어도 조각(적는 칸)을 두고 「의견 N」은 N ≥ 1 일 때만 보인다 — 남이 쓰면 cmtPaint 가 숫자 · 숨김만 바꾼다(data-cmtn)
+    var cm = cmtOn(), ckey = (kind || 'd') + ':' + a.id;
+    var ops = opt && opt.ops === false ? '' : opinionsHtml(a), nOps = !ops ? 0 : cm ? cmtRowsKey(ckey).length : apprOpinions(a).length;
     return '<div class="apv' + (open ? ' open' : '') + '" data-apv="' + esc(apvKey(kind, a)) + '" data-apvk="' + esc(kind || '') + '" data-apvid="' + esc(a.id) + '">' +
       '<div class="apvbar"><button type="button" class="btn sm" data-apvtog aria-expanded="' + open + '">' + (open ? '문서 접기' : '문서 보기') + '</button>' +
-      (nOps ? '<span class="apvopn" title="‘문서 보기’를 누르면 의견이 보여요">의견 ' + n0(nOps) + '</span>' : '') +
+      (cm && ops ? '<span class="apvopn" data-cmtn="' + esc(ckey) + '"' + (nOps ? '' : ' hidden') + ' title="‘문서 보기’를 누르면 의견이 보여요">의견 ' + n0(nOps) + '</span>'
+        : nOps ? '<span class="apvopn" title="‘문서 보기’를 누르면 의견이 보여요">의견 ' + n0(nOps) + '</span>' : '') +
       '<span class="dim apvhint">쪽을 누르면 크게 보여요</span></div>' +
       (ops ? '<div class="apvops"' + (open ? '' : ' hidden') + '>' + ops + '</div>' : '') +
       '<div class="apvpages" aria-label="결재 문서 미리보기"' + (open ? '' : ' hidden') + '></div></div>';
@@ -6308,6 +7140,7 @@
       '<div class="ahd"><span class="st ' + st.cls + '">' + esc(st.t) + '</span>' +
       '<span style="flex:1"></span>' + btn + '</div>' +
       // 의견(2026-10-21) — 진행 줄 바로 아래 차례대로(담당 → 결재자 승인 의견). 펼친 문서 자리에는 다시 넣지 않는다(ops:false)
+      //   2026-11-26 묶음 D: 의견 줄 조각(댓글처럼 — 적는 칸 · 본인 줄 수정 삭제). 줄이 0이어도 둔다(올린 사람도 언제든 남긴다)
       (a ? apprTrack(a) + opinionsHtml(a) : '<div class="anote" style="margin-top:0">' + APPR_HINT + ' 지난번 결재선도 불러올\u00a0수\u00a0있어요.</div>') +
       (locked && EXT.apprExtra ? (function (x) { return x + apvIfPdf('', a, x, { ops: false }); })(EXT.apprExtra(a)) : '') +
       // 결재 중 안내는 위 큰 제목 아래 한 줄(fixHowPlain)이 말한다(2026-10-19 — 「결재 중」 세 번).
@@ -12060,6 +12893,9 @@ window.EduGuard = {
       });
     }
     if ($('apprWhy') && String($('apprWhy').value || '').trim()) return true;
+    // 창 안 의견 고치기 칸에 고친 글(2026-11-26 묶음 D) — 창을 닫으면 그 고치기는 버려진다(closePanel)
+    var ced = $('pBody') && $('pBody').querySelector('.cmt-ed');
+    if (ced && CMT_EDIT) { var crw = cmtRow(CMT_EDIT.id); if (crw && String(ced.value) !== String(crw.body == null ? '' : crw.body)) return true; }
     if (APPR_BACK && APPR_BACK.why.trim()) return true;       // 결재 문서를 보러 간 사이 — 적던 의견이 있다
     // 확장 모듈의 창(결재선·사람 고치기) — 실제로 바꾼 것이 있을 때만 되묻는다.
     if (EXT.dirty.some(function (fn) { try { return !!fn(); } catch (e) { return false; } })) return true;
@@ -12083,6 +12919,13 @@ window.EduGuard = {
   }
   function closePanel() {
     CLOSE_ASK = null; APPR_BACK = null; SUBMIT.token = null; SUBMIT.send = null; RATE_ASK = null;
+    DLG_PEND = false; DLG_SUM = false; DLG_IME = false; DLG_TYPED = false;    // 맡아 둔 결재 창 맞추기 · 조합 · 적기 시작 깃발도 버린다(2026-11-26 묶음 D Task 1 — dlgHold)
+    // 창에서 연 의견 고치기 · 지울지 묻기도 창과 함께 버린다(창 밖 조각에는 그리지 않는다 — 남겨 두면 새 판 지킴(cmtPending)이 풀리지 않는다, Task 6)
+    if (CMT_EDIT && !CMT_EDIT.w) CMT_EDIT = null;
+    if (CMT_DELQ && !CMT_DELQ.w) CMT_DELQ = null;
+    // 창 칸에서 @ 로 고른 사람 · 창 안 칸에서 연 @ 목록도 창과 함께 버린다(Task 7)
+    WHY_PICKED = [];
+    if (POP && $('panel').contains(POP.el)) cmtPopClose();
     // 안전교육 시청 창이면 멈추고 지금 위치를 저장한다(앱이 화면을 나갈 때와 같다, 2026-10-14).
     if (EDUW) eduStop();
     if (!$('panel').classList.contains('open')) { PANEL_FROM = null; return; }
@@ -12434,6 +13277,7 @@ window.EduGuard = {
     bindDrop($('hpDrop'), hpFiles);
     afterPaint();
     keepRestore(keep);             // .tall(자기 스크롤)·찾기로 숨긴 줄이 정해진 뒤에 되돌린다
+    cmtPopCheck();                 // @ 목록을 연 칸이 다시 그려졌으면 목록을 닫는다(2026-11-26 Task 7)
     noteFocusCard();
     // 정렬 머리를 눌러 다시 그렸으면 그 머리로 포커스를 돌려준다(키보드로 누르던 자리를 잃지 않게).
     if (SORT_FOCUS) {
@@ -13066,7 +13910,7 @@ window.EduGuard = {
     }
     if (e.target.closest('#btnBackAppr')) {
       var bk = APPR_BACK; APPR_BACK = null;
-      if (bk) { openApprAct(bk.act, bk.id, bk.kind); if ($('apprWhy')) $('apprWhy').value = bk.why; }
+      if (bk) { openApprAct(bk.act, bk.id, bk.kind); if ($('apprWhy')) { $('apprWhy').value = bk.why; WHY_PICKED = (bk.pk || []).slice(); } }
       return;
     }
     if ((el = e.target.closest('[data-appr]'))) { openApprAct(el.dataset.appr, +el.dataset.id, el.dataset.kind || ''); return; }
@@ -13084,6 +13928,8 @@ window.EduGuard = {
       //   그 사이 회수·다시 상신으로 문서가 바뀌었으면 서버가 409 STALE 로 돌려보낸다(옛 금액을 보고 새 금액을 승인하지 않게).
       if (el.dataset.sub) p2.expect_submitted_at = el.dataset.sub;
       if (why && act !== 'withdraw') p2.comment = why;
+      // @ 로 고른 사람(2026-11-26 묶음 D Task 7) — 승인 의견 · 반려 사유에 「@이름」이 남은 사람만(승인 · 반려 창만 · 서버가 다시 거른다)
+      if (why && (act === 'approve' || act === 'reject') && cmtOn()) p2.mentions = cmtMentions(why, WHY_PICKED);
       // 서버가 문구를 안 보내는 동작(회수)도 무엇을 했는지 말한다 — 예전엔 「처리했습니다.」(2026-10-15 매뉴얼 로봇)
       var okWord = { withdraw: '회수했어요. 고친 뒤 다시 상신하세요.', approve: '승인했어요.', reject: '반려했어요.',
         recall_reject: '승인을 취소하고 상신자에게 반려했어요.' }[act];
@@ -13097,8 +13943,9 @@ window.EduGuard = {
       el.disabled = true;
       var p3 = {}; Object.keys(ra.payload).forEach(function (k) { p3[k] = ra.payload[k]; });
       p3.ack_rate_change = true;
-      var w3 = String(($('apprWhy') || {}).value || '').trim();       // 묻는 동안 고친 의견도 함께
+      var w3 = String(($('apprWhy') || {}).value || '').trim();       // 묻는 동안 고친 의견도 함께(부른 사람도 그 글로 다시 — Task 7)
       if (w3) p3.comment = w3; else delete p3.comment;
+      if (w3 && cmtOn()) p3.mentions = cmtMentions(w3, WHY_PICKED); else delete p3.mentions;
       callAppr(p3, ra.okMsg).then(function (ok) { if (!ok && document.contains(el)) el.disabled = false; });
       return;
     }
@@ -13238,6 +14085,14 @@ window.EduGuard = {
     if (e.target.id === 'ibQ') INBOX_Q = e.target.value; else FILT.q = e.target.value;
     queueSearch(e.target);
   });
+  // 결재 창(#panel) 안 한글 조합(2026-11-26 묶음 D Task 1 — dlgTyping): 조합 중에는 창을 다시 그리지도 닫지도 않는다(같은 까닭 — 조합 버퍼는 되돌릴 수 없다).
+  //   조합이 끝나면 맡아 둔 맞추기는 apprUnhold(compositionend · capture)가 푼다. 끝은 어디서 와도 내린다(조합은 한 번에 하나 — 끝을 못 들은 깃발이 남지 않게).
+  //   capture — 칸에서 거품을 멈춰도 듣는다
+  document.addEventListener('compositionstart', function (e) { var p = $('panel'); if (p && e.target && p.contains(e.target)) DLG_IME = true; }, true);
+  document.addEventListener('compositionend', function () { DLG_IME = false; }, true);
+  // 결재 창 안 칸에 입력이 있었다(DLG_TYPED, 고침 1 R5 — dlgHold): 그때부터 그 칸의 초점이 「적는 중」이다. 창을 닫거나 새로 열 때까지 남는다(지운 뒤에도 — 적던 자리다).
+  //   저절로 초점이 간 사유 칸 · 입력 없이 다시 채운 사유(APPR_KEEP)는 적은 것이 아니다. capture — 칸에서 거품을 멈춰도 듣는다
+  document.addEventListener('input', function (e) { var p = $('panel'); if (p && e.target && p.contains(e.target)) DLG_TYPED = true; }, true);
   // 결재함 그 밖의 건 — 상신일 칸은 고르면 바로 다시 그린다(2026-10-14)
   document.addEventListener('change', function (e) {
     if (e.target.id === 'eduAdmMonth') { EDU_ADM.month = e.target.value || ''; render(); return; }
@@ -14459,7 +15314,8 @@ window.EduGuard = {
     // 결재 확인 창이 자기 자신을 다시 그리는 것(검증 결과를 받은 뒤 등)이면 돌아올 곳이 아니다 — 「← 결재 화면으로」가 저절로 생겼다(2026-10-16 4차).
     var go0 = $('btnApprGo');
     if (go0 && $('panel').classList.contains('open') && String(footHtml || '').indexOf('id="btnApprGo"') < 0) {
-      APPR_BACK = { act: go0.dataset.act, id: +go0.dataset.id, kind: go0.dataset.kind || '', why: String(($('apprWhy') || {}).value || '') };
+      // @ 로 고른 사람(pk — 2026-11-26 Task 7)도 — 돌아오면 다시 채운 글의 「@이름」이 그대로 그 사람을 부른다
+      APPR_BACK = { act: go0.dataset.act, id: +go0.dataset.id, kind: go0.dataset.kind || '', why: String(($('apprWhy') || {}).value || ''), pk: WHY_PICKED.slice() };
     }
     $('panel').classList.toggle('wide', !!wide);
     $('pTitle').textContent = title || '';
@@ -14467,6 +15323,7 @@ window.EduGuard = {
     $('pBody').innerHTML = bodyHtml || '';
     $('pFoot').innerHTML = backBtn() + (footHtml || '');
     $('panel').classList.add('open');
+    cmtPopCheck();                 // 창 안 칸(#apprWhy · 고치기 칸)에서 연 @ 목록 — 창을 새로 그렸으면 닫는다(Task 7)
   }
   /** 결재 확인 창에서 넘어온 화면이면 '돌아가기' 버튼. 아니면 빈 글. */
   function backBtn() {
